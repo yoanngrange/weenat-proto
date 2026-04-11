@@ -1,6 +1,6 @@
-# Weenat Proto
+# Proto
 
-Prototype agri-tech Weenat développé avec Vite et Vanilla JavaScript.
+Prototype avec Vite et Vanilla JavaScript.
 
 ## Commandes
 
