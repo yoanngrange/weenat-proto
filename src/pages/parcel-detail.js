@@ -1,5 +1,5 @@
 // Parcel detail page logic
-import { parcels } from '../data/parcels.js'
+import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { organizations } from '../data/orgs.js'
 import { openExportModal } from '../modules/export-modal.js'

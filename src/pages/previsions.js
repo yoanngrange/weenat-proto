@@ -1,5 +1,5 @@
 // Previsions page logic
-import { parcels } from '../data/parcels.js'
+import { plots } from '../data/plots.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   populateLocationSelect()

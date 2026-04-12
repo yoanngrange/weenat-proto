@@ -65,15 +65,20 @@
         <div id="topbar">
           <div id="breadcrumb">Parcelles Réseau</div>
           <div class="topbar-actions">
-            <button id="export-btn">Exporter</button>
+            <button id="export-csv-btn" class="btn-secondary">Exporter</button>
+            <button id="export-btn">Ajouter</button>
           </div>
         </div>
-        <div id="filters">
+        <div id="metric-controls">
           <select id="metric-selector">
             <option value="pluie">Pluie</option>
-            <option value="ru">Réserve utile</option>
             <option value="temp">Température</option>
+            <option value="humidite">Humidité</option>
+            <option value="etat-hydrique">État hydrique</option>
           </select>
+          <select id="aggregate-selector"></select>
+        </div>
+        <div id="filters">
           <select id="culture-filter">
             <option value="">Toutes cultures</option>
             <option value="Blé tendre">Blé tendre</option>
@@ -107,15 +112,25 @@
           </select>
           <select id="texture-filter">
             <option value="">Toutes textures</option>
-            <option value="Argileux">Argileux</option>
-            <option value="Limoneux">Limoneux</option>
-            <option value="Sableux">Sableux</option>
+            <option value="Argile">Argile</option>
+            <option value="Argile limoneuse">Argile limoneuse</option>
+            <option value="Argile sableuse">Argile sableuse</option>
+            <option value="Limon argileux">Limon argileux</option>
+            <option value="Limon argileux silteux">Limon argileux silteux</option>
+            <option value="Limon argileux sableux">Limon argileux sableux</option>
+            <option value="Loam">Loam</option>
+            <option value="Limon sableux">Limon sableux</option>
+            <option value="Sable argileux">Sable argileux</option>
+            <option value="Limon">Limon</option>
+            <option value="Sable limoneux">Sable limoneux</option>
+            <option value="Sable">Sable</option>
           </select>
           <select id="etat-hydrique-filter">
             <option value="">Tous états</option>
-            <option value="faible">Faible (&lt;50%)</option>
-            <option value="moyen">Moyen (50-75%)</option>
-            <option value="bon">Bon (&gt;75%)</option>
+            <option value="rfu-100-50">RFU 100 à 50%</option>
+            <option value="rfu-50-20">RFU 50 à 20%</option>
+            <option value="rfu-20-5">RFU 20 à 5%</option>
+            <option value="rfu-5-0">RFU 5 à 0%</option>
           </select>
           <div id="active-filters"></div>
           <select id="org-filter" class="network-only">

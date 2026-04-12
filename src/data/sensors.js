@@ -40,26 +40,26 @@ export const sensors = [
   { id: 21, parcelId: 18, model: "P", serial: "L600AD521", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 77, messages7d: 82, event: null },
   // Pour parcelle 19
   { id: 22, parcelId: 19, model: "T", serial: "L600AD522", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 88, messages7d: 91, event: null },
-  // Pour parcelle 20
+  // Pour parcelle 20 (orgId:3 Terrain Nord)
   { id: 23, parcelId: 20, model: "CHP-30/60", serial: "L600AD523", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 92, messages7d: 95, event: null },
-  // Pour parcelle 21
+  // Pour parcelle 21 (orgId:3 Terrain Sud)
   { id: 24, parcelId: 21, model: "P+", serial: "L600AD524", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 86, messages7d: 90, event: null },
-  // Pour parcelle 22
+  // Pour parcelle 22 (orgId:4 Manche 1)
   { id: 25, parcelId: 22, model: "SMV", serial: "L600AD525", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 78, messages7d: 83, event: null },
-  // Pour parcelle 23
+  // Pour parcelle 23 (orgId:4 Manche 2)
   { id: 26, parcelId: 23, model: "EC", serial: "L600AD526", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 80, messages7d: 85, event: null },
-  // Pour parcelle 24
+  // Pour parcelle 24 (orgId:5 Côte Malouine)
   { id: 27, parcelId: 24, model: "T_MINI", serial: "L600AD527", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 89, messages7d: 92, event: null },
-  // Pour parcelle 25
+  // Pour parcelle 25 (orgId:5 Champ côtier 2)
   { id: 28, parcelId: 25, model: "P+", serial: "L600AD528", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 91, messages7d: 94, event: null },
-  // Pour parcelle 26
+  // Pour parcelle 26 (orgId:6 Bio 1)
   { id: 29, parcelId: 26, model: "CHP-15/30", serial: "L600AD529", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 84, messages7d: 87, event: null },
-  // Pour parcelle 27
+  // Pour parcelle 27 (orgId:6 Bio 2)
   { id: 30, parcelId: 27, model: "P", serial: "L600AD530", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 79, messages7d: 84, event: null },
-  // Pour parcelle 28
+  // Pour parcelle 28 (orgId:7 Calvados 1)
   { id: 31, parcelId: 28, model: "T", serial: "L600AD531", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 87, messages7d: 90, event: null },
-  // Pour parcelle 29
+  // Pour parcelle 29 (orgId:8 Orne 1)
   { id: 32, parcelId: 29, model: "CHP-30/60", serial: "L600AD532", telecom: "LoRa", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 93, messages7d: 96, event: null },
-  // Pour parcelle 30
+  // Pour parcelle 30 (orgId:8 Orne 2)
   { id: 33, parcelId: 30, model: "P+", serial: "L600AD533", telecom: "Sigfox", lastMessage: "2023-10-01T10:00:00Z", networkQuality: 85, messages7d: 88, event: null }
 ];

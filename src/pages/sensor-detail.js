@@ -1,6 +1,6 @@
 // Sensor detail page logic
 import { sensors } from '../data/sensors.js'
-import { parcels } from '../data/parcels.js'
+import { plots } from '../data/plots.js'
 import { organizations } from '../data/orgs.js'
 import { openExportModal } from '../modules/export-modal.js'
 
