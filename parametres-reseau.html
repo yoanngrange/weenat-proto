@@ -45,7 +45,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" class="active"><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -63,61 +62,20 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Paramètres Réseau</div>
-        </div>
-        <div id="filters">
-          <select id="metric-selector">
-            <option value="pluie">Pluie</option>
-            <option value="ru">Réserve utile</option>
-            <option value="temp">Température</option>
-          </select>
-          <select id="model-filter">
-            <option value="">Tous modèles</option>
-            <option value="P+">P+</option>
-            <option value="P">P</option>
-            <option value="PT">PT</option>
-            <option value="T">T</option>
-            <option value="T_MINI">T_MINI</option>
-            <option value="SMV">SMV</option>
-            <option value="EC">EC</option>
-            <option value="CHP-15/30">CHP-15/30</option>
-            <option value="CHP-30/60">CHP-30/60</option>
-          </select>
-          <select id="event-filter">
-            <option value="">Tous événements</option>
-            <option value="capteur couché">Capteur couché</option>
-            <option value="capteur déplacé">Capteur déplacé</option>
-            <option value="émissions interrompues">Émissions interrompues</option>
-            <option value="cuillère bloquée">Cuillère bloquée</option>
-          </select>
-          <select id="telecom-filter">
-            <option value="">Toutes télécoms</option>
-            <option value="Sigfox">Sigfox</option>
-            <option value="LoRa">LoRa</option>
-          </select>
-          <div id="active-filters"></div>
-          <select id="org-filter" class="network-only">
-            <option value="">Toutes organisations</option>
-          </select>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
         </div>
         <main id="content">
-          <div id="map-container" class="view active" data-view="map">
-            <div id="legend"></div>
-          </div>
-          <div id="list-container" class="view" data-view="list"></div>
-          <div id="admin-container" class="view" data-view="admin">
-            <div id="stats-cards"></div>
-            <div id="admin-table"></div>
+          <div id="reseau-settings">
+            <div id="settings-form-col"></div>
+            <div id="settings-preview-col"></div>
           </div>
         </main>
       </div>
-      <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
-        <button class="view-btn" data-view="admin">Administration</button>
-      </div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/pages/parametres-reseau.js"></script>
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>

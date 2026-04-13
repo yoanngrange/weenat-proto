@@ -1,82 +1,199 @@
+// 30 membres : 1 propriétaire, 4 admins, 20 agents, 5 lecteurs
+// 25% femmes (8), 75% hommes (22)
+// ~90% des parcelles sont associées à un seul membre
+
 export const members = [
+  // ── Propriétaire (1M) ─────────────────────────────────────────────────────
   {
-    id: 1,
-    firstName: "Jean",
-    lastName: "Dupont",
-    email: "jean.dupont@exploitation.fr",
-    role: "administrateur",
-    createdAt: "2023-01-15T10:30:00Z"
+    id: 1, prenom: 'Philippe', nom: 'Renard',
+    email: 'philippe.renard@weenat.com',
+    role: 'propriétaire', statut: 'actif',
+    orgIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+    parcelIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42]
+  },
+
+  // ── Admins (3M, 1F) ───────────────────────────────────────────────────────
+  {
+    id: 2, prenom: 'Thomas', nom: 'Bertrand',
+    email: 'thomas.bertrand@weenat.com',
+    role: 'admin', statut: 'actif',
+    orgIds: [1,2,3,4,5],
+    parcelIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
   },
   {
-    id: 2,
-    firstName: "Marie",
-    lastName: "Martin",
-    email: "marie.martin@exploitation.fr",
-    role: "éditeur",
-    createdAt: "2023-02-20T14:15:00Z"
+    id: 3, prenom: 'Julien', nom: 'Martin',
+    email: 'julien.martin@weenat.com',
+    role: 'admin', statut: 'actif',
+    orgIds: [6,7,8,9,10],
+    parcelIds: [20,21,22,23,24,25,26,27,28,29,30,31]
   },
   {
-    id: 3,
-    firstName: "Pierre",
-    lastName: "Dubois",
-    email: "pierre.dubois@exploitation.fr",
-    role: "lecteur",
-    createdAt: "2023-03-10T09:45:00Z"
+    id: 4, prenom: 'Sophie', nom: 'Dubois',
+    email: 'sophie.dubois@weenat.com',
+    role: 'admin', statut: 'actif',
+    orgIds: [11,12,13,14,15],
+    parcelIds: [32,33,34,35,36,37]
   },
   {
-    id: 4,
-    firstName: "Sophie",
-    lastName: "Lefebvre",
-    email: "sophie.lefebvre@exploitation.fr",
-    role: "éditeur",
-    createdAt: "2023-04-05T16:20:00Z"
+    id: 5, prenom: 'Nicolas', nom: 'Laurent',
+    email: 'nicolas.laurent@weenat.com',
+    role: 'admin', statut: 'actif',
+    orgIds: [16,17,18,19,20],
+    parcelIds: [38,39,40,41,42]
+  },
+
+  // ── Agents (15M, 5F) ──────────────────────────────────────────────────────
+  {
+    id: 6, prenom: 'Alexandre', nom: 'Bernard',
+    email: 'alexandre.bernard@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [1, 2]
   },
   {
-    id: 5,
-    firstName: "Michel",
-    lastName: "Garcia",
-    email: "michel.garcia@exploitation.fr",
-    role: "lecteur",
-    createdAt: "2023-05-12T11:30:00Z"
+    id: 7, prenom: 'Maxime', nom: 'Petit',
+    email: 'maxime.petit@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [3, 4]
   },
   {
-    id: 6,
-    firstName: "Isabelle",
-    lastName: "Roux",
-    email: "isabelle.roux@exploitation.fr",
-    role: "administrateur",
-    createdAt: "2023-06-18T13:45:00Z"
+    id: 8, prenom: 'Claire', nom: 'Moreau',
+    email: 'claire.moreau@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [5, 6]
   },
   {
-    id: 7,
-    firstName: "François",
-    lastName: "Moreau",
-    email: "francois.moreau@exploitation.fr",
-    role: "éditeur",
-    createdAt: "2023-07-22T08:15:00Z"
+    id: 9, prenom: 'François', nom: 'Leroy',
+    email: 'francois.leroy@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [7, 8]
   },
   {
-    id: 8,
-    firstName: "Catherine",
-    lastName: "Simon",
-    email: "catherine.simon@exploitation.fr",
-    role: "lecteur",
-    createdAt: "2023-08-30T15:00:00Z"
+    id: 10, prenom: 'Sébastien', nom: 'Girard',
+    email: 'sebastien.girard@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [9, 10, 11]
   },
   {
-    id: 9,
-    firstName: "Philippe",
-    lastName: "Michel",
-    email: "philippe.michel@exploitation.fr",
-    role: "éditeur",
-    createdAt: "2023-09-14T12:30:00Z"
+    id: 11, prenom: 'Damien', nom: 'Rousseau',
+    email: 'damien.rousseau@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [12, 13]
   },
   {
-    id: 10,
-    firstName: "Nathalie",
-    lastName: "Thomas",
-    email: "nathalie.thomas@exploitation.fr",
-    role: "lecteur",
-    createdAt: "2023-10-08T10:00:00Z"
+    id: 12, prenom: 'Marie', nom: 'Dumont',
+    email: 'marie.dumont@fermedubocage.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [1], parcelIds: [14, 15]
+  },
+  {
+    id: 13, prenom: 'Antoine', nom: 'Noël',
+    email: 'antoine.noel@coopbretonne.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [2], parcelIds: [16, 17]
+  },
+  {
+    id: 14, prenom: 'Kevin', nom: 'Simon',
+    email: 'kevin.simon@coopbretonne.fr',
+    role: 'agent', statut: 'inactif',
+    orgIds: [2, 3], parcelIds: [18, 19, 20]
+  },
+  {
+    id: 15, prenom: 'Romain', nom: 'Leclerc',
+    email: 'romain.leclerc@explonormande.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [3], parcelIds: [21]
+  },
+  {
+    id: 16, prenom: 'Lucie', nom: 'Fontaine',
+    email: 'lucie.fontaine@agrimanche.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [4], parcelIds: [22, 23]
+  },
+  {
+    id: 17, prenom: 'Vincent', nom: 'Barbier',
+    email: 'vincent.barbier@fermecotiere.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [5], parcelIds: [24, 25]
+  },
+  {
+    id: 18, prenom: 'Christophe', nom: 'Garnier',
+    email: 'christophe.garnier@coopbiobretagne.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [6], parcelIds: [26, 27]
+  },
+  {
+    id: 19, prenom: 'Nathalie', nom: 'Perez',
+    email: 'nathalie.perez@explocalvados.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [7, 8], parcelIds: [28, 29]
+  },
+  {
+    id: 20, prenom: 'Arnaud', nom: 'Meyer',
+    email: 'arnaud.meyer@fermeorne.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [8, 9], parcelIds: [30, 31]
+  },
+  {
+    id: 21, prenom: 'Guillaume', nom: 'Roux',
+    email: 'guillaume.roux@coopnormande.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [10, 11], parcelIds: [32, 33]
+  },
+  {
+    id: 22, prenom: 'Étienne', nom: 'Chevalier',
+    email: 'etienne.chevalier@exploirv.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [12, 13], parcelIds: [34, 35]
+  },
+  {
+    id: 23, prenom: 'Isabelle', nom: 'Schmitt',
+    email: 'isabelle.schmitt@fermenormandebio.fr',
+    role: 'agent', statut: 'inactif',
+    orgIds: [14, 15], parcelIds: [36, 37]
+  },
+  {
+    id: 24, prenom: 'Pierre', nom: 'Thomas',
+    email: 'pierre.thomas@coopbretsud.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [15, 16, 17], parcelIds: [38, 39]
+  },
+  {
+    id: 25, prenom: 'Cédric', nom: 'Morin',
+    email: 'cedric.morin@agrieure.fr',
+    role: 'agent', statut: 'actif',
+    orgIds: [18, 19, 20], parcelIds: [40, 41, 42]
+  },
+
+  // ── Lecteurs (3M, 2F) ─────────────────────────────────────────────────────
+  // Parcelles 1, 5, 15, 30, 40 ont 2 membres (~10%)
+  {
+    id: 26, prenom: 'Benoît', nom: 'Faure',
+    email: 'benoit.faure@fermedubocage.fr',
+    role: 'lecteur', statut: 'actif',
+    orgIds: [1], parcelIds: [1]
+  },
+  {
+    id: 27, prenom: 'Alice', nom: 'Masson',
+    email: 'alice.masson@fermedubocage.fr',
+    role: 'lecteur', statut: 'actif',
+    orgIds: [1], parcelIds: [5]
+  },
+  {
+    id: 28, prenom: 'Laurent', nom: 'Colin',
+    email: 'laurent.colin@coopbretonne.fr',
+    role: 'lecteur', statut: 'actif',
+    orgIds: [2], parcelIds: [15]
+  },
+  {
+    id: 29, prenom: 'Véronique', nom: 'Blanc',
+    email: 'veronique.blanc@fermeorne.fr',
+    role: 'lecteur', statut: 'actif',
+    orgIds: [8], parcelIds: [30]
+  },
+  {
+    id: 30, prenom: 'Stéphane', nom: 'Denis',
+    email: 'stephane.denis@agrieure.fr',
+    role: 'lecteur', statut: 'inactif',
+    orgIds: [18], parcelIds: [40]
   }
-];
+]

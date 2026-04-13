@@ -43,7 +43,6 @@
         <a href="adherents.html" class="active"><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -61,71 +60,56 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Adhérents</div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
           <div class="topbar-actions">
             <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
+            <button id="export-btn">Inviter un adhérent</button>
+          </div>
+        </div>
+        <div id="controls-row">
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-plan">
+              <button class="filter-dropdown-btn" type="button">
+                Plan <span class="fd-badge" id="badge-plan" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-plan"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-statut">
+              <button class="filter-dropdown-btn" type="button">
+                Statut <span class="fd-badge" id="badge-statut" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-statut"></div>
+            </div>
+            <div id="active-filters"></div>
           </div>
         </div>
         <main id="content">
-          <div id="filters">
-            <select id="plan-filter">
-              <option value="">Tous plans</option>
-              <option value="Essential">Essential</option>
-              <option value="Plus">Plus</option>
-              <option value="Expert">Expert</option>
-            </select>
-            <select id="status-filter">
-              <option value="">Tous statuts</option>
-              <option value="actif">Actif</option>
-              <option value="inactif">Inactif</option>
-            </select>
-            <button id="invite-adherent-btn">Inviter un adhérent</button>
+          <div id="admin-container" style="overflow-y:auto;flex:1">
+            <div id="stats-cards"></div>
+            <table id="adherents-table">
+              <thead>
+                <tr>
+                  <th data-column="name">Exploitation</th>
+                  <th data-column="code">Code adhérent</th>
+                  <th data-column="proprietaire">Propriétaire</th>
+                  <th data-column="plan">Plan</th>
+                  <th data-column="statut">Statut</th>
+                  <th data-column="date">Date adhésion</th>
+                  <th data-column="ville">Ville</th>
+                  <th data-column="dept">Département</th>
+                  <th>Membres associés</th>
+                  <th data-column="capteurs">Capteurs</th>
+                  <th data-column="parcelles">Parcelles</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
-          <table id="adherents-table">
-            <thead>
-              <tr>
-                <th data-column="code">Code adhérent</th>
-                <th data-column="exploitation">Exploitation</th>
-                <th data-column="proprietaire">Propriétaire</th>
-                <th data-column="ville">Ville</th>
-                <th data-column="departement">Département</th>
-                <th data-column="plan">Plan</th>
-                <th data-column="capteurs">Capteurs</th>
-                <th data-column="parcelles">Parcelles</th>
-                <th data-column="membres">Membres</th>
-                <th data-column="surface">Surface</th>
-                <th data-column="statut">Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Lignes d'adhérents -->
-            </tbody>
-          </table>
         </main>
-      </div>
-    </div>
-
-    <!-- Modale invitation adhérent -->
-    <div id="invite-adherent-modal" class="modal" style="display: none;">
-      <div class="modal-content">
-        <h2>Inviter un adhérent</h2>
-        <input type="text" placeholder="Prénom" />
-        <input type="text" placeholder="Nom" />
-        <input type="email" placeholder="Email" />
-        <input type="text" placeholder="Nom exploitation" />
-        <input type="tel" placeholder="Téléphone" />
-        <input type="text" placeholder="Code adhérent" />
-        <select>
-          <option>Plus</option>
-          <option>Expert</option>
-        </select>
-        <select>
-          <option>Sans période d'essai</option>
-          <option>1 mois</option>
-        </select>
-        <button>Envoyer invitation</button>
-        <button onclick="closeModal()">Annuler</button>
       </div>
     </div>
 

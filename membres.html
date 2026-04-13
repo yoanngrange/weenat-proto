@@ -43,7 +43,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -61,57 +60,53 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Membres</div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
           <div class="topbar-actions">
+            <button id="import-btn" class="btn-secondary">Importer</button>
             <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
+            <button id="export-btn">Inviter un membre</button>
+          </div>
+        </div>
+        <div id="controls-row">
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-role">
+              <button class="filter-dropdown-btn" type="button">
+                Rôle <span class="fd-badge" id="badge-role" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-role"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-statut">
+              <button class="filter-dropdown-btn" type="button">
+                Statut <span class="fd-badge" id="badge-statut" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-statut"></div>
+            </div>
+            <div id="active-filters"></div>
           </div>
         </div>
         <main id="content">
-          <div id="members-header">
-            <input type="text" id="search" placeholder="Rechercher par nom ou email..." />
-            <button id="invite-btn">Inviter un membre</button>
+          <div id="admin-container" style="overflow-y:auto;flex:1">
+            <div id="stats-cards"></div>
+            <table id="members-table">
+              <thead>
+                <tr>
+                  <th data-column="nom">Nom</th>
+                  <th data-column="email">Email</th>
+                  <th data-column="role">Rôle</th>
+                  <th>Adhérents</th>
+                  <th>Parcelles</th>
+                  <th>Capteurs</th>
+                  <th data-column="statut">Statut</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
-          <table id="members-table">
-            <thead>
-              <tr>
-                <th data-column="name">Nom</th>
-                <th data-column="email">Email</th>
-                <th data-column="role">Rôle</th>
-                <th data-column="status">Statut</th>
-                <th data-column="since">Membre depuis</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Jean Dupont</td>
-                <td>jean@exemple.fr</td>
-                <td><span class="badge admin">Administrateur</span></td>
-                <td>Actif</td>
-                <td>2023-01-15</td>
-                <td><button class="menu-btn">···</button></td>
-              </tr>
-              <!-- Plus de lignes -->
-            </tbody>
-          </table>
         </main>
-      </div>
-    </div>
-
-    <!-- Modale invitation -->
-    <div id="invite-modal" class="modal" style="display: none;">
-      <div class="modal-content">
-        <h2>Inviter un membre</h2>
-        <input type="email" placeholder="Email" />
-        <select>
-          <option>Lecteur</option>
-          <option>Éditeur</option>
-          <option>Administrateur</option>
-        </select>
-        <p>Description des droits...</p>
-        <button>Envoyer invitation</button>
-        <button onclick="closeModal()">Annuler</button>
       </div>
     </div>
 

@@ -2,6 +2,7 @@ import './styles/main.css'
 import { orgs } from './data/orgs.js'
 import { plots } from './data/plots.js'
 import { sensors } from './data/sensors.js'
+import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
 
 let currentRole = 'admin' // 'admin' or 'adherent'
@@ -17,6 +18,9 @@ let selectedIrrigations = []
 let selectedEtatsHydriques = []
 let selectedTextures = []
 let selectedIntegrations = []
+let selectedModels = []
+let selectedEvents = []
+let selectedTelecoms = []
 let map
 let markers = []
 
@@ -60,6 +64,12 @@ const metricAggregates = {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+  // capteurs.html has no map — default to list view
+  if (pageType === '') {
+    const page = window.location.pathname.split('/').pop()
+    if (page === 'capteurs.html' || page === 'capteurs-reseau.html') currentView = 'list'
+  }
+
   initNavigation()
   initRoleSwitcher()
   initViewSwitcher()
@@ -121,18 +131,21 @@ function updateView() {
   animateView(activeView)
   if (currentView === 'map') {
     setTimeout(() => map.invalidateSize(), 100)
-    updateMap()
   }
+  updateContent()
 }
 
 // Filters
 function initFilters() {
-  document.getElementById('metric-selector').addEventListener('change', (e) => {
-    currentMetric = e.target.value
-    currentAggregate = metricAggregates[currentMetric]?.[0]?.value || currentAggregate
-    updateAggregateOptions()
-    updateContent()
-  })
+  const metricSel = document.getElementById('metric-selector')
+  if (metricSel) {
+    metricSel.addEventListener('change', (e) => {
+      currentMetric = e.target.value
+      currentAggregate = metricAggregates[currentMetric]?.[0]?.value || currentAggregate
+      updateAggregateOptions()
+      updateContent()
+    })
+  }
 
   const aggregateSelect = document.getElementById('aggregate-selector')
   if (aggregateSelect) {
@@ -142,30 +155,43 @@ function initFilters() {
     })
   }
 
-  // Multi-select dropdowns (culture, texture, état hydrique)
+  // Multi-select dropdowns
   populateFilterDropdowns()
   initFilterDropdownToggle()
 
-  // Simple selects (org, model, event, telecom)
+  // Simple selects (org — legacy capteurs.html)
   const orgFilter = document.getElementById('org-filter')
   if (orgFilter) orgFilter.addEventListener('change', updateContent)
-  const modelFilter = document.getElementById('model-filter')
-  if (modelFilter) modelFilter.addEventListener('change', updateContent)
-  const eventFilter = document.getElementById('event-filter')
-  if (eventFilter) eventFilter.addEventListener('change', updateContent)
-  const telecomFilter = document.getElementById('telecom-filter')
-  if (telecomFilter) telecomFilter.addEventListener('change', updateContent)
 
   populateOrgFilter()
-  updateAggregateOptions()
+  if (metricSel) updateAggregateOptions()
 }
 
 const INTEGRATION_NAMES = [
-  'Modèles Arvalis', 'Irrigation Optimisée', 'Soil Moisture Monitor', 'Crop Yield Predictor',
-  'Pest Alert System', 'Weather Integration', 'Fertilizer Calculator', 'Drone Mapping',
-  'Water Balance Model', 'Disease Forecasting', 'Smart Irrigation Hub', 'Crop Rotation Planner',
-  'Nutrient Deficiency Detector', 'Frost Protection', 'Harvest Optimizer', 'Carbon Footprint Tracker'
+  'Abelio', 'Criiam Sud', 'Cropwise Protector', 'DeciTrait',
+  'IRRÉ-LIS Mono-Culture', 'IRRÉ-LIS Multi-Cultures',
+  'Limacapt', 'Modèles Arvalis — PRÉVI-LIS / MILÉOS',
+  'Movida GrapeVision', 'Pixagri', 'Rimpro', 'Semiloni',
+  'Vintel', 'VitiMeteo', 'Xarvio'
 ]
+
+const INTEGRATION_IDS = {
+  'Abelio': 'abelio',
+  'Criiam Sud': 'criiam-sud',
+  'Cropwise Protector': 'cropwise-protector',
+  'DeciTrait': 'decitrait',
+  'IRRÉ-LIS Mono-Culture': 'irre-lis-mono',
+  'IRRÉ-LIS Multi-Cultures': 'irre-lis-multi',
+  'Limacapt': 'limacapt',
+  'Modèles Arvalis — PRÉVI-LIS / MILÉOS': 'arvalis-previlis-mileos',
+  'Movida GrapeVision': 'movida-grapevision',
+  'Pixagri': 'pixagri',
+  'Rimpro': 'rimpro',
+  'Semiloni': 'semiloni',
+  'Vintel': 'vintel',
+  'VitiMeteo': 'vitimeteo',
+  'Xarvio': 'xarvio'
+}
 
 function makeCheckboxPanel(panelId, values, stateRef, badgeId) {
   const panel = document.getElementById(panelId)
@@ -202,6 +228,28 @@ function populateFilterDropdowns() {
 
   makeCheckboxPanel('panel-integration', INTEGRATION_NAMES.sort(),
     { set: v => { selectedIntegrations = v } }, 'badge-integration')
+
+  // Capteurs filters (capteurs.html uses checkbox dropdowns too)
+  const allModels = [...new Set(sensors.map(s => s.model))].sort()
+  makeCheckboxPanel('panel-model', allModels,
+    { set: v => { selectedModels = v } }, 'badge-model')
+  makeCheckboxPanel('panel-event', null,
+    { set: v => { selectedEvents = v } }, 'badge-event')
+  makeCheckboxPanel('panel-telecom', null,
+    { set: v => { selectedTelecoms = v } }, 'badge-telecom')
+
+  // Org panel for capteurs (network-only)
+  const panelOrg = document.getElementById('panel-org')
+  if (panelOrg) {
+    orgs.forEach(org => {
+      const lbl = document.createElement('label')
+      lbl.innerHTML = `<input type="checkbox" value="${org.id}"> ${org.name}`
+      panelOrg.appendChild(lbl)
+    })
+    panelOrg.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', updateContent)
+    })
+  }
 }
 
 function updateBadge(id, count) {
@@ -335,26 +383,73 @@ function getFilteredData() {
     filteredSensors = filteredSensors.filter(s => s.model === model)
   }
 
-  const eventEl = document.getElementById('event-filter')
-  const event = eventEl ? eventEl.value : ''
-  if (event) {
-    filteredSensors = filteredSensors.filter(s => s.event === event)
+  if (selectedModels.length > 0) {
+    filteredSensors = filteredSensors.filter(s => selectedModels.includes(s.model))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
   }
 
-  const telecomEl = document.getElementById('telecom-filter')
-  const telecom = telecomEl ? telecomEl.value : ''
-  if (telecom) {
-    filteredSensors = filteredSensors.filter(s => s.telecom === telecom)
+  if (selectedEvents.length > 0) {
+    filteredSensors = filteredSensors.filter(s => selectedEvents.includes(s.event))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
   }
+
+  if (selectedTelecoms.length > 0) {
+    filteredSensors = filteredSensors.filter(s => selectedTelecoms.includes(s.telecom))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
+  }
+
+  // Legacy simple selects (capteurs-reseau only)
+  const eventEl = document.getElementById('event-filter')
+  const eventVal = eventEl ? eventEl.value : ''
+  if (eventVal) filteredSensors = filteredSensors.filter(s => s.event === eventVal)
+
+  const telecomEl = document.getElementById('telecom-filter')
+  const telecomVal = telecomEl ? telecomEl.value : ''
+  if (telecomVal) filteredSensors = filteredSensors.filter(s => s.telecom === telecomVal)
 
   updateFilterChips()
   return { parcels: filteredParcels, sensors: filteredSensors }
 }
 
+const PAGE_TITLES = {
+  'parcelles.html': { title: 'Parcelles', section: 'exploitation' },
+  'parcelles-reseau.html': { title: 'Parcelles', section: 'reseau' },
+  'capteurs.html': { title: 'Capteurs', section: 'exploitation' },
+  'capteurs-reseau.html': { title: 'Capteurs', section: 'reseau' },
+  'membres.html': { title: 'Membres', section: 'exploitation' },
+  'adherents.html': { title: 'Adhérents', section: 'reseau' },
+  'facturation.html': { title: 'Facturation', section: 'reseau' },
+  'previsions.html': { title: 'Prévisions', section: 'exploitation' },
+  'integrations.html': { title: 'Intégrations', section: 'exploitation' },
+  'parametres.html': { title: 'Paramètres', section: 'exploitation' },
+  'parametres-reseau.html': { title: 'Paramètres', section: 'reseau' },
+  'informations.html': { title: 'Informations', section: 'reseau' },
+  'alertes.html': { title: 'Mes alertes', section: null },
+  'notifications.html': { title: 'Mes notifications', section: null },
+  'mon-compte.html': { title: 'Mon compte', section: null },
+  'aide.html': { title: 'Aide', section: null },
+}
+
+function updateBreadcrumb() {
+  const page = window.location.pathname.split('/').pop() || 'parcelles.html'
+  const meta = PAGE_TITLES[page] || { title: 'Parcelles', section: 'exploitation' }
+
+  const contextEl = document.getElementById('breadcrumb-context')
+  const titleEl = document.getElementById('breadcrumb-title')
+  if (!contextEl || !titleEl) return
+
+  const sectionLabel = meta.section === 'reseau' ? 'Mon réseau' : meta.section === 'exploitation' ? 'Mon exploitation' : ''
+  contextEl.textContent = sectionLabel
+  contextEl.hidden = !sectionLabel
+  titleEl.textContent = meta.title
+}
+
 // Update content based on role and section
 function updateContent() {
-  const breadcrumb = document.getElementById('breadcrumb')
-  breadcrumb.textContent = currentRole === 'admin' ? (currentSection === 'reseau' ? 'Admin réseau' : 'Mon exploitation') : 'Mon exploitation'
+  updateBreadcrumb()
+
+  const metricControls = document.getElementById('metric-controls')
+  if (metricControls) metricControls.style.display = currentView === 'admin' ? 'none' : ''
 
   const { parcels: filteredParcels, sensors: filteredSensors } = getFilteredData()
 
@@ -369,6 +464,7 @@ function updateContent() {
 
 // Map
 function initMap() {
+  if (!document.getElementById('map-container')) return
   map = L.map('map-container').setView([48.5, -2.5], 8)
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -392,6 +488,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         `<strong>${parcel.name}</strong><br>${getMetricTooltipValue(parcel)}<br>Culture: ${parcel.crop}<br>Superficie: ${parcel.area} ha`,
         { sticky: true, direction: 'top', opacity: 0.95 }
       )
+      layer.on('click', () => { window.location.href = `parcelle-detail.html?id=${parcel.id}` })
       layer.addTo(map)
       markers.push(layer)
     })
@@ -405,7 +502,8 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         fillOpacity: 0.8,
         radius: 8
       }).addTo(map)
-      marker.bindPopup(`<b><a href="parcelle-detail.html?id=${parcel.id}" style="color: inherit; text-decoration: none;">${parcel.name}</a></b><br>${metricValue}<br>Culture: ${parcel.crop}<br>Superficie: ${parcel.area} ha`)
+      marker.on('click', () => { window.location.href = `parcelle-detail.html?id=${parcel.id}` })
+      marker.bindTooltip(`<strong>${parcel.name}</strong><br>${metricValue}<br>${parcel.crop} · ${parcel.area} ha`, { sticky: true, opacity: 0.95 })
       markers.push(marker)
     })
 
@@ -413,16 +511,17 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       filteredSensors.forEach(sensor => {
         const parcel = plots.find(p => p.id === sensor.parcelId)
         if (parcel) {
-          const color = getSensorColor(sensor, currentMetric)
+          const color = getSensorColor(sensor)
+          const metricValue = getSensorMetricDisplay(sensor, currentMetric)
           const marker = L.marker([parcel.lat, parcel.lng], {
             icon: L.divIcon({
               className: 'sensor-icon',
-              html: `<div style="background-color: ${color}; width: 10px; height: 10px; border-radius: 50%;"></div>`,
+              html: `<div style="background-color:${color};width:10px;height:10px;border-radius:50%;cursor:pointer"></div>`,
               iconSize: [10, 10]
             })
           }).addTo(map)
-          const metricValue = getSensorMetricDisplay(sensor, currentMetric)
-          marker.bindPopup(`<b><a href="capteur-detail.html?id=${sensor.id}" style="color: inherit; text-decoration: none;">${sensor.model} - ${sensor.serial}</a></b><br>${metricValue}<br>Qualité réseau: ${sensor.networkQuality}%<br>Événement: ${sensor.event || 'Aucun'}`)
+          marker.bindTooltip(`<strong>${sensor.model} · ${sensor.serial}</strong><br>${metricValue}<br>Signal: ${sensor.networkQuality}%${sensor.event ? '<br>⚠ ' + sensor.event : ''}`, { sticky: true, opacity: 0.95 })
+          marker.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
           markers.push(marker)
         }
       })
@@ -628,7 +727,7 @@ function getMetricColor(parcel, metric) {
   return '#0172A4'
 }
 
-function getSensorColor(sensor, metric) {
+function getSensorColor(sensor) {
   return sensor.event ? '#E05252' : '#24B066'
 }
 
@@ -703,9 +802,9 @@ function createSensorTable(sensors) {
   sensors.forEach(sensor => {
     const parcel = plots.find(p => p.id === sensor.parcelId)
     const org = parcel ? orgs.find(o => o.id === parcel.orgId) : null
-    html += `<tr>
+    html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
       <td><input type="checkbox" data-type="sensor" data-id="${sensor.id}" /></td>
-      <td><a href="capteur-detail.html?id=${sensor.id}">${sensor.model}</a></td>
+      <td><strong>${sensor.model}</strong></td>
       <td>${sensor.serial}${org ? ' — ' + org.ville : ''}</td>
       <td>${sensor.telecom}</td>
       <td>${new Date(sensor.lastMessage).toLocaleDateString()}</td>
@@ -716,6 +815,16 @@ function createSensorTable(sensors) {
     </tr>`
   })
   html += '</tbody></table>'
+
+  setTimeout(() => {
+    document.querySelectorAll('#sensor-table .clickable-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.tagName === 'INPUT') return
+        window.location.href = row.dataset.href
+      })
+    })
+  }, 0)
+
   return html
 }
 
@@ -739,14 +848,15 @@ function sortTable(tableId, column, direction) {
   const tbody = table.querySelector('tbody')
   const rows = Array.from(tbody.querySelectorAll('tr'))
 
+  const colIndex = Array.from(table.querySelectorAll('th')).findIndex(th => th.dataset.column === column)
   rows.sort((a, b) => {
-    const aVal = a.children[Array.from(table.querySelectorAll('th')).findIndex(th => th.dataset.column === column)].textContent.trim()
-    const bVal = b.children[Array.from(table.querySelectorAll('th')).findIndex(th => th.dataset.column === column)].textContent.trim()
-    if (direction === 'asc') {
-      return aVal.localeCompare(bVal)
-    } else {
-      return bVal.localeCompare(aVal)
-    }
+    const aRaw = a.children[colIndex].textContent.trim()
+    const bRaw = b.children[colIndex].textContent.trim()
+    const aNum = parseFloat(aRaw)
+    const bNum = parseFloat(bRaw)
+    const numeric = !isNaN(aNum) && !isNaN(bNum)
+    const cmp = numeric ? aNum - bNum : aRaw.localeCompare(bRaw, 'fr')
+    return direction === 'asc' ? cmp : -cmp
   })
 
   rows.forEach(row => tbody.appendChild(row))
@@ -768,15 +878,25 @@ function renderAdmin(filteredParcels, filteredSensors) {
   if (pageType.startsWith('parcelles')) {
     // Parcel-specific stats
     const totalArea = filteredParcels.reduce((s, p) => s + p.area, 0)
+    const avgArea = filteredParcels.length ? totalArea / filteredParcels.length : 0
     const withSensors = filteredParcels.filter(p => sensors.some(s => s.parcelId === p.id)).length
     const withoutSensors = filteredParcels.length - withSensors
+    const withInteg = filteredParcels.filter(p => (p.integrations || []).length > 0).length
+    const uniqueCultures = new Set(filteredParcels.map(p => p.crop)).size
+    const withIrrigation = filteredParcels.filter(p => p.irrigation && p.irrigation !== "Pas d'irrigation").length
+    const totalSensorsLinked = filteredParcels.reduce((s, p) => s + sensors.filter(se => se.parcelId === p.id).length, 0)
 
     container.innerHTML += `
       <div id="stats-cards">
         <div class="stat-card"><div class="stat-label">Parcelles</div><div class="stat-value">${filteredParcels.length}</div></div>
         <div class="stat-card"><div class="stat-label">Surface totale</div><div class="stat-value">${totalArea.toFixed(1)} ha</div></div>
+        <div class="stat-card"><div class="stat-label">Surface moyenne</div><div class="stat-value">${avgArea.toFixed(1)} ha</div></div>
+        <div class="stat-card"><div class="stat-label">Cultures</div><div class="stat-value">${uniqueCultures}</div></div>
         <div class="stat-card"><div class="stat-label">Avec capteur</div><div class="stat-value">${withSensors}</div></div>
         <div class="stat-card warn"><div class="stat-label">Sans capteur</div><div class="stat-value">${withoutSensors}</div></div>
+        <div class="stat-card"><div class="stat-label">Capteurs liés</div><div class="stat-value">${totalSensorsLinked}</div></div>
+        <div class="stat-card"><div class="stat-label">Avec intégration</div><div class="stat-value">${withInteg}</div></div>
+        <div class="stat-card"><div class="stat-label">Avec irrigation</div><div class="stat-value">${withIrrigation}</div></div>
       </div>
     `
     container.innerHTML += createParcelAdminTable(filteredParcels)
@@ -801,35 +921,14 @@ function renderAdmin(filteredParcels, filteredSensors) {
 }
 
 function initAddModal() {
-  const addBtn = document.getElementById('add-btn')
-  if (addBtn) {
-    addBtn.addEventListener('click', () => {
-      const modal = document.createElement('div')
-      modal.className = 'modal'
-      modal.innerHTML = `
-        <div class="modal-content">
-          <h2>Ajouter</h2>
-          <button data-action="capteur">Capteur</button>
-          <button data-action="station">Station météo virtuelle</button>
-          <button data-action="parcelle">Parcelle</button>
-          <button data-action="membre">Membre</button>
-          <button data-action="adherent" class="admin-only">Adhérent</button>
-          <button data-action="alerte">Alerte</button>
-          <button onclick="this.closest('.modal').remove()">Annuler</button>
-        </div>
-      `
-      document.body.appendChild(modal)
-      modal.querySelectorAll('button[data-action]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          console.log('Add', btn.dataset.action)
-          modal.remove()
-        })
-      })
-    })
-  }
+  // Handled globally by menu-switch.js — no-op here
 }
 
 function initExportButton() {
+  document.getElementById('import-btn')?.addEventListener('click', () => {
+    showToast('Import CSV/Excel — fonctionnalité à venir')
+  })
+
   const exportBtn = document.getElementById('export-btn')
   if (!exportBtn) return
   exportBtn.addEventListener('click', () => {
@@ -925,7 +1024,6 @@ function createParcelMetricTable(parcels) {
   const metricLabel = { pluie: 'Pluie', temp: 'Température', humidite: 'Humidité', 'etat-hydrique': 'État hydrique' }[currentMetric] || currentMetric
 
   let html = '<table id="parcel-table"><thead><tr>'
-  html += '<th><input type="checkbox" id="check-all-list"></th>'
   html += '<th data-column="name">Parcelle</th>'
   html += '<th data-column="crop">Culture</th>'
   html += '<th data-column="area">Surface</th>'
@@ -950,7 +1048,6 @@ function createParcelMetricTable(parcels) {
     const irrigationClass = irrigation === "Pas d'irrigation" ? 'tag-none' : 'tag tag-irrigation'
 
     html += `<tr class="clickable-row" data-href="parcelle-detail.html?id=${parcel.id}">`
-    html += `<td onclick="event.stopPropagation()"><input type="checkbox" data-type="parcel" data-id="${parcel.id}"></td>`
     html += `<td><a href="parcelle-detail.html?id=${parcel.id}" class="row-link">${parcel.name}</a></td>`
     html += `<td>${parcel.crop}</td>`
     html += `<td class="num">${parcel.area} ha</td>`
@@ -971,73 +1068,114 @@ function createParcelMetricTable(parcels) {
   setTimeout(() => {
     document.querySelectorAll('#parcel-table .clickable-row').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'A') return
+        if (e.target.tagName === 'A') return
         window.location.href = row.dataset.href
       })
     })
-    const checkAll = document.getElementById('check-all-list')
-    if (checkAll) {
-      checkAll.addEventListener('change', () => {
-        document.querySelectorAll('#parcel-table input[type=checkbox][data-type=parcel]').forEach(cb => {
-          cb.checked = checkAll.checked
-        })
-      })
-    }
   }, 0)
 
   return html
 }
 
 // ── Vue admin parcelles : info + modification ────────────────────────────────
+function parcelMinimap(parcel) {
+  const W = 64, H = 44, pad = 5
+  if (!parcel.latlngs || parcel.latlngs.length < 3) {
+    return `<svg width="${W}" height="${H}"><rect x="4" y="4" width="${W-8}" height="${H-8}" rx="3" fill="var(--bdr2)" stroke="var(--bdr)" stroke-width="1"/></svg>`
+  }
+  const lats = parcel.latlngs.map(p => p[0])
+  const lngs = parcel.latlngs.map(p => p[1])
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
+  const rngLng = maxLng - minLng || 0.0001
+  const rngLat = maxLat - minLat || 0.0001
+  const sx = lng => (pad + (lng - minLng) / rngLng * (W - 2 * pad)).toFixed(1)
+  const sy = lat => (pad + (maxLat - lat) / rngLat * (H - 2 * pad)).toFixed(1)
+  const pts = parcel.latlngs.map(p => `${sx(p[1])},${sy(p[0])}`).join(' ')
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polygon points="${pts}" style="fill:var(--pri2);stroke:var(--pri);stroke-width:1.5"/></svg>`
+}
+
 function createParcelAdminTable(parcels) {
   const crops = [...new Set(plots.map(p => p.crop))].sort()
   const textures = [...new Set(plots.map(p => p.texture))].sort()
+  const irrigationTypes = ["Pas d'irrigation","Pivot","Enrouleur","Rampe","Goutte à goutte","Goutte à goutte enterré","Micro aspersion","Couverture intégrale","Gravitaire"]
 
   let html = `
     <div id="bulk-bar" class="bulk-bar hidden">
       <span id="bulk-count"></span>
-      <button class="btn-secondary" id="bulk-crop-btn">Modifier la culture</button>
-      <button class="btn-secondary" id="bulk-texture-btn">Modifier la texture de sol</button>
+      <div class="bulk-actions">
+        <button class="btn-secondary btn-sm" id="bulk-crop-btn"><i class="bi bi-flower1"></i> Modifier la culture</button>
+        <button class="btn-secondary btn-sm" id="bulk-texture-btn"><i class="bi bi-layers"></i> Modifier la texture</button>
+        <button class="btn-secondary btn-sm" id="bulk-env-btn"><i class="bi bi-droplet"></i> Modifier l'environnement</button>
+        <button class="btn-secondary btn-sm" id="bulk-integ-btn"><i class="bi bi-plug"></i> Activer une intégration</button>
+        <button class="btn-secondary btn-sm" id="bulk-alert-btn"><i class="bi bi-bell"></i> Créer une alerte</button>
+        <button class="btn-secondary btn-sm" id="bulk-member-btn"><i class="bi bi-person"></i> Associer à un membre</button>
+        <button class="btn-secondary btn-sm" id="bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
+        <button class="btn-secondary btn-sm bulk-archive-btn" id="bulk-archive-btn"><i class="bi bi-archive"></i> Archiver</button>
+        <button class="btn-secondary btn-sm bulk-danger-btn" id="bulk-delete-btn"><i class="bi bi-trash"></i> Supprimer</button>
+      </div>
     </div>
   `
 
   html += '<table id="parcel-admin-table"><thead><tr>'
   html += '<th><input type="checkbox" id="check-all-admin"></th>'
   html += '<th data-column="name">Parcelle</th>'
+  html += '<th class="col-minimap"></th>'
   html += '<th data-column="crop">Culture</th>'
   html += '<th data-column="area">Surface (ha)</th>'
-  html += '<th data-column="texture">Texture de sol</th>'
-  html += '<th data-column="reserveHydrique">RU (%)</th>'
-  html += '<th data-column="degresJour">Degrés-jour</th>'
-  html += '<th data-column="sensors">Capteurs liés</th>'
+  html += '<th data-column="texture">Texture</th>'
+  html += '<th data-column="irrigation">Environnement</th>'
+  html += '<th data-column="sensors">Capteurs</th>'
+  html += '<th data-column="integrations">Intégrations</th>'
+  html += '<th data-column="membre">Membres</th>'
   html += '<th></th>'
   html += '</tr></thead><tbody>'
 
   parcels.forEach(parcel => {
-    const sensorCount = sensors.filter(s => s.parcelId === parcel.id).length
+    const parcelSensors = sensors.filter(s => s.parcelId === parcel.id)
+    const integList = parcel.integrations || []
+
+    const sensorsHtml = parcelSensors.length
+      ? parcelSensors.map(s => `<a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial}</a>`).join('<br>')
+      : '<span class="tag-none">—</span>'
+
+    const integHtml = integList.length
+      ? integList.map(name => {
+          const id = INTEGRATION_IDS[name]
+          return id
+            ? `<a href="integration-detail.html?id=${id}" class="admin-link">${name}</a>`
+            : `<span>${name}</span>`
+        }).join('<br>')
+      : '<span class="tag-none">—</span>'
+
+    const parcelMembers = members.filter(m => m.parcelIds.includes(parcel.id))
+    const membreHtml = parcelMembers.length
+      ? parcelMembers.map(m => `<a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>`).join('<br>')
+      : '<span class="tag-none">—</span>'
+
     html += `<tr>
       <td><input type="checkbox" class="parcel-admin-check" data-id="${parcel.id}"></td>
-      <td><a href="parcelle-detail.html?id=${parcel.id}">${parcel.name}</a></td>
+      <td><a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${parcel.name}</a></td>
+      <td class="col-minimap">${parcelMinimap(parcel)}</td>
       <td>
         <select class="inline-edit" data-field="crop" data-id="${parcel.id}">
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </td>
-      <td>${parcel.area}</td>
+      <td class="num">${parcel.area}</td>
       <td>
         <select class="inline-edit" data-field="texture" data-id="${parcel.id}">
           ${textures.map(t => `<option value="${t}"${t === parcel.texture ? ' selected' : ''}>${t}</option>`).join('')}
         </select>
       </td>
       <td>
-        <input type="number" class="inline-edit" data-field="reserveHydrique" data-id="${parcel.id}"
-          value="${parcel.reserveHydrique}" min="0" max="100" style="width:60px">
+        <select class="inline-edit" data-field="irrigation" data-id="${parcel.id}">
+          ${irrigationTypes.map(v => `<option value="${v}"${v === (parcel.irrigation || "Pas d'irrigation") ? ' selected' : ''}>${v}</option>`).join('')}
+        </select>
       </td>
-      <td>
-        <input type="number" class="inline-edit" data-field="degresJour" data-id="${parcel.id}"
-          value="${parcel.degresJour}" min="0" style="width:70px">
-      </td>
-      <td>${sensorCount}</td>
+      <td class="admin-links-cell">${sensorsHtml}</td>
+      <td class="admin-links-cell">${integHtml}</td>
+      <td>${membreHtml}</td>
       <td>
         <button class="btn-save hidden" data-id="${parcel.id}" title="Enregistrer">
           <i class="bi bi-check-lg"></i>
@@ -1130,10 +1268,106 @@ function initParcelAdminTable(container) {
       }
     })
   }
+
+  // Modifier l'environnement
+  container.querySelector('#bulk-env-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    const options = ["Pas d'irrigation", "Pivot", "Enrouleur", "Rampe", "Goutte à goutte", "Goutte à goutte enterré", "Micro aspersion", "Couverture intégrale", "Gravitaire"]
+    const val = prompt(`Type d'irrigation pour ${checked.length} parcelle(s) :\n${options.join(', ')}`)
+    if (val && options.includes(val)) {
+      checked.forEach(id => {
+        const plot = plots.find(p => p.id === id)
+        if (plot) plot.irrigation = val
+      })
+      showToast(`Environnement mis à jour pour ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
+      const { parcels } = getFilteredData()
+      container.innerHTML = createParcelAdminTable(parcels)
+      initParcelAdminTable(container)
+    }
+  })
+
+  // Activer une intégration
+  container.querySelector('#bulk-integ-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    const val = prompt(`Nom de l'intégration à activer :\n${INTEGRATION_NAMES.join(', ')}`)
+    if (val && INTEGRATION_NAMES.includes(val)) {
+      checked.forEach(id => {
+        const plot = plots.find(p => p.id === id)
+        if (plot) {
+          if (!plot.integrations) plot.integrations = []
+          if (!plot.integrations.includes(val)) plot.integrations.push(val)
+        }
+      })
+      showToast(`Intégration "${val}" activée pour ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
+    }
+  })
+
+  // Créer une alerte
+  container.querySelector('#bulk-alert-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    showToast(`Alerte créée pour ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
+  })
+
+  // Associer à un membre
+  container.querySelector('#bulk-member-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    const val = prompt(`Nom ou email du membre à associer :`)
+    if (val?.trim()) {
+      showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} associée${checked.length > 1 ? 's' : ''} à « ${val.trim()} »`)
+    }
+  })
+
+  // Ajouter aux favoris
+  container.querySelector('#bulk-fav-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} ajoutée${checked.length > 1 ? 's' : ''} aux favoris`)
+  })
+
+  // Archiver
+  container.querySelector('#bulk-archive-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    if (!confirm(`Archiver ${checked.length} parcelle${checked.length > 1 ? 's' : ''} ?`)) return
+    showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} archivée${checked.length > 1 ? 's' : ''}`)
+  })
+
+  // Supprimer
+  container.querySelector('#bulk-delete-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    if (!confirm(`Supprimer définitivement ${checked.length} parcelle${checked.length > 1 ? 's' : ''} ? Cette action est irréversible.`)) return
+    checked.forEach(id => {
+      const idx = plots.findIndex(p => p.id === id)
+      if (idx !== -1) plots.splice(idx, 1)
+    })
+    showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} supprimée${checked.length > 1 ? 's' : ''}`)
+    const { parcels } = getFilteredData()
+    container.innerHTML = createParcelAdminTable(parcels)
+    initParcelAdminTable(container)
+  })
 }
 
 function getCheckedAdminIds(container) {
   return Array.from(container.querySelectorAll('.parcel-admin-check:checked')).map(cb => Number(cb.dataset.id))
+}
+
+function showToast(msg, duration = 3000) {
+  let el = document.getElementById('app-toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'app-toast'
+    el.className = 'toast'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.classList.add('show')
+  clearTimeout(el._timer)
+  el._timer = setTimeout(() => el.classList.remove('show'), duration)
 }
 
 function updateBulkBar(container) {

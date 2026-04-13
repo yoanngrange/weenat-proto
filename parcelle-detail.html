@@ -45,7 +45,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -63,138 +62,89 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Parcelle <span id="parcel-name"></span></div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
+          <div class="topbar-actions">
+            <button id="modifier-btn" class="btn-secondary"><i class="bi bi-pencil"></i> Modifier</button>
+          </div>
         </div>
-        <main id="content">
-          <div id="parcel-header">
-            <div class="parcel-info">
-              <h1 id="parcel-title"></h1>
-              <div class="parcel-meta">
-                <span id="parcel-crop"></span>
-                <span id="parcel-area"></span>
-                <span id="parcel-org"></span>
-              </div>
-            </div>
-          </div>
+        <main id="content" class="detail-content">
+          <div class="detail-layout" id="detail-layout">
 
-          <div id="parcel-tabs">
-            <button class="tab-btn active" data-tab="data">Données</button>
-            <button class="tab-btn" data-tab="forecast">Prévisions</button>
-          </div>
-
-          <div id="tab-content">
-            <div class="tab-panel active" data-tab="data">
-              <div id="weather-station">
-                <h3>Station météo</h3>
-                <div id="weather-values">
-                  <!-- Weather values will be populated by JS -->
+            <div class="detail-main">
+              <div class="detail-header">
+                <div class="detail-header-info">
+                  <h1 id="parcel-title" class="detail-title"></h1>
+                  <div class="detail-meta-row">
+                    <span id="parcel-crop-badge" class="detail-badge"></span>
+                    <span id="parcel-area-badge" class="detail-badge detail-badge--neutral"></span>
+                    <span id="parcel-org-badge" class="detail-meta-dim"></span>
+                  </div>
+                </div>
+                <div class="detail-period-selector">
+                  <select id="period-select">
+                    <option value="7d">7 jours</option>
+                    <option value="30d">30 jours</option>
+                    <option value="3m">3 mois</option>
+                    <option value="1y">1 an</option>
+                  </select>
+                  <select id="time-step">
+                    <option value="1h">1h</option>
+                    <option value="6h">6h</option>
+                    <option value="1d">1 jour</option>
+                  </select>
                 </div>
               </div>
 
-              <div id="period-selector">
-                <select id="period-select">
-                  <option value="7d">7 jours</option>
-                  <option value="30d">30 jours</option>
-                  <option value="3m">3 mois</option>
-                  <option value="1y">1 an</option>
-                </select>
-                <select id="time-step">
-                  <option value="1h">1 heure</option>
-                  <option value="6h">6 heures</option>
-                  <option value="1d">1 jour</option>
-                </select>
-              </div>
-
-              <div id="charts-container">
-                <!-- Charts will be populated by JS -->
-              </div>
+              <div id="weather-strip" class="latest-strip"></div>
+              <div id="charts-container" class="charts-stack"></div>
             </div>
 
-            <div class="tab-panel" data-tab="forecast">
-              <div id="forecast-cards">
-                <!-- 7 day forecast cards will be populated by JS -->
-              </div>
-
-              <div id="hourly-forecast">
-                <h3>Bande horaire</h3>
-                <div id="hourly-scroll">
-                  <!-- Hourly forecast will be populated by JS -->
+            <div class="detail-panel" id="detail-panel">
+              <button class="panel-toggle-btn" id="panel-toggle" title="Masquer le panneau">
+                <i class="bi bi-layout-sidebar-reverse"></i>
+              </button>
+              <div class="panel-inner">
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-info-circle"></i> Identification</div>
+                  <div class="panel-section-bd" id="panel-ident"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Localisation</div>
+                  <div id="parcel-mini-map" class="mini-map"></div>
+                  <div class="panel-section-bd" id="panel-loc"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-broadcast"></i> Capteurs liés</div>
+                  <div class="panel-section-bd" id="panel-sensors"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-plug"></i> Intégrations actives</div>
+                  <div class="panel-section-bd" id="panel-integrations"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-people"></i> Membres associés</div>
+                  <div class="panel-section-bd" id="panel-membres"></div>
+                  <div style="padding:8px 0 0">
+                    <div id="add-membre-row" style="display:flex;gap:6px;align-items:center">
+                      <select id="add-membre-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
+                        <option value="">Ajouter un membre…</option>
+                      </select>
+                      <button id="add-membre-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-lightning"></i> Actions</div>
+                  <div class="panel-section-bd" id="panel-actions"></div>
                 </div>
               </div>
-
-              <table id="detailed-forecast-table">
-                <thead>
-                  <tr>
-                    <th>Heure</th>
-                    <th>Météo</th>
-                    <th>Pluie</th>
-                    <th>Temp</th>
-                    <th>Humidité</th>
-                    <th>Vent</th>
-                    <th>DPV</th>
-                    <th>Rayonnement</th>
-                    <th>Nuages</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Detailed forecast will be populated by JS -->
-                </tbody>
-              </table>
-
-              <div id="forecast-location">
-                <span id="location-badge"></span>
-                <span class="badge">AROME</span>
-              </div>
             </div>
+
           </div>
         </main>
-
-        <aside id="parcel-sidebar">
-          <div id="about-panel">
-            <h2>À propos</h2>
-
-            <div id="parcel-thumbnail">
-              <!-- Satellite thumbnail will be populated by JS -->
-            </div>
-
-            <div class="about-section">
-              <h3>Culture & Stade</h3>
-              <p id="parcel-crop-stage"></p>
-            </div>
-
-            <div class="about-section">
-              <h3>Texture du sol</h3>
-              <p id="parcel-soil-texture">Argileux</p>
-            </div>
-
-            <div class="about-section">
-              <h3>Type d'irrigation</h3>
-              <p id="parcel-irrigation">Goutte à goutte</p>
-            </div>
-
-            <div class="about-section">
-              <h3>Capteurs liés</h3>
-              <div id="linked-sensors">
-                <!-- Linked sensors will be populated by JS -->
-              </div>
-            </div>
-
-            <div class="about-section">
-              <h3>Intégrations actives</h3>
-              <div id="active-integrations">
-                <span class="badge">Arvalis</span>
-                <span class="badge">Irrigation Opt</span>
-              </div>
-            </div>
-
-            <div class="about-section">
-              <h3>Actions</h3>
-              <button id="favorite-btn">⭐ Favoris</button>
-              <button id="rename-btn">Renommer</button>
-              <button id="archive-btn" class="danger">Archiver</button>
-            </div>
-          </div>
-        </aside>
       </div>
     </div>
 

@@ -45,7 +45,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -63,7 +62,10 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Capteurs Réseau</div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
           <div class="topbar-actions">
             <button id="export-csv-btn" class="btn-secondary">Exporter</button>
             <button id="export-btn">Ajouter</button>
@@ -77,15 +79,28 @@
           </select>
           <select id="model-filter">
             <option value="">Tous modèles</option>
-            <option value="P+">P+</option>
-            <option value="P">P</option>
-            <option value="PT">PT</option>
-            <option value="T">T</option>
-            <option value="T_MINI">T_MINI</option>
-            <option value="SMV">SMV</option>
-            <option value="EC">EC</option>
-            <option value="CHP-15/30">CHP-15/30</option>
-            <option value="CHP-30/60">CHP-30/60</option>
+            <optgroup label="Stations météo">
+              <option value="P+">P+ — Station météo avancée</option>
+              <option value="PT">PT — Station météo compacte</option>
+              <option value="P">P — Pluviomètre</option>
+              <option value="W">W — Anémomètre</option>
+              <option value="TH">TH — Thermo-hygromètre</option>
+              <option value="PYRANO">PYRANO — Pyranomètre</option>
+              <option value="PAR">PAR — Capteur PAR</option>
+            </optgroup>
+            <optgroup label="Sol & Irrigation">
+              <option value="CHP-15/30">CHP-15/30 — Tensiomètre 15/30 cm</option>
+              <option value="CHP-30/60">CHP-30/60 — Tensiomètre 30/60 cm</option>
+              <option value="CHP-60/90">CHP-60/90 — Tensiomètre 60/90 cm</option>
+              <option value="CAPA-30-3">CAPA-30-3 — Sonde capacitive 3 niveaux</option>
+              <option value="CAPA-60-6">CAPA-60-6 — Sonde capacitive 6 niveaux</option>
+              <option value="EC">EC — Sonde de fertigation</option>
+              <option value="T_MINI">T_MINI — Thermomètre sol</option>
+            </optgroup>
+            <optgroup label="Maladie">
+              <option value="LWS">LWS — Capteur d'humectation foliaire</option>
+              <option value="T_GEL">T_GEL — Capteur anti-gel</option>
+            </optgroup>
           </select>
           <select id="event-filter">
             <option value="">Tous événements</option>

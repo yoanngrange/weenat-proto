@@ -1,7 +1,9 @@
 // Previsions page logic
 import { plots } from '../data/plots.js'
+import { updateBreadcrumb } from '../js/breadcrumb.js'
 
 document.addEventListener('DOMContentLoaded', () => {
+  updateBreadcrumb()
   populateLocationSelect()
   generateForecast()
   generateHourlyTable()
@@ -9,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function populateLocationSelect() {
   const select = document.getElementById('location-select')
-  parcels.forEach(parcel => {
+  plots.forEach(parcel => {
     const option = document.createElement('option')
     option.value = parcel.id
     option.textContent = `${parcel.name} (${parcel.crop})`

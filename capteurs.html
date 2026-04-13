@@ -45,7 +45,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -63,52 +62,60 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Capteurs</div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
           <div class="topbar-actions">
+            <button id="import-btn" class="btn-secondary">Importer</button>
             <button id="export-csv-btn" class="btn-secondary">Exporter</button>
             <button id="export-btn">Ajouter</button>
           </div>
         </div>
-        <div id="filters">
-          <select id="metric-selector">
-            <option value="pluie">Pluie</option>
-            <option value="ru">Réserve utile</option>
-            <option value="temp">Température</option>
-          </select>
-          <select id="model-filter">
-            <option value="">Tous modèles</option>
-            <option value="P+">P+</option>
-            <option value="P">P</option>
-            <option value="PT">PT</option>
-            <option value="T">T</option>
-            <option value="T_MINI">T_MINI</option>
-            <option value="SMV">SMV</option>
-            <option value="EC">EC</option>
-            <option value="CHP-15/30">CHP-15/30</option>
-            <option value="CHP-30/60">CHP-30/60</option>
-          </select>
-          <select id="event-filter">
-            <option value="">Tous événements</option>
-            <option value="capteur couché">Capteur couché</option>
-            <option value="capteur déplacé">Capteur déplacé</option>
-            <option value="émissions interrompues">Émissions interrompues</option>
-            <option value="cuillère bloquée">Cuillère bloquée</option>
-          </select>
-          <select id="telecom-filter">
-            <option value="">Toutes télécoms</option>
-            <option value="Sigfox">Sigfox</option>
-            <option value="LoRa">LoRa</option>
-          </select>
-          <div id="active-filters"></div>
-          <select id="org-filter" class="network-only">
-            <option value="">Toutes organisations</option>
-          </select>
+        <div id="controls-row">
+          <!-- metric-selector kept hidden for main.js compat -->
+          <div id="metric-controls" style="display:none">
+            <select id="metric-selector"><option value="pluie">Pluie</option></select>
+          </div>
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-model">
+              <button class="filter-dropdown-btn" type="button">
+                Modèle <span class="fd-badge" id="badge-model" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-model"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-event">
+              <button class="filter-dropdown-btn" type="button">
+                Événement <span class="fd-badge" id="badge-event" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-event">
+                <label><input type="checkbox" value="capteur couché"> Capteur couché</label>
+                <label><input type="checkbox" value="capteur déplacé"> Capteur déplacé</label>
+                <label><input type="checkbox" value="émissions interrompues"> Émissions interrompues</label>
+                <label><input type="checkbox" value="cuillère bloquée"> Cuillère bloquée</label>
+              </div>
+            </div>
+            <div class="filter-dropdown" id="fd-telecom">
+              <button class="filter-dropdown-btn" type="button">
+                Télécom <span class="fd-badge" id="badge-telecom" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-telecom">
+                <label><input type="checkbox" value="Sigfox"> Sigfox</label>
+                <label><input type="checkbox" value="LoRa"> LoRa</label>
+              </div>
+            </div>
+            <div class="filter-dropdown network-only" id="fd-org" style="display:none">
+              <button class="filter-dropdown-btn" type="button">
+                Organisation <span class="fd-badge" id="badge-org" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-org"></div>
+            </div>
+            <div id="active-filters"></div>
+          </div>
         </div>
         <main id="content">
-          <div id="map-container" class="view active" data-view="map">
-            <div id="legend"></div>
-          </div>
-          <div id="list-container" class="view" data-view="list"></div>
+          <div id="list-container" class="view active" data-view="list"></div>
           <div id="admin-container" class="view" data-view="admin">
             <div id="stats-cards"></div>
             <div id="admin-table"></div>
@@ -116,8 +123,7 @@
         </main>
       </div>
       <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
+        <button class="view-btn active" data-view="list">Liste</button>
         <button class="view-btn" data-view="admin">Administration</button>
       </div>
     </div>

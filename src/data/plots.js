@@ -5,31 +5,31 @@ export const plots = [
   {
     id: 1, orgId: 1, name: "Le Grand Pré", lat: 48.1507, lng: -1.1858,
     area: 8.4, crop: "Blé tendre", reserveHydrique: 72, degresJour: 1210, texture: "Limon argileux",
-    irrigation: "Pas d'irrigation", integrations: ["Modèles Arvalis", "Disease Forecasting"],
+    irrigation: "Pas d'irrigation", integrations: ["Modèles Arvalis — PRÉVI-LIS / MILÉOS"],
     latlngs: [[48.1518,-1.1875],[48.1521,-1.1843],[48.1497,-1.1840],[48.1493,-1.1873]]
   },
   {
     id: 2, orgId: 1, name: "Les Trois Arpents", lat: 48.1508, lng: -1.1822,
     area: 5.2, crop: "Maïs", reserveHydrique: 58, degresJour: 1140, texture: "Limon argilo-sableux",
-    irrigation: "Pivot", integrations: ["Irrigation Optimisée", "Water Balance Model"],
+    irrigation: "Pivot", integrations: ["Pixagri"],
     latlngs: [[48.1521,-1.1843],[48.1519,-1.1805],[48.1495,-1.1806],[48.1497,-1.1840]]
   },
   {
     id: 3, orgId: 1, name: "La Petite Lande", lat: 48.1480, lng: -1.1860,
     area: 3.9, crop: "Orge", reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
-    irrigation: "Pas d'irrigation", integrations: ["Modèles Arvalis"],
+    irrigation: "Pas d'irrigation", integrations: [],
     latlngs: [[48.1493,-1.1873],[48.1497,-1.1840],[48.1477,-1.1843],[48.1473,-1.1878]]
   },
   {
     id: 4, orgId: 1, name: "Les Courtils", lat: 48.1480, lng: -1.1823,
     area: 4.5, crop: "Colza", reserveHydrique: 81, degresJour: 960, texture: "Limono-argileux fin",
-    irrigation: "Pas d'irrigation", integrations: ["Pest Alert System", "Carbon Footprint Tracker"],
+    irrigation: "Pas d'irrigation", integrations: [],
     latlngs: [[48.1497,-1.1840],[48.1495,-1.1806],[48.1471,-1.1810],[48.1473,-1.1843]]
   },
   {
     id: 5, orgId: 1, name: "La Grande Pièce", lat: 48.1530, lng: -1.1905,
     area: 11.2, crop: "Blé tendre", reserveHydrique: 76, degresJour: 1195, texture: "Limon fin",
-    irrigation: "Enrouleur", integrations: ["Modèles Arvalis", "Harvest Optimizer"],
+    irrigation: "Enrouleur", integrations: ["Cropwise Protector"],
     latlngs: [[48.1543,-1.1935],[48.1545,-1.1878],[48.1518,-1.1875],[48.1514,-1.1933]]
   },
 
@@ -43,13 +43,13 @@ export const plots = [
   {
     id: 7, orgId: 1, name: "La Croix", lat: 48.1688, lng: -1.1477,
     area: 4.1, crop: "Lin", reserveHydrique: 55, degresJour: 1010, texture: "Sable",
-    irrigation: "Pas d'irrigation", integrations: ["Crop Rotation Planner"],
+    irrigation: "Pas d'irrigation", integrations: [],
     latlngs: [[48.1700,-1.1503],[48.1700,-1.1454],[48.1678,-1.1457],[48.1677,-1.1504]]
   },
   {
     id: 8, orgId: 1, name: "La Lande", lat: 48.1754, lng: -1.1395,
     area: 8.7, crop: "Colza", reserveHydrique: 69, degresJour: 980, texture: "Argile limoneuse",
-    irrigation: "Rampe", integrations: ["Smart Irrigation Hub", "Water Balance Model"],
+    irrigation: "Rampe", integrations: [],
     latlngs: [[48.1771,-1.1422],[48.1770,-1.1370],[48.1739,-1.1373],[48.1740,-1.1424]]
   },
 
@@ -57,19 +57,19 @@ export const plots = [
   {
     id: 9, orgId: 1, name: "Le Marais Bas", lat: 48.1238, lng: -1.2170,
     area: 7.5, crop: "Betterave sucrière", reserveHydrique: 90, degresJour: 1100, texture: "Limon",
-    irrigation: "Goutte à goutte", integrations: ["Soil Moisture Monitor", "Nutrient Deficiency Detector"],
+    irrigation: "Goutte à goutte", integrations: [],
     latlngs: [[48.1253,-1.2194],[48.1254,-1.2148],[48.1224,-1.2150],[48.1222,-1.2196]]
   },
   {
     id: 10, orgId: 1, name: "La Côte", lat: 48.1206, lng: -1.2172,
     area: 5.1, crop: "Pomme de terre", reserveHydrique: 62, degresJour: 1055, texture: "Limon sableux",
-    irrigation: "Couverture intégrale", integrations: ["Frost Protection", "Crop Yield Predictor"],
+    irrigation: "Couverture intégrale", integrations: [],
     latlngs: [[48.1222,-1.2196],[48.1224,-1.2150],[48.1192,-1.2153],[48.1190,-1.2198]]
   },
   {
     id: 11, orgId: 1, name: "Le Pré du Val", lat: 48.1177, lng: -1.2152,
     area: 4.8, crop: "Maïs", reserveHydrique: 74, degresJour: 1130, texture: "Sable limoneux",
-    irrigation: "Micro aspersion", integrations: ["Irrigation Optimisée"],
+    irrigation: "Micro aspersion", integrations: ["IRRÉ-LIS Mono-Culture"],
     latlngs: [[48.1190,-1.2153],[48.1192,-1.2115],[48.1163,-1.2118],[48.1161,-1.2157]]
   },
 
@@ -83,19 +83,19 @@ export const plots = [
   {
     id: 13, orgId: 1, name: "Les Haies", lat: 48.1355, lng: -1.2362,
     area: 4.3, crop: "Pois de printemps", reserveHydrique: 79, degresJour: 930, texture: "Argile",
-    irrigation: "Gravitaire", integrations: ["Weather Integration"],
+    irrigation: "Gravitaire", integrations: [],
     latlngs: [[48.1370,-1.2385],[48.1372,-1.2343],[48.1341,-1.2345],[48.1339,-1.2387]]
   },
   {
     id: 14, orgId: 1, name: "Le Clos", lat: 48.0912, lng: -1.1828,
     area: 5.7, crop: "Tournesol", reserveHydrique: 53, degresJour: 1270, texture: "Sable limoneux",
-    irrigation: "Goutte à goutte enterré", integrations: ["Soil Moisture Monitor"],
+    irrigation: "Goutte à goutte enterré", integrations: [],
     latlngs: [[48.0926,-1.1851],[48.0928,-1.1808],[48.0900,-1.1810],[48.0897,-1.1854]]
   },
   {
     id: 15, orgId: 1, name: "La Plaine", lat: 48.1655, lng: -1.2108,
     area: 12.3, crop: "Blé tendre", reserveHydrique: 83, degresJour: 1185, texture: "Limon argileux",
-    irrigation: "Enrouleur", integrations: ["Modèles Arvalis", "Fertilizer Calculator", "Carbon Footprint Tracker"],
+    irrigation: "Enrouleur", integrations: ["Modèles Arvalis — PRÉVI-LIS / MILÉOS", "Xarvio"],
     latlngs: [[48.1674,-1.2141],[48.1676,-1.2079],[48.1637,-1.2083],[48.1635,-1.2145]]
   },
 

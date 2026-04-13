@@ -43,7 +43,6 @@
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
         <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-        <a href="informations.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -61,29 +60,21 @@
 
       <div id="main-content">
         <div id="topbar">
-          <div id="breadcrumb">Intégrations</div>
+          <div id="breadcrumb">
+            <div id="breadcrumb-context"></div>
+            <div id="breadcrumb-title"></div>
+          </div>
         </div>
         <div id="filters">
-          <select id="type-filter">
-            <option value="">Tous types</option>
-            <option value="maladie">Maladie</option>
-            <option value="irrigation">Irrigation</option>
-            <option value="autre">Autre</option>
-          </select>
-          <select id="country-filter">
-            <option value="">Tous pays</option>
-            <!-- 15 pays européens -->
-          </select>
+          <div class="filter-pills-row">
+            <button class="filter-pill active" data-type="">Toutes</button>
+            <button class="filter-pill" data-type="maladie">Maladie &amp; ravageurs</button>
+            <button class="filter-pill" data-type="irrigation">Irrigation</button>
+            <button class="filter-pill" data-type="fertilisation">Fertilisation &amp; traitements</button>
+          </div>
         </div>
         <main id="content">
-          <div id="integrations-grid">
-            <div class="integration-card">
-              <div class="logo">🌾</div>
-              <h3>Modèles Arvalis</h3>
-              <p>Description...</p>
-            </div>
-            <!-- Plus de cartes -->
-          </div>
+          <div id="integrations-grid"></div>
         </main>
       </div>
     </div>

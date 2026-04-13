@@ -1,42 +1,79 @@
-// Informations page logic
-import { organizations } from '../data/orgs.js'
+// Informations page logic — visible to adhérents réseau
+import { orgs } from '../data/orgs.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
+import { network } from '../data/network.js'
+import { updateBreadcrumb } from '../js/breadcrumb.js'
 
 document.addEventListener('DOMContentLoaded', () => {
-  updateNetworkStats()
-  initNetworkMap()
+  updateBreadcrumb()
+  renderNetworkInfo()
 })
 
-function updateNetworkStats() {
+function renderNetworkInfo() {
+  const container = document.getElementById('network-info')
   const totalSensors = sensors.length
-  const weatherSensors = sensors.filter(s => s.model.includes('Meteo')).length
-  const irrigationSensors = sensors.filter(s => s.model.includes('Irrigation')).length
-  const totalParcels = parcels.length
-  const totalAdherents = organizations.length
+  const totalParcels = plots.length
+  const totalAdherents = orgs.length
 
-  document.querySelector('.stat:nth-child(1)').textContent = `Capteurs météo: ${weatherSensors}`
-  document.querySelector('.stat:nth-child(2)').textContent = `Capteurs irrigation: ${irrigationSensors}`
-  document.querySelector('.stat:nth-child(3)').textContent = `Parcelles: ${totalParcels}`
-  document.querySelector('.stat:nth-child(4)').textContent = `Adhérents: ${totalAdherents}`
-}
+  function esc(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  }
 
-function initNetworkMap() {
-  const map = L.map('network-map').setView([46.5, 2.5], 6) // Center on France
+  function getInitials(name) {
+    return (name || '?').split(/[\s\-']+/).slice(0, 2).map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  }
 
-  // Add satellite tiles
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-  }).addTo(map)
+  const antennesHtml = network.antennes.map(a => `
+    <div class="info-location-card">
+      <div class="info-location-name">${esc(a.nom)}</div>
+      <div class="info-location-addr">${[esc(a.adresse), esc(a.codePostal), esc(a.ville)].filter(Boolean).join(', ')}</div>
+      ${a.telephone ? `<div class="info-location-tel"><i class="bi bi-telephone"></i> ${esc(a.telephone)}</div>` : ''}
+    </div>`).join('')
 
-  // Add markers for organizations
-  organizations.forEach(org => {
-    const marker = L.marker([org.location.lat, org.location.lng])
-      .addTo(map)
-      .bindPopup(`<b>${org.name}</b><br>${org.location.city}, ${org.location.department}`)
-  })
+  container.innerHTML = `
+    <div class="info-header">
+      <div class="info-logo-avatar">${getInitials(network.nom)}</div>
+      <div>
+        <h1 class="info-nom">${esc(network.nom)}</h1>
+        <div class="info-contacts">
+          ${network.telephone ? `<span><i class="bi bi-telephone"></i> ${esc(network.telephone)}</span>` : ''}
+          ${network.email ? `<span><i class="bi bi-envelope"></i> <a href="mailto:${esc(network.email)}">${esc(network.email)}</a></span>` : ''}
+          ${network.siteWeb ? `<span><i class="bi bi-globe"></i> ${esc(network.siteWeb)}</span>` : ''}
+        </div>
+      </div>
+    </div>
 
-  // Fit map to markers
-  const group = new L.featureGroup(organizations.map(org => L.marker([org.location.lat, org.location.lng])))
-  map.fitBounds(group.getBounds().pad(0.1))
+    <p class="info-description">${esc(network.description)}</p>
+
+    <div class="info-stats-row">
+      <div class="info-stat">
+        <div class="info-stat-value">${totalSensors}</div>
+        <div class="info-stat-label">Capteurs</div>
+      </div>
+      <div class="info-stat">
+        <div class="info-stat-value">${totalParcels}</div>
+        <div class="info-stat-label">Parcelles</div>
+      </div>
+      <div class="info-stat">
+        <div class="info-stat-value">${totalAdherents}</div>
+        <div class="info-stat-label">Adhérents</div>
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3><i class="bi bi-geo-alt"></i> Siège social</h3>
+      <div class="info-location-card">
+        <div class="info-location-addr">
+          ${[esc(network.siege.adresse), esc(network.siege.codePostal), esc(network.siege.ville)].filter(Boolean).join(', ')}
+        </div>
+        ${network.telephone ? `<div class="info-location-tel"><i class="bi bi-telephone"></i> ${esc(network.telephone)}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="info-section">
+      <h3><i class="bi bi-pin-map"></i> Antennes &amp; points de vente</h3>
+      <div class="info-locations-grid">${antennesHtml}</div>
+    </div>
+  `
 }

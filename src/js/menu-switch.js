@@ -13,8 +13,7 @@ const menuData = {
       { href: 'capteurs-reseau.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'adherents.html', icon: 'bi-person-plus', text: 'Adhérents' },
       { href: 'facturation.html', icon: 'bi-receipt', text: 'Facturation' },
-      { href: 'parametres-reseau.html', icon: 'bi-gear', text: 'Paramètres' },
-      { href: 'informations.html', icon: 'bi-info-circle', text: 'Informations' }
+      { href: 'parametres-reseau.html', icon: 'bi-gear', text: 'Paramètres' }
     ]
   },
   'adherent-reseau': {
@@ -48,7 +47,7 @@ function getCurrentPage() {
 function generateMenuContent(role, currentPage) {
   const structure = menuData[role];
   let html = '';
-  
+
   html += '<div class="nav-section" data-section="exploitation">Mon exploitation</div>';
   html += '<div class="nav-group exploitation">';
   structure.exploitation.forEach(link => {
@@ -90,10 +89,92 @@ function switchMenuRole() {
   localStorage.setItem('menuRole', newRole);
 }
 
-window.addEventListener('load', function() {
+// ——— Add modal ———
+
+function getCurrentRole() {
+  const sidebar = document.getElementById('sidebar');
+  return sidebar ? sidebar.getAttribute('data-role') || 'admin-reseau' : 'admin-reseau';
+}
+
+function openAddModal() {
+  const role = getCurrentRole();
+  const isAdmin = role === 'admin-reseau';
+
+  const modal = document.createElement('div');
+  modal.className = 'modal add-modal';
+  modal.innerHTML = `
+    <div class="add-modal-content">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Ajouter</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+
+      <div class="add-modal-section">
+        <div class="add-modal-section-label">Mon exploitation</div>
+        <div class="add-modal-grid">
+          <button class="add-item-btn" data-action="parcelle">
+            <i class="bi bi-geo-alt-fill"></i>
+            <span>Parcelle</span>
+          </button>
+          <button class="add-item-btn" data-action="capteur">
+            <i class="bi bi-broadcast"></i>
+            <span>Capteur</span>
+          </button>
+          <button class="add-item-btn" data-action="station">
+            <i class="bi bi-cloud-sun-fill"></i>
+            <span>Station météo virtuelle</span>
+          </button>
+          <button class="add-item-btn" data-action="membre">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>Membre</span>
+          </button>
+        </div>
+      </div>
+
+      ${isAdmin ? `
+      <div class="add-modal-section">
+        <div class="add-modal-section-label">Mon réseau</div>
+        <div class="add-modal-grid">
+          <button class="add-item-btn" data-action="adherent">
+            <i class="bi bi-building"></i>
+            <span>Adhérent</span>
+          </button>
+        </div>
+      </div>` : ''}
+
+      <div class="add-modal-section">
+        <div class="add-modal-section-label">Mon compte</div>
+        <div class="add-modal-grid">
+          <button class="add-item-btn" data-action="alerte">
+            <i class="bi bi-bell-fill"></i>
+            <span>Alerte</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Close on backdrop click
+  modal.addEventListener('click', e => {
+    if (e.target === modal) modal.remove();
+  });
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove());
+
+  // Action buttons (stub — log for prototype)
+  modal.querySelectorAll('.add-item-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      console.log('[add]', btn.dataset.action);
+      modal.remove();
+    });
+  });
+
+  document.body.appendChild(modal);
+}
+
+window.addEventListener('load', function () {
   const savedRole = localStorage.getItem('menuRole');
   const sidebar = document.getElementById('sidebar');
-  
+
   if (savedRole && savedRole === 'adherent-reseau' && sidebar) {
     const currentPage = getCurrentPage();
     const navLinks = document.getElementById('nav-links');
@@ -102,5 +183,11 @@ window.addEventListener('load', function() {
     sidebar.setAttribute('data-role', 'adherent-reseau');
   } else if (sidebar) {
     sidebar.setAttribute('data-role', 'admin-reseau');
+  }
+
+  // Wire up the + button on every page
+  const addBtn = document.getElementById('add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', openAddModal);
   }
 });
