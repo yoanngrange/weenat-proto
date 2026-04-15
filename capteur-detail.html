@@ -66,48 +66,44 @@
             <div id="breadcrumb-context"></div>
             <div id="breadcrumb-title"></div>
           </div>
-          <div class="topbar-actions">
-            <button id="modifier-btn" class="btn-secondary"><i class="bi bi-pencil"></i> Modifier</button>
-          </div>
         </div>
         <main id="content" class="detail-content">
           <div class="detail-layout" id="detail-layout">
 
             <div class="detail-main">
-              <div class="detail-header">
-                <div class="detail-header-info">
-                  <h1 id="sensor-title" class="detail-title"></h1>
-                  <div class="detail-meta-row">
-                    <span id="sensor-model-badge" class="detail-badge"></span>
-                    <span id="sensor-event-badge" class="detail-badge detail-badge--err" style="display:none">
-                      <i class="bi bi-exclamation-triangle-fill"></i>
-                      <span id="sensor-event-text">Événement actif</span>
-                    </span>
-                    <span id="sensor-last-msg" class="detail-meta-dim"></span>
-                  </div>
+              <div id="latest-strip-wrap" class="latest-strip-wrap">
+                <div class="latest-strip-title">Dernières données</div>
+                <div id="latest-strip" class="latest-strip"></div>
+              </div>
+              <div class="chart-controls chart-controls--sticky">
+                <div class="period-presets" id="period-presets">
+                  <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
+                  <button class="period-preset-btn" data-period="hier">Hier</button>
+                  <button class="period-preset-btn" data-period="3d">3 jours</button>
+                  <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                  <button class="period-preset-btn" data-period="30d">30 jours</button>
+                  <button class="period-preset-btn" data-period="365d">365 jours</button>
+                  <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
                 </div>
-                <div class="detail-period-selector">
-                  <select id="period-select">
-                    <option value="7d">7 jours</option>
-                    <option value="30d">30 jours</option>
-                    <option value="3m">3 mois</option>
-                    <option value="1y">1 an</option>
-                  </select>
-                  <select id="time-step">
-                    <option value="1h">1h</option>
-                    <option value="6h">6h</option>
-                    <option value="1d">1 jour</option>
-                  </select>
+                <div id="custom-date-row" class="custom-date-row" style="display:none">
+                  <input type="date" id="date-from">
+                  <span class="custom-date-sep">—</span>
+                  <input type="date" id="date-to">
                 </div>
+                <select id="time-step" class="time-step-select">
+                  <option value="max">Maximal</option>
+                  <option value="1h" selected>Horaire</option>
+                  <option value="1d">Journalier</option>
+                  <option value="1w">Hebdomadaire</option>
+                </select>
               </div>
 
-              <div id="latest-strip" class="latest-strip"></div>
               <div id="charts-container" class="charts-stack"></div>
             </div>
 
             <div class="detail-panel" id="detail-panel">
               <button class="panel-toggle-btn" id="panel-toggle" title="Masquer le panneau">
-                <i class="bi bi-layout-sidebar-reverse"></i>
+                <i class="bi bi-chevron-right"></i>
               </button>
               <div class="panel-inner">
                 <div class="panel-section">
@@ -126,6 +122,10 @@
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-exclamation-circle"></i> Événements en cours</div>
                   <div class="panel-section-bd" id="panel-events"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Parcelles liées</div>
+                  <div class="panel-section-bd" id="panel-plots"></div>
                 </div>
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-graph-up"></i> Données disponibles</div>

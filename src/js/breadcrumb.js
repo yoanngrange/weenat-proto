@@ -19,26 +19,39 @@ export const PAGE_TITLES = {
   'aide.html': { title: 'Aide', section: null },
   'capteur-detail.html': { title: 'Capteur', section: 'exploitation' },
   'parcelle-detail.html': { title: 'Parcelle', section: 'exploitation' },
+  'parcelle-modifier-contour.html': { title: 'Modifier le contour', section: 'exploitation' },
   'integration-detail.html': { title: 'Intégration', section: 'exploitation' },
 }
 
 /**
- * Fill #breadcrumb-context and #breadcrumb-title based on the current page URL.
- * @param {string} [titleOverride] - If provided, overrides the title from PAGE_TITLES.
+ * Fill #breadcrumb-context and #breadcrumb-title.
+ * @param {string} titleOverride  - Overrides the page-level title (e.g. parcel name).
+ * @param {object} [parent]       - Optional parent link: { label, href }
+ *   When provided, the title line becomes: "ParentLabel › Title"
  */
-export function updateBreadcrumb(titleOverride) {
+export function updateBreadcrumb(titleOverride, parent) {
   const page = window.location.pathname.split('/').pop() || 'parcelles.html'
   const meta = PAGE_TITLES[page] || { title: 'Parcelles', section: 'exploitation' }
 
   const contextEl = document.getElementById('breadcrumb-context')
-  const titleEl = document.getElementById('breadcrumb-title')
+  const titleEl   = document.getElementById('breadcrumb-title')
   if (!contextEl || !titleEl) return
 
   const sectionLabel =
-    meta.section === 'reseau' ? 'Mon réseau' :
+    meta.section === 'reseau'       ? 'Mon réseau' :
     meta.section === 'exploitation' ? 'Mon exploitation' : ''
+
   contextEl.textContent = sectionLabel
   contextEl.hidden = !sectionLabel
 
-  titleEl.textContent = titleOverride !== undefined ? titleOverride : meta.title
+  const title = titleOverride !== undefined ? titleOverride : meta.title
+
+  if (parent) {
+    titleEl.innerHTML =
+      `<a href="${parent.href}" class="breadcrumb-parent">${parent.label}</a>` +
+      `<span class="breadcrumb-sep">›</span>` +
+      `<span>${title}</span>`
+  } else {
+    titleEl.textContent = title
+  }
 }

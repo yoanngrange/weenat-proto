@@ -893,7 +893,7 @@ function renderAdmin(filteredParcels, filteredSensors) {
         <div class="stat-card"><div class="stat-label">Surface moyenne</div><div class="stat-value">${avgArea.toFixed(1)} ha</div></div>
         <div class="stat-card"><div class="stat-label">Cultures</div><div class="stat-value">${uniqueCultures}</div></div>
         <div class="stat-card"><div class="stat-label">Avec capteur</div><div class="stat-value">${withSensors}</div></div>
-        <div class="stat-card warn"><div class="stat-label">Sans capteur</div><div class="stat-value">${withoutSensors}</div></div>
+        <div class="stat-card"><div class="stat-label">Sans capteur</div><div class="stat-value">${withoutSensors}</div></div>
         <div class="stat-card"><div class="stat-label">Capteurs liés</div><div class="stat-value">${totalSensorsLinked}</div></div>
         <div class="stat-card"><div class="stat-label">Avec intégration</div><div class="stat-value">${withInteg}</div></div>
         <div class="stat-card"><div class="stat-label">Avec irrigation</div><div class="stat-value">${withIrrigation}</div></div>
@@ -910,7 +910,7 @@ function renderAdmin(filteredParcels, filteredSensors) {
     container.innerHTML += `
       <div id="stats-cards">
         <div class="stat-card"><div class="stat-label">Capteurs actifs</div><div class="stat-value">${totalSensors}</div></div>
-        <div class="stat-card warn"><div class="stat-label">Avec événement</div><div class="stat-value">${sensorsWithEvent}</div></div>
+        <div class="stat-card"><div class="stat-label">Avec événement</div><div class="stat-value">${sensorsWithEvent}</div></div>
         <div class="stat-card"><div class="stat-label">Qualité réseau moy.</div><div class="stat-value">${avgNetworkQuality.toFixed(1)} %</div></div>
       </div>
     `
@@ -1078,21 +1078,34 @@ function createParcelMetricTable(parcels) {
 }
 
 // ── Vue admin parcelles : info + modification ────────────────────────────────
-function parcelMinimap(parcel) {
-  const W = 64, H = 44, pad = 5
-  if (!parcel.latlngs || parcel.latlngs.length < 3) {
-    return `<svg width="${W}" height="${H}"><rect x="4" y="4" width="${W-8}" height="${H-8}" rx="3" fill="var(--bdr2)" stroke="var(--bdr)" stroke-width="1"/></svg>`
-  }
-  const lats = parcel.latlngs.map(p => p[0])
-  const lngs = parcel.latlngs.map(p => p[1])
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
-  const rngLng = maxLng - minLng || 0.0001
-  const rngLat = maxLat - minLat || 0.0001
-  const sx = lng => (pad + (lng - minLng) / rngLng * (W - 2 * pad)).toFixed(1)
-  const sy = lat => (pad + (maxLat - lat) / rngLat * (H - 2 * pad)).toFixed(1)
-  const pts = parcel.latlngs.map(p => `${sx(p[1])},${sy(p[0])}`).join(' ')
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polygon points="${pts}" style="fill:var(--pri2);stroke:var(--pri);stroke-width:1.5"/></svg>`
+const adminMiniMaps = new Map() // parcelId → L.map instance
+
+function initAdminMinimaps(container) {
+  adminMiniMaps.forEach(m => { try { m.remove() } catch (_) {} })
+  adminMiniMaps.clear()
+
+  container.querySelectorAll('.admin-minimap[data-parcel-id]').forEach(div => {
+    const id      = div.dataset.parcelId
+    const latlngs = JSON.parse(decodeURIComponent(div.dataset.latlngs || '%5B%5D'))
+    const lat     = parseFloat(div.dataset.lat)
+    const lng     = parseFloat(div.dataset.lng)
+
+    const m = L.map(div, {
+      zoomControl: false, attributionControl: false,
+      dragging: false, touchZoom: false, scrollWheelZoom: false,
+      doubleClickZoom: false, boxZoom: false, keyboard: false,
+    })
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(m)
+
+    if (latlngs.length >= 3) {
+      const poly = L.polygon(latlngs, { color: 'white', weight: 1.5, fillColor: '#0172A4', fillOpacity: 0.35 }).addTo(m)
+      m.fitBounds(poly.getBounds(), { padding: [4, 4] })
+    } else {
+      m.setView([lat, lng], 14)
+      L.circleMarker([lat, lng], { radius: 5, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 1.5 }).addTo(m)
+    }
+    adminMiniMaps.set(id, m)
+  })
 }
 
 function createParcelAdminTable(parcels) {
@@ -1106,7 +1119,7 @@ function createParcelAdminTable(parcels) {
       <div class="bulk-actions">
         <button class="btn-secondary btn-sm" id="bulk-crop-btn"><i class="bi bi-flower1"></i> Modifier la culture</button>
         <button class="btn-secondary btn-sm" id="bulk-texture-btn"><i class="bi bi-layers"></i> Modifier la texture</button>
-        <button class="btn-secondary btn-sm" id="bulk-env-btn"><i class="bi bi-droplet"></i> Modifier l'environnement</button>
+        <button class="btn-secondary btn-sm" id="bulk-env-btn"><i class="bi bi-droplet"></i> Modifier l'irrigation</button>
         <button class="btn-secondary btn-sm" id="bulk-integ-btn"><i class="bi bi-plug"></i> Activer une intégration</button>
         <button class="btn-secondary btn-sm" id="bulk-alert-btn"><i class="bi bi-bell"></i> Créer une alerte</button>
         <button class="btn-secondary btn-sm" id="bulk-member-btn"><i class="bi bi-person"></i> Associer à un membre</button>
@@ -1124,7 +1137,7 @@ function createParcelAdminTable(parcels) {
   html += '<th data-column="crop">Culture</th>'
   html += '<th data-column="area">Surface (ha)</th>'
   html += '<th data-column="texture">Texture</th>'
-  html += '<th data-column="irrigation">Environnement</th>'
+  html += '<th data-column="irrigation">Irrigation</th>'
   html += '<th data-column="sensors">Capteurs</th>'
   html += '<th data-column="integrations">Intégrations</th>'
   html += '<th data-column="membre">Membres</th>'
@@ -1136,27 +1149,37 @@ function createParcelAdminTable(parcels) {
     const integList = parcel.integrations || []
 
     const sensorsHtml = parcelSensors.length
-      ? parcelSensors.map(s => `<a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial}</a>`).join('<br>')
+      ? parcelSensors.map(s => `
+          <div class="admin-item-row">
+            <a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial}</a>
+            <button class="icon-btn remove-sensor-admin" data-sensor-id="${s.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+          </div>`).join('')
       : '<span class="tag-none">—</span>'
 
     const integHtml = integList.length
       ? integList.map(name => {
           const id = INTEGRATION_IDS[name]
-          return id
-            ? `<a href="integration-detail.html?id=${id}" class="admin-link">${name}</a>`
-            : `<span>${name}</span>`
-        }).join('<br>')
+          return `
+            <div class="admin-item-row">
+              ${id ? `<a href="integration-detail.html?id=${id}" class="admin-link">${name}</a>` : `<span class="admin-link">${name}</span>`}
+              <button class="icon-btn remove-integ-admin" data-parcel-id="${parcel.id}" data-name="${encodeURIComponent(name)}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+            </div>`
+        }).join('')
       : '<span class="tag-none">—</span>'
 
     const parcelMembers = members.filter(m => m.parcelIds.includes(parcel.id))
     const membreHtml = parcelMembers.length
-      ? parcelMembers.map(m => `<a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>`).join('<br>')
+      ? parcelMembers.map(m => `
+          <div class="admin-item-row">
+            <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+            <button class="icon-btn remove-member-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+          </div>`).join('')
       : '<span class="tag-none">—</span>'
 
     html += `<tr>
       <td><input type="checkbox" class="parcel-admin-check" data-id="${parcel.id}"></td>
       <td><a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${parcel.name}</a></td>
-      <td class="col-minimap">${parcelMinimap(parcel)}</td>
+      <td class="col-minimap"><div class="admin-minimap" data-parcel-id="${parcel.id}" data-latlngs="${encodeURIComponent(JSON.stringify(parcel.latlngs || []))}" data-lat="${parcel.lat}" data-lng="${parcel.lng}"></div></td>
       <td>
         <select class="inline-edit" data-field="crop" data-id="${parcel.id}">
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
@@ -1189,6 +1212,50 @@ function createParcelAdminTable(parcels) {
 }
 
 function initParcelAdminTable(container) {
+  // Initialize satellite mini-maps
+  setTimeout(() => initAdminMinimaps(container), 0)
+
+  // Remove sensor from parcel
+  container.querySelectorAll('.remove-sensor-admin').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const sensorId = parseInt(btn.dataset.sensorId)
+      const sensor = sensors.find(s => s.id === sensorId)
+      if (sensor) sensor.parcelId = null
+      const { parcels } = getFilteredData()
+      container.innerHTML = createParcelAdminTable(parcels)
+      initParcelAdminTable(container)
+    })
+  })
+
+  // Remove integration from parcel
+  container.querySelectorAll('.remove-integ-admin').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const parcelId = parseInt(btn.dataset.parcelId)
+      const name = decodeURIComponent(btn.dataset.name)
+      const plot = plots.find(p => p.id === parcelId)
+      if (plot) plot.integrations = (plot.integrations || []).filter(i => i !== name)
+      const { parcels } = getFilteredData()
+      container.innerHTML = createParcelAdminTable(parcels)
+      initParcelAdminTable(container)
+    })
+  })
+
+  // Remove member from parcel
+  container.querySelectorAll('.remove-member-admin').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const memberId = parseInt(btn.dataset.memberId)
+      const parcelId = parseInt(btn.dataset.parcelId)
+      const member = members.find(m => m.id === memberId)
+      if (member) member.parcelIds = (member.parcelIds || []).filter(id => id !== parcelId)
+      const { parcels } = getFilteredData()
+      container.innerHTML = createParcelAdminTable(parcels)
+      initParcelAdminTable(container)
+    })
+  })
+
   // Inline edits → show save button
   container.querySelectorAll('.inline-edit').forEach(input => {
     input.addEventListener('change', () => {
@@ -1280,7 +1347,7 @@ function initParcelAdminTable(container) {
         const plot = plots.find(p => p.id === id)
         if (plot) plot.irrigation = val
       })
-      showToast(`Environnement mis à jour pour ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
+      showToast(`Irrigation mise à jour pour ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
       const { parcels } = getFilteredData()
       container.innerHTML = createParcelAdminTable(parcels)
       initParcelAdminTable(container)
