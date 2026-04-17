@@ -66,16 +66,50 @@
             <div id="breadcrumb-context"></div>
             <div id="breadcrumb-title"></div>
           </div>
+          <div class="topbar-actions">
+            <button class="btn-secondary" id="export-notifs-btn"><i class="bi bi-download"></i> Exporter</button>
+          </div>
+        </div>
+        <div id="controls-row" style="position:sticky;top:60px;z-index:90;background:var(--bg)">
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <select class="param-input" id="filter-notif-type">
+              <option value="">Catégorie</option>
+              <option value="capteur">Capteur</option>
+              <option value="parcelle">Parcelle</option>
+              <option value="membre">Membre</option>
+              <option value="alerte">Alerte</option>
+              <option value="intégration">Intégration</option>
+              <option value="adhérent">Adhérent</option>
+            </select>
+            <select class="param-input" id="filter-notif-org">
+              <option value="">Organisation</option>
+            </select>
+            <select class="param-input" id="filter-notif-secteur">
+              <option value="">Secteur</option>
+            </select>
+            <select class="param-input" id="filter-notif-capteur">
+              <option value="">Capteur</option>
+            </select>
+            <select class="param-input" id="filter-notif-periode">
+              <option value="">Période</option>
+              <option value="today">Aujourd'hui</option>
+              <option value="yesterday">Hier</option>
+              <option value="7d">7 derniers jours</option>
+              <option value="30d">30 derniers jours</option>
+              <option value="365d">365 derniers jours</option>
+            </select>
+          </div>
         </div>
         <main id="content">
-          <div class="notifications-content">
-            <h2>Mes Notifications</h2>
-            <p>Centre de notifications</p>
+          <div class="admin-content" style="padding:20px 24px">
+            <div id="notif-wall" class="notif-wall"></div>
+            <div id="notif-pagination" class="notif-pagination"></div>
           </div>
         </main>
       </div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/pages/notifications.js"></script>
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>

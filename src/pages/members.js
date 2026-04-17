@@ -32,10 +32,20 @@ let selectedStatuts = ['actif', 'invité']
 let currentSort     = { column: null, direction: 'asc' }
 let selectedIds     = new Set()
 
+const ADHERENT_MEMBERS = [
+  { id: 901, prenom: 'Marie',       nom: 'Martin',     email: 'marie.martin@ferme-du-bocage.fr',     role: 'propriétaire', statut: 'actif' },
+  { id: 902, prenom: 'Jean-Michel', nom: 'Dutilleul',  email: 'jm.dutilleul@ferme-du-bocage.fr',     role: 'admin',        statut: 'actif' },
+]
+
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
-  initFilters()
-  render()
+  const role = localStorage.getItem('menuRole') || 'admin-reseau'
+  if (role === 'adherent-reseau') {
+    renderAdherentMembers()
+  } else {
+    initFilters()
+    render()
+  }
 })
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -359,6 +369,30 @@ function updateStats(list) {
       <div class="stat-label">${s.label}</div>
       <div class="stat-value">${s.value}</div>
     </div>
+  `).join('')
+}
+
+function renderAdherentMembers() {
+  const statsEl = document.getElementById('stats-cards')
+  if (statsEl) {
+    statsEl.innerHTML = [
+      { label: 'Membres', value: 2 },
+      { label: 'Actifs', value: 2 },
+    ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div></div>`).join('')
+  }
+
+  const tbody = document.querySelector('#members-table tbody')
+  if (!tbody) return
+  tbody.innerHTML = ADHERENT_MEMBERS.map(m => `
+    <tr>
+      <td class="col-check"></td>
+      <td><span class="member-name">${m.prenom} ${m.nom}</span><div class="member-email-sub">${m.email}</div></td>
+      <td>${m.role}</td>
+      <td class="admin-links-cell"><span class="tag-none">—</span></td>
+      <td class="admin-links-cell"><span class="tag-none">—</span></td>
+      <td class="admin-links-cell"><span class="tag-none">—</span></td>
+      <td>${statutBadge(m.statut)}</td>
+    </tr>
   `).join('')
 }
 

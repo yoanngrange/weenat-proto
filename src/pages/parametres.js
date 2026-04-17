@@ -49,7 +49,7 @@ function renderForm() {
     <div class="param-section">
       <div class="param-section-title">Mon exploitation</div>
 
-      <div class="param-form-grid">
+      <div class="param-form-grid" style="max-width:640px">
         <div class="param-field">
           <label class="param-label">Nom de l'exploitation</label>
           <input type="text" class="param-input" id="org-name" value="${org.name || ''}">

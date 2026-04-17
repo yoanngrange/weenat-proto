@@ -12,13 +12,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const CONTRACT = {
-  plan:             'Plus',
-  anniversaire:     '2022-03-15',
-  numero:           'CTR-2022-00418',
-  licencesMembres:  5,
-  licencesAdherents: 3,
-  licencesTotal:    8,
-  prixUnitaire:     29,   // € HT / mois
+  plan:                 'Plus',
+  anniversaire:         '2022-03-15',
+  numero:               'CTR-2022-00418',
+  licencesMembres:      5,
+  licencesAdherents:    3,
+  licencesIntegrations: 27,
+  licencesTotal:        8,
+  prixUnitaire:         29,   // € HT / mois
 }
 
 const BILLING_ADDR = {
@@ -37,7 +38,6 @@ function renderBillingPage() {
   if (!root) return
 
   const invoices = generateInvoices()
-  const pending  = invoices.filter(i => i.statut === 'en attente').length
 
   root.innerHTML = `
     <!-- 2-column top: stats+contract left, billing address right -->
@@ -55,13 +55,13 @@ function renderBillingPage() {
               <div class="billing-stat-value">${CONTRACT.licencesAdherents}</div>
               <div class="billing-stat-label">Licences adhérents</div>
             </div>
+            <div class="billing-stat-card">
+              <div class="billing-stat-value">${CONTRACT.licencesIntegrations}</div>
+              <div class="billing-stat-label">Licences intégrations</div>
+            </div>
             <div class="billing-stat-card billing-stat-card--total">
               <div class="billing-stat-value">${CONTRACT.licencesTotal}</div>
               <div class="billing-stat-label">Total licences</div>
-            </div>
-            <div class="billing-stat-card${pending > 0 ? ' billing-stat-card--warn' : ''}">
-              <div class="billing-stat-value">${pending}</div>
-              <div class="billing-stat-label">Facture${pending !== 1 ? 's' : ''} en attente</div>
             </div>
           </div>
         </div>

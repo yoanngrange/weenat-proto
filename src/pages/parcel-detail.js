@@ -155,7 +155,14 @@ function getPeriodMinutes() {
 
 function getStepMinutes() {
   const step = document.getElementById('time-step')?.value || '1h'
-  return { max: 15, '1h': 60, '1d': 1440, '1w': 10080 }[step] ?? 60
+  return { max: 15, '1h': 60, '1d': 1440, '1w': 10080, '1mo': 43200 }[step] ?? 60
+}
+
+function getDefaultStep(period) {
+  if (period === '365d') return '1mo'
+  if (period === '30d')  return '1w'
+  if (period === '7d')   return '1d'
+  return '1h'
 }
 
 function getDisplayCount() {
@@ -184,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPanel()
   initPanelToggle()
   initPeriodControls()
-  initMiniMap()
+  initTabs()
+  initDashGrid()
 })
 
 // ─── Weather strip ────────────────────────────────────────────────────────────
@@ -344,10 +352,15 @@ function smoothPath(points) {
 // ─── X-axis label formatter ───────────────────────────────────────────────────
 
 function xLabel(agoMins) {
-  if (agoMins < 120)        return `-${agoMins}min`
-  if (agoMins < 2880)       return `-${Math.round(agoMins / 60)}h`
-  if (agoMins < 20160)      return `-${Math.round(agoMins / 1440)}j`
-  return `-${Math.round(agoMins / 10080)}sem`
+  const d = new Date(Date.now() - agoMins * 60000)
+  if (agoMins < 1440) {
+    return `${String(d.getHours()).padStart(2, '0')}h`
+  }
+  if (agoMins >= 43200) {
+    const MONTHS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
+    return MONTHS[d.getMonth()]
+  }
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 // ─── Realistic time-series simulation ────────────────────────────────────────
@@ -889,6 +902,8 @@ function initPeriodControls() {
       customRow.style.display = 'flex'
     } else {
       customRow.style.display = 'none'
+      const stepSel = document.getElementById('time-step')
+      if (stepSel) stepSel.value = getDefaultStep(currentPeriod)
       renderCharts()
     }
   })
@@ -1458,5 +1473,266 @@ function initPanelToggle() {
     const collapsed = layout.classList.toggle('panel-collapsed')
     btn.title = collapsed ? 'Afficher le panneau' : 'Masquer le panneau'
     icon.className = collapsed ? 'bi bi-chevron-left' : 'bi bi-chevron-right'
+  })
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+let _miniMapInitialized = false
+
+function initTabs() {
+  const btns = document.querySelectorAll('.detail-tab-btn')
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'))
+      document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'))
+      btn.classList.add('active')
+      const paneId = btn.dataset.pane
+      document.getElementById(paneId).classList.add('active')
+
+      if (paneId === 'tab-donnees' && !_miniMapInitialized) {
+        _miniMapInitialized = true
+        initMiniMap()
+      }
+    })
+  })
+}
+
+// ─── Dashboard (Vue personnalisée) ────────────────────────────────────────────
+
+const DASH_BLOCK_DEFS = [
+  { id: 'temp',         size: '1x1', title: 'Température',   icon: 'bi-thermometer-half', color: '#e07050' },
+  { id: 'pluie',        size: '1x1', title: 'Pluie (cumul)', icon: 'bi-cloud-rain-heavy', color: '#45b7d1' },
+  { id: 'humidite',     size: '1x1', title: 'Humidité air',  icon: 'bi-droplet-half',     color: '#4ecdc4' },
+  { id: 'sensors',      size: '1x2', title: 'Capteurs liés', icon: 'bi-broadcast',        color: '#0172A4' },
+  { id: 'map',          size: '1x2', title: 'Localisation',  icon: 'bi-geo-alt',          color: '#6080b0' },
+  { id: 'vent',         size: '1x1', title: 'Vent',          icon: 'bi-wind',             color: '#7bc4b0' },
+  { id: 'integrations', size: '1x1', title: 'Intégrations',  icon: 'bi-plug',             color: '#2d9e5f' },
+  { id: 'bilan',        size: '3x2', title: 'Bilan hydrique',icon: 'bi-droplet',          color: '#0172A4' },
+]
+
+const DASH_STORAGE_KEY = () => `dash-order-parcel-${parcelId}`
+
+let _dashMap = null
+
+function initDashGrid() {
+  const grid = document.getElementById('dash-grid')
+  if (!grid) return
+
+  let order
+  try { order = JSON.parse(localStorage.getItem(DASH_STORAGE_KEY())) || null } catch { order = null }
+  if (!order) order = DASH_BLOCK_DEFS.map(b => b.id)
+
+  function renderBlocks() {
+    grid.innerHTML = ''
+    order.forEach(id => {
+      const def = DASH_BLOCK_DEFS.find(b => b.id === id)
+      if (!def) return
+      const block = document.createElement('div')
+      block.className = `dash-block dash-block--${def.size}`
+      block.dataset.id = id
+      block.draggable = true
+      block.innerHTML = `
+        <div class="dash-block-hd" style="color:${def.color}">
+          <i class="bi ${def.icon}"></i> ${def.title}
+          <span class="dash-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></span>
+        </div>
+        <div class="dash-block-body" id="dblock-${id}"></div>
+      `
+      grid.appendChild(block)
+    })
+    populateDashBlocks()
+    attachDashDragHandlers(grid)
+  }
+
+  renderBlocks()
+}
+
+function populateDashBlocks() {
+  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+
+  // ── Température ──
+  const tempEl = document.getElementById('dblock-temp')
+  if (tempEl) {
+    const hasTempSensor = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'temp'))
+    const tempVal = hasTempSensor ? rnd(10, 28) : null
+    tempEl.innerHTML = tempVal != null
+      ? `<div class="dash-val-big" style="color:#e07050">${tempVal}<span class="dash-val-unit"> °C</span></div>
+         <div class="dash-val-trend ${tempVal > 18 ? 'up' : 'down'}"><i class="bi bi-arrow-${tempVal > 18 ? 'up' : 'down'}-right"></i> Dernière mesure</div>
+         <div class="dash-val-sub">Aujourd'hui</div>`
+      : `<div class="dash-empty">Aucun capteur de température</div>`
+  }
+
+  // ── Pluie ──
+  const pluieEl = document.getElementById('dblock-pluie')
+  if (pluieEl) {
+    const hasPluie = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'pluie'))
+    const pluieVal = hasPluie ? rnd(0, 35) : null
+    pluieEl.innerHTML = pluieVal != null
+      ? `<div class="dash-val-big" style="color:#45b7d1">${pluieVal}<span class="dash-val-unit"> mm</span></div>
+         <div class="dash-val-sub">Cumul 7 jours</div>`
+      : `<div class="dash-empty">Aucun capteur de pluie</div>`
+  }
+
+  // ── Humidité ──
+  const humEl = document.getElementById('dblock-humidite')
+  if (humEl) {
+    const hasHum = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'humidite'))
+    const humVal = hasHum ? rnd(40, 90) : null
+    humEl.innerHTML = humVal != null
+      ? `<div class="dash-val-big" style="color:#4ecdc4">${humVal}<span class="dash-val-unit"> %</span></div>
+         <div class="dash-val-sub">Dernière mesure</div>`
+      : `<div class="dash-empty">Aucun capteur d'humidité</div>`
+  }
+
+  // ── Vent ──
+  const ventEl = document.getElementById('dblock-vent')
+  if (ventEl) {
+    const hasVent = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'vent'))
+    const ventVal = hasVent ? rnd(0, 35) : rnd(5, 20)
+    ventEl.innerHTML = `
+      <div class="dash-val-big" style="color:#7bc4b0">${ventVal}<span class="dash-val-unit"> km/h</span></div>
+      <div class="dash-val-sub">Vitesse moyenne</div>`
+  }
+
+  // ── Capteurs liés ──
+  const sensEl = document.getElementById('dblock-sensors')
+  if (sensEl) {
+    if (linkedSensors.length === 0) {
+      sensEl.innerHTML = '<div class="dash-empty">Aucun capteur lié</div>'
+    } else {
+      sensEl.innerHTML = linkedSensors.map(s => `
+        <div class="dash-sensor-row">
+          <span class="dash-sensor-dot" style="background:${s.event ? 'var(--warn)' : 'var(--ok)'}"></span>
+          <span class="dash-sensor-model">${s.model}</span>
+          <span class="dash-sensor-serial">${s.serial}</span>
+        </div>
+      `).join('')
+    }
+  }
+
+  // ── Intégrations ──
+  const integEl = document.getElementById('dblock-integrations')
+  if (integEl) {
+    const active = parcelState.integrations || []
+    integEl.innerHTML = active.length === 0
+      ? '<div class="dash-empty">Aucune intégration active</div>'
+      : active.map(name => `
+          <span class="dash-integ-pill"><i class="bi bi-plug-fill"></i> ${name}</span>
+        `).join('')
+  }
+
+  // ── Map ──
+  const mapEl = document.getElementById('dblock-map')
+  if (mapEl) {
+    mapEl.style.padding = '0 0 8px 0'
+    mapEl.innerHTML = '<div class="dash-map-inner" id="dash-map-container"></div>'
+    requestAnimationFrame(() => initDashMap())
+  }
+
+  // ── Bilan hydrique ──
+  const bilanEl = document.getElementById('dblock-bilan')
+  if (bilanEl) {
+    const pluieMm  = rndf(20, 80)
+    const etpMm    = rndf(15, 60)
+    const irrigMm  = (parcelState.irrigationEvents || []).reduce((s, e) => s + (e.mm || 0), 0)
+    const drainMm  = Math.max(0, pluieMm + irrigMm - etpMm)
+    const balMm    = pluieMm + irrigMm - etpMm - drainMm
+    const balColor = balMm >= 0 ? 'var(--ok)' : 'var(--err)'
+
+    bilanEl.innerHTML = `
+      <div style="display:flex;gap:16px;align-items:flex-start;height:100%">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1">
+          ${dashBilanCard('Pluie', pluieMm.toFixed(0), 'mm', '#45b7d1', 'bi-cloud-rain-heavy', '7 derniers jours')}
+          ${dashBilanCard('ETP', etpMm.toFixed(1), 'mm', '#c090e0', 'bi-sun', '7 derniers jours')}
+          ${dashBilanCard('Irrigation', irrigMm.toFixed(0), 'mm', '#0172A4', 'bi-droplet-fill', 'Cumulé')}
+          ${dashBilanCard('Drainage', drainMm.toFixed(0), 'mm', '#7bc4b0', 'bi-arrow-down-circle', 'Estimé')}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 140px;gap:4px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bdr)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)">Bilan net</div>
+          <div style="font-size:36px;font-weight:700;color:${balColor}">${balMm >= 0 ? '+' : ''}${balMm.toFixed(0)}</div>
+          <div style="font-size:13px;color:${balColor};font-weight:600">mm</div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:4px">7 derniers jours</div>
+        </div>
+      </div>
+    `
+  }
+}
+
+function dashBilanCard(label, val, unit, color, icon, sub) {
+  return `
+    <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:${color};font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <i class="bi ${icon}"></i> ${label}
+      </div>
+      <div style="font-size:22px;font-weight:700;color:var(--txt)">${val} <span style="font-size:12px;font-weight:400;color:var(--txt2)">${unit}</span></div>
+      <div style="font-size:10px;color:var(--txt3);margin-top:2px">${sub}</div>
+    </div>
+  `
+}
+
+function initDashMap() {
+  const container = document.getElementById('dash-map-container')
+  if (!container || _dashMap) return
+
+  const org = orgs.find(o => o.id === parcelBase.orgId)
+  if (!org?.lat) return
+
+  _dashMap = L.map(container, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false })
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Esri'
+  }).addTo(_dashMap)
+
+  const latlngs = parcelState.latlngs || parcelBase.latlngs
+  if (Array.isArray(latlngs) && latlngs.length >= 3) {
+    const poly = L.polygon(latlngs, {
+      color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.35
+    }).addTo(_dashMap)
+    _dashMap.fitBounds(poly.getBounds(), { padding: [8, 8] })
+  } else {
+    _dashMap.setView([org.lat, org.lng], 14)
+    L.circleMarker([org.lat, org.lng], {
+      radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
+    }).addTo(_dashMap)
+  }
+}
+
+function attachDashDragHandlers(grid) {
+  let dragSrc = null
+
+  grid.querySelectorAll('.dash-block').forEach(block => {
+    block.addEventListener('dragstart', e => {
+      dragSrc = block
+      e.dataTransfer.effectAllowed = 'move'
+      setTimeout(() => block.classList.add('dash-drag-ghost'), 0)
+    })
+    block.addEventListener('dragend', () => {
+      block.classList.remove('dash-drag-ghost')
+      grid.querySelectorAll('.dash-block').forEach(b => b.classList.remove('dash-drag-over'))
+      dragSrc = null
+      const order = [...grid.querySelectorAll('.dash-block')].map(b => b.dataset.id)
+      localStorage.setItem(DASH_STORAGE_KEY(), JSON.stringify(order))
+    })
+    block.addEventListener('dragover', e => {
+      e.preventDefault()
+      if (!dragSrc || block === dragSrc) return
+      e.dataTransfer.dropEffect = 'move'
+      grid.querySelectorAll('.dash-block').forEach(b => b.classList.remove('dash-drag-over'))
+      block.classList.add('dash-drag-over')
+    })
+    block.addEventListener('dragleave', () => {
+      block.classList.remove('dash-drag-over')
+    })
+    block.addEventListener('drop', e => {
+      e.preventDefault()
+      if (!dragSrc || block === dragSrc) return
+      block.classList.remove('dash-drag-over')
+      const allBlocks = [...grid.querySelectorAll('.dash-block')]
+      const srcIdx = allBlocks.indexOf(dragSrc)
+      const tgtIdx = allBlocks.indexOf(block)
+      if (srcIdx < tgtIdx) block.after(dragSrc)
+      else block.before(dragSrc)
+    })
   })
 }

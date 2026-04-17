@@ -6,6 +6,7 @@ import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
 
 let currentRole = 'admin' // 'admin' or 'adherent'
+const ADHERENT_ORG_ID = 1
 let currentSection = 'exploitation'
 let currentView = 'map'
 let currentMetric = 'pluie'
@@ -97,15 +98,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const _storedRole = localStorage.getItem('menuRole')
   if (_storedRole === 'adherent-reseau') currentRole = 'adherent'
 
-  // Capteurs : vue liste par défaut
-  if (_page === 'capteurs.html' || _page === 'capteurs-reseau.html') currentView = 'list'
+  // Capteurs : vue carte par défaut
+  if (_page === 'capteurs.html' || _page === 'capteurs-reseau.html') currentView = 'map'
 
   initNavigation()
   initRoleSwitcher()
   initViewSwitcher()
   initFilters()
   initMap()
-  initAddModal()
   initExportButton()
   initSelectionListeners()
   updateContent()
@@ -291,7 +291,7 @@ function populateFilterDropdowns() {
     { set: v => { selectedIntegrations = v } }, 'badge-integration', true)
 
   // Capteurs filters (capteurs.html uses checkbox dropdowns too)
-  const allModels = [...new Set(sensors.map(s => s.model))].sort()
+  const allModels = ['P', 'PT', 'P+', 'CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6', 'TH', 'T_MINI', 'T_GEL', 'W', 'PYRANO', 'PAR', 'LWS', 'EC']
   makeCheckboxPanel('panel-model', allModels,
     { set: v => { selectedModels = v } }, 'badge-model')
   makeCheckboxPanel('panel-event', null,
@@ -409,7 +409,7 @@ function getFilteredData() {
       filteredParcels = plots.filter(p => filteredSensors.some(s => s.parcelId === p.id))
     } else {
       // Adhérent Mon exploitation : son org uniquement
-      filteredParcels = plots.filter(p => p.orgId === 1)
+      filteredParcels = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
       filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
     }
   } else {
@@ -658,18 +658,30 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       filteredSensors.forEach(sensor => {
         const parcel = plots.find(p => p.id === sensor.parcelId)
         if (parcel) {
-          const color = getSensorColor(sensor)
-          const metricValue = getSensorMetricDisplay(sensor, currentMetric)
-          const marker = L.marker([parcel.lat, parcel.lng], {
-            icon: L.divIcon({
-              className: 'sensor-icon',
-              html: `<div style="background-color:${color};width:10px;height:10px;border-radius:50%;cursor:pointer"></div>`,
-              iconSize: [10, 10]
-            })
+          const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
+          const valText   = sensorVal ? `${sensorVal[0]} ${sensorVal[1]}` : `${sensor.networkQuality}%`
+          const eventStr  = sensor.event ? `<br><span style="color:var(--warn)">⚠ ${sensor.event}</span>` : ''
+
+          const circle = L.circleMarker([parcel.lat, parcel.lng], {
+            radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
           }).addTo(map)
-          marker.bindTooltip(`<strong>${sensor.model} · ${sensor.serial}</strong><br>${metricValue}<br>Signal: ${sensor.networkQuality}%${sensor.event ? '<br>⚠ ' + sensor.event : ''}`, { sticky: true, opacity: 0.95 })
-          marker.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
-          markers.push(marker)
+          circle.bindTooltip(
+            `<strong>${sensor.serial} · ${sensor.model}</strong><br>${valText}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
+            { sticky: true, opacity: 0.95 }
+          )
+          circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
+          markers.push(circle)
+
+          const label = L.marker([parcel.lat, parcel.lng], {
+            icon: L.divIcon({
+              className: '',
+              html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
+              iconSize: [0, 0],
+              iconAnchor: [0, 24],
+            }),
+            interactive: false,
+          }).addTo(map)
+          markers.push(label)
         }
       })
     }
@@ -677,10 +689,15 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
 
   if (markers.length > 0) {
     const group = L.featureGroup(markers)
-    if (markers.length === 1 && typeof markers[0].getLatLng === 'function') {
-      map.setView(markers[0].getLatLng(), 10)
+    const bounds = group.getBounds()
+    if (!bounds.isValid()) return
+    const ne = bounds.getNorthEast(), sw = bounds.getSouthWest()
+    const isSinglePoint = Math.abs(ne.lat - sw.lat) < 0.001 && Math.abs(ne.lng - sw.lng) < 0.001
+    const isCapteurPage = !pageType.startsWith('parcelles')
+    if (isSinglePoint) {
+      map.setView(bounds.getCenter(), isCapteurPage ? 10 : 13)
     } else {
-      map.fitBounds(group.getBounds().pad(0.12))
+      map.fitBounds(bounds.pad(isCapteurPage ? 0.4 : 0.15), { maxZoom: isCapteurPage ? 10 : 14 })
     }
   }
 
@@ -943,12 +960,12 @@ function renderList(filteredParcels, filteredSensors) {
 // Model type mapping
 const MODEL_TYPE = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
-  'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre min',
+  'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
   'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
-  'LWS': 'Humectation feuille', 'T_GEL': 'Capteur gel',
-  'CHP-15/30': 'Sonde capa.', 'CHP-30/60': 'Sonde capa.', 'CHP-60/90': 'Sonde capa.',
-  'CAPA-30-3': 'Tensiomètre', 'CAPA-60-6': 'Tensiomètre',
-  'EC': 'Sonde EC',
+  'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive',
+  'EC': 'Sonde fertirrigation',
 }
 
 // Brand assignment (deterministic by serial prefix)
@@ -1060,7 +1077,6 @@ function createSensorTable(sensors) {
   const aggLabel = getAggregateLabel(currentAggregate)
 
   let html = '<table id="sensor-table"><thead><tr>'
-  html += '<th></th>'
   html += '<th data-column="brand">Marque</th>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
@@ -1086,7 +1102,6 @@ function createSensorTable(sensors) {
       : '<span class="tag-none">—</span>'
     const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
     html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
-      <td><input type="checkbox" data-type="sensor" data-id="${sensor.id}" /></td>
       <td>${brand}</td>
       <td><strong>${sensor.model}</strong><br><span style="font-size:10px;color:var(--txt3)">${typeName}</span></td>
       <td>${formatSerial(sensor)}</td>
@@ -1214,9 +1229,6 @@ function renderAdmin(filteredParcels, filteredSensors) {
   animateView(container)
 }
 
-function initAddModal() {
-  // Handled globally by menu-switch.js — no-op here
-}
 
 function initExportButton() {
   document.getElementById('import-btn')?.addEventListener('click', () => {
@@ -1288,6 +1300,7 @@ function updateFilterChips() {
 
 function createAdminTable(sensorList) {
   let html = '<table id="admin-sensor-table"><thead><tr>'
+  html += '<th class="col-check"><input type="checkbox" id="check-all-admin-sensor"></th>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
   html += '<th data-column="telecom">Télécom</th>'
@@ -1327,6 +1340,7 @@ function createAdminTable(sensorList) {
     const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
 
     html += `<tr>
+      <td class="col-check"><input type="checkbox" class="sensor-admin-check" data-id="${sensor.id}"></td>
       <td>${sensor.model}</td>
       <td>${formatSerial(sensor)}</td>
       <td>${sensor.telecom}</td>
@@ -1344,6 +1358,13 @@ function createAdminTable(sensorList) {
 }
 
 function initSensorAdminTable(container) {
+  const checkAll = container.querySelector('#check-all-admin-sensor')
+  if (checkAll) {
+    checkAll.addEventListener('change', () => {
+      container.querySelectorAll('.sensor-admin-check').forEach(cb => { cb.checked = checkAll.checked })
+    })
+  }
+
   container.querySelectorAll('.remove-parcel-sensor-admin').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation()

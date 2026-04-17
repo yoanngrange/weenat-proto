@@ -1,5 +1,8 @@
 // Integration detail page
 import { integrations } from './integrations.js'
+import { plots } from '../data/plots.js'
+import { sensors } from '../data/sensors.js'
+import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 
 const urlParams = new URLSearchParams(window.location.search)
@@ -18,6 +21,24 @@ const TYPE_COLORS = {
   fertilisation: 'var(--ok)'
 }
 
+const INTEG_META = {
+  'abelio':                 { cultures: 'Grandes cultures (blé, maïs, colza)', pays: 'France, Belgique', email: 'contact@abelio.fr', siteWeb: 'abelio.fr' },
+  'criiam-sud':             { cultures: 'Vigne, maraîchage, arboriculture', pays: 'France (bassin méditerranéen)', email: 'contact@criiam-sud.fr', siteWeb: 'criiam-sud.fr' },
+  'cropwise-protector':     { cultures: 'Grandes cultures (blé, colza, pomme de terre)', pays: 'France, Belgique, Suisse', email: 'cropwise.support@syngenta.com', siteWeb: 'cropwise.com' },
+  'decitrait':              { cultures: 'Vigne', pays: 'France, Suisse, Espagne', email: 'contact@decitrait.fr', siteWeb: 'decitrait.fr', jetons: 5 },
+  'irre-lis-mono':          { cultures: 'Toutes cultures (maïs, sorgho, pomme de terre…)', pays: 'France', email: 'irre-lis@arvalis.fr', siteWeb: 'irre-lis.fr', jetons: 4 },
+  'irre-lis-multi':         { cultures: 'Toutes cultures (rotation multi-parcelles)', pays: 'France', email: 'irre-lis@arvalis.fr', siteWeb: 'irre-lis.fr', jetons: 3 },
+  'limacapt':               { cultures: 'Grandes cultures (colza, céréales)', pays: 'France, Belgique', email: 'contact@limacapt.fr', siteWeb: 'limacapt.fr' },
+  'arvalis-previlis-mileos':{ cultures: 'Céréales d\'hiver, pomme de terre', pays: 'France', email: 'previlis@arvalis.fr', siteWeb: 'arvalis.fr' },
+  'movida-grapevision':     { cultures: 'Vigne', pays: 'France, Espagne, Italie', email: 'grapevision@movida.fr', siteWeb: 'grapevision.com' },
+  'pixagri':                { cultures: 'Toutes cultures', pays: 'France, Europe', email: 'contact@pixagri.com', siteWeb: 'pixagri.com' },
+  'rimpro':                 { cultures: 'Vigne, fruits à pépins', pays: 'France, Belgique, Suisse', email: 'contact@rimpro.eu', siteWeb: 'rimpro.eu' },
+  'semiloni':               { cultures: 'Oignon porte-graine', pays: 'France', email: 'semiloni@inrae.fr', siteWeb: 'semiloni.fr' },
+  'vintel':                 { cultures: 'Vigne', pays: 'France', email: 'contact@vintel.fr', siteWeb: 'vintel.fr' },
+  'vitimeteo':              { cultures: 'Vigne', pays: 'France, Suisse, Allemagne', email: 'info@vitimeteo.de', siteWeb: 'vitimeteo.de' },
+  'xarvio':                 { cultures: 'Grandes cultures (blé, colza, maïs)', pays: 'France, Belgique, Allemagne, Espagne', email: 'xarvio.support@basf.com', siteWeb: 'xarvio.com' },
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (!integ) {
     document.getElementById('integ-detail').innerHTML =
@@ -32,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
 function render() {
   const color = TYPE_COLORS[integ.type]
   const label = TYPE_LABELS[integ.type]
+  const meta  = INTEG_META[integ.id] || {}
+
+  const connectedPlots = plots.filter(p => (p.integrations || []).includes(integ.name))
 
   document.getElementById('integ-detail').innerHTML = `
     <div class="integ-detail-layout">
@@ -65,8 +89,8 @@ function render() {
           <div class="integ-detail-cta">
             <button class="integ-connect-btn${integ.connected ? ' connected' : ''}" id="connect-btn">
               ${integ.connected
-                ? '<i class="bi bi-check-circle-fill"></i> Connectée'
-                : '<i class="bi bi-plug"></i> Connecter'}
+                ? '<i class="bi bi-pause-circle-fill"></i> Désactiver'
+                : '<i class="bi bi-play-circle-fill"></i> Activer'}
             </button>
           </div>
         </div>
@@ -87,26 +111,46 @@ function render() {
           </div>
         </div>
 
+        ${connectedPlots.length ? `
         <div class="integ-detail-section">
-          <div class="integ-detail-section-title">Comment ça marche ?</div>
-          <ol class="integ-steps">
-            <li>Vérifiez que vous disposez d'un capteur compatible (voir ci-dessus).</li>
-            <li>Cliquez sur <strong>Connecter</strong> pour autoriser le partage de données.</li>
-            <li>Configurez vos parcelles sur la plateforme partenaire.</li>
-            <li>Vos données Weenat alimentent automatiquement les modèles.</li>
-          </ol>
+          <div class="integ-detail-section-title">Parcelles connectées (${connectedPlots.length})</div>
+          <div class="admin-table-wrap" style="margin-top:8px">
+            <table class="admin-table" style="font-size:12px">
+              <thead>
+                <tr>
+                  <th>Parcelle</th>
+                  <th>Ville</th>
+                  <th>Surface</th>
+                  <th>Culture</th>
+                  <th>Irrigation</th>
+                  <th>Capteurs</th>
+                  <th>ID parcelle</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${connectedPlots.map(p => {
+                  const org = orgs.find(o => o.id === p.orgId)
+                  const ville = org?.ville || '—'
+                  const plotSensors = sensors.filter(s => s.parcelId === p.id)
+                  const models = [...new Set(plotSensors.map(s => s.model))].join(', ') || '—'
+                  return `<tr>
+                    <td style="font-weight:500">${p.name}</td>
+                    <td class="member-email">${ville}</td>
+                    <td class="num">${p.area} ha</td>
+                    <td>${p.crop}</td>
+                    <td>${p.irrigation}</td>
+                    <td class="member-email">${models}</td>
+                    <td class="num">${p.id}</td>
+                  </tr>`
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
+        ` : ''}
       </div>
 
       <div class="integ-detail-aside">
-        <div class="integ-aside-section">
-          <div class="integ-aside-label">Statut</div>
-          <div class="integ-aside-value" id="status-display">
-            ${integ.connected
-              ? '<span style="color:var(--ok)"><i class="bi bi-check-circle-fill"></i> Connectée</span>'
-              : '<span style="color:var(--txt3)"><i class="bi bi-circle"></i> Non connectée</span>'}
-          </div>
-        </div>
         <div class="integ-aside-section">
           <div class="integ-aside-label">Catégorie</div>
           <div class="integ-aside-value">${label}</div>
@@ -119,10 +163,35 @@ function render() {
           <div class="integ-aside-label">Fréquence de sync.</div>
           <div class="integ-aside-value">Toutes les heures</div>
         </div>
+        ${meta.cultures ? `
         <div class="integ-aside-section">
-          <div class="integ-aside-label">Support</div>
+          <div class="integ-aside-label">Cultures couvertes</div>
+          <div class="integ-aside-value">${meta.cultures}</div>
+        </div>` : ''}
+        ${meta.pays ? `
+        <div class="integ-aside-section">
+          <div class="integ-aside-label">Pays couverts</div>
+          <div class="integ-aside-value">${meta.pays}</div>
+        </div>` : ''}
+        ${meta.jetons != null ? `
+        <div class="integ-aside-section">
+          <div class="integ-aside-label">Jetons disponibles</div>
+          <div class="integ-aside-value" style="font-size:20px;font-weight:600;color:var(--pri)">${meta.jetons}</div>
+        </div>` : ''}
+        ${meta.email ? `
+        <div class="integ-aside-section">
+          <div class="integ-aside-label">Email</div>
+          <div class="integ-aside-value"><a href="mailto:${meta.email}" style="color:var(--pri)">${meta.email}</a></div>
+        </div>` : ''}
+        ${meta.siteWeb ? `
+        <div class="integ-aside-section">
+          <div class="integ-aside-label">Site web</div>
+          <div class="integ-aside-value"><a href="#" style="color:var(--pri)">${meta.siteWeb}</a></div>
+        </div>` : ''}
+        <div class="integ-aside-section">
+          <div class="integ-aside-label">Aide</div>
           <div class="integ-aside-value">
-            <a href="#" style="color:var(--pri)">Documentation</a>
+            <a href="#" style="color:var(--pri)">Comment faire ?</a>
           </div>
         </div>
       </div>
@@ -139,12 +208,8 @@ function toggleConnect() {
   const btn = document.getElementById('connect-btn')
   btn.className = `integ-connect-btn${integ.connected ? ' connected' : ''}`
   btn.innerHTML = integ.connected
-    ? '<i class="bi bi-check-circle-fill"></i> Connectée'
-    : '<i class="bi bi-plug"></i> Connecter'
-
-  document.getElementById('status-display').innerHTML = integ.connected
-    ? '<span style="color:var(--ok)"><i class="bi bi-check-circle-fill"></i> Connectée</span>'
-    : '<span style="color:var(--txt3)"><i class="bi bi-circle"></i> Non connectée</span>'
+    ? '<i class="bi bi-pause-circle-fill"></i> Désactiver'
+    : '<i class="bi bi-play-circle-fill"></i> Activer'
 }
 
 function getInitials(name) {

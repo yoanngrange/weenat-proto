@@ -67,6 +67,20 @@
             <div id="breadcrumb-title"></div>
           </div>
         </div>
+        <div class="detail-tab-bar">
+          <button class="detail-tab-btn active" data-pane="tab-custom">
+            <i class="bi bi-grid-1x2"></i> Vue personnalisée
+          </button>
+          <button class="detail-tab-btn" data-pane="tab-donnees">
+            <i class="bi bi-graph-up"></i> Données
+          </button>
+        </div>
+
+        <div id="tab-custom" class="detail-tab-pane active">
+          <div class="dash-grid" id="dash-grid"></div>
+        </div>
+
+        <div id="tab-donnees" class="detail-tab-pane">
         <main id="content" class="detail-content">
           <div class="detail-layout" id="detail-layout">
 
@@ -95,6 +109,7 @@
                   <option value="1h" selected>Horaire</option>
                   <option value="1d">Journalier</option>
                   <option value="1w">Hebdomadaire</option>
+                  <option value="1mo">Mensuel</option>
                 </select>
                 <label class="chart-toggle-label">
                   <input type="checkbox" id="toggle-phenologie">
@@ -150,6 +165,7 @@
 
           </div>
         </main>
+        </div><!-- #tab-donnees -->
       </div>
     </div>
 

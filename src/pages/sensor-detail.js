@@ -28,6 +28,13 @@ const METRIC_DEFS = {
   humidite_sol_60:  { name: 'Hum. sol 60 cm',      unit: '%vol',      color: '#9a7015', baseVal: () => rnd(18, 42)   },
   humidite_sol_90:  { name: 'Hum. sol 90 cm',      unit: '%vol',      color: '#7c5800', baseVal: () => rnd(20, 40)   },
   temp_sol:         { name: 'Temp. sol',            unit: '°C',        color: '#bb8fce', baseVal: () => rnd(8, 22)    },
+  potentiel_hydrique: {
+    name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9',
+    baseVal: () => {
+      const month = new Date().getMonth()
+      return Math.round(10 + (0.5 - 0.5 * Math.cos(2 * Math.PI * month / 12)) * 140)
+    }
+  },
   tensio_30:        { name: 'Tension sol 30 cm',    unit: 'cbar',      color: '#98d8c8', baseVal: () => rnd(10, 80)   },
   tensio_60:        { name: 'Tension sol 60 cm',    unit: 'cbar',      color: '#78b8a8', baseVal: () => rnd(10, 80)   },
   tensio_90:        { name: 'Tension sol 90 cm',    unit: 'cbar',      color: '#589888', baseVal: () => rnd(10, 80)   },
@@ -48,7 +55,7 @@ const METRICS_BY_MODEL = {
   'TH':       ['temperature', 'humidite_air', 'dpv', 'temp_rosee'],
   'T_MINI':   ['temperature_min'],
   'W':        ['vent_vitesse', 'vent_rafales', 'vent_direction'],
-  'CHP-15/30': ['humidite_sol_15', 'humidite_sol_30', 'temp_sol'],
+  'CHP-15/30': ['potentiel_hydrique', 'temp_sol'],
   'CHP-30/60': ['humidite_sol_30', 'humidite_sol_60', 'temp_sol'],
   'CHP-60/90': ['humidite_sol_60', 'humidite_sol_90', 'temp_sol'],
   'CAPA-30-3': ['_capa_vwc', '_capa_temp'],
@@ -114,7 +121,14 @@ function getPeriodMinutes() {
 
 function getStepMinutes() {
   const step = document.getElementById('time-step')?.value || '1h'
-  return { max: 15, '1h': 60, '1d': 1440, '1w': 10080 }[step] ?? 60
+  return { max: 15, '1h': 60, '1d': 1440, '1w': 10080, '1mo': 43200 }[step] ?? 60
+}
+
+function getDefaultStep(period) {
+  if (period === '365d') return '1mo'
+  if (period === '30d')  return '1w'
+  if (period === '7d')   return '1d'
+  return '1h'
 }
 
 function getDisplayCount() {
@@ -425,10 +439,15 @@ function smoothPath(points) {
 }
 
 function xLabel(agoMins) {
-  if (agoMins < 120)   return `-${agoMins}min`
-  if (agoMins < 2880)  return `-${Math.round(agoMins/60)}h`
-  if (agoMins < 20160) return `-${Math.round(agoMins/1440)}j`
-  return `-${Math.round(agoMins/10080)}sem`
+  const d = new Date(Date.now() - agoMins * 60000)
+  if (agoMins < 1440) {
+    return `${String(d.getHours()).padStart(2, '0')}h`
+  }
+  if (agoMins >= 43200) {
+    const MONTHS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
+    return MONTHS[d.getMonth()]
+  }
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 function drawAllCharts() {
@@ -533,6 +552,10 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
       const nightFactor = Math.max(0, 0.8 - sf * 1.2)
       const v = base * nightFactor
       return Math.max(0, v * n())
+    }
+    case 'potentiel_hydrique': {
+      // Soil water potential: slow changes, unit kPa (0-200)
+      return Math.max(5, Math.min(195, base * n()))
     }
     case 'humidite_sol_15':
     case 'humidite_sol_30':
@@ -715,6 +738,7 @@ function initPeriodControls() {
       customRow.style.display = 'flex'
     } else {
       customRow.style.display = 'none'
+      if (stepSel) stepSel.value = getDefaultStep(currentPeriod)
       renderCharts()
     }
   })

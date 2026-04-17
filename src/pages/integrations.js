@@ -161,20 +161,23 @@ const TYPE_COLORS = {
   fertilisation: 'var(--ok)'
 }
 
+const ADHERENT_ACTIVE_IDS = new Set(['irre-lis-mono', 'cropwise-protector', 'abelio'])
+
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
-  renderIntegrationStats()
-  populateIntegrationsGrid()
+  const role = localStorage.getItem('menuRole') || 'admin-reseau'
+  const adherentMode = role === 'adherent-reseau'
+  renderIntegrationStats(adherentMode)
+  populateIntegrationsGrid('', adherentMode)
   setupFilters()
 })
 
-function renderIntegrationStats() {
+function renderIntegrationStats(adherentMode = false) {
   const container = document.getElementById('integrations-stats')
   if (!container) return
 
   const total = integrations.length
 
-  // Real counts from plot data
   const plotCounts = {}
   integrations.forEach(integ => {
     plotCounts[integ.id] = plots.filter(p =>
@@ -182,16 +185,40 @@ function renderIntegrationStats() {
     ).length
   })
 
-  // Exploitation = org 1, adhérents = other orgs
-  const orgPlots     = plots.filter(p => p.orgId === 1)
-  const adherPlots   = plots.filter(p => p.orgId !== 1)
+  if (adherentMode) {
+    const activeIntegrations = integrations.filter(i => ADHERENT_ACTIVE_IDS.has(i.id))
+    const top5Rows = activeIntegrations.map((i, idx) => `
+      <div class="integ-top5-row">
+        <span class="integ-top5-rank">${idx + 1}</span>
+        <span class="integ-top5-name">${i.name}</span>
+        <div class="integ-top5-bar">
+          <div style="width:${Math.round((1 - idx * 0.2) * 100)}%;background:${TYPE_COLORS[i.type] || 'var(--pri)'};height:100%;border-radius:3px"></div>
+        </div>
+      </div>
+    `).join('')
+    container.innerHTML = `
+      <div class="integ-stats-2col">
+        <div class="integ-stats-left">
+          <div class="stat-card"><div class="stat-label">Mes intégrations actives</div><div class="stat-value">${ADHERENT_ACTIVE_IDS.size}</div></div>
+          <div class="stat-card"><div class="stat-label">Intégrations disponibles</div><div class="stat-value">${total}</div></div>
+        </div>
+        <div class="integ-stats-right">
+          <div class="integ-top5-title">Mes intégrations actives</div>
+          ${top5Rows}
+        </div>
+      </div>
+    `
+    container._plotCounts = plotCounts
+    return
+  }
+
+  const orgPlots   = plots.filter(p => p.orgId === 1)
+  const adherPlots = plots.filter(p => p.orgId !== 1)
 
   const activeExploit = integrations.filter(i => i.connected).length
-  // Count distinct integrations used by adherent plots
   const integNamesInAdher = new Set(adherPlots.flatMap(p => p.integrations || []))
   const activeAdher = integrations.filter(i => integNamesInAdher.has(i.name)).length
 
-  // Top 5 by real plot count
   const top5 = [...integrations]
     .sort((a, b) => plotCounts[b.id] - plotCounts[a.id])
     .filter(i => plotCounts[i.id] > 0)
@@ -224,7 +251,7 @@ function renderIntegrationStats() {
   container._plotCounts = plotCounts
 }
 
-function populateIntegrationsGrid(filter = '') {
+function populateIntegrationsGrid(filter = '', adherentMode = false) {
   const grid = document.getElementById('integrations-grid')
   grid.innerHTML = ''
 
@@ -241,12 +268,15 @@ function populateIntegrationsGrid(filter = '') {
   const plotCounts = statsEl?._plotCounts || {}
 
   filtered.forEach(integration => {
-    // orgCount = org 1 plots, adherentCount = other org plots
+    const isActive = adherentMode
+      ? ADHERENT_ACTIVE_IDS.has(integration.id)
+      : integration.connected
+
     const orgCount      = plots.filter(p => p.orgId === 1 && (p.integrations || []).includes(integration.name)).length
     const adherentCount = plots.filter(p => p.orgId !== 1 && (p.integrations || []).includes(integration.name)).length
 
     const card = document.createElement('div')
-    card.className = `integration-card${integration.connected ? ' connected' : ''}`
+    card.className = `integration-card${isActive ? ' integ-card-active' : ''}`
     card.style.cursor = 'pointer'
     card.innerHTML = `
       <div class="integ-card-logo-left">
@@ -264,14 +294,14 @@ function populateIntegrationsGrid(filter = '') {
         <div class="integ-card-name">
           ${integration.name}
           ${integration.badge ? `<span class="integ-card-variant">${integration.badge}</span>` : ''}
+          ${isActive ? '<span class="integ-active-pill"><i class="bi bi-check-circle-fill"></i> Active</span>' : ''}
         </div>
         <p class="integ-card-desc">${integration.description}</p>
         <div class="integ-card-badges">
-          ${orgCount > 0 ? `<span class="integ-plot-badge integ-plot-org" title="Parcelles réseau"><i class="bi bi-geo-alt"></i> ${orgCount} réseau</span>` : ''}
-          ${adherentCount > 0 ? `<span class="integ-plot-badge integ-plot-adh" title="Parcelles adhérents"><i class="bi bi-people"></i> ${adherentCount} adhérents</span>` : ''}
+          ${!adherentMode && orgCount > 0 ? `<span class="integ-plot-badge integ-plot-org" title="Parcelles réseau"><i class="bi bi-geo-alt"></i> ${orgCount} réseau</span>` : ''}
+          ${!adherentMode && adherentCount > 0 ? `<span class="integ-plot-badge integ-plot-adh" title="Parcelles adhérents"><i class="bi bi-people"></i> ${adherentCount} adhérents</span>` : ''}
         </div>
       </div>
-      ${integration.connected ? '<div class="integ-card-connected"><i class="bi bi-check-circle-fill"></i></div>' : ''}
     `
     card.addEventListener('click', () => {
       window.location.href = `integration-detail.html?id=${integration.id}`
@@ -285,11 +315,12 @@ function getInitials(name) {
 }
 
 function setupFilters() {
+  const adherentMode = (localStorage.getItem('menuRole') || 'admin-reseau') === 'adherent-reseau'
   document.querySelectorAll('.filter-pill').forEach(pill => {
     pill.addEventListener('click', () => {
       document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'))
       pill.classList.add('active')
-      populateIntegrationsGrid(pill.dataset.type || '')
+      populateIntegrationsGrid(pill.dataset.type || '', adherentMode)
     })
   })
 }

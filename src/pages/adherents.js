@@ -5,15 +5,36 @@ import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getStoredOrgs, saveOrgs } from '../data/store.js'
 
+// Map raw org statut → simplified filter key
+const STATUT_SIMPLIFIED = {
+  'actif':                 'actif',
+  'actif en essai':        'en essai',
+  'en essai':              'en essai',
+  'invité':                'invité',
+  'invitation en attente': 'invité',
+  'inactif':               'inactif',
+  'désactivé':             'inactif',
+  'demande en attente':    'demandeur',
+}
+
 const STATUT_STYLES = {
-  'actif':                { cls: 'statut-actif',     icon: 'bi-check-circle-fill' },
-  'inactif':              { cls: 'statut-inactif',   icon: 'bi-circle' },
-  'actif en essai':       { cls: 'statut-essai',     icon: 'bi-clock' },
-  'en essai':             { cls: 'statut-essai',     icon: 'bi-clock' },
-  'invité':               { cls: 'statut-invite',    icon: 'bi-envelope' },
-  'désactivé':            { cls: 'statut-disabled',  icon: 'bi-slash-circle' },
-  'invitation en attente':{ cls: 'statut-attente',   icon: 'bi-envelope' },
-  'demande en attente':   { cls: 'statut-attente',   icon: 'bi-hourglass' }
+  'actif':      { cls: 'statut-actif',   icon: 'bi-check-circle-fill' },
+  'en essai':   { cls: 'statut-essai',   icon: 'bi-clock' },
+  'invité':     { cls: 'statut-invite',  icon: 'bi-envelope' },
+  'inactif':    { cls: 'statut-inactif', icon: 'bi-circle' },
+  'demandeur':  { cls: 'statut-attente', icon: 'bi-hourglass' },
+}
+
+const STATUT_FILTER_OPTIONS = ['actif', 'en essai', 'invité', 'demandeur', 'inactif']
+
+function orgStatutSimplified(org) {
+  return STATUT_SIMPLIFIED[org.statut] || 'inactif'
+}
+
+function orgMemberLimit(org) {
+  const s = orgStatutSimplified(org)
+  if (s === 'actif') return (org.id % 3 === 0) ? 1 : 2
+  return 0
 }
 
 // Local mutable copy — restored from localStorage if available
@@ -29,7 +50,7 @@ const localOrgs = _stored || orgs.map((o, i) => {
 const PLANS = ['Essential', 'Plus', 'Expert']
 
 let selectedPlans   = []
-let selectedStatuts = ['actif', 'en essai', 'invité']
+let selectedStatuts = ['actif', 'en essai', 'invité', 'demandeur']
 let currentSort     = { column: null, direction: 'asc' }
 let selectedIds     = new Set()
 
@@ -42,11 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Filters ──────────────────────────────────────────────────────────────────
 
 function initFilters() {
-  const plans   = [...new Set(localOrgs.map(o => o.plan))].sort()
-  const statuts = [...new Set(localOrgs.map(o => o.statut))].sort()
+  const plans = [...new Set(localOrgs.map(o => o.plan))].sort()
 
   makeCheckboxPanel('panel-plan',   plans,   v => { selectedPlans   = v }, 'badge-plan')
-  makeCheckboxPanel('panel-statut', statuts, v => { selectedStatuts = v }, 'badge-statut', ['actif', 'en essai', 'invité'])
+  makeCheckboxPanel('panel-statut', STATUT_FILTER_OPTIONS, v => { selectedStatuts = v }, 'badge-statut', ['actif', 'en essai', 'invité', 'demandeur'])
 
   document.querySelectorAll('.filter-dropdown-btn').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -113,7 +133,7 @@ function updateBadge(id, count) {
 function getFiltered() {
   let list = localOrgs
   if (selectedPlans.length)   list = list.filter(o => selectedPlans.includes(o.plan))
-  if (selectedStatuts.length) list = list.filter(o => selectedStatuts.includes(o.statut))
+  if (selectedStatuts.length) list = list.filter(o => selectedStatuts.includes(orgStatutSimplified(o)))
   return list
 }
 
@@ -155,10 +175,13 @@ function render() {
   list.forEach(org => {
     const orgParcels = plots.filter(p => p.orgId === org.id)
     const orgSensors = sensors.filter(s => s.orgId === org.id)
-    const orgMembers = members.filter(m => m.orgIds.includes(org.id))
+    const allOrgMembers = members.filter(m => m.orgIds.includes(org.id))
+    const limit = orgMemberLimit(org)
+    const orgMembers = allOrgMembers.slice(0, limit)
 
-    const statutStyle = STATUT_STYLES[org.statut] || { cls: 'statut-inactif', icon: 'bi-circle' }
-    const isDisabled  = org.statut === 'désactivé'
+    const simplified  = orgStatutSimplified(org)
+    const statutStyle = STATUT_STYLES[simplified] || { cls: 'statut-inactif', icon: 'bi-circle' }
+    const isDisabled  = simplified === 'inactif'
 
     const membresHtml = orgMembers.length
       ? orgMembers.map(m => `<div class="admin-item-row"><a href="adherent-detail.html?id=${org.id}" class="admin-link">${m.prenom} ${m.nom}</a><button class="icon-btn remove-member-org" data-member-id="${m.id}" data-org-id="${org.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
@@ -168,7 +191,7 @@ function render() {
     let proprietaireHtml
     if (orgMembers.length <= 1) {
       const name = orgMembers[0] ? `${orgMembers[0].prenom} ${orgMembers[0].nom}` : currentPropNom
-      proprietaireHtml = `<span class="member-name">${name}</span>`
+      proprietaireHtml = `<span class="member-name">${name || '—'}</span>`
     } else {
       proprietaireHtml = `<select class="inline-edit adh-prop-select" data-id="${org.id}">
         ${orgMembers.map(m => {
@@ -188,7 +211,7 @@ function render() {
       <td class="member-email">${org.codeAdherent}</td>
       <td>${proprietaireHtml}</td>
       <td><span class="plan-badge plan-badge--${(org.plan||'').toLowerCase()}">${org.plan}</span></td>
-      <td><span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${org.statut}</span></td>
+      <td><span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${simplified}</span></td>
       <td class="member-email">${formatDate(org.dateAdhesion)}</td>
       <td class="member-email">${org.ville}</td>
       <td class="member-email">${org.departement}</td>
@@ -335,20 +358,21 @@ function formatDate(iso) {
 
 function updateStats(list) {
   const total      = list.length
-  const actifs     = list.filter(o => o.statut === 'actif').length
-  const enEssai    = list.filter(o => ['en essai', 'actif en essai'].includes(o.statut)).length
-  const inactifs   = list.filter(o => o.statut === 'inactif').length
-  const invites    = list.filter(o => ['invité','invitation en attente'].includes(o.statut)).length
-  const desactives = list.filter(o => o.statut === 'désactivé').length
-  const byPlan = PLANS.map(p => ({ label: p, value: list.filter(o => o.plan === p).length }))
+  const actifs     = list.filter(o => orgStatutSimplified(o) === 'actif').length
+  const enEssai    = list.filter(o => orgStatutSimplified(o) === 'en essai').length
+  const inactifs   = list.filter(o => orgStatutSimplified(o) === 'inactif').length
+  const invites    = list.filter(o => orgStatutSimplified(o) === 'invité').length
+  const demandeurs = list.filter(o => orgStatutSimplified(o) === 'demandeur').length
+  const plans = PLANS.filter(p => p !== 'Essential')
+  const byPlan = plans.map(p => ({ label: p, value: list.filter(o => o.plan === p).length }))
 
   document.getElementById('stats-cards').innerHTML = [
-    { label: 'Adhérents',  value: total },
-    { label: 'Actifs',     value: actifs },
-    { label: 'En essai',   value: enEssai },
-    { label: 'Invités',    value: invites,    warn: invites > 0 },
-    { label: 'Inactifs',   value: inactifs,   warn: inactifs > 0 },
-    { label: 'Désactivés', value: desactives, warn: desactives > 0 },
+    { label: 'Adhérents',   value: total },
+    { label: 'Actifs',      value: actifs },
+    { label: 'En essai',    value: enEssai },
+    { label: 'Invités',     value: invites,    warn: invites > 0 },
+    { label: 'Demandeurs',  value: demandeurs, warn: demandeurs > 0 },
+    { label: 'Inactifs',    value: inactifs,   warn: inactifs > 0 },
     ...byPlan.map(p => ({ label: p.label, value: p.value }))
   ].map(s => `
     <div class="stat-card${s.warn ? ' warn' : ''}">

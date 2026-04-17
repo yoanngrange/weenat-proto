@@ -65,11 +65,12 @@
             <div id="breadcrumb-title"></div>
           </div>
         </div>
-        <main id="content">
-          <select id="location-select">
-            <option>Choisir une parcelle ou un capteur</option>
-            <!-- Options dynamiques -->
+        <div id="controls-row">
+          <select id="location-select" class="param-input" style="max-width:320px">
+            <option value="">Choisir une parcelle ou un capteur</option>
           </select>
+        </div>
+        <main id="content">
           <div id="forecast"></div>
           <table id="hourly-table">
             <thead>

@@ -78,35 +78,35 @@ export const sensors = [
   { id: 46,  orgId: 14, parcelId: 42, model: "CHP-15/30", serial: "WEE-01446", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
 
   // ── Org 15 : Coopérative Bretonne Sud ────────────────────────────────────
-  { id: 47,  orgId: 15, parcelId: null, model: "P+",        serial: "WEE-01547", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
-  { id: 48,  orgId: 15, parcelId: null, model: "CHP-30/60", serial: "WEE-01548", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
-  { id: 49,  orgId: 15, parcelId: null, model: "P+",        serial: "WEE-01549", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 47,  orgId: 15, parcelId: 37,  model: "P+",        serial: "WEE-01547", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+  { id: 48,  orgId: 15, parcelId: 120, model: "CHP-30/60", serial: "WEE-01548", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
+  { id: 49,  orgId: 15, parcelId: 121, model: "P+",        serial: "WEE-01549", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
 
   // ── Org 16 : Exploitation de la Seine-Maritime ───────────────────────────
-  { id: 50,  orgId: 16, parcelId: null, model: "CHP-15/30", serial: "WEE-01650", telecom: "LoRa",   lastMessage: "2024-04-10T10:00:00Z", networkQuality: 45, messages7d: 12,  event: "émissions interrompues" },
-  { id: 51,  orgId: 16, parcelId: null, model: "P+",        serial: "WEE-01651", telecom: "Sigfox", lastMessage: "2024-04-09T10:00:00Z", networkQuality: 40, messages7d: 8,   event: "batterie faible" },
+  { id: 50,  orgId: 16, parcelId: 38,  model: "CHP-15/30", serial: "WEE-01650", telecom: "LoRa",   lastMessage: "2024-04-10T10:00:00Z", networkQuality: 45, messages7d: 12,  event: "émissions interrompues" },
+  { id: 51,  orgId: 16, parcelId: 125, model: "P+",        serial: "WEE-01651", telecom: "Sigfox", lastMessage: "2024-04-09T10:00:00Z", networkQuality: 40, messages7d: 8,   event: "batterie faible" },
 
   // ── Org 17 : Ferme Côtière Nord ──────────────────────────────────────────
-  { id: 52,  orgId: 17, parcelId: null, model: "P+",        serial: "WEE-01752", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 93, messages7d: 96,  event: null },
-  { id: 53,  orgId: 17, parcelId: null, model: "CHP-15/30", serial: "WEE-01753", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
-  { id: 54,  orgId: 17, parcelId: null, model: "CHP-30/60", serial: "WEE-01754", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
-  { id: 55,  orgId: 17, parcelId: null, model: "P+",        serial: "WEE-01755", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
+  { id: 52,  orgId: 17, parcelId: 39,  model: "P+",        serial: "WEE-01752", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 93, messages7d: 96,  event: null },
+  { id: 53,  orgId: 17, parcelId: 130, model: "CHP-15/30", serial: "WEE-01753", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
+  { id: 54,  orgId: 17, parcelId: 131, model: "CHP-30/60", serial: "WEE-01754", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
+  { id: 55,  orgId: 17, parcelId: 132, model: "P+",        serial: "WEE-01755", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
 
   // ── Org 18 : Agriculteurs de l'Eure ──────────────────────────────────────
-  { id: 56,  orgId: 18, parcelId: null, model: "P+",        serial: "WEE-01856", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
-  { id: 57,  orgId: 18, parcelId: null, model: "CHP-15/30", serial: "WEE-01857", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
-  { id: 58,  orgId: 18, parcelId: null, model: "EC",        serial: "WEE-01858", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 83,  event: null },
+  { id: 56,  orgId: 18, parcelId: 40,  model: "P+",        serial: "WEE-01856", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
+  { id: 57,  orgId: 18, parcelId: 135, model: "CHP-15/30", serial: "WEE-01857", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
+  { id: 58,  orgId: 18, parcelId: 136, model: "EC",        serial: "WEE-01858", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 83,  event: null },
 
   // ── Org 19 : Coop Bio Normandie ──────────────────────────────────────────
-  { id: 59,  orgId: 19, parcelId: null, model: "CHP-30/60", serial: "WEE-01959", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 77, messages7d: 81,  event: null },
-  { id: 60,  orgId: 19, parcelId: null, model: "P+",        serial: "WEE-01960", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 80, messages7d: 84,  event: null },
+  { id: 59,  orgId: 19, parcelId: 41,  model: "CHP-30/60", serial: "WEE-01959", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 77, messages7d: 81,  event: null },
+  { id: 60,  orgId: 19, parcelId: 140, model: "P+",        serial: "WEE-01960", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 80, messages7d: 84,  event: null },
 
   // ── Org 20 : Ferme Bretonne Centrale ─────────────────────────────────────
-  { id: 61,  orgId: 20, parcelId: null, model: "P+",        serial: "WEE-02061", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
-  { id: 62,  orgId: 20, parcelId: null, model: "CHP-15/30", serial: "WEE-02062", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
-  { id: 63,  orgId: 20, parcelId: null, model: "CHP-30/60", serial: "WEE-02063", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 94,  event: null },
-  { id: 64,  orgId: 20, parcelId: null, model: "P+",        serial: "WEE-02064", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
-  { id: 65,  orgId: 20, parcelId: null, model: "TH",        serial: "WEE-02065", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 78, messages7d: 82,  event: null },
+  { id: 61,  orgId: 20, parcelId: 42,  model: "P+",        serial: "WEE-02061", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+  { id: 62,  orgId: 20, parcelId: 145, model: "CHP-15/30", serial: "WEE-02062", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
+  { id: 63,  orgId: 20, parcelId: 146, model: "CHP-30/60", serial: "WEE-02063", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 94,  event: null },
+  { id: 64,  orgId: 20, parcelId: 147, model: "P+",        serial: "WEE-02064", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 65,  orgId: 20, parcelId: 148, model: "TH",        serial: "WEE-02065", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 78, messages7d: 82,  event: null },
 
   // ── Org 21 : GAEC des Quatre Vents ───────────────────────────────────────
   { id: 66,  orgId: 21, parcelId: null, model: "P+",        serial: "WEE-02166", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
@@ -239,25 +239,25 @@ export const sensors = [
 
   // ── Capteurs supplémentaires pour densifier certains adhérents ────────────
   // Org 1 (supplémentaires)
-  { id: 155, orgId: 1,  parcelId: null, model: "P+",        serial: "WEE-00155", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
-  { id: 156, orgId: 1,  parcelId: null, model: "CHP-30/60", serial: "WEE-00156", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 155, orgId: 1,  parcelId: 13,  model: "P+",        serial: "WEE-00155", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
+  { id: 156, orgId: 1,  parcelId: 14,  model: "CHP-30/60", serial: "WEE-00156", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   // Org 2 (supplémentaires)
-  { id: 157, orgId: 2,  parcelId: null, model: "P+",        serial: "WEE-00257", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
-  { id: 158, orgId: 2,  parcelId: null, model: "CHP-15/30", serial: "WEE-00258", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
-  { id: 159, orgId: 2,  parcelId: null, model: "P+",        serial: "WEE-00259", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
+  { id: 157, orgId: 2,  parcelId: 43,  model: "P+",        serial: "WEE-00257", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
+  { id: 158, orgId: 2,  parcelId: 44,  model: "CHP-15/30", serial: "WEE-00258", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+  { id: 159, orgId: 2,  parcelId: 46,  model: "P+",        serial: "WEE-00259", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
   // Org 6 (supplémentaires)
-  { id: 160, orgId: 6,  parcelId: null, model: "P+",        serial: "WEE-00660", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
-  { id: 161, orgId: 6,  parcelId: null, model: "CHP-30/60", serial: "WEE-00661", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
-  { id: 162, orgId: 6,  parcelId: null, model: "P+",        serial: "WEE-00662", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
+  { id: 160, orgId: 6,  parcelId: 70,  model: "P+",        serial: "WEE-00660", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+  { id: 161, orgId: 6,  parcelId: 71,  model: "CHP-30/60", serial: "WEE-00661", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
+  { id: 162, orgId: 6,  parcelId: 72,  model: "P+",        serial: "WEE-00662", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
   // Org 8 (supplémentaires)
-  { id: 163, orgId: 8,  parcelId: null, model: "CHP-15/30", serial: "WEE-00863", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
-  { id: 164, orgId: 8,  parcelId: null, model: "P+",        serial: "WEE-00864", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 83, messages7d: 87,  event: null },
+  { id: 163, orgId: 8,  parcelId: 80,  model: "CHP-15/30", serial: "WEE-00863", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
+  { id: 164, orgId: 8,  parcelId: 81,  model: "P+",        serial: "WEE-00864", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 83, messages7d: 87,  event: null },
   // Org 10 (supplémentaires)
-  { id: 165, orgId: 10, parcelId: null, model: "P+",        serial: "WEE-01065", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
-  { id: 166, orgId: 10, parcelId: null, model: "CHP-15/30", serial: "WEE-01066", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
-  { id: 167, orgId: 10, parcelId: null, model: "CHP-30/60", serial: "WEE-01067", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 165, orgId: 10, parcelId: 92,  model: "P+",        serial: "WEE-01065", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
+  { id: 166, orgId: 10, parcelId: 93,  model: "CHP-15/30", serial: "WEE-01066", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
+  { id: 167, orgId: 10, parcelId: 95,  model: "CHP-30/60", serial: "WEE-01067", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   // Org 17 (supplémentaire)
-  { id: 168, orgId: 17, parcelId: null, model: "CHP-15/30", serial: "WEE-01768", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
+  { id: 168, orgId: 17, parcelId: 133, model: "CHP-15/30", serial: "WEE-01768", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
   // Org 23 (supplémentaire)
   { id: 169, orgId: 23, parcelId: null, model: "P+",        serial: "WEE-02369", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
   { id: 170, orgId: 23, parcelId: null, model: "CHP-30/60", serial: "WEE-02370", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },

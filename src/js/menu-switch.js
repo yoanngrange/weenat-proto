@@ -33,11 +33,16 @@ const menuData = {
 };
 
 const accountLinks = [
-  { href: 'mon-compte.html', icon: 'bi-person', text: 'Mon compte' },
+  { href: 'mon-compte.html', icon: 'bi-person', text: 'Mon compte', avatar: true },
   { href: 'alertes.html', icon: 'bi-bell', text: 'Mes alertes' },
   { href: 'notifications.html', icon: 'bi-envelope', text: 'Mes notifications' },
   { href: 'aide.html', icon: 'bi-question-circle', text: 'Aide' }
 ];
+
+const ROLE_USERS = {
+  'admin-reseau':    { initials: 'JD' },
+  'adherent-reseau': { initials: 'MM' }
+};
 
 function getCurrentPage() {
   const path = window.location.pathname;
@@ -65,9 +70,19 @@ function generateMenuContent(role, currentPage) {
   html += '</div>';
 
   html += '<div class="nav-group compte">';
+  const avatarUrl = localStorage.getItem('avatarUrl');
+  const user = ROLE_USERS[role] || ROLE_USERS['admin-reseau'];
   accountLinks.forEach(link => {
     const isActive = link.href.replace('.html', '') === currentPage;
-    html += `<a href="${link.href}" ${isActive ? 'class="active"' : ''}><i class="bi ${link.icon}"></i> ${link.text}</a>`;
+    let iconHtml;
+    if (link.avatar) {
+      iconHtml = avatarUrl
+        ? `<img class="nav-av-img" src="${avatarUrl}" alt="avatar">`
+        : `<span class="nav-av">${user.initials}</span>`;
+    } else {
+      iconHtml = `<i class="bi ${link.icon}"></i>`;
+    }
+    html += `<a href="${link.href}" ${isActive ? 'class="active"' : ''}>${iconHtml} ${link.text}</a>`;
   });
   html += '</div>';
 
@@ -149,6 +164,10 @@ function openAddModal() {
             <i class="bi bi-bell-fill"></i>
             <span>Alerte</span>
           </button>
+          <button class="add-item-btn" data-action="export">
+            <i class="bi bi-download"></i>
+            <span>Export de données</span>
+          </button>
         </div>
       </div>
     </div>
@@ -172,22 +191,15 @@ function openAddModal() {
 }
 
 window.addEventListener('load', function () {
-  const savedRole = localStorage.getItem('menuRole');
+  const savedRole = localStorage.getItem('menuRole') || 'admin-reseau';
   const sidebar = document.getElementById('sidebar');
-
-  if (savedRole && savedRole === 'adherent-reseau' && sidebar) {
+  if (sidebar) {
     const currentPage = getCurrentPage();
     const navLinks = document.getElementById('nav-links');
-    const newHTML = generateMenuContent('adherent-reseau', currentPage);
-    navLinks.innerHTML = newHTML;
-    sidebar.setAttribute('data-role', 'adherent-reseau');
-  } else if (sidebar) {
-    sidebar.setAttribute('data-role', 'admin-reseau');
+    navLinks.innerHTML = generateMenuContent(savedRole, currentPage);
+    sidebar.setAttribute('data-role', savedRole);
   }
 
-  // Wire up the + button on every page
   const addBtn = document.getElementById('add-btn');
-  if (addBtn) {
-    addBtn.addEventListener('click', openAddModal);
-  }
+  if (addBtn) addBtn.addEventListener('click', openAddModal);
 });

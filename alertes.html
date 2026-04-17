@@ -67,19 +67,54 @@
             <div id="breadcrumb-title"></div>
           </div>
           <div class="topbar-actions">
-            <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
+            <button class="btn-primary"><i class="bi bi-plus"></i> Nouvelle alerte</button>
+          </div>
+        </div>
+        <div id="controls-row" style="position:sticky;top:60px;z-index:90;background:var(--bg)">
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-statut-alerte">
+              <button class="filter-dropdown-btn" type="button">
+                Statut <span class="fd-badge" id="badge-statut-alerte" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-statut-alerte"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-metric-alerte">
+              <button class="filter-dropdown-btn" type="button">
+                Métrique <span class="fd-badge" id="badge-metric-alerte" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-metric-alerte"></div>
+            </div>
           </div>
         </div>
         <main id="content">
-          <div class="alerts-content">
-            <h2>Mes Alertes</h2>
-            <p>Gestion de vos alertes système</p>
+          <div class="admin-content" style="padding:20px 24px">
+
+            <div id="stats-cards" style="margin-bottom:16px"></div>
+
+            <div class="admin-table-wrap">
+              <table class="admin-table" id="alertes-table">
+                <thead>
+                  <tr>
+                    <th class="col-check"><input type="checkbox" id="select-all-alertes"></th>
+                    <th data-column="name">Nom de l'alerte</th>
+                    <th data-column="created">Date de création</th>
+                    <th data-column="lastTriggered">Dernier déclenchement</th>
+                    <th>Capteurs &amp; parcelles</th>
+                    <th data-column="metric">Métrique</th>
+                    <th>Paramètres</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
           </div>
         </main>
       </div>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/pages/alertes.js"></script>
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>
