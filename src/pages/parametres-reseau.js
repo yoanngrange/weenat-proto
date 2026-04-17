@@ -25,11 +25,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ——— Form ———
 
+const META_NETWORKS = ['Grand Ouest', 'Météo Sud', 'Comptoirs du Nord', 'Réseaux Landais', 'Grande Beauce']
+
 function renderForm() {
   const col = document.getElementById('settings-form-col')
   col.innerHTML = `
     <h2>Configurer le réseau</h2>
     <form id="network-form" autocomplete="off">
+
+      <fieldset>
+        <legend>Partage de capteurs</legend>
+        <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
+          Définissez quels capteurs sont partagés entre les adhérents de votre réseau.
+        </p>
+        <div class="share-toggle-row">
+          <div class="share-toggle-info">
+            <span class="share-toggle-label">Capteurs météo</span>
+            <span class="share-toggle-desc">Les capteurs météo sont partagés</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="share-meteo" checked>
+            <span class="toggle-knob"></span>
+          </label>
+        </div>
+        <div class="share-toggle-row">
+          <div class="share-toggle-info">
+            <span class="share-toggle-label">Capteurs d'irrigation</span>
+            <span class="share-toggle-desc">Les capteurs d'irrigation (tensiomètres, sondes capacitives et sondes de fertirrigation) sont partagés</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="share-irrigation">
+            <span class="toggle-knob"></span>
+          </label>
+        </div>
+        <div class="share-toggle-row">
+          <div class="share-toggle-info">
+            <span class="share-toggle-label">Stations virtuelles</span>
+            <span class="share-toggle-desc">Les stations météo virtuelles sont partagées</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="share-virtual">
+            <span class="toggle-knob"></span>
+          </label>
+        </div>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bdr)">
+          <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px">Méta-réseaux</div>
+          <p style="font-size:12px;color:var(--txt3);margin-bottom:10px">
+            Partager vos capteurs au sein de groupements de réseaux.
+          </p>
+          ${META_NETWORKS.map(n => `
+            <div class="share-toggle-row share-toggle-row--compact">
+              <span class="share-toggle-label" style="font-size:12px">${n}</span>
+              <label class="toggle-switch toggle-switch--sm">
+                <input type="checkbox">
+                <span class="toggle-knob"></span>
+              </label>
+            </div>
+          `).join('')}
+        </div>
+      </fieldset>
 
       <fieldset>
         <legend>Identité</legend>

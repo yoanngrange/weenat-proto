@@ -37,11 +37,26 @@ export function updateBreadcrumb(titleOverride, parent) {
   const titleEl   = document.getElementById('breadcrumb-title')
   if (!contextEl || !titleEl) return
 
-  const sectionLabel =
-    meta.section === 'reseau'       ? 'Mon réseau' :
-    meta.section === 'exploitation' ? 'Mon exploitation' : ''
+  // Entity name varies by role (stored in localStorage by menu-switch.js)
+  const menuRole = localStorage.getItem('menuRole') || 'admin-reseau'
+  const isAdmin  = menuRole === 'admin-reseau'
 
-  contextEl.textContent = sectionLabel
+  const ENTITY_NAMES = {
+    exploitation: isAdmin ? 'Breiz\'Agri Conseil' : 'Ferme du Bocage',
+    reseau:       'Breiz\'Agri Conseil',
+  }
+
+  const sectionLabel =
+    meta.section === 'reseau'       ? `Mon réseau` :
+    meta.section === 'exploitation' ? `Mon exploitation` : ''
+
+  const entityName = meta.section ? ENTITY_NAMES[meta.section] : ''
+
+  if (sectionLabel) {
+    contextEl.innerHTML = `${sectionLabel}<span class="breadcrumb-entity">${entityName}</span>`
+  } else {
+    contextEl.textContent = ''
+  }
   contextEl.hidden = !sectionLabel
 
   const title = titleOverride !== undefined ? titleOverride : meta.title

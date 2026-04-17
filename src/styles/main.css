@@ -305,6 +305,26 @@ color: grey;
   height: 100%;
 }
 
+.map-value-badge {
+  background: var(--bg);
+  border: 1.5px solid;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
+  transform: translate(-50%, -50%);
+  display: inline-block;
+}
+
+.map-value-badge-unit {
+  font-size: 9px;
+  font-weight: 400;
+  opacity: .8;
+}
+
 #controls-row {
   padding: 10px 20px;
   background-color: var(--bg);
@@ -487,6 +507,84 @@ th.sort-desc::after {
   margin-bottom: 10px;
 }
 
+/* Integration stats top5 */
+.integ-top5 {
+  background: var(--srf);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 20px;
+  max-width: 48em;
+}
+
+.integ-top5-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--txt3);
+  margin-bottom: 8px;
+}
+
+.integ-top5-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.integ-top5-rank {
+  width: 16px;
+  text-align: center;
+  color: var(--txt3);
+  font-size: 11px;
+}
+
+.integ-top5-name { flex: 1; font-weight: 500; }
+
+.integ-top5-count {
+  font-size: 11px;
+  color: var(--txt3);
+  white-space: nowrap;
+}
+
+.integ-top5-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--bdr2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* Integration card plot badges */
+.integ-card-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.integ-plot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.integ-plot-org {
+  background: var(--pri2);
+  color: var(--pri);
+}
+
+.integ-plot-adh {
+  background: var(--ok2);
+  color: var(--ok);
+}
+
 .integration-card h3 {
   margin: 10px 0;
 }
@@ -598,12 +696,63 @@ th.sort-desc::after {
 }
 
 .forecast-day {
-  min-width: 150px;
+  min-width: 130px;
   background-color: var(--srf);
-  padding: 10px;
+  border: 1px solid var(--bdr);
+  padding: 10px 8px;
   border-radius: 8px;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
+
+.fc-date {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--txt2);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.fc-atmogram {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.fc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.fc-row i {
+  width: 14px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.fc-val {
+  color: var(--txt);
+  font-size: 12px;
+}
+
+.fc-unit {
+  font-size: 10px;
+  color: var(--txt3);
+}
+
+.fc-temp-max { color: #e07050; font-weight: 700; }
+.fc-temp-min { color: #6eb4d4; font-weight: 700; }
+.fc-temp-time { font-size: 10px; color: var(--txt3); margin-left: 2px; }
 
 .sparkline {
   margin-top: 10px;
@@ -1370,6 +1519,28 @@ button:hover {
   color: var(--txt);
 }
 
+.filter-search {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--txt);
+  outline: none;
+}
+
+.filter-search:focus {
+  border-color: var(--pri);
+}
+
+.filter-items {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .filter-dropdown-panel label:hover {
   background: var(--bg);
 }
@@ -1424,6 +1595,23 @@ button:hover {
   display: block;
 }
 
+.point-parcel-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 68px;
+  border-radius: 4px;
+  background: var(--surface-2, #f0f4f8);
+  color: var(--color-primary, #0172A4);
+  font-size: 11px;
+  gap: 4px;
+}
+.point-parcel-cell i {
+  font-size: 20px;
+}
+
 .admin-item-row {
   display: flex;
   align-items: center;
@@ -1464,6 +1652,12 @@ button:hover {
 
 .admin-link--name:hover {
   color: var(--pri);
+}
+
+.admin-city-name {
+  font-size: 10px;
+  color: var(--txt3);
+  margin-top: 1px;
 }
 
 .stat-card.warn {
@@ -2065,7 +2259,7 @@ td.num {
 /* ── Paramètres réseau — two-column layout ────────────────────────────────── */
 #reseau-settings {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 520px 1fr;
   gap: 0;
   height: 100%;
   overflow: hidden;
@@ -3009,6 +3203,23 @@ td.num {
   color: var(--txt3);
 }
 
+.statut-invite {
+  background: #FEF9EC;
+  color: #B45309;
+}
+
+.statut-disabled {
+  background: #fee;
+  color: var(--err);
+}
+
+.member-actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
 /* ── Adhérents page ──────────────────────────────────────────────────────── */
 .plan-badge {
   display: inline-block;
@@ -3266,8 +3477,9 @@ td.num {
   display: flex;
   gap: 6px;
   align-items: stretch;
-  padding: 6px 0 0;
+  padding: 6px 14px 0;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .panel-add-select {
@@ -3494,11 +3706,8 @@ td.num {
 
 .contour-save-btn:hover { background: #015a7a; }
 
-/* ── Cumul summary block ─────────────────────────────────────────────────────── */
+/* ── Cumul summary / water balance ───────────────────────────────────────────── */
 .cumul-summary {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
   padding: 12px 16px;
   background: var(--srf);
   border: 1px solid var(--bdr);
@@ -3506,32 +3715,85 @@ td.num {
   margin-top: 12px;
 }
 
-.cumul-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--bg);
-  border-radius: 6px;
-  flex: 1 1 140px;
-}
+.water-balance-wrap { }
 
-.cumul-item i {
-  font-size: 16px;
-}
-
-.cumul-label {
+.water-balance-title {
   font-size: 12px;
+  font-weight: 600;
   color: var(--txt3);
-  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 6px;
 }
 
-.cumul-value {
-  margin-left: auto;
-  font-size: 16px;
+.water-balance-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 11px;
+  margin-top: 4px;
+  color: var(--txt2);
+}
+
+/* ── Irrigation calendar ─────────────────────────────────────────────────────── */
+.irrig-calendar {
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.irrig-cal-month {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt2);
+  text-align: center;
+  margin-bottom: 4px;
+  text-transform: capitalize;
+}
+
+.irrig-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.irrig-cal-hd {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--txt3);
+  padding: 2px 0;
+}
+
+.irrig-cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--txt2);
+  position: relative;
+  cursor: default;
+}
+
+.irrig-cal-cell.irrig-cal-empty {
+  opacity: 0;
+}
+
+.irrig-cal-cell.irrig-cal-has-event {
+  background: #0172A415;
+  color: #0172A4;
   font-weight: 700;
-  color: var(--txt);
-  white-space: nowrap;
+}
+
+.irrig-cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: block;
+  margin-top: 1px;
 }
 
 /* ── Irrigation form in chart card ──────────────────────────────────────────── */
@@ -3540,4 +3802,607 @@ td.num {
   border-radius: 6px;
   padding: 10px;
   background: var(--srf);
+}
+
+/* ── Toggle switch ───────────────────────────────────────────────────────────── */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle-switch input { display: none; }
+
+.toggle-knob {
+  position: absolute;
+  inset: 0;
+  background: var(--bdr2);
+  border-radius: 20px;
+  transition: background .2s;
+}
+
+.toggle-knob::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: transform .2s;
+}
+
+.toggle-switch input:checked + .toggle-knob { background: var(--pri); }
+.toggle-switch input:checked + .toggle-knob::after { transform: translateX(16px); }
+
+.toggle-switch--sm { width: 28px; height: 16px; }
+.toggle-switch--sm .toggle-knob::after { width: 12px; height: 12px; }
+.toggle-switch--sm input:checked + .toggle-knob::after { transform: translateX(12px); }
+
+.share-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bdr2);
+}
+
+.share-toggle-row--compact {
+  padding: 5px 0;
+}
+
+.share-toggle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.share-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt);
+}
+
+.share-toggle-desc {
+  font-size: 11px;
+  color: var(--txt3);
+}
+
+/* ── Paramètres form ─────────────────────────────────────────────────────────── */
+.param-section {
+  margin-bottom: 32px;
+}
+
+.param-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--txt2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.param-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.param-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.param-field--wide {
+  grid-column: 1 / -1;
+}
+
+.param-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--txt2);
+}
+
+.param-input {
+  padding: 8px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--txt);
+  font-size: 13px;
+  outline: none;
+}
+
+.param-input:focus { border-color: var(--pri); }
+
+.param-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.param-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.param-chip:has(input:checked) {
+  background: var(--pri2);
+  border-color: var(--pri);
+  color: var(--pri);
+}
+
+.param-chip input { display: none; }
+
+/* Subscription plans */
+.param-plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.param-plan {
+  position: relative;
+  border: 2px solid var(--bdr);
+  border-radius: 10px;
+  padding: 20px 16px 16px;
+}
+
+.param-plan--current {
+  box-shadow: 0 0 0 1px var(--pri);
+}
+
+.param-plan-badge {
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.param-plan-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.param-plan-price {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--txt);
+}
+
+.param-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.param-plan-features li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--txt2);
+}
+
+/* ── Facturation page ─────────────────────────────────────────────────────── */
+
+.billing-stats-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.billing-stat-card {
+  flex: 1 1 120px;
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.billing-stat-card--total {
+  border-color: var(--pri);
+}
+
+.billing-stat-card--warn {
+  border-color: var(--warn, #f59e0b);
+  background: #fffbeb;
+}
+
+.billing-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--txt);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.billing-stat-label {
+  font-size: 12px;
+  color: var(--txt2);
+}
+
+.billing-section {
+  background: var(--surface);
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+
+.billing-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--txt);
+  margin: 0 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.billing-contract-grid{
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.billing-contract-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--bdr);
+}
+
+.billing-contract-label {
+  font-size: 11px;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.billing-contract-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+}
+
+.billing-contract-mono {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.billing-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.billing-form-full {
+  grid-column: 1 / -1;
+}
+
+.billing-table-wrap {
+  overflow-x: auto;
+}
+
+.billing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.billing-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--bg);
+  white-space: nowrap;
+}
+
+.billing-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bdr);
+  color: var(--txt);
+  vertical-align: middle;
+}
+
+.billing-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.billing-invoice-num {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--txt2);
+}
+
+.billing-amount {
+  font-weight: 600;
+}
+
+.billing-actions-cell {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.plan-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.plan-badge--essential { background: #e0f2fe; color: #0369a1; }
+.plan-badge--plus      { background: #f0fdf4; color: #15803d; }
+.plan-badge--expert    { background: #faf5ff; color: #7c3aed; }
+
+/* ── Sensor config panel ─────────────────────────────────────────────────── */
+
+.config-section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bdr);
+}
+
+.config-section:last-child {
+  border-bottom: none;
+}
+
+.config-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--txt2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 10px;
+}
+
+/* ── Temperature threshold row ───────────────────────────────────────────── */
+
+.temp-threshold-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  border: 1px solid var(--bdr);
+}
+
+.temp-threshold-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 180px;
+  font-size: 13px;
+}
+
+.temp-threshold-stat i {
+  font-size: 14px;
+  color: var(--txt2);
+}
+
+.temp-threshold-val {
+  font-weight: 700;
+  color: var(--txt);
+  min-width: 52px;
+}
+
+.temp-threshold-label {
+  color: var(--txt2);
+  font-size: 12px;
+}
+
+.temp-threshold-ctrl {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--txt2);
+}
+
+.temp-thresh-input {
+  width: 50px;
+  padding: 2px 6px;
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--txt);
+  text-align: center;
+}
+
+/* ── Multi-horizon chart ─────────────────────────────────────────────────── */
+
+.chart-card--multi {
+  container-type: inline-size;
+}
+
+.multi-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 6px 0 4px;
+  font-size: 11px;
+  color: var(--txt2);
+  align-items: center;
+}
+
+.multi-legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Mon secteur checkbox filter ─────────────────────────────────────────── */
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filter-toggle input[type=checkbox] {
+  cursor: pointer;
+  accent-color: var(--pri);
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Bulk action bar (membres / adhérents) ───────────────────────────────── */
+.bulk-action-bar.hidden { display: none !important; }
+
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 16px;
+  background: var(--pri2);
+  border-bottom: 1px solid var(--pri);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pri);
+  flex-wrap: wrap;
+}
+
+.bulk-count {
+  white-space: nowrap;
+  min-width: 6em;
+}
+
+.bulk-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--txt2);
+}
+
+.bulk-select {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--txt);
+  cursor: pointer;
+}
+
+.bulk-select:focus {
+  outline: none;
+  border-color: var(--pri);
+}
+
+/* ── Checkbox column ─────────────────────────────────────────────────────── */
+.col-check {
+  width: 36px;
+  text-align: center;
+  padding-left: 8px !important;
+  padding-right: 4px !important;
+}
+
+.col-check input[type=checkbox] {
+  cursor: pointer;
+  accent-color: var(--pri);
+}
+
+/* ── Selected table row ──────────────────────────────────────────────────── */
+tr.row-selected td {
+  background: var(--pri2);
+}
+
+/* ── Integrations 2-column stats layout ─────────────────────────────────── */
+.integ-stats-2col {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px 32px;
+  padding: 16px 20px;
+  align-items: start;
+}
+
+.integ-stats-left {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.integ-stats-right {
+  background: var(--srf);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 240px;
+}
+
+/* ── Breadcrumb entity name ──────────────────────────────────────────────── */
+.breadcrumb-entity {
+  font-weight: 600;
+  color: var(--txt);
+  margin-left: 5px;
+}
+
+/* ── Facturation 2-column top layout ────────────────────────────────────── */
+.billing-top-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  align-items: start;
+}
+
+.billing-top-left,
+.billing-top-right {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .billing-top-2col {
+    grid-template-columns: 1fr;
+  }
 }

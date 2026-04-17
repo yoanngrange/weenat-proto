@@ -49,3 +49,27 @@ export function clearParcel(id) {
   delete store[`parcel_${id}`]
   save(store)
 }
+
+// ─── Members list ─────────────────────────────────────────────────────────────
+
+export function getStoredMembers() {
+  return load()['members'] || null
+}
+
+export function saveMembers(list) {
+  const store = load()
+  store['members'] = list
+  save(store)
+}
+
+// ─── Orgs list ────────────────────────────────────────────────────────────────
+
+export function getStoredOrgs() {
+  return load()['orgs'] || null
+}
+
+export function saveOrgs(list) {
+  const store = load()
+  store['orgs'] = list
+  save(store)
+}

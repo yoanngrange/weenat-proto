@@ -1,5 +1,6 @@
 // Integrations page — simplified cards, click → detail
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+import { plots } from '../data/plots.js'
 
 export const integrations = [
   {
@@ -162,9 +163,66 @@ const TYPE_COLORS = {
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
+  renderIntegrationStats()
   populateIntegrationsGrid()
   setupFilters()
 })
+
+function renderIntegrationStats() {
+  const container = document.getElementById('integrations-stats')
+  if (!container) return
+
+  const total = integrations.length
+
+  // Real counts from plot data
+  const plotCounts = {}
+  integrations.forEach(integ => {
+    plotCounts[integ.id] = plots.filter(p =>
+      (p.integrations || []).includes(integ.name)
+    ).length
+  })
+
+  // Exploitation = org 1, adhérents = other orgs
+  const orgPlots     = plots.filter(p => p.orgId === 1)
+  const adherPlots   = plots.filter(p => p.orgId !== 1)
+
+  const activeExploit = integrations.filter(i => i.connected).length
+  // Count distinct integrations used by adherent plots
+  const integNamesInAdher = new Set(adherPlots.flatMap(p => p.integrations || []))
+  const activeAdher = integrations.filter(i => integNamesInAdher.has(i.name)).length
+
+  // Top 5 by real plot count
+  const top5 = [...integrations]
+    .sort((a, b) => plotCounts[b.id] - plotCounts[a.id])
+    .filter(i => plotCounts[i.id] > 0)
+    .slice(0, 5)
+
+  const maxCount = top5[0] ? plotCounts[top5[0].id] : 1
+
+  container.innerHTML = `
+    <div class="integ-stats-2col">
+      <div class="integ-stats-left">
+        <div class="stat-card"><div class="stat-label">Intégrations actives exploitation</div><div class="stat-value">${activeExploit}</div></div>
+        <div class="stat-card"><div class="stat-label">Intégrations actives adhérents</div><div class="stat-value">${activeAdher}</div></div>
+        <div class="stat-card"><div class="stat-label">Intégrations disponibles</div><div class="stat-value">${total}</div></div>
+      </div>
+      <div class="integ-stats-right">
+        <div class="integ-top5-title">Top 5 utilisées (parcelles)</div>
+        ${top5.length ? top5.map((i, idx) => `
+          <div class="integ-top5-row">
+            <span class="integ-top5-rank">${idx + 1}</span>
+            <span class="integ-top5-name">${i.name}</span>
+            <span class="integ-top5-count">${plotCounts[i.id]}</span>
+            <div class="integ-top5-bar">
+              <div style="width:${Math.round(plotCounts[i.id] / maxCount * 100)}%;background:${TYPE_COLORS[i.type] || 'var(--pri)'};height:100%;border-radius:3px"></div>
+            </div>
+          </div>
+        `).join('') : '<div style="color:var(--txt3);font-size:13px;padding:12px 0">Aucune parcelle avec intégration active.</div>'}
+      </div>
+    </div>
+  `
+  container._plotCounts = plotCounts
+}
 
 function populateIntegrationsGrid(filter = '') {
   const grid = document.getElementById('integrations-grid')
@@ -179,7 +237,14 @@ function populateIntegrationsGrid(filter = '') {
     return
   }
 
+  const statsEl = document.getElementById('integrations-stats')
+  const plotCounts = statsEl?._plotCounts || {}
+
   filtered.forEach(integration => {
+    // orgCount = org 1 plots, adherentCount = other org plots
+    const orgCount      = plots.filter(p => p.orgId === 1 && (p.integrations || []).includes(integration.name)).length
+    const adherentCount = plots.filter(p => p.orgId !== 1 && (p.integrations || []).includes(integration.name)).length
+
     const card = document.createElement('div')
     card.className = `integration-card${integration.connected ? ' connected' : ''}`
     card.style.cursor = 'pointer'
@@ -201,6 +266,10 @@ function populateIntegrationsGrid(filter = '') {
           ${integration.badge ? `<span class="integ-card-variant">${integration.badge}</span>` : ''}
         </div>
         <p class="integ-card-desc">${integration.description}</p>
+        <div class="integ-card-badges">
+          ${orgCount > 0 ? `<span class="integ-plot-badge integ-plot-org" title="Parcelles réseau"><i class="bi bi-geo-alt"></i> ${orgCount} réseau</span>` : ''}
+          ${adherentCount > 0 ? `<span class="integ-plot-badge integ-plot-adh" title="Parcelles adhérents"><i class="bi bi-people"></i> ${adherentCount} adhérents</span>` : ''}
+        </div>
       </div>
       ${integration.connected ? '<div class="integ-card-connected"><i class="bi bi-check-circle-fill"></i></div>' : ''}
     `

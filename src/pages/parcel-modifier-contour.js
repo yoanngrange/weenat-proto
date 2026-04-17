@@ -176,7 +176,25 @@ function deleteContour() {
   updateHint()
 }
 
-function saveContour() {
+function computeCentroid(pts) {
+  const lat = pts.reduce((s, p) => s + p[0], 0) / pts.length
+  const lng = pts.reduce((s, p) => s + p[1], 0) / pts.length
+  return { lat, lng }
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`
+    const res = await fetch(url, { headers: { 'User-Agent': 'WeenatProto/1.0' } })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.address?.municipality || data?.address?.city || data?.address?.town || data?.address?.village || null
+  } catch {
+    return null
+  }
+}
+
+async function saveContour() {
   let latlngs = null
 
   if (isDrawing && drawingPoints.length >= 3) {
@@ -188,7 +206,17 @@ function saveContour() {
     latlngs = drawingPoints
   }
 
-  patchParcel(parcelId, { latlngs })
+  // Compute centroid and reverse geocode
+  let patch = { latlngs }
+  if (Array.isArray(latlngs) && latlngs.length >= 3) {
+    const { lat, lng } = computeCentroid(latlngs)
+    patch.lat = lat
+    patch.lng = lng
+    const ville = await reverseGeocode(lat, lng)
+    if (ville) patch.ville = ville
+  }
+
+  patchParcel(parcelId, patch)
 
   // Show confirmation and return
   const btn = document.getElementById('btn-save')

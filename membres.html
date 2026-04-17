@@ -70,7 +70,7 @@
             <button id="export-btn">Inviter un membre</button>
           </div>
         </div>
-        <div id="controls-row">
+        <div id="controls-row" style="position:sticky;top:0;z-index:50;background:var(--bg)">
           <div id="filters">
             <span class="filters-title">Filtrer</span>
             <div class="filter-dropdown" id="fd-role">
@@ -94,12 +94,12 @@
             <table id="members-table">
               <thead>
                 <tr>
+                  <th class="col-check"><input type="checkbox" id="select-all-members"></th>
                   <th data-column="nom">Nom</th>
-                  <th data-column="email">Email</th>
                   <th data-column="role">Rôle</th>
-                  <th>Adhérents</th>
-                  <th>Parcelles</th>
-                  <th>Capteurs</th>
+                  <th data-column="orgs">Organisations</th>
+                  <th data-column="parcelles">Parcelles</th>
+                  <th data-column="capteurs">Capteurs</th>
                   <th data-column="statut">Statut</th>
                 </tr>
               </thead>

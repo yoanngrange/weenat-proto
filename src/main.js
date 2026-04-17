@@ -21,6 +21,11 @@ let selectedIntegrations = []
 let selectedModels = []
 let selectedEvents = []
 let selectedTelecoms = []
+let selectedOrgs = []
+let selectedVilles = []
+let filterMonSecteur = false
+
+const MON_SECTEUR_DEPTS = new Set(["Ille-et-Vilaine", "Morbihan", "Côtes-d'Armor"])
 let map
 let markers = []
 
@@ -59,16 +64,41 @@ const metricAggregates = {
     { value: '7jours', label: '7 jours' },
     { value: '30jours', label: '30 jours' },
     { value: '1an', label: '1 an' }
+  ],
+  vent: [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' },
+    { value: 'moyenne-30', label: 'Moyenne 30 jours' }
+  ],
+  rayonnement: [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'today', label: "Aujourd'hui (cumul)" },
+    { value: '7jours', label: '7 jours (cumul)' }
+  ],
+  'humidite-sol': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
   ]
 }
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
-  // capteurs.html has no map — default to list view
-  if (pageType === '') {
-    const page = window.location.pathname.split('/').pop()
-    if (page === 'capteurs.html' || page === 'capteurs-reseau.html') currentView = 'list'
+  const _page = window.location.pathname.split('/').pop()
+
+  // Initialise la section depuis l'URL
+  if (_page === 'parcelles-reseau.html' || _page === 'capteurs-reseau.html') {
+    currentSection = 'reseau'
   }
+
+  // Sync le rôle depuis localStorage (mis à jour par menu-switch.js)
+  const _storedRole = localStorage.getItem('menuRole')
+  if (_storedRole === 'adherent-reseau') currentRole = 'adherent'
+
+  // Capteurs : vue liste par défaut
+  if (_page === 'capteurs.html' || _page === 'capteurs-reseau.html') currentView = 'list'
 
   initNavigation()
   initRoleSwitcher()
@@ -102,6 +132,7 @@ function updateNavigation() {
 // Role switcher
 function initRoleSwitcher() {
   const switcher = document.getElementById('role-switch')
+  if (!switcher) return
   switcher.addEventListener('click', () => {
     currentRole = currentRole === 'admin' ? 'adherent' : 'admin'
     switcher.textContent = currentRole === 'admin' ? 'Admin réseau' : 'Adhérent'
@@ -159,6 +190,15 @@ function initFilters() {
   populateFilterDropdowns()
   initFilterDropdownToggle()
 
+  // Mon secteur checkbox
+  const monSecteurCb = document.getElementById('check-mon-secteur')
+  if (monSecteurCb) {
+    monSecteurCb.addEventListener('change', () => {
+      filterMonSecteur = monSecteurCb.checked
+      updateContent()
+    })
+  }
+
   // Simple selects (org — legacy capteurs.html)
   const orgFilter = document.getElementById('org-filter')
   if (orgFilter) orgFilter.addEventListener('change', updateContent)
@@ -193,28 +233,49 @@ const INTEGRATION_IDS = {
   'Xarvio': 'xarvio'
 }
 
-function makeCheckboxPanel(panelId, values, stateRef, badgeId) {
+function makeCheckboxPanel(panelId, values, stateRef, badgeId, searchable = false) {
   const panel = document.getElementById(panelId)
   if (!panel) return
-  if (values) {
-    panel.innerHTML = values.map(v =>
-      `<label><input type="checkbox" value="${v}"> ${v}</label>`
-    ).join('')
+
+  function buildItems(vals) {
+    return vals.map(v => `<label><input type="checkbox" value="${v}"> ${v}</label>`).join('')
   }
-  panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value)
-      stateRef.set(checked)
-      updateBadge(badgeId, checked.length)
-      updateContent()
+
+  if (values) {
+    const searchHtml = searchable
+      ? `<input type="text" class="filter-search" placeholder="Rechercher…" autocomplete="off">`
+      : ''
+    panel.innerHTML = searchHtml + `<div class="filter-items">${buildItems(values)}</div>`
+
+    if (searchable) {
+      const input = panel.querySelector('.filter-search')
+      const itemsEl = panel.querySelector('.filter-items')
+      input.addEventListener('input', () => {
+        const q = input.value.toLowerCase()
+        const filtered = values.filter(v => v.toLowerCase().includes(q))
+        itemsEl.innerHTML = buildItems(filtered)
+        bindCheckboxes()
+      })
+    }
+  }
+
+  function bindCheckboxes() {
+    panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value)
+        stateRef.set(checked)
+        updateBadge(badgeId, checked.length)
+        updateContent()
+      })
     })
-  })
+  }
+  bindCheckboxes()
 }
 
 function populateFilterDropdowns() {
   const cultures = [...new Set(plots.map(p => p.crop))].sort()
   makeCheckboxPanel('panel-culture', cultures,
-    { set: v => { selectedCultures = v } }, 'badge-culture')
+    { set: v => { selectedCultures = v } }, 'badge-culture', true)
 
   makeCheckboxPanel('panel-irrigation', null,
     { set: v => { selectedIrrigations = v } }, 'badge-irrigation')
@@ -227,7 +288,7 @@ function populateFilterDropdowns() {
     { set: v => { selectedTextures = v } }, 'badge-texture')
 
   makeCheckboxPanel('panel-integration', INTEGRATION_NAMES.sort(),
-    { set: v => { selectedIntegrations = v } }, 'badge-integration')
+    { set: v => { selectedIntegrations = v } }, 'badge-integration', true)
 
   // Capteurs filters (capteurs.html uses checkbox dropdowns too)
   const allModels = [...new Set(sensors.map(s => s.model))].sort()
@@ -241,15 +302,25 @@ function populateFilterDropdowns() {
   // Org panel for capteurs (network-only)
   const panelOrg = document.getElementById('panel-org')
   if (panelOrg) {
+    panelOrg.innerHTML = ''
     orgs.forEach(org => {
       const lbl = document.createElement('label')
       lbl.innerHTML = `<input type="checkbox" value="${org.id}"> ${org.name}`
       panelOrg.appendChild(lbl)
     })
     panelOrg.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      cb.addEventListener('change', updateContent)
+      cb.addEventListener('change', () => {
+        selectedOrgs = Array.from(panelOrg.querySelectorAll('input:checked')).map(i => Number(i.value))
+        updateBadge('badge-org', selectedOrgs.length)
+        updateContent()
+      })
     })
   }
+
+  // Ville panel for capteurs (network-only)
+  const allVilles = [...new Set(orgs.map(o => o.ville).filter(Boolean))].sort()
+  makeCheckboxPanel('panel-ville', allVilles,
+    { set: v => { selectedVilles = v } }, 'badge-ville', false)
 }
 
 function updateBadge(id, count) {
@@ -299,10 +370,22 @@ function updateFiltersVisibility() {
   adminOnly.forEach(el => {
     el.style.display = currentRole === 'admin' ? 'block' : 'none'
   })
+
+  // Vue admin inaccessible pour l'adhérent sur les pages réseau
+  const adminViewBtn = document.querySelector('.view-btn[data-view="admin"]')
+  if (adminViewBtn) {
+    const canSeeAdmin = currentRole === 'admin' || currentSection !== 'reseau'
+    adminViewBtn.style.display = canSeeAdmin ? '' : 'none'
+    if (!canSeeAdmin && currentView === 'admin') {
+      currentView = 'list'
+      updateView()
+    }
+  }
 }
 
 function populateOrgFilter() {
   const select = document.getElementById('org-filter')
+  if (!select) return  // modern pages use panel-org dropdown instead
   select.innerHTML = '<option value="">Toutes organisations</option>'
   orgs.forEach(org => {
     const option = document.createElement('option')
@@ -317,21 +400,29 @@ function getFilteredData() {
   let filteredSensors = sensors
 
   // Role-based filtering
+  const METEO_MODELS = new Set(['P', 'PT', 'P+', 'TH', 'LWS', 'W', 'PYRANO', 'PAR', 'T_MINI'])
+
   if (currentRole === 'adherent') {
     if (currentSection === 'reseau') {
-      const validModels = ['P+', 'P', 'PT', 'T', 'T_MINI', 'SMV']
-      filteredSensors = sensors.filter(s => s.orgId !== 1 && validModels.includes(s.model))
+      // Adhérent Mon réseau : tous les capteurs météo du réseau (pas irrigation)
+      filteredSensors = sensors.filter(s => METEO_MODELS.has(s.model))
       filteredParcels = plots.filter(p => filteredSensors.some(s => s.parcelId === p.id))
     } else {
+      // Adhérent Mon exploitation : son org uniquement
       filteredParcels = plots.filter(p => p.orgId === 1)
       filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
     }
-  } else if (currentRole === 'admin' && currentSection === 'reseau') {
-    filteredParcels = plots
-    filteredSensors = sensors
   } else {
-    filteredParcels = plots.filter(p => p.orgId === 1)
-    filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    // Admin réseau
+    if (currentSection === 'reseau') {
+      // Admin Mon réseau : tout le réseau
+      filteredParcels = plots
+      filteredSensors = sensors
+    } else {
+      // Admin Mon exploitation : son org uniquement
+      filteredParcels = plots.filter(p => p.orgId === 1)
+      filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    }
   }
 
   // Apply multi-select filters
@@ -407,6 +498,29 @@ function getFilteredData() {
   const telecomVal = telecomEl ? telecomEl.value : ''
   if (telecomVal) filteredSensors = filteredSensors.filter(s => s.telecom === telecomVal)
 
+  if (filterMonSecteur) {
+    const secteurOrgIds = new Set(orgs.filter(o => MON_SECTEUR_DEPTS.has(o.departement)).map(o => o.id))
+    filteredParcels = filteredParcels.filter(p => secteurOrgIds.has(p.orgId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+  }
+
+  if (selectedOrgs.length > 0) {
+    filteredSensors = filteredSensors.filter(s => {
+      const parcel = plots.find(p => p.id === s.parcelId)
+      return selectedOrgs.includes(parcel ? parcel.orgId : s.orgId)
+    })
+    filteredParcels = filteredParcels.filter(p => selectedOrgs.includes(p.orgId))
+  }
+
+  if (selectedVilles.length > 0) {
+    const villeOrgIds = new Set(orgs.filter(o => selectedVilles.includes(o.ville)).map(o => o.id))
+    filteredSensors = filteredSensors.filter(s => {
+      const parcel = plots.find(p => p.id === s.parcelId)
+      return villeOrgIds.has(parcel ? parcel.orgId : s.orgId)
+    })
+    filteredParcels = filteredParcels.filter(p => villeOrgIds.has(p.orgId))
+  }
+
   updateFilterChips()
   return { parcels: filteredParcels, sensors: filteredSensors }
 }
@@ -438,8 +552,22 @@ function updateBreadcrumb() {
   const titleEl = document.getElementById('breadcrumb-title')
   if (!contextEl || !titleEl) return
 
+  const menuRole = localStorage.getItem('menuRole') || 'admin-reseau'
+  const isAdmin  = menuRole === 'admin-reseau'
+
+  const ENTITY_NAMES = {
+    exploitation: isAdmin ? "Breiz'Agri Conseil" : 'Ferme du Bocage',
+    reseau:       "Breiz'Agri Conseil",
+  }
+
   const sectionLabel = meta.section === 'reseau' ? 'Mon réseau' : meta.section === 'exploitation' ? 'Mon exploitation' : ''
-  contextEl.textContent = sectionLabel
+  const entityName   = meta.section ? ENTITY_NAMES[meta.section] : ''
+
+  if (sectionLabel) {
+    contextEl.innerHTML = `${sectionLabel}<span class="breadcrumb-entity">${entityName}</span>`
+  } else {
+    contextEl.textContent = ''
+  }
   contextEl.hidden = !sectionLabel
   titleEl.textContent = meta.title
 }
@@ -491,6 +619,25 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       layer.on('click', () => { window.location.href = `parcelle-detail.html?id=${parcel.id}` })
       layer.addTo(map)
       markers.push(layer)
+
+      // Permanent value label at polygon centroid
+      const value = computeMetricValue(parcel, currentMetric, currentAggregate)
+      const unit  = getMetricUnit(currentMetric)
+      const color = getMetricColor(parcel, currentMetric)
+      const labelLat = parcel.lat || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[0], 0) / parcel.latlngs.length : null)
+      const labelLng = parcel.lng || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[1], 0) / parcel.latlngs.length : null)
+      if (labelLat && labelLng) {
+        const label = L.marker([labelLat, labelLng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="map-value-badge" style="border-color:${color};color:${color}">${value}<span class="map-value-badge-unit"> ${unit}</span></div>`,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0],
+          }),
+          interactive: false,
+        }).addTo(map)
+        markers.push(label)
+      }
     })
   } else {
     filteredParcels.forEach(parcel => {
@@ -533,7 +680,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
     if (markers.length === 1 && typeof markers[0].getLatLng === 'function') {
       map.setView(markers[0].getLatLng(), 10)
     } else {
-      map.fitBounds(group.getBounds().pad(0.1))
+      map.fitBounds(group.getBounds().pad(0.12))
     }
   }
 
@@ -551,6 +698,13 @@ function createParcelLayer(parcel) {
 
   if (parcel.latlngs) {
     return L.polygon(parcel.latlngs, style)
+  }
+
+  // ~7% shown as simple point markers (no polygon shape)
+  if (!parcel.shape && parcel.id % 14 === 0) {
+    return L.circleMarker([parcel.lat, parcel.lng], {
+      radius: 6, color: '#ffffff', fillColor: '#0172A4', fillOpacity: 0.85, weight: 2
+    })
   }
 
   if (parcel.shape?.type === 'circle') {
@@ -775,43 +929,175 @@ function renderList(filteredParcels, filteredSensors) {
       container.innerHTML = '<p class="empty-state">Aucune parcelle ne correspond aux filtres sélectionnés.</p>'
     }
   } else {
+    // Capteurs pages: sensor table only (no parcel metric table)
     if (filteredSensors.length > 0) {
       container.innerHTML += createSensorTable(filteredSensors)
-    }
-    if (filteredParcels.length > 0) {
-      container.innerHTML += createParcelMetricTable(filteredParcels)
+    } else {
+      container.innerHTML = '<p class="empty-state">Aucun capteur ne correspond aux filtres sélectionnés.</p>'
     }
   }
 
   animateView(container)
 }
 
+// Model type mapping
+const MODEL_TYPE = {
+  'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre min',
+  'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
+  'LWS': 'Humectation feuille', 'T_GEL': 'Capteur gel',
+  'CHP-15/30': 'Sonde capa.', 'CHP-30/60': 'Sonde capa.', 'CHP-60/90': 'Sonde capa.',
+  'CAPA-30-3': 'Tensiomètre', 'CAPA-60-6': 'Tensiomètre',
+  'EC': 'Sonde EC',
+}
+
+// Brand assignment (deterministic by serial prefix)
+function getSensorBrand(sensor) {
+  const s = sensor.serial || ''
+  if (s.startsWith('CR') || s.startsWith('CO')) return 'CoRHIZE'
+  if (s.startsWith('DA') || s.startsWith('DV')) return 'Davis'
+  return 'Weenat'
+}
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+const PLOT_DISPLAY_NAMES = [
+  'Le Grand Clos', 'La Petite Pièce', 'Les Terres Noires', 'Le Carré du Bois',
+  'La Lande de la Croix', 'Le Fond du Vallon', 'La Butte Ronde', 'Le Clos des Sables',
+  'La Plaine du Bourg', 'Le Pré de la Mare', 'Les Arpents Verts', 'Le Coteau Blanc',
+  'Le Grand Sillon', 'La Vieille Lande', 'Les Quatre Coins', 'Le Beau Pré',
+  "La Pièce de l'Angle", 'Le Fond des Haies', 'La Terre Rouge', 'Les Longues Raies',
+  'Le Champ Vert', 'La Plaine Basse', 'Les Bordures', 'Le Clos du Haut',
+  'La Grande Pièce Nord', 'Le Pré de la Croix', 'La Butte Creuse', 'Le Champ de la Forêt',
+  'Les Terres Rouges', "La Vallée des Chênes", 'Le Clos Fleuri', 'Les Terres Grasses',
+  'La Lande Sèche', 'Le Pré Marécageux', 'La Côte du Moulin', 'Les Hautes Raies',
+  'Le Fond du Bois', 'La Plaine du Sud', 'Le Petit Carré', 'Les Quatre Vents',
+  'La Vieille Pièce', 'Le Grand Fond', 'La Prairie Humide', 'Le Champ Long',
+  'La Butte du Bourg', 'Le Clos Fleuri Est', 'Les Terres Basses', 'La Pièce du Moulin',
+  'Le Carré Vert', 'La Lande Blanche',
+]
+
+function getPlotDisplayName(plot) {
+  if (plot.id <= 15) return plot.name
+  return PLOT_DISPLAY_NAMES[(plot.id - 16) % PLOT_DISPLAY_NAMES.length]
+}
+
+const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+function formatSerial(sensor) {
+  const id = sensor.id
+  const c1 = CHARS[id % CHARS.length]
+  const num = String(400 + (id * 37) % 500).padStart(3, '0')
+  const c2 = CHARS[(id * 7) % CHARS.length]
+  const c3 = CHARS[(id * 13) % CHARS.length]
+  const d1 = (id * 3) % 10
+  return `${c1}${num}${c2}${c3}${d1}`
+}
+
+function getSensorAge(sensor) {
+  const minutes = 1 + (sensor.id * 7) % 14
+  return `il y a ${minutes} min`
+}
+
+const EVENT_ICONS = {
+  'capteur couché':        'bi-arrow-down-circle',
+  'capteur déplacé':       'bi-geo-alt',
+  'émissions interrompues':'bi-wifi-off',
+  'cuillère bloquée':      'bi-slash-circle',
+}
+
+function computeSensorValue(sensor, metric, aggregate) {
+  const n = (seed) => Math.round(Math.sin(sensor.id * 1.9 + seed) * 3)
+
+  const PLUIE_MODELS  = new Set(['P', 'PT', 'P+'])
+  const TEMP_MODELS   = new Set(['TH', 'PT', 'P+', 'T_MINI'])
+  const HUM_MODELS    = new Set(['TH', 'PT', 'P+'])
+  const VENT_MODELS   = new Set(['W', 'PT', 'P+'])
+  const RAY_MODELS    = new Set(['PYRANO', 'PAR'])
+  const SOL_MODELS    = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6'])
+
+  if (metric === 'pluie') {
+    if (!PLUIE_MODELS.has(sensor.model)) return null
+    const base = 5 + (sensor.id % 10)
+    const vals = { today: Math.max(0, base + n(1)), yesterday: Math.max(0, base - 1 + n(2)), '7jours': Math.max(0, base * 3 + n(3)), '30jours': Math.max(0, base * 12 + n(4)), '1an': Math.max(0, base * 45 + n(5)) }
+    return [vals[aggregate] ?? base, 'mm']
+  }
+  if (metric === 'temp') {
+    if (!TEMP_MODELS.has(sensor.model)) return null
+    const base = 12 + (sensor.id % 8)
+    const vals = { reel: base + n(1), 'min-jour': base - 4 + n(2), 'max-jour': base + 5 + n(3), 'moyenne-7': base + 1 + n(4), 'moyenne-30': base + n(5) }
+    return [vals[aggregate] ?? base, '°C']
+  }
+  if (metric === 'humidite') {
+    if (!HUM_MODELS.has(sensor.model)) return null
+    const base = 55 + (sensor.id % 30)
+    const vals = { reel: Math.min(100, base + n(1)), 'min-jour': Math.max(20, base - 20 + n(2)), 'max-jour': Math.min(100, base + 15 + n(3)), 'moyenne-7': Math.min(100, base - 5 + n(4)), 'moyenne-30': Math.min(100, base - 2 + n(5)) }
+    return [vals[aggregate] ?? base, '%']
+  }
+  if (metric === 'vent') {
+    if (!VENT_MODELS.has(sensor.model)) return null
+    const base = 10 + (sensor.id % 15)
+    const vals = { reel: base + n(1), 'max-jour': base + 12 + n(2), 'moyenne-7': base + 3 + n(3), 'moyenne-30': base + 1 + n(4) }
+    return [vals[aggregate] ?? base, 'km/h']
+  }
+  if (metric === 'rayonnement') {
+    if (!RAY_MODELS.has(sensor.model)) return null
+    const base = 200 + (sensor.id % 300)
+    const vals = { reel: base + n(1) * 10, today: base * 3 + n(2) * 50, '7jours': base * 20 + n(3) * 100 }
+    return [vals[aggregate] ?? base, metric === 'reel' ? 'W/m²' : 'Wh/m²']
+  }
+  if (metric === 'humidite-sol') {
+    if (!SOL_MODELS.has(sensor.model)) return null
+    const base = 30 + (sensor.id % 50)
+    const vals = { reel: Math.min(100, base + n(1)), 'min-jour': Math.max(5, base - 15 + n(2)), 'max-jour': Math.min(100, base + 10 + n(3)), 'moyenne-7': Math.min(100, base - 3 + n(4)) }
+    return [vals[aggregate] ?? base, '%']
+  }
+  return null
+}
+
 function createSensorTable(sensors) {
+  const metricLabels = { pluie: 'Pluie', temp: 'Température', humidite: 'Humidité rel.', vent: 'Vent', rayonnement: 'Rayonnement', 'humidite-sol': 'Humidité sol' }
+  const metricLabel = metricLabels[currentMetric] || 'Mesure'
+  const aggLabel = getAggregateLabel(currentAggregate)
+
   let html = '<table id="sensor-table"><thead><tr>'
   html += '<th></th>'
+  html += '<th data-column="brand">Marque</th>'
   html += '<th data-column="model">Modèle</th>'
-  html += '<th data-column="serial">N° série + Ville</th>'
+  html += '<th data-column="serial">N° série</th>'
+  html += '<th data-column="city">Ville</th>'
   html += '<th data-column="telecom">Télécom</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
   html += '<th data-column="networkQuality">Qualité réseau %</th>'
   html += '<th data-column="messages7d">Messages 7j %</th>'
   html += '<th data-column="org">Organisation</th>'
   html += '<th data-column="event">Événement</th>'
+  html += `<th data-column="mesure" class="col-active-header">${metricLabel}<br><small style="font-weight:400">${aggLabel}</small></th>`
   html += '</tr></thead><tbody>'
 
   sensors.forEach(sensor => {
     const parcel = plots.find(p => p.id === sensor.parcelId)
-    const org = parcel ? orgs.find(o => o.id === parcel.orgId) : null
+    const org = parcel ? orgs.find(o => o.id === parcel.orgId) : orgs.find(o => o.id === sensor.orgId)
+    const brand = getSensorBrand(sensor)
+    const typeName = MODEL_TYPE[sensor.model] || sensor.model
+    const city = org?.ville || '—'
+    const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
+    const mesureHtml = sensorVal
+      ? `${sensorVal[0]} ${sensorVal[1]}`
+      : '<span class="tag-none">—</span>'
+    const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
     html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
       <td><input type="checkbox" data-type="sensor" data-id="${sensor.id}" /></td>
-      <td><strong>${sensor.model}</strong></td>
-      <td>${sensor.serial}${org ? ' — ' + org.ville : ''}</td>
+      <td>${brand}</td>
+      <td><strong>${sensor.model}</strong><br><span style="font-size:10px;color:var(--txt3)">${typeName}</span></td>
+      <td>${formatSerial(sensor)}</td>
+      <td>${city}</td>
       <td>${sensor.telecom}</td>
-      <td>${new Date(sensor.lastMessage).toLocaleDateString()}</td>
+      <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       <td>${sensor.networkQuality}</td>
       <td>${sensor.messages7d}</td>
       <td>${org ? org.name : '—'}</td>
-      <td>${sensor.event || ''}</td>
+      <td>${eventIcon}${sensor.event || ''}</td>
+      <td class="col-active num">${mesureHtml}</td>
     </tr>`
   })
   html += '</tbody></table>'
@@ -850,8 +1136,8 @@ function sortTable(tableId, column, direction) {
 
   const colIndex = Array.from(table.querySelectorAll('th')).findIndex(th => th.dataset.column === column)
   rows.sort((a, b) => {
-    const aRaw = a.children[colIndex].textContent.trim()
-    const bRaw = b.children[colIndex].textContent.trim()
+    const aRaw = getCellSortValue(a.children[colIndex])
+    const bRaw = getCellSortValue(b.children[colIndex])
     const aNum = parseFloat(aRaw)
     const bNum = parseFloat(bRaw)
     const numeric = !isNaN(aNum) && !isNaN(bNum)
@@ -868,6 +1154,13 @@ function sortTable(tableId, column, direction) {
       th.classList.add(`sort-${direction}`)
     }
   })
+}
+
+function getCellSortValue(cell) {
+  if (!cell) return ''
+  const sel = cell.querySelector('select')
+  if (sel) return sel.options[sel.selectedIndex]?.text ?? sel.value ?? ''
+  return cell.textContent.trim()
 }
 
 // Admin view
@@ -915,6 +1208,7 @@ function renderAdmin(filteredParcels, filteredSensors) {
       </div>
     `
     container.innerHTML += createAdminTable(filteredSensors)
+    initSensorAdminTable(container)
   }
 
   animateView(container)
@@ -992,7 +1286,7 @@ function updateFilterChips() {
   // Les badges sur les boutons sont suffisants — pas de chips textuelles
 }
 
-function createAdminTable(sensors) {
+function createAdminTable(sensorList) {
   let html = '<table id="admin-sensor-table"><thead><tr>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
@@ -1000,21 +1294,76 @@ function createAdminTable(sensors) {
   html += '<th data-column="lastMessage">Dernier message</th>'
   html += '<th data-column="networkQuality">Qualité réseau</th>'
   html += '<th data-column="event">Événement</th>'
+  html += '<th data-column="parcelle">Parcelle</th>'
+  html += '<th data-column="membres">Membres</th>'
+  html += '<th data-column="organisation">Organisation</th>'
   html += '</tr></thead><tbody>'
 
-  sensors.forEach(sensor => {
+  sensorList.forEach(sensor => {
+    const parcel = plots.find(p => p.id === sensor.parcelId)
+
+    const parcelHtml = parcel
+      ? `<div class="admin-item-row">
+           <a href="parcelle-detail.html?id=${parcel.id}" class="admin-link">${getPlotDisplayName(parcel)}</a>
+           <button class="icon-btn remove-parcel-sensor-admin" data-sensor-id="${sensor.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+         </div>`
+      : '<span class="tag-none">—</span>'
+
+    const allParcelMembers = parcel ? members.filter(m => m.parcelIds.includes(parcel.id) && m.role !== 'propriétaire') : []
+    const memberLimit = (sensor.id % 3 === 0) ? 0 : Math.min(2, allParcelMembers.length)
+    const displayMembers = allParcelMembers.slice(0, memberLimit)
+    const membresHtml = displayMembers.length
+      ? displayMembers.map(m => `<div class="admin-item-row">
+           <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+           <button class="icon-btn remove-member-sensor-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+         </div>`).join('')
+      : '<span class="tag-none">—</span>'
+
+    const currentOrgId = sensor.orgId ?? parcel?.orgId
+    const orgSelectHtml = `<select class="inline-edit" data-field="orgId" data-sensor-id="${sensor.id}">
+      ${orgs.map(o => `<option value="${o.id}"${o.id === currentOrgId ? ' selected' : ''}>${o.name}</option>`).join('')}
+    </select>`
+
+    const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
+
     html += `<tr>
       <td>${sensor.model}</td>
-      <td>${sensor.serial}</td>
+      <td>${formatSerial(sensor)}</td>
       <td>${sensor.telecom}</td>
-      <td>${new Date(sensor.lastMessage).toLocaleDateString()}</td>
+      <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       <td>${sensor.networkQuality}%</td>
-      <td>${sensor.event || 'Aucun'}</td>
+      <td>${eventIcon}${sensor.event || ''}</td>
+      <td class="admin-links-cell">${parcelHtml}</td>
+      <td class="admin-links-cell">${membresHtml}</td>
+      <td>${orgSelectHtml}</td>
     </tr>`
   })
 
   html += '</tbody></table>'
   return html
+}
+
+function initSensorAdminTable(container) {
+  container.querySelectorAll('.remove-parcel-sensor-admin').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const sensorId = parseInt(btn.dataset.sensorId)
+      const sensor = sensors.find(s => s.id === sensorId)
+      if (sensor) sensor.parcelId = null
+      updateContent()
+    })
+  })
+
+  container.querySelectorAll('.remove-member-sensor-admin').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const memberId = parseInt(btn.dataset.memberId)
+      const parcelId = parseInt(btn.dataset.parcelId)
+      const member = members.find(m => m.id === memberId)
+      if (member) member.parcelIds = member.parcelIds.filter(id => id !== parcelId)
+      updateContent()
+    })
+  })
 }
 
 /// ── Vue liste parcelles ───────────────────────────────────────────────────────
@@ -1048,7 +1397,7 @@ function createParcelMetricTable(parcels) {
     const irrigationClass = irrigation === "Pas d'irrigation" ? 'tag-none' : 'tag tag-irrigation'
 
     html += `<tr class="clickable-row" data-href="parcelle-detail.html?id=${parcel.id}">`
-    html += `<td><a href="parcelle-detail.html?id=${parcel.id}" class="row-link">${parcel.name}</a></td>`
+    html += `<td><a href="parcelle-detail.html?id=${parcel.id}" class="row-link">${getPlotDisplayName(parcel)}</a></td>`
     html += `<td>${parcel.crop}</td>`
     html += `<td class="num">${parcel.area} ha</td>`
     html += `<td>${parcel.texture}</td>`
@@ -1126,6 +1475,7 @@ function createParcelAdminTable(parcels) {
         <button class="btn-secondary btn-sm" id="bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
         <button class="btn-secondary btn-sm bulk-archive-btn" id="bulk-archive-btn"><i class="bi bi-archive"></i> Archiver</button>
         <button class="btn-secondary btn-sm bulk-danger-btn" id="bulk-delete-btn"><i class="bi bi-trash"></i> Supprimer</button>
+        <button class="btn-secondary btn-sm" id="bulk-save-btn" style="color:var(--ok)"><i class="bi bi-check-lg"></i> Enregistrer</button>
       </div>
     </div>
   `
@@ -1133,11 +1483,11 @@ function createParcelAdminTable(parcels) {
   html += '<table id="parcel-admin-table"><thead><tr>'
   html += '<th><input type="checkbox" id="check-all-admin"></th>'
   html += '<th data-column="name">Parcelle</th>'
-  html += '<th class="col-minimap"></th>'
-  html += '<th data-column="crop">Culture</th>'
+  html += '<th class="col-minimap">Contour</th>'
   html += '<th data-column="area">Surface (ha)</th>'
-  html += '<th data-column="texture">Texture</th>'
-  html += '<th data-column="irrigation">Irrigation</th>'
+  html += '<th data-column="crop">Culture</th>'
+  html += '<th data-column="texture">Texture de Sol</th>'
+  html += '<th data-column="irrigation">Type d\'irrigation</th>'
   html += '<th data-column="sensors">Capteurs</th>'
   html += '<th data-column="integrations">Intégrations</th>'
   html += '<th data-column="membre">Membres</th>'
@@ -1147,6 +1497,7 @@ function createParcelAdminTable(parcels) {
   parcels.forEach(parcel => {
     const parcelSensors = sensors.filter(s => s.parcelId === parcel.id)
     const integList = parcel.integrations || []
+    const cityName = parcel.ville || parcel.city || ''
 
     const sensorsHtml = parcelSensors.length
       ? parcelSensors.map(s => `
@@ -1178,14 +1529,20 @@ function createParcelAdminTable(parcels) {
 
     html += `<tr>
       <td><input type="checkbox" class="parcel-admin-check" data-id="${parcel.id}"></td>
-      <td><a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${parcel.name}</a></td>
-      <td class="col-minimap"><div class="admin-minimap" data-parcel-id="${parcel.id}" data-latlngs="${encodeURIComponent(JSON.stringify(parcel.latlngs || []))}" data-lat="${parcel.lat}" data-lng="${parcel.lng}"></div></td>
+      <td>
+        <a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${getPlotDisplayName(parcel)}</a>
+        ${cityName ? `<div class="admin-city-name">${cityName}</div>` : ''}
+      </td>
+      <td class="col-minimap">${(!parcel.latlngs && parcel.id % 14 === 0)
+        ? `<div class="point-parcel-cell"><i class="bi bi-geo-alt-fill"></i><span>Point GPS</span></div>`
+        : `<div class="admin-minimap" data-parcel-id="${parcel.id}" data-latlngs="${encodeURIComponent(JSON.stringify(parcel.latlngs || []))}" data-lat="${parcel.lat}" data-lng="${parcel.lng}"></div>`
+      }</td>
+      <td class="num">${parcel.area}</td>
       <td>
         <select class="inline-edit" data-field="crop" data-id="${parcel.id}">
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </td>
-      <td class="num">${parcel.area}</td>
       <td>
         <select class="inline-edit" data-field="texture" data-id="${parcel.id}">
           ${textures.map(t => `<option value="${t}"${t === parcel.texture ? ' selected' : ''}>${t}</option>`).join('')}
@@ -1416,6 +1773,10 @@ function initParcelAdminTable(container) {
     const { parcels } = getFilteredData()
     container.innerHTML = createParcelAdminTable(parcels)
     initParcelAdminTable(container)
+  })
+
+  container.querySelector('#bulk-save-btn')?.addEventListener('click', () => {
+    showToast('Modifications enregistrées.')
   })
 }
 

@@ -307,5 +307,16 @@ export const sensors = [
   { id: 198, orgId: 34, parcelId: null, model: "CHP-15/30", serial: "WEE-03498", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 76, messages7d: 80,  event: null },
   // Org 39 (supplémentaire)
   { id: 199, orgId: 39, parcelId: null, model: "CHP-30/60", serial: "WEE-03999", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
-  { id: 200, orgId: 39, parcelId: null, model: "P+",        serial: "WEE-04000", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null }
+  { id: 200, orgId: 39, parcelId: null, model: "P+",        serial: "WEE-04000", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
+  // Orgs 2-20 — capteurs liés aux nouvelles parcelles
+  { id: 201, orgId: 2,  parcelId: 43,  model: "P",         serial: "WEE-02201", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+  { id: 202, orgId: 3,  parcelId: 49,  model: "TH",        serial: "WEE-03202", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
+  { id: 203, orgId: 5,  parcelId: 61,  model: "P+",        serial: "WEE-05203", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
+  { id: 204, orgId: 6,  parcelId: 67,  model: "PYRANO",    serial: "WEE-06204", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 83, messages7d: 87,  event: null },
+  { id: 205, orgId: 9,  parcelId: 85,  model: "W",         serial: "WEE-09205", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
+  { id: 206, orgId: 11, parcelId: 97,  model: "LWS",       serial: "WEE-11206", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 80, messages7d: 84,  event: null },
+  { id: 207, orgId: 12, parcelId: 103, model: "PT",        serial: "WEE-12207", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
+  { id: 208, orgId: 15, parcelId: 120, model: "PAR",       serial: "WEE-15208", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 209, orgId: 17, parcelId: 130, model: "CHP-15/30", serial: "WEE-17209", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
+  { id: 210, orgId: 20, parcelId: 145, model: "CAPA-60",   serial: "WEE-20210", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 82, messages7d: 86,  event: null }
 ]

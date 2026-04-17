@@ -215,7 +215,6 @@ function renderWeatherStrip() {
     card.innerHTML = `
       <div class="latest-card-name" style="color:${m.color}">${m.name}</div>
       <div class="latest-card-value">${val}<span class="latest-card-unit"> ${m.unit}</span></div>
-      <div class="latest-card-ts">Maintenant</div>
     `
     container.appendChild(card)
   })
@@ -263,10 +262,13 @@ function appendChartCard(container, m) {
   const base = m.base()
   const card = document.createElement('div')
   card.className = 'chart-card'
-  card.dataset.base      = base
-  card.dataset.color     = m.color
-  card.dataset.cumul     = m.isCumul ? '1' : ''
-  card.dataset.chartType = m.chartType || 'line'
+  card.dataset.base       = base
+  card.dataset.color      = m.color
+  card.dataset.cumul      = m.isCumul ? '1' : ''
+  card.dataset.chartType  = m.chartType || 'line'
+  card.dataset.metricId   = m.id
+  card.dataset.metricName = m.name
+  card.dataset.metricUnit = m.unit
 
   const cumulHtml = m.cumul
     ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label}</span><span class="chart-cumul-value">${genCumulValue(m)} ${m.cumul.unit}</span></div>`
@@ -283,6 +285,136 @@ function appendChartCard(container, m) {
   container.appendChild(card)
 }
 
+// ─── Global tooltip ───────────────────────────────────────────────────────────
+
+let _tooltip = null
+function getTooltip() {
+  if (!_tooltip) {
+    _tooltip = document.createElement('div')
+    _tooltip.className = 'chart-tooltip'
+    document.body.appendChild(_tooltip)
+  }
+  return _tooltip
+}
+
+// ─── Color gradient helpers ────────────────────────────────────────────────────
+
+// Returns [colorLow, colorHigh] for a gradient based on the metric color.
+// Temperature gets a blue→red gradient. Others: desaturated→full.
+function getGradientColors(color, metricId) {
+  if (metricId === 'temp' || metricId === 'temperature') return ['#6eb4d4', '#e07050']
+  if (metricId === 'tmin') return ['#aecce8', '#5580c0']
+  if (metricId === 'temp_rosee') return ['#a0d0f0', '#4090c0']
+  // Default: mix towards white at the low end
+  return [blendWithWhite(color, 0.55), color]
+}
+
+function blendWithWhite(hex, t) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const rr = Math.round(r + (255 - r) * t)
+  const gg = Math.round(g + (255 - g) * t)
+  const bb = Math.round(b + (255 - b) * t)
+  return `#${rr.toString(16).padStart(2,'0')}${gg.toString(16).padStart(2,'0')}${bb.toString(16).padStart(2,'0')}`
+}
+
+// ─── Smooth curve path (Catmull-Rom → cubic Bezier) ──────────────────────────
+
+function smoothPath(points) {
+  if (points.length < 2) return ''
+  if (points.length === 2) {
+    return `M${points[0].x},${points[0].y} L${points[1].x},${points[1].y}`
+  }
+  let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(i - 1, 0)]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[Math.min(i + 2, points.length - 1)]
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+  }
+  return d
+}
+
+// ─── X-axis label formatter ───────────────────────────────────────────────────
+
+function xLabel(agoMins) {
+  if (agoMins < 120)        return `-${agoMins}min`
+  if (agoMins < 2880)       return `-${Math.round(agoMins / 60)}h`
+  if (agoMins < 20160)      return `-${Math.round(agoMins / 1440)}j`
+  return `-${Math.round(agoMins / 10080)}sem`
+}
+
+// ─── Realistic time-series simulation ────────────────────────────────────────
+
+function hourOfDay(minutesAgo) {
+  const ms = Date.now() - minutesAgo * 60000
+  return new Date(ms).getHours() + new Date(ms).getMinutes() / 60
+}
+
+function solarFactor(h) {
+  return Math.max(0, Math.sin(Math.PI * (h - 6) / 12))
+}
+
+function tempFactor(h) {
+  return 0.5 + 0.5 * Math.sin(2 * Math.PI * (h - 4) / 24 - Math.PI / 2)
+}
+
+function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
+  const h  = hourOfDay(minutesAgo)
+  const tf = tempFactor(h)
+  const sf = solarFactor(h)
+  const n  = () => 1 + (Math.random() - 0.5) * 2 * noise
+
+  switch (metricId) {
+    case 'temp': {
+      return ((base - 6) + tf * 12) * n()
+    }
+    case 'tmin': {
+      return ((base - 4) + tf * 8) * n()
+    }
+    case 'temp_rosee': {
+      const airTemp = (base - 6) + tf * 12
+      return Math.min(airTemp - 1, ((base - 8) + tf * 6)) * n()
+    }
+    case 'tsol': {
+      const h2 = hourOfDay(minutesAgo + 120)
+      return ((base - 3) + tempFactor(h2) * 6) * n()
+    }
+    case 'humidite': {
+      return Math.min(100, Math.max(20, (base + (1 - tf) * 25 - tf * 15) * n()))
+    }
+    case 'rayonnement': {
+      return Math.max(0, sf * base * 1.3 * n())
+    }
+    case 'etp': {
+      return Math.max(0, sf * base * 1.5 * n())
+    }
+    case 'dpv': {
+      return Math.max(0, (sf * base * 1.4 + 0.05) * n())
+    }
+    case 'humec': {
+      return Math.max(0, base * Math.max(0, 0.8 - sf * 1.2) * n())
+    }
+    case 'pluie': {
+      return Math.random() < 0.12 ? base * Math.random() * 2 : 0
+    }
+    case 'vent':
+    case 'rafales': {
+      return Math.max(0, base * (0.6 + sf * 0.8) * n())
+    }
+    default:
+      return Math.max(0, base * n())
+  }
+}
+
+// ─── Draw all charts ──────────────────────────────────────────────────────────
+
 function drawAllCharts() {
   const count = getDisplayCount()
   const step  = getStepMinutes()
@@ -292,25 +424,35 @@ function drawAllCharts() {
     const color     = card.dataset.color
     const isCumul   = card.dataset.cumul === '1'
     const chartType = card.dataset.chartType || 'line'
+    const metricId  = card.dataset.metricId || ''
+    const metricName = card.dataset.metricName || ''
+    const metricUnit = card.dataset.metricUnit || ''
     if (card.dataset.isIrrigation) {
       drawIrrigationChart(card.querySelector('.chart-svg'), color, count, step)
     } else {
-      drawChart(card.querySelector('.chart-svg'), base, color, count, step, isCumul, chartType)
+      drawChart(card.querySelector('.chart-svg'), base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
     }
   })
 }
 
-function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line') {
-  const W = 600, H = 180, PAD = { t: 12, r: 8, b: 28, l: 44 }
+function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '') {
+  const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
 
-  // Generate 15-min base points, then aggregate to step
+  // Generate values with realistic day/night cycle
   const rawPerStep = Math.max(1, Math.round(stepMins / 15))
-  const vals = Array.from({ length: count }, () => {
-    let sum = 0
-    for (let i = 0; i < rawPerStep; i++) sum += Math.max(0, base + (Math.random() - 0.5) * base * 0.5)
-    return isCumul ? sum : sum / rawPerStep
+  const vals = Array.from({ length: count }, (_, idx) => {
+    const minsAgo = (count - 1 - idx) * stepMins
+    if (isCumul) {
+      let sum = 0
+      for (let j = 0; j < rawPerStep; j++) {
+        sum += genRealisticVal(metricId, base / rawPerStep, minsAgo + j * (stepMins / rawPerStep))
+      }
+      return sum
+    } else {
+      return genRealisticVal(metricId, base, minsAgo)
+    }
   })
 
   const minV = chartType === 'bar' ? 0 : Math.min(...vals)
@@ -320,46 +462,123 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
 
-  let lines = ''
+  // Gradient ID (unique per SVG element)
+  const gradId = `grad_${Math.random().toString(36).slice(2)}`
+  const [colorLow, colorHigh] = getGradientColors(color, metricId)
+
+  let out = `<defs>
+    <linearGradient id="${gradId}" x1="0" y1="1" x2="0" y2="0" gradientUnits="objectBoundingBox">
+      <stop offset="0%" stop-color="${colorLow}"/>
+      <stop offset="100%" stop-color="${colorHigh}"/>
+    </linearGradient>
+    <clipPath id="clip_${gradId}">
+      <rect x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}"/>
+    </clipPath>
+  </defs>`
+
+  // ── Horizontal grid lines + Y labels ──
   for (let i = 0; i <= 4; i++) {
     const y = PAD.t + (i / 4) * innerH
-    const v = (maxV - (i / 4) * range).toFixed(1)
-    lines += `<line x1="${PAD.l}" y1="${y}" x2="${W - PAD.r}" y2="${y}" stroke="var(--bdr2)" stroke-width="1"/>`
-    lines += `<text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="var(--txt3)">${v}</text>`
+    const v = maxV - (i / 4) * range
+    const label = Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)
+    out += `<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W - PAD.r}" y2="${y.toFixed(1)}" stroke="var(--bdr2)" stroke-width="1"/>`
+    out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${label}</text>`
   }
 
-  // X-axis labels
+  // ── Vertical grid lines (limited, aligned to X labels) ──
   const labelStep = Math.max(1, Math.floor(count / 6))
   for (let i = 0; i < count; i += labelStep) {
-    const x = xOf(i)
+    const x = xOf(i).toFixed(1)
     const agoMins = (count - i) * stepMins
-    let label
-    if (agoMins < 120)        label = `-${agoMins}min`
-    else if (agoMins < 2880)  label = `-${Math.round(agoMins / 60)}h`
-    else if (agoMins < 20160) label = `-${Math.round(agoMins / 1440)}j`
-    else                      label = `-${Math.round(agoMins / 10080)}sem`
-    lines += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--txt3)">${label}</text>`
+    out += `<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="3,3"/>`
+    out += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(agoMins)}</text>`
   }
 
   if (chartType === 'bar') {
     const barW = Math.max(2, (innerW / count) * 0.65)
     vals.forEach((v, i) => {
       if (v <= 0) return
-      const x  = xOf(i)
-      const y  = yOf(v)
-      const h  = (PAD.t + innerH) - y
-      lines += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="0.85" rx="1"/>`
+      const x = xOf(i)
+      const y = yOf(v)
+      const h = (PAD.t + innerH) - y
+      out += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="url(#${gradId})" opacity="0.9" rx="1"/>`
     })
   } else {
-    const pts      = vals.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ')
-    const areaPath = `M${xOf(0).toFixed(1)},${yOf(vals[0]).toFixed(1)} ` +
-      vals.map((v, i) => `L${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ') +
-      ` L${xOf(count - 1).toFixed(1)},${PAD.t + innerH} L${xOf(0).toFixed(1)},${PAD.t + innerH} Z`
-    lines += `<path d="${areaPath}" fill="${color}" opacity="0.12"/>`
-    lines += `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`
+    const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
+    const linePath = smoothPath(pts)
+
+    // Area fill (very light)
+    const areaD = linePath +
+      ` L${xOf(count - 1).toFixed(1)},${PAD.t + innerH} L${PAD.l.toFixed(1)},${PAD.t + innerH} Z`
+    out += `<path d="${areaD}" fill="${colorHigh}" opacity="0.07" clip-path="url(#clip_${gradId})"/>`
+    // Stroke with gradient
+    out += `<path d="${linePath}" fill="none" stroke="url(#${gradId})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#clip_${gradId})"/>`
   }
 
-  svg.innerHTML = lines
+  // ── Invisible overlay for tooltip interaction ──
+  out += `<rect class="chart-hover-rect" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="cursor:crosshair"/>`
+
+  svg.innerHTML = out
+
+  // Attach tooltip
+  attachChartTooltip(svg, vals, xOf, yOf, minV, maxV, count, stepMins, metricName, metricUnit, color, PAD, W, H)
+}
+
+function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, count, stepMins, metricName, metricUnit, color, PAD, W, _H) {
+  const tip  = getTooltip()
+  const rect = svg.querySelector('.chart-hover-rect')
+  if (!rect) return
+
+  // Dot marker (reused)
+  const ns = 'http://www.w3.org/2000/svg'
+  const dot = document.createElementNS(ns, 'circle')
+  dot.setAttribute('r', '4')
+  dot.setAttribute('fill', color)
+  dot.setAttribute('stroke', '#fff')
+  dot.setAttribute('stroke-width', '1.5')
+  dot.style.display = 'none'
+  dot.style.pointerEvents = 'none'
+  svg.appendChild(dot)
+
+  rect.addEventListener('mousemove', e => {
+    const svgRect = svg.getBoundingClientRect()
+    const scaleX  = W / svgRect.width
+    const svgX    = (e.clientX - svgRect.left) * scaleX
+
+    // Find nearest index
+    const innerW = W - PAD.l - PAD.r
+    const frac   = Math.max(0, Math.min(1, (svgX - PAD.l) / innerW))
+    const idx    = Math.round(frac * (count - 1))
+    if (idx < 0 || idx >= vals.length) return
+
+    const v  = vals[idx]
+    const cx = xOf(idx)
+    const cy = yOf(v)
+
+    dot.setAttribute('cx', cx)
+    dot.setAttribute('cy', cy)
+    dot.style.display = ''
+
+    const agoMins = (count - idx) * stepMins
+    const tsLabel = xLabel(agoMins)
+    const valLabel = Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)
+
+    tip.innerHTML = `
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:2px">${metricName}</div>
+      <div class="chart-tooltip-val" style="color:${color}">${valLabel} <span style="font-size:12px;font-weight:400;color:var(--txt2)">${metricUnit}</span></div>
+      <div class="chart-tooltip-ts">${tsLabel}</div>
+    `
+    tip.style.display = 'block'
+    const tx = e.clientX + 12
+    const ty = e.clientY - 10
+    tip.style.left = `${Math.min(tx, window.innerWidth - 160)}px`
+    tip.style.top  = `${ty}px`
+  })
+
+  rect.addEventListener('mouseleave', () => {
+    tip.style.display = 'none'
+    dot.style.display = 'none'
+  })
 }
 
 function drawIrrigationChart(svg, color, count, stepMins) {
@@ -442,16 +661,60 @@ function appendIrrigationChart(container) {
 function renderIrrigEvents(card) {
   const list = card.querySelector('.irrig-events-list')
   const events = parcelState.irrigationEvents || []
-  if (events.length === 0) {
-    list.innerHTML = '<span class="panel-empty" style="font-size:12px">Aucune irrigation saisie</span>'
-    return
+
+  // Show mini calendar for current month + event list below
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
+
+  // Map events by day-of-month
+  const byDay = {}
+  events.forEach((e, i) => {
+    const d = new Date(e.isoDate)
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const day = d.getDate()
+      if (!byDay[day]) byDay[day] = []
+      byDay[day].push(i)
+    }
+  })
+
+  const firstDay = new Date(year, month, 1).getDay() // 0=Sun
+  const startOffset = (firstDay + 6) % 7             // Mon-first
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const dayHeaders = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d =>
+    `<div class="irrig-cal-hd">${d}</div>`
+  ).join('')
+
+  let cells = Array(startOffset).fill(`<div class="irrig-cal-cell irrig-cal-empty"></div>`).join('')
+  for (let d = 1; d <= daysInMonth; d++) {
+    const idxs = byDay[d]
+    const hasDot = idxs && idxs.length > 0
+    const total = hasDot ? idxs.reduce((s, i) => s + (events[i]?.mm || 0), 0) : 0
+    cells += `<div class="irrig-cal-cell${hasDot ? ' irrig-cal-has-event' : ''}" data-day="${d}" title="${hasDot ? total.toFixed(0) + ' mm' : ''}">
+      <span class="irrig-cal-day">${d}</span>
+      ${hasDot ? `<span class="irrig-cal-dot" style="background:#0172A4"></span>` : ''}
+    </div>`
   }
-  list.innerHTML = events.map((e, i) => `
-    <div class="integ-pill-row" style="margin-top:3px">
-      <span class="integ-pill"><i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${e.mm} mm — ${e.isoDate.replace('T', ' ').slice(0, 16)}</span>
-      <button class="icon-btn remove-irrig-btn" data-idx="${i}" title="Supprimer"><i class="bi bi-x-lg"></i></button>
+
+  list.innerHTML = `
+    <div class="irrig-calendar">
+      <div class="irrig-cal-month">${monthName}</div>
+      <div class="irrig-cal-grid">${dayHeaders}${cells}</div>
     </div>
-  `).join('')
+    <div class="irrig-event-rows">
+      ${events.length === 0
+        ? '<span class="panel-empty" style="font-size:12px">Aucune irrigation saisie</span>'
+        : events.map((e, i) => `
+          <div class="integ-pill-row" style="margin-top:3px">
+            <span class="integ-pill"><i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${e.mm} mm — ${e.isoDate.replace('T', ' ').slice(0, 16)}</span>
+            <button class="icon-btn remove-irrig-btn" data-idx="${i}" title="Supprimer"><i class="bi bi-x-lg"></i></button>
+          </div>
+        `).join('')
+      }
+    </div>
+  `
 
   list.querySelectorAll('.remove-irrig-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -498,44 +761,99 @@ function showIrrigForm(card) {
 
 function renderSummaryBlock() {
   const container = document.getElementById('charts-container')
-  // Compute cumuls from parcel state metrics
   const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  let pluieMm = null, irrigMm = 0, etpMm = null
+  let pluieMm = 0
 
   linkedSensors.forEach(s => {
     const metrics = METRICS_BY_MODEL[s.model] || []
-    metrics.forEach(m => {
-      if (m.id === 'pluie' && pluieMm === null) pluieMm = rnd(20, 80)
-    })
+    if (metrics.some(m => m.id === 'pluie')) pluieMm = rnd(20, 80)
   })
-  if (pluieMm === null) pluieMm = 0
 
-  etpMm = rndf(15, 60)
-  irrigMm = (parcelState.irrigationEvents || []).reduce((s, e) => s + (e.mm || 0), 0)
+  const etpMm   = rndf(15, 60)
+  const irrigMm = (parcelState.irrigationEvents || []).reduce((s, e) => s + (e.mm || 0), 0)
   const drainageMm = Math.max(0, pluieMm + irrigMm - etpMm)
+  const balanceMm  = pluieMm + irrigMm - etpMm - drainageMm
 
   const summary = document.createElement('div')
   summary.className = 'cumul-summary'
+
+  // SVG water balance diagram
+  // Layout: soil rectangle in centre; arrows pointing in/out
+  const W = 480, H = 240
+  const soilY1 = 100, soilY2 = 180, soilX1 = 140, soilX2 = 340
+
+  function arrowUp(x, y1, y2, color, label, val) {
+    // Arrow going upward (loss: ETP)
+    const mx = x
+    return `
+      <line x1="${mx}" y1="${y2}" x2="${mx}" y2="${y1 + 10}" stroke="${color}" stroke-width="3" marker-end="url(#ah-${color.replace('#','')})"/>
+      <text x="${mx}" y="${y1 - 6}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${label}</text>
+      <text x="${mx}" y="${y1 - 20}" text-anchor="middle" fill="${color}" font-size="13" font-weight="700">${val} mm</text>
+    `
+  }
+
+  function arrowDown(x, y1, y2, color, label, val, yLabel) {
+    const mx = x
+    return `
+      <line x1="${mx}" y1="${y1}" x2="${mx}" y2="${y2 - 10}" stroke="${color}" stroke-width="3" marker-end="url(#ad-${color.replace('#','')})"/>
+      <text x="${mx}" y="${yLabel ?? (y1 - 10)}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${label}</text>
+      <text x="${mx}" y="${(yLabel ?? (y1 - 10)) - 14}" text-anchor="middle" fill="${color}" font-size="13" font-weight="700">${val} mm</text>
+    `
+  }
+
+  function arrowDef(id, color) {
+    return `<marker id="${id}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="${color}"/>
+    </marker>`
+  }
+
+  const etpColor   = '#c090e0'
+  const pluieColor = '#45b7d1'
+  const irrigColor = '#0172A4'
+  const drainColor = '#7bc4b0'
+  const balColor   = balanceMm >= 0 ? '#2d9e5f' : '#e07050'
+
   summary.innerHTML = `
-    <div class="cumul-item">
-      <i class="bi bi-cloud-rain" style="color:#45b7d1"></i>
-      <span class="cumul-label">Pluie</span>
-      <span class="cumul-value">${pluieMm.toFixed(0)} mm</span>
-    </div>
-    <div class="cumul-item">
-      <i class="bi bi-sun" style="color:#c090e0"></i>
-      <span class="cumul-label">ETP</span>
-      <span class="cumul-value">${etpMm.toFixed(1)} mm</span>
-    </div>
-    <div class="cumul-item">
-      <i class="bi bi-droplet-fill" style="color:#0172A4"></i>
-      <span class="cumul-label">Irrigations</span>
-      <span class="cumul-value">${irrigMm.toFixed(1)} mm</span>
-    </div>
-    <div class="cumul-item">
-      <i class="bi bi-layers" style="color:#7bc4b0"></i>
-      <span class="cumul-label">Drainage estimé</span>
-      <span class="cumul-value">${drainageMm.toFixed(0)} mm</span>
+    <div class="water-balance-wrap">
+      <div class="water-balance-title">Bilan hydrique — période sélectionnée</div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:520px;display:block;margin:0 auto">
+        <defs>
+          ${arrowDef('ah-' + etpColor.replace('#',''),   etpColor)}
+          ${arrowDef('ad-' + pluieColor.replace('#',''), pluieColor)}
+          ${arrowDef('ad-' + irrigColor.replace('#',''), irrigColor)}
+          ${arrowDef('ad-' + drainColor.replace('#',''), drainColor)}
+        </defs>
+
+        <!-- Soil block -->
+        <rect x="${soilX1}" y="${soilY1}" width="${soilX2 - soilX1}" height="${soilY2 - soilY1}"
+              rx="6" fill="#d4a85855" stroke="#a07030" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 - 6}" text-anchor="middle"
+              fill="#7a5020" font-size="11">Sol</text>
+        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 + 10}" text-anchor="middle"
+              fill="${balColor}" font-size="14" font-weight="700">
+          ${balanceMm >= 0 ? '+' : ''}${balanceMm.toFixed(0)} mm
+        </text>
+        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 + 24}" text-anchor="middle"
+              fill="${balColor}" font-size="10">bilan net</text>
+
+        <!-- ETP arrow up from soil surface -->
+        ${arrowUp(240, 18, soilY1, etpColor, 'ETP', etpMm.toFixed(1))}
+
+        <!-- Pluie arrow down -->
+        ${arrowDown(160, 10, soilY1, pluieColor, 'Pluie', pluieMm.toFixed(0), 22)}
+
+        <!-- Irrigation arrow down (slightly right of rain) -->
+        ${arrowDown(320, 10, soilY1, irrigColor, 'Irrigation', irrigMm.toFixed(0), 22)}
+
+        <!-- Drainage arrow down from soil bottom -->
+        ${arrowDown(240, soilY2, H - 10, drainColor, 'Drainage', drainageMm.toFixed(0), soilY2 + 20)}
+      </svg>
+      <div class="water-balance-legend">
+        <span style="color:${pluieColor}">&#x25BC; Pluie ${pluieMm.toFixed(0)} mm</span>
+        <span style="color:${irrigColor}">&#x25BC; Irrigation ${irrigMm.toFixed(0)} mm</span>
+        <span style="color:${etpColor}">&#x25B2; ETP ${etpMm.toFixed(1)} mm</span>
+        <span style="color:${drainColor}">&#x25BC; Drainage ${drainageMm.toFixed(0)} mm</span>
+      </div>
     </div>
   `
   container.appendChild(summary)
@@ -632,7 +950,7 @@ function renderIdentification(org) {
   bindEditable(el, 'irrigation', irrigation,          v => saveState({ irrigation: v }))
 }
 
-function editableRow(label, value, field, inputType) {
+function editableRow(label, _value, field, _inputType) {
   return `
     <div class="panel-row editable-row" data-field="${field}">
       <span class="panel-row-key">${label}</span>
@@ -641,7 +959,7 @@ function editableRow(label, value, field, inputType) {
     </div>`
 }
 
-function editableSelect(label, value, field, options, displayClass) {
+function editableSelect(label, _value, field, options, displayClass) {
   const cls = displayClass ? ` data-display-class="${displayClass}"` : ''
   return `
     <div class="panel-row editable-row" data-field="${field}" data-options="${encodeURIComponent(JSON.stringify(options))}"${cls}>
@@ -728,14 +1046,20 @@ function renderGeolocalisation(org) {
 
   const hasShape = Array.isArray(latlngs) && latlngs.length >= 3
 
+  // Use stored ville/coords if available (set after contour edit + geocoding)
+  const ville = parcelState.ville || parcelBase.ville || org?.ville || '—'
+  const dept  = parcelBase.departement || org?.departement
+  const lat   = parcelState.lat ?? parcelBase.lat ?? org?.lat
+  const lng   = parcelState.lng ?? parcelBase.lng ?? org?.lng
+
   el.innerHTML = `
     <div class="panel-row">
       <span class="panel-row-key">Commune</span>
-      <span class="panel-row-val">${org?.ville || '—'}${org?.departement ? ` (${org.departement})` : ''}</span>
+      <span class="panel-row-val">${ville}${dept ? ` (${dept})` : ''}</span>
     </div>
     <div class="panel-row">
       <span class="panel-row-key">Coordonnées</span>
-      <span class="panel-row-val">${org?.lat?.toFixed(4) ?? '—'}, ${org?.lng?.toFixed(4) ?? '—'}</span>
+      <span class="panel-row-val">${lat != null ? lat.toFixed(4) : '—'}, ${lng != null ? lng.toFixed(4) : '—'}</span>
     </div>
     <div style="padding:8px 0 4px">
       <a href="parcelle-modifier-contour.html?id=${parcelId}" class="contour-link">
@@ -763,7 +1087,6 @@ function getLinkedMetricIds() {
 function renderLinkedSensors() {
   const el     = document.getElementById('panel-sensors')
   const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  const org    = orgs.find(o => o.id === parcelBase.orgId)
 
   // Available sensors: same org, not yet linked
   const available = allSensors.filter(s =>
@@ -788,7 +1111,7 @@ function renderLinkedSensors() {
 
   if (available.length > 0) {
     html += `
-      <div class="panel-add-row" style="margin-top:6px">
+      <div class="panel-add-row">
         <select id="add-sensor-select" class="panel-add-select">
           <option value="">Ajouter un capteur…</option>
           ${available.map(s => `<option value="${s.id}">${s.model} — ${s.serial}</option>`).join('')}
@@ -881,7 +1204,7 @@ function renderIntegrations() {
 
   if (inactive.length > 0) {
     html += `
-      <div class="panel-add-row" style="margin-top:6px">
+      <div class="panel-add-row">
         <select id="add-integ-select" class="panel-add-select">
           <option value="">Ajouter une intégration…</option>
           ${inactive.map(n => `<option value="${encodeURIComponent(n)}">${n}</option>`).join('')}
@@ -1013,9 +1336,27 @@ function renderAlertes() {
   })
 }
 
+function getAvailableAlertMetrics() {
+  const metrics = []
+  const linked  = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  linked.forEach(s => {
+    const defs = METRICS_BY_MODEL[s.model] || []
+    defs.forEach(m => {
+      if (!metrics.find(x => x.id === m.id)) metrics.push({ id: m.id, name: m.name, unit: m.unit })
+    })
+  })
+  // Always-available metrics
+  ALWAYS_METRICS.forEach(m => {
+    if (!metrics.find(x => x.id === m.id)) metrics.push({ id: m.id, name: m.name, unit: m.unit })
+  })
+  return metrics
+}
+
 function showCreateAlertForm(container) {
   const existingForm = container.querySelector('.alert-create-form')
   if (existingForm) return
+
+  const availableMetrics = getAvailableAlertMetrics()
 
   const form = document.createElement('div')
   form.className = 'alert-create-form'
@@ -1023,23 +1364,17 @@ function showCreateAlertForm(container) {
     <div class="alert-form-row">
       <select id="alert-metric" class="panel-add-select">
         <option value="">Métrique…</option>
-        <option value="Pluie">Pluie</option>
-        <option value="Température">Température</option>
-        <option value="Humidité sol">Humidité sol</option>
-        <option value="ETP">ETP</option>
-        <option value="Vent">Vent</option>
-        <option value="Rayonnement">Rayonnement</option>
-        <option value="T° de rosée">T° de rosée</option>
+        ${availableMetrics.map(m => `<option value="${m.id}" data-unit="${m.unit}">${m.name}</option>`).join('')}
       </select>
     </div>
-    <div class="alert-form-row">
-      <select id="alert-condition" class="panel-add-select" style="max-width:80px">
+    <div class="alert-form-row" style="align-items:center;gap:6px">
+      <select id="alert-condition" class="panel-add-select" style="max-width:70px;flex:0 0 auto">
         <option value=">">&gt;</option>
         <option value="<">&lt;</option>
         <option value="=">=</option>
       </select>
-      <input type="number" id="alert-threshold" class="inline-edit" placeholder="Seuil" style="width:70px">
-      <input type="text"   id="alert-unit"      class="inline-edit" placeholder="Unité" style="width:50px">
+      <input type="number" id="alert-threshold" class="inline-edit" placeholder="Valeur" style="flex:1;min-width:0">
+      <span id="alert-unit-label" style="font-size:11px;color:var(--txt3);flex-shrink:0;min-width:30px">—</span>
     </div>
     <div class="alert-form-actions">
       <button id="alert-save-btn" class="panel-add-btn">Enregistrer</button>
@@ -1048,26 +1383,32 @@ function showCreateAlertForm(container) {
   `
   container.appendChild(form)
 
-  document.getElementById('alert-save-btn').addEventListener('click', () => {
-    const metric    = document.getElementById('alert-metric').value
-    const condition = document.getElementById('alert-condition').value
-    const threshold = document.getElementById('alert-threshold').value
-    const unit      = document.getElementById('alert-unit').value
-    if (!metric || !threshold) return
+  // Update unit label when metric changes
+  form.querySelector('#alert-metric').addEventListener('change', e => {
+    const opt = e.target.selectedOptions[0]
+    form.querySelector('#alert-unit-label').textContent = opt?.dataset.unit || '—'
+  })
+
+  form.querySelector('#alert-save-btn').addEventListener('click', () => {
+    const sel       = form.querySelector('#alert-metric')
+    const metricId  = sel.value
+    const metricDef = availableMetrics.find(m => m.id === metricId)
+    const condition = form.querySelector('#alert-condition').value
+    const threshold = form.querySelector('#alert-threshold').value
+    if (!metricId || !threshold) return
 
     const newAlert = {
       type:      'seuil',
-      label:     `Alerte ${metric}`,
-      metric, condition, threshold, unit,
+      label:     `Alerte ${metricDef?.name || metricId}`,
+      metric:    metricDef?.name || metricId,
+      condition, threshold,
+      unit:      metricDef?.unit || '',
     }
-    const updated = [...(parcelState.alertes || []), newAlert]
-    saveState({ alertes: updated })
+    saveState({ alertes: [...(parcelState.alertes || []), newAlert] })
     renderAlertes()
   })
 
-  document.getElementById('alert-cancel-btn').addEventListener('click', () => {
-    form.remove()
-  })
+  form.querySelector('#alert-cancel-btn').addEventListener('click', () => form.remove())
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────

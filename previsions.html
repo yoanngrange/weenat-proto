@@ -70,17 +70,7 @@
             <option>Choisir une parcelle ou un capteur</option>
             <!-- Options dynamiques -->
           </select>
-          <div id="forecast">
-            <div class="forecast-day">
-              <h3>Lundi 2 oct</h3>
-              <p>Pluie: 5mm</p>
-              <p>ETP: 3mm</p>
-              <p>Temp: 15-22°C</p>
-              <!-- Plus -->
-              <div class="sparkline">📈</div>
-            </div>
-            <!-- 7 jours -->
-          </div>
+          <div id="forecast"></div>
           <table id="hourly-table">
             <thead>
               <tr>
@@ -90,6 +80,7 @@
                 <th>Temp</th>
                 <th>Humidité</th>
                 <th>Vent</th>
+                <th data-col="winddir">Dir. vent</th>
                 <th>DPV</th>
                 <th>Rayonnement</th>
                 <th>Nuages</th>

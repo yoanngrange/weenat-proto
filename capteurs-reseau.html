@@ -71,59 +71,75 @@
             <button id="export-btn">Ajouter</button>
           </div>
         </div>
-        <div id="filters">
-          <select id="metric-selector">
-            <option value="pluie">Pluie</option>
-            <option value="ru">Réserve utile</option>
-            <option value="temp">Température</option>
-          </select>
-          <select id="model-filter">
-            <option value="">Tous modèles</option>
-            <optgroup label="Stations météo">
-              <option value="P+">P+ — Station météo avancée</option>
-              <option value="PT">PT — Station météo compacte</option>
-              <option value="P">P — Pluviomètre</option>
-              <option value="W">W — Anémomètre</option>
-              <option value="TH">TH — Thermo-hygromètre</option>
-              <option value="PYRANO">PYRANO — Pyranomètre</option>
-              <option value="PAR">PAR — Capteur PAR</option>
-            </optgroup>
-            <optgroup label="Sol & Irrigation">
-              <option value="CHP-15/30">CHP-15/30 — Tensiomètre 15/30 cm</option>
-              <option value="CHP-30/60">CHP-30/60 — Tensiomètre 30/60 cm</option>
-              <option value="CHP-60/90">CHP-60/90 — Tensiomètre 60/90 cm</option>
-              <option value="CAPA-30-3">CAPA-30-3 — Sonde capacitive 3 niveaux</option>
-              <option value="CAPA-60-6">CAPA-60-6 — Sonde capacitive 6 niveaux</option>
-              <option value="EC">EC — Sonde de fertigation</option>
-              <option value="T_MINI">T_MINI — Thermomètre sol</option>
-            </optgroup>
-            <optgroup label="Maladie">
-              <option value="LWS">LWS — Capteur d'humectation foliaire</option>
-              <option value="T_GEL">T_GEL — Capteur anti-gel</option>
-            </optgroup>
-          </select>
-          <select id="event-filter">
-            <option value="">Tous événements</option>
-            <option value="capteur couché">Capteur couché</option>
-            <option value="capteur déplacé">Capteur déplacé</option>
-            <option value="émissions interrompues">Émissions interrompues</option>
-            <option value="cuillère bloquée">Cuillère bloquée</option>
-          </select>
-          <select id="telecom-filter">
-            <option value="">Toutes télécoms</option>
-            <option value="Sigfox">Sigfox</option>
-            <option value="LoRa">LoRa</option>
-          </select>
-          <div id="active-filters"></div>
-          <select id="org-filter" class="network-only">
-            <option value="">Toutes organisations</option>
-          </select>
+        <div id="controls-row">
+          <div id="metric-controls">
+            <div class="control-group">
+              <span class="control-label">Mesure</span>
+              <select id="metric-selector">
+                <option value="pluie">Pluie</option>
+                <option value="temp">Température</option>
+                <option value="humidite">Humidité relative</option>
+                <option value="vent">Vent</option>
+                <option value="rayonnement">Rayonnement</option>
+                <option value="humidite-sol">Humidité sol</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Agrégat</span>
+              <select id="aggregate-selector"></select>
+            </div>
+          </div>
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-model">
+              <button class="filter-dropdown-btn" type="button">
+                Modèle <span class="fd-badge" id="badge-model" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-model"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-event">
+              <button class="filter-dropdown-btn" type="button">
+                Événement <span class="fd-badge" id="badge-event" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-event">
+                <label><input type="checkbox" value="capteur couché"> Capteur couché</label>
+                <label><input type="checkbox" value="capteur déplacé"> Capteur déplacé</label>
+                <label><input type="checkbox" value="émissions interrompues"> Émissions interrompues</label>
+                <label><input type="checkbox" value="cuillère bloquée"> Cuillère bloquée</label>
+              </div>
+            </div>
+            <div class="filter-dropdown" id="fd-telecom">
+              <button class="filter-dropdown-btn" type="button">
+                Télécom <span class="fd-badge" id="badge-telecom" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-telecom">
+                <label><input type="checkbox" value="Sigfox"> Sigfox</label>
+                <label><input type="checkbox" value="LoRa"> LoRa</label>
+                <label><input type="checkbox" value="5G"> 5G</label>
+              </div>
+            </div>
+            <div class="filter-dropdown" id="fd-org">
+              <button class="filter-dropdown-btn" type="button">
+                Organisation <span class="fd-badge" id="badge-org" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-org"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-ville">
+              <button class="filter-dropdown-btn" type="button">
+                Ville <span class="fd-badge" id="badge-ville" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-ville"></div>
+            </div>
+            <label class="filter-toggle"><input type="checkbox" id="check-mon-secteur"> Mon secteur</label>
+            <div id="active-filters"></div>
+          </div>
         </div>
         <main id="content">
-          <div id="map-container" class="view active" data-view="map">
+          <div id="map-container" class="view" data-view="map">
+            <div id="map" style="width:100%;height:100%"></div>
             <div id="legend"></div>
           </div>
-          <div id="list-container" class="view" data-view="list"></div>
+          <div id="list-container" class="view active" data-view="list"></div>
           <div id="admin-container" class="view" data-view="admin">
             <div id="stats-cards"></div>
             <div id="admin-table"></div>
@@ -131,8 +147,8 @@
         </main>
       </div>
       <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
+        <button class="view-btn" data-view="map">Carte</button>
+        <button class="view-btn active" data-view="list">Liste</button>
         <button class="view-btn" data-view="admin">Administration</button>
       </div>
     </div>

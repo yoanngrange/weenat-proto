@@ -71,73 +71,78 @@
             <button id="export-btn">Ajouter</button>
           </div>
         </div>
-        <div id="metric-controls">
-          <select id="metric-selector">
-            <option value="pluie">Pluie</option>
-            <option value="temp">Température</option>
-            <option value="humidite">Humidité</option>
-            <option value="etat-hydrique">État hydrique</option>
-          </select>
-          <select id="aggregate-selector"></select>
-        </div>
-        <div id="filters">
-          <select id="culture-filter">
-            <option value="">Toutes cultures</option>
-            <option value="Blé tendre">Blé tendre</option>
-            <option value="Maïs">Maïs</option>
-            <option value="Colza">Colza</option>
-            <option value="Orge">Orge</option>
-            <option value="Pomme de terre">Pomme de terre</option>
-            <option value="Artichaut">Artichaut</option>
-            <option value="Lin">Lin</option>
-            <option value="Betterave sucrière">Betterave sucrière</option>
-            <option value="Avoine">Avoine</option>
-            <option value="Tournesol">Tournesol</option>
-            <option value="Légumes bio">Légumes bio</option>
-            <option value="Épinard">Épinard</option>
-            <option value="Chou-fleur">Chou-fleur</option>
-            <option value="Carotte">Carotte</option>
-            <option value="Pois">Pois</option>
-            <option value="Seigle">Seigle</option>
-            <option value="Triticale">Triticale</option>
-            <option value="Haricot">Haricot</option>
-            <option value="Luzerne">Luzerne</option>
-            <option value="Radis">Radis</option>
-            <option value="Navet">Navet</option>
-            <option value="Poireau">Poireau</option>
-            <option value="Tomate">Tomate</option>
-            <option value="Betterave fourragère">Betterave fourragère</option>
-            <option value="Chou">Chou</option>
-            <option value="Maïs ensilage">Maïs ensilage</option>
-            <option value="Laitue">Laitue</option>
-            <option value="Orge de printemps">Orge de printemps</option>
-          </select>
-          <select id="texture-filter">
-            <option value="">Toutes textures</option>
-            <option value="Argile">Argile</option>
-            <option value="Argile limoneuse">Argile limoneuse</option>
-            <option value="Argile sableuse">Argile sableuse</option>
-            <option value="Limon argileux">Limon argileux</option>
-            <option value="Limon argileux silteux">Limon argileux silteux</option>
-            <option value="Limon argileux sableux">Limon argileux sableux</option>
-            <option value="Loam">Loam</option>
-            <option value="Limon sableux">Limon sableux</option>
-            <option value="Sable argileux">Sable argileux</option>
-            <option value="Limon">Limon</option>
-            <option value="Sable limoneux">Sable limoneux</option>
-            <option value="Sable">Sable</option>
-          </select>
-          <select id="etat-hydrique-filter">
-            <option value="">Tous états</option>
-            <option value="rfu-100-50">RFU 100 à 50%</option>
-            <option value="rfu-50-20">RFU 50 à 20%</option>
-            <option value="rfu-20-5">RFU 20 à 5%</option>
-            <option value="rfu-5-0">RFU 5 à 0%</option>
-          </select>
-          <div id="active-filters"></div>
-          <select id="org-filter" class="network-only">
-            <option value="">Toutes organisations</option>
-          </select>
+        <div id="controls-row">
+          <div id="metric-controls">
+            <div class="control-group">
+              <span class="control-label">Mesure</span>
+              <select id="metric-selector">
+                <option value="pluie">Pluie</option>
+                <option value="temp">Température</option>
+                <option value="humidite">Humidité</option>
+                <option value="etat-hydrique">État hydrique</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <span class="control-label">Agrégat</span>
+              <select id="aggregate-selector"></select>
+            </div>
+          </div>
+          <div id="filters">
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-culture">
+              <button class="filter-dropdown-btn" type="button">
+                Culture <span class="fd-badge" id="badge-culture" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-culture"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-irrigation">
+              <button class="filter-dropdown-btn" type="button">
+                Irrigation <span class="fd-badge" id="badge-irrigation" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-irrigation">
+                <label><input type="checkbox" value="Pas d'irrigation"> Pas d'irrigation</label>
+                <label><input type="checkbox" value="Enrouleur"> Enrouleur</label>
+                <label><input type="checkbox" value="Pivot"> Pivot</label>
+                <label><input type="checkbox" value="Rampe"> Rampe</label>
+                <label><input type="checkbox" value="Couverture intégrale"> Couverture intégrale</label>
+                <label><input type="checkbox" value="Gravitaire"> Gravitaire</label>
+                <label><input type="checkbox" value="Goutte à goutte"> Goutte à goutte</label>
+                <label><input type="checkbox" value="Micro aspersion"> Micro aspersion</label>
+                <label><input type="checkbox" value="Goutte à goutte enterré"> Goutte à goutte enterré</label>
+              </div>
+            </div>
+            <div class="filter-dropdown" id="fd-etat-hydrique">
+              <button class="filter-dropdown-btn" type="button">
+                État hydrique <span class="fd-badge" id="badge-etat-hydrique" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-etat-hydrique">
+                <label><input type="checkbox" value="rfu-100-50"> RFU 100 – 50 %</label>
+                <label><input type="checkbox" value="rfu-50-20"> RFU 50 – 20 %</label>
+                <label><input type="checkbox" value="rfu-20-5"> RFU 20 – 5 %</label>
+                <label><input type="checkbox" value="rfu-5-0"> RFU 5 – 0 %</label>
+              </div>
+            </div>
+            <div class="filter-dropdown" id="fd-texture">
+              <button class="filter-dropdown-btn" type="button">
+                Texture de sol <span class="fd-badge" id="badge-texture" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-texture"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-integration">
+              <button class="filter-dropdown-btn" type="button">
+                Intégration <span class="fd-badge" id="badge-integration" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-integration"></div>
+            </div>
+            <div class="filter-dropdown network-only" id="fd-org" style="display:none">
+              <button class="filter-dropdown-btn" type="button">
+                Organisation <span class="fd-badge" id="badge-org" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-org"></div>
+            </div>
+            <label class="filter-toggle"><input type="checkbox" id="check-mon-secteur"> Mon secteur</label>
+            <div id="active-filters" hidden></div>
+          </div>
         </div>
         <main id="content">
           <div id="map-container" class="view active" data-view="map">

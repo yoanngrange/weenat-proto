@@ -1,31 +1,317 @@
-// Facturation page logic
+// Facturation page — redesigned
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+import { members } from '../data/members.js'
+import { orgs } from '../data/orgs.js'
+import { network } from '../data/network.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
-  populateBillingHistory()
+  renderBillingPage()
 })
 
-function populateBillingHistory() {
-  const tbody = document.querySelector('#billing-history tbody')
-  tbody.innerHTML = ''
+// ── Constants ─────────────────────────────────────────────────────────────────
 
-  // Generate fake billing history
-  const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
-  const statuses = ['Payée', 'En attente', 'Échue']
+const CONTRACT = {
+  plan:             'Plus',
+  anniversaire:     '2022-03-15',
+  numero:           'CTR-2022-00418',
+  licencesMembres:  5,
+  licencesAdherents: 3,
+  licencesTotal:    8,
+  prixUnitaire:     29,   // € HT / mois
+}
 
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(2023, i, 1)
-    const amount = Math.random() > 0.5 ? 25 : 14
-    const status = statuses[Math.floor(Math.random() * statuses.length)]
+const BILLING_ADDR = {
+  societe:    network.nom,
+  siret:      network.siret,
+  adresse:    network.siege.adresse,
+  cp:         network.siege.codePostal,
+  ville:      network.siege.ville,
+  pays:       network.siege.pays,
+}
 
-    const row = document.createElement('tr')
-    row.innerHTML = `
-      <td>${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-01</td>
-      <td>${amount}€</td>
-      <td><span class="badge ${status.toLowerCase().replace(' ', '-')}">${status}</span></td>
-      <td><button class="download-btn">Télécharger PDF</button></td>
-    `
-    tbody.appendChild(row)
+// ── Main render ───────────────────────────────────────────────────────────────
+
+function renderBillingPage() {
+  const root = document.getElementById('billing-page')
+  if (!root) return
+
+  const invoices = generateInvoices()
+  const pending  = invoices.filter(i => i.statut === 'en attente').length
+
+  root.innerHTML = `
+    <!-- 2-column top: stats+contract left, billing address right -->
+    <div class="billing-top-2col">
+      <div class="billing-top-left">
+        <!-- Stats -->
+        <div class="billing-section">
+          <h2 class="billing-section-title"><i class="bi bi-bar-chart"></i> Licences</h2>
+          <div class="billing-contract-grid">
+            <div class="billing-stat-card">
+              <div class="billing-stat-value">${CONTRACT.licencesMembres}</div>
+              <div class="billing-stat-label">Licences membres</div>
+            </div>
+            <div class="billing-stat-card">
+              <div class="billing-stat-value">${CONTRACT.licencesAdherents}</div>
+              <div class="billing-stat-label">Licences adhérents</div>
+            </div>
+            <div class="billing-stat-card billing-stat-card--total">
+              <div class="billing-stat-value">${CONTRACT.licencesTotal}</div>
+              <div class="billing-stat-label">Total licences</div>
+            </div>
+            <div class="billing-stat-card${pending > 0 ? ' billing-stat-card--warn' : ''}">
+              <div class="billing-stat-value">${pending}</div>
+              <div class="billing-stat-label">Facture${pending !== 1 ? 's' : ''} en attente</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contract info -->
+        <div class="billing-section">
+          <h2 class="billing-section-title"><i class="bi bi-file-earmark-text"></i> Contrat</h2>
+          <div class="billing-contract-grid">
+            <div class="billing-contract-item">
+              <span class="billing-contract-label">Abonnement</span>
+              <span class="billing-contract-value">
+                <span class="plan-badge plan-badge--${CONTRACT.plan.toLowerCase()}">${CONTRACT.plan}</span>
+              </span>
+            </div>
+            <div class="billing-contract-item">
+              <span class="billing-contract-label">Début du contrat</span>
+              <span class="billing-contract-value">${formatDate(CONTRACT.anniversaire)}</span>
+            </div>
+            <div class="billing-contract-item">
+              <span class="billing-contract-label">N° contrat</span>
+              <span class="billing-contract-value billing-contract-mono">${CONTRACT.numero}</span>
+            </div>
+            <div class="billing-contract-item">
+              <span class="billing-contract-label">Tarif</span>
+              <span class="billing-contract-value">${CONTRACT.prixUnitaire} € HT / mois / licence</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="billing-top-right">
+        <!-- Billing address form -->
+        <div class="billing-section">
+          <h2 class="billing-section-title"><i class="bi bi-building"></i> Adresse de facturation</h2>
+      <form id="billing-addr-form" autocomplete="off">
+        <div class="billing-form-grid">
+          <div class="form-row billing-form-full">
+            <label for="bf-societe">Raison sociale</label>
+            <input id="bf-societe" type="text" value="${esc(BILLING_ADDR.societe)}" placeholder="Nom de la société">
+          </div>
+          <div class="form-row billing-form-full">
+            <label for="bf-adresse">Adresse postale</label>
+            <input id="bf-adresse" type="text" value="${esc(BILLING_ADDR.adresse)}" placeholder="Numéro et rue">
+          </div>
+          <div class="form-row">
+            <label for="bf-cp">Code postal</label>
+            <input id="bf-cp" type="text" value="${esc(BILLING_ADDR.cp)}" placeholder="00000">
+          </div>
+          <div class="form-row">
+            <label for="bf-ville">Ville</label>
+            <input id="bf-ville" type="text" value="${esc(BILLING_ADDR.ville)}" placeholder="Ville">
+          </div>
+          <div class="form-row billing-form-full">
+            <label for="bf-pays">Pays</label>
+            <select id="bf-pays">
+              ${COUNTRIES.map(c => `<option value="${c.code}"${c.code === BILLING_ADDR.pays ? ' selected' : ''}>${c.label}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-row billing-form-full" id="bf-siret-row">
+            <label for="bf-siret" id="bf-siret-label">SIRET</label>
+            <input id="bf-siret" type="text" value="${esc(BILLING_ADDR.siret)}" placeholder="14 chiffres">
+          </div>
+        </div>
+          <div class="form-actions" style="margin-top:16px">
+            <button type="button" id="billing-addr-save" class="btn-primary">
+              <i class="bi bi-check-lg"></i> Enregistrer
+            </button>
+            <button type="button" id="billing-addr-cancel" class="btn-secondary">Annuler</button>
+          </div>
+        </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoice history -->
+    <div class="billing-section">
+      <h2 class="billing-section-title"><i class="bi bi-receipt"></i> Historique des factures</h2>
+      <div class="billing-table-wrap">
+        <table class="billing-table">
+          <thead>
+            <tr>
+              <th>N° facture</th>
+              <th>Date d'émission</th>
+              <th>Montant HT</th>
+              <th>Date de règlement</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoices.map(inv => `
+              <tr>
+                <td class="billing-invoice-num">${inv.numero}</td>
+                <td>${formatDate(inv.dateEmission)}</td>
+                <td class="billing-amount">${inv.montant.toFixed(2)} € HT</td>
+                <td>${inv.dateReglement ? formatDate(inv.dateReglement) : '<span style="color:var(--txt3)">—</span>'}</td>
+                <td>${invoiceStatusBadge(inv.statut)}</td>
+                <td class="billing-actions-cell">
+                  <button class="icon-btn billing-pdf-btn" data-id="${inv.numero}" title="Télécharger PDF">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                  </button>
+                  <button class="icon-btn billing-detail-btn" data-id="${inv.numero}" title="Voir le détail">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                  ${inv.statut === 'en attente' ? `
+                    <button class="icon-btn billing-pay-btn" data-id="${inv.numero}" title="Payer" style="color:var(--ok)">
+                      <i class="bi bi-credit-card"></i>
+                    </button>
+                  ` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `
+
+  bindEvents()
+}
+
+// ── Event binding ─────────────────────────────────────────────────────────────
+
+function bindEvents() {
+  // Country select → update tax field label
+  const paysSelect = document.getElementById('bf-pays')
+  if (paysSelect) {
+    paysSelect.addEventListener('change', () => updateTaxField(paysSelect.value))
+    updateTaxField(paysSelect.value)
+  }
+
+  document.getElementById('billing-addr-save')?.addEventListener('click', () => {
+    showToast('Adresse de facturation enregistrée.')
+  })
+  document.getElementById('billing-addr-cancel')?.addEventListener('click', () => {
+    document.getElementById('bf-societe').value = BILLING_ADDR.societe
+    document.getElementById('bf-adresse').value = BILLING_ADDR.adresse
+    document.getElementById('bf-cp').value       = BILLING_ADDR.cp
+    document.getElementById('bf-ville').value    = BILLING_ADDR.ville
+    document.getElementById('bf-pays').value     = BILLING_ADDR.pays
+    document.getElementById('bf-siret').value    = BILLING_ADDR.siret
+    updateTaxField(BILLING_ADDR.pays)
+  })
+
+  document.querySelectorAll('.billing-pdf-btn').forEach(btn => {
+    btn.addEventListener('click', () => showToast(`PDF facture ${btn.dataset.id} téléchargé.`))
+  })
+  document.querySelectorAll('.billing-detail-btn').forEach(btn => {
+    btn.addEventListener('click', () => showToast(`Détail facture ${btn.dataset.id}.`))
+  })
+  document.querySelectorAll('.billing-pay-btn').forEach(btn => {
+    btn.addEventListener('click', () => showToast(`Paiement facture ${btn.dataset.id} : redirection…`))
+  })
+}
+
+function updateTaxField(pays) {
+  const row   = document.getElementById('bf-siret-row')
+  const label = document.getElementById('bf-siret-label')
+  const input = document.getElementById('bf-siret')
+  if (!row || !label || !input) return
+  if (pays === 'FR') {
+    row.hidden    = false
+    label.textContent = 'SIRET'
+    input.placeholder = '14 chiffres'
+  } else if (EU_COUNTRIES.includes(pays)) {
+    row.hidden    = false
+    label.textContent = 'N° TVA intracommunautaire'
+    input.placeholder = 'FR12345678901'
+  } else {
+    row.hidden = true
   }
 }
+
+// ── Data helpers ──────────────────────────────────────────────────────────────
+
+function generateInvoices() {
+  const invoices = []
+  const now      = new Date('2026-04-15')
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const yyyy = d.getFullYear()
+    const mm   = String(d.getMonth() + 1).padStart(2, '0')
+    const isPast = i > 0
+    const statut = isPast
+      ? (i === 2 ? 'en attente' : 'payée')
+      : 'en attente'
+    const dateReglement = statut === 'payée'
+      ? isoDate(new Date(d.getFullYear(), d.getMonth(), 18))
+      : null
+    invoices.push({
+      numero:         `FAC-${yyyy}-${mm}`,
+      dateEmission:   isoDate(new Date(d.getFullYear(), d.getMonth(), 1)),
+      montant:        CONTRACT.licencesTotal * CONTRACT.prixUnitaire,
+      dateReglement,
+      statut,
+    })
+  }
+  return invoices.reverse()
+}
+
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  const [y, m, day] = iso.split('-')
+  return `${day}/${m}/${y}`
+}
+
+function invoiceStatusBadge(statut) {
+  if (statut === 'payée')      return `<span class="statut-badge statut-actif"><i class="bi bi-check-circle-fill"></i> Payée</span>`
+  if (statut === 'en attente') return `<span class="statut-badge statut-essai"><i class="bi bi-clock"></i> En attente</span>`
+  if (statut === 'échue')      return `<span class="statut-badge statut-inactif"><i class="bi bi-exclamation-circle"></i> Échue</span>`
+  return `<span class="statut-badge">${statut}</span>`
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function showToast(msg) {
+  const t = document.createElement('div')
+  t.className = 'toast'
+  t.textContent = msg
+  document.body.appendChild(t)
+  setTimeout(() => t.classList.add('show'), 10)
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300) }, 2500)
+}
+
+// ── Country lists ─────────────────────────────────────────────────────────────
+
+const EU_COUNTRIES = ['DE','AT','BE','BG','CY','HR','DK','ES','EE','FI','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','CZ','RO','SK','SI','SE']
+
+const COUNTRIES = [
+  { code: 'FR', label: 'France' },
+  { code: 'BE', label: 'Belgique' },
+  { code: 'CH', label: 'Suisse' },
+  { code: 'LU', label: 'Luxembourg' },
+  { code: 'DE', label: 'Allemagne' },
+  { code: 'ES', label: 'Espagne' },
+  { code: 'IT', label: 'Italie' },
+  { code: 'PT', label: 'Portugal' },
+  { code: 'NL', label: 'Pays-Bas' },
+  { code: 'AT', label: 'Autriche' },
+  { code: 'PL', label: 'Pologne' },
+  { code: 'GB', label: 'Royaume-Uni' },
+  { code: 'US', label: 'États-Unis' },
+  { code: 'CA', label: 'Canada' },
+  { code: 'MA', label: 'Maroc' },
+  { code: 'TN', label: 'Tunisie' },
+  { code: 'SN', label: 'Sénégal' },
+]
