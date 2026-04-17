@@ -4,16 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-B-u6VpP8.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Weenat Proto</title>
+    <title>Détail Capteur - Weenat Proto</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/main-6h3kY6nD.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/orgs-b3kLTQ0f.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/plots-CEyFXpqF.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/sensors-BafoiuOm.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/members-U142UPu4.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/main-CwK8t_T-.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/capteur-detail-DcLM2Kbo.js"></script>
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-6h3kY6nD.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-BafoiuOm.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-CEyFXpqF.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-b3kLTQ0f.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-U142UPu4.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-CD3EeVEY.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-MO2UfX1b.js">
   <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-DI2i-KZ0.css">
 
   <body>
@@ -72,98 +74,104 @@
             <div id="breadcrumb-context"></div>
             <div id="breadcrumb-title"></div>
           </div>
-          <div class="topbar-actions">
-            <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
-          </div>
         </div>
-        <div id="controls-row">
-          <div id="metric-controls">
-            <select id="metric-selector">
-              <option value="pluie">Pluie</option>
-              <option value="temp">Température</option>
-              <option value="humidite">Humidité</option>
-              <option value="etat-hydrique">État hydrique</option>
-            </select>
-            <select id="aggregate-selector"></select>
-          </div>
-          <div id="filters">
-            <select id="culture-filter">
-              <option value="">Toutes cultures</option>
-              <option value="Blé tendre">Blé tendre</option>
-              <option value="Maïs">Maïs</option>
-              <option value="Colza">Colza</option>
-              <option value="Orge">Orge</option>
-              <option value="Pomme de terre">Pomme de terre</option>
-              <option value="Artichaut">Artichaut</option>
-              <option value="Lin">Lin</option>
-              <option value="Betterave sucrière">Betterave sucrière</option>
-              <option value="Avoine">Avoine</option>
-              <option value="Tournesol">Tournesol</option>
-              <option value="Légumes bio">Légumes bio</option>
-              <option value="Épinard">Épinard</option>
-              <option value="Chou-fleur">Chou-fleur</option>
-              <option value="Carotte">Carotte</option>
-              <option value="Pois">Pois</option>
-              <option value="Seigle">Seigle</option>
-              <option value="Triticale">Triticale</option>
-              <option value="Haricot">Haricot</option>
-              <option value="Luzerne">Luzerne</option>
-              <option value="Radis">Radis</option>
-              <option value="Navet">Navet</option>
-              <option value="Poireau">Poireau</option>
-              <option value="Tomate">Tomate</option>
-              <option value="Betterave fourragère">Betterave fourragère</option>
-              <option value="Chou">Chou</option>
-              <option value="Maïs ensilage">Maïs ensilage</option>
-              <option value="Laitue">Laitue</option>
-              <option value="Orge de printemps">Orge de printemps</option>
-            </select>
-            <select id="texture-filter">
-              <option value="">Toutes textures</option>
-              <option value="Argile">Argile</option>
-              <option value="Argile limoneuse">Argile limoneuse</option>
-              <option value="Argile sableuse">Argile sableuse</option>
-              <option value="Limon argileux">Limon argileux</option>
-              <option value="Limon argileux silteux">Limon argileux silteux</option>
-              <option value="Limon argileux sableux">Limon argileux sableux</option>
-              <option value="Loam">Loam</option>
-              <option value="Limon sableux">Limon sableux</option>
-              <option value="Sable argileux">Sable argileux</option>
-              <option value="Limon">Limon</option>
-              <option value="Sable limoneux">Sable limoneux</option>
-              <option value="Sable">Sable</option>
-            </select>
-            <select id="etat-hydrique-filter">
-              <option value="">Tous états</option>
-              <option value="rfu-100-50">RFU 100 à 50%</option>
-              <option value="rfu-50-20">RFU 50 à 20%</option>
-              <option value="rfu-20-5">RFU 20 à 5%</option>
-              <option value="rfu-5-0">RFU 5 à 0%</option>
-            </select>
-            <div id="active-filters"></div>
-            <select id="org-filter" class="network-only">
-              <option value="">Toutes organisations</option>
-            </select>
-          </div>
-        </div>
-        <main id="content">
-          <div id="map-container" class="view active" data-view="map">
-            <div id="legend"></div>
-          </div>
-          <div id="list-container" class="view" data-view="list"></div>
-          <div id="admin-container" class="view" data-view="admin">
-            <div id="stats-cards"></div>
-            <div id="admin-table"></div>
+        <main id="content" class="detail-content">
+          <div class="detail-layout" id="detail-layout">
+
+            <div class="detail-main">
+              <div id="latest-strip-wrap" class="latest-strip-wrap">
+                <div class="latest-strip-title">Dernières données</div>
+                <div id="latest-strip" class="latest-strip"></div>
+              </div>
+              <div class="chart-controls chart-controls--sticky">
+                <div class="period-presets" id="period-presets">
+                  <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
+                  <button class="period-preset-btn" data-period="hier">Hier</button>
+                  <button class="period-preset-btn" data-period="3d">3 jours</button>
+                  <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                  <button class="period-preset-btn" data-period="30d">30 jours</button>
+                  <button class="period-preset-btn" data-period="365d">365 jours</button>
+                  <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
+                </div>
+                <div id="custom-date-row" class="custom-date-row" style="display:none">
+                  <input type="date" id="date-from">
+                  <span class="custom-date-sep">—</span>
+                  <input type="date" id="date-to">
+                </div>
+                <select id="time-step" class="time-step-select">
+                  <option value="max">Maximal</option>
+                  <option value="1h" selected>Horaire</option>
+                  <option value="1d">Journalier</option>
+                  <option value="1w">Hebdomadaire</option>
+                  <option value="1mo">Mensuel</option>
+                </select>
+              </div>
+
+              <div id="charts-container" class="charts-stack"></div>
+            </div>
+
+            <div class="detail-panel" id="detail-panel">
+              <button class="panel-toggle-btn" id="panel-toggle" title="Masquer le panneau">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+              <div class="panel-inner">
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-cpu"></i> Identification</div>
+                  <div class="panel-section-bd" id="panel-ident"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Localisation</div>
+                  <div id="sensor-mini-map" class="mini-map"></div>
+                  <div class="panel-section-bd" id="panel-loc"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-reception-4"></i> Qualité signal</div>
+                  <div class="panel-section-bd" id="panel-signal"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-exclamation-circle"></i> Événements en cours</div>
+                  <div class="panel-section-bd" id="panel-events"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Parcelles liées</div>
+                  <div class="panel-section-bd" id="panel-plots"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-graph-up"></i> Données disponibles</div>
+                  <div class="panel-section-bd" id="panel-metrics"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-sliders"></i> Configuration</div>
+                  <div class="panel-section-bd" id="panel-config"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-lightning"></i> Actions</div>
+                  <div class="panel-section-bd" id="panel-actions"></div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-people"></i> Membres associés</div>
+                  <div class="panel-section-bd" id="panel-membres"></div>
+                  <div style="padding:8px 0 0">
+                    <div id="add-membre-row" style="display:flex;gap:6px;align-items:center">
+                      <select id="add-membre-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
+                        <option value="">Ajouter un membre…</option>
+                      </select>
+                      <button id="add-membre-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-section">
+                  <div class="panel-section-hd"><i class="bi bi-tools"></i> Historique maintenance</div>
+                  <div class="panel-section-bd" id="panel-maint"></div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </main>
       </div>
-      <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
-        <button class="view-btn" data-view="admin">Administration</button>
-      </div>
     </div>
+
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>

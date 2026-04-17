@@ -4,18 +4,18 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-B-u6VpP8.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Weenat Proto</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Membres - Weenat Proto</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/main-6h3kY6nD.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/orgs-b3kLTQ0f.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/plots-CEyFXpqF.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/sensors-BafoiuOm.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/members-U142UPu4.js"></script>
-  <script type="module" crossorigin src="/weenat-proto/assets/main-CwK8t_T-.js"></script>
-  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-DI2i-KZ0.css">
-
+    <script type="module" crossorigin src="/weenat-proto/assets/membres-C7vZVsLy.js"></script>
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-6h3kY6nD.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-U142UPu4.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-b3kLTQ0f.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-CEyFXpqF.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-BafoiuOm.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-CD3EeVEY.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-MO2UfX1b.js">
+    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-DI2i-KZ0.css">
+  </head>
   <body>
     <div id="app">
       <nav id="sidebar">
@@ -40,7 +40,7 @@
         <a href="capteurs.html" ><i class="bi bi-broadcast"></i> Capteurs</a>
         <a href="previsions.html" ><i class="bi bi-cloud-sun"></i> Prévisions</a>
         <a href="integrations.html" ><i class="bi bi-plug"></i> Intégrations</a>
-        <a href="membres.html" ><i class="bi bi-people"></i> Membres</a>
+        <a href="membres.html" class="active"><i class="bi bi-people"></i> Membres</a>
         <a href="parametres.html" ><i class="bi bi-gear"></i> Paramètres</a>
       </div>
           <div class="nav-section" data-section="reseau">Mon réseau</div>
@@ -73,97 +73,51 @@
             <div id="breadcrumb-title"></div>
           </div>
           <div class="topbar-actions">
+            <button id="import-btn" class="btn-secondary">Importer</button>
             <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
+            <button id="export-btn">Inviter un membre</button>
           </div>
         </div>
-        <div id="controls-row">
-          <div id="metric-controls">
-            <select id="metric-selector">
-              <option value="pluie">Pluie</option>
-              <option value="temp">Température</option>
-              <option value="humidite">Humidité</option>
-              <option value="etat-hydrique">État hydrique</option>
-            </select>
-            <select id="aggregate-selector"></select>
-          </div>
+        <div id="controls-row" style="position:sticky;top:60px;z-index:90;background:var(--bg)">
           <div id="filters">
-            <select id="culture-filter">
-              <option value="">Toutes cultures</option>
-              <option value="Blé tendre">Blé tendre</option>
-              <option value="Maïs">Maïs</option>
-              <option value="Colza">Colza</option>
-              <option value="Orge">Orge</option>
-              <option value="Pomme de terre">Pomme de terre</option>
-              <option value="Artichaut">Artichaut</option>
-              <option value="Lin">Lin</option>
-              <option value="Betterave sucrière">Betterave sucrière</option>
-              <option value="Avoine">Avoine</option>
-              <option value="Tournesol">Tournesol</option>
-              <option value="Légumes bio">Légumes bio</option>
-              <option value="Épinard">Épinard</option>
-              <option value="Chou-fleur">Chou-fleur</option>
-              <option value="Carotte">Carotte</option>
-              <option value="Pois">Pois</option>
-              <option value="Seigle">Seigle</option>
-              <option value="Triticale">Triticale</option>
-              <option value="Haricot">Haricot</option>
-              <option value="Luzerne">Luzerne</option>
-              <option value="Radis">Radis</option>
-              <option value="Navet">Navet</option>
-              <option value="Poireau">Poireau</option>
-              <option value="Tomate">Tomate</option>
-              <option value="Betterave fourragère">Betterave fourragère</option>
-              <option value="Chou">Chou</option>
-              <option value="Maïs ensilage">Maïs ensilage</option>
-              <option value="Laitue">Laitue</option>
-              <option value="Orge de printemps">Orge de printemps</option>
-            </select>
-            <select id="texture-filter">
-              <option value="">Toutes textures</option>
-              <option value="Argile">Argile</option>
-              <option value="Argile limoneuse">Argile limoneuse</option>
-              <option value="Argile sableuse">Argile sableuse</option>
-              <option value="Limon argileux">Limon argileux</option>
-              <option value="Limon argileux silteux">Limon argileux silteux</option>
-              <option value="Limon argileux sableux">Limon argileux sableux</option>
-              <option value="Loam">Loam</option>
-              <option value="Limon sableux">Limon sableux</option>
-              <option value="Sable argileux">Sable argileux</option>
-              <option value="Limon">Limon</option>
-              <option value="Sable limoneux">Sable limoneux</option>
-              <option value="Sable">Sable</option>
-            </select>
-            <select id="etat-hydrique-filter">
-              <option value="">Tous états</option>
-              <option value="rfu-100-50">RFU 100 à 50%</option>
-              <option value="rfu-50-20">RFU 50 à 20%</option>
-              <option value="rfu-20-5">RFU 20 à 5%</option>
-              <option value="rfu-5-0">RFU 5 à 0%</option>
-            </select>
+            <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-role">
+              <button class="filter-dropdown-btn" type="button">
+                Rôle <span class="fd-badge" id="badge-role" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-role"></div>
+            </div>
+            <div class="filter-dropdown" id="fd-statut">
+              <button class="filter-dropdown-btn" type="button">
+                Statut <span class="fd-badge" id="badge-statut" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-statut"></div>
+            </div>
             <div id="active-filters"></div>
-            <select id="org-filter" class="network-only">
-              <option value="">Toutes organisations</option>
-            </select>
           </div>
         </div>
         <main id="content">
-          <div id="map-container" class="view active" data-view="map">
-            <div id="legend"></div>
-          </div>
-          <div id="list-container" class="view" data-view="list"></div>
-          <div id="admin-container" class="view" data-view="admin">
+          <div id="admin-container" style="overflow-y:auto;flex:1">
             <div id="stats-cards"></div>
-            <div id="admin-table"></div>
+            <table id="members-table">
+              <thead>
+                <tr>
+                  <th class="col-check"><input type="checkbox" id="select-all-members"></th>
+                  <th data-column="nom">Nom</th>
+                  <th data-column="role">Rôle</th>
+                  <th data-column="orgs">Organisations</th>
+                  <th data-column="parcelles">Parcelles</th>
+                  <th data-column="capteurs">Capteurs</th>
+                  <th data-column="statut">Statut</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </main>
       </div>
-      <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
-        <button class="view-btn" data-view="admin">Administration</button>
-      </div>
     </div>
+
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>
