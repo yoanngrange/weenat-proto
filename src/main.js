@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap()
   initExportButton()
   initSelectionListeners()
-  updateContent()
+  updateView()
 })
 
 // Navigation
