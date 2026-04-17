@@ -1523,29 +1523,18 @@ function initDashGrid() {
   try { order = JSON.parse(localStorage.getItem(DASH_STORAGE_KEY())) || null } catch { order = null }
   if (!order) order = DASH_BLOCK_DEFS.map(b => b.id)
 
-  function renderBlocks() {
-    grid.innerHTML = ''
-    order.forEach(id => {
-      const def = DASH_BLOCK_DEFS.find(b => b.id === id)
-      if (!def) return
-      const block = document.createElement('div')
-      block.className = `dash-block dash-block--${def.size}`
-      block.dataset.id = id
-      block.draggable = true
-      block.innerHTML = `
-        <div class="dash-block-hd" style="color:${def.color}">
-          <i class="bi ${def.icon}"></i> ${def.title}
-          <span class="dash-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></span>
-        </div>
-        <div class="dash-block-body" id="dblock-${id}"></div>
-      `
-      grid.appendChild(block)
-    })
-    populateDashBlocks()
-    attachDashDragHandlers(grid)
-  }
-
-  renderBlocks()
+  grid.innerHTML = ''
+  order.forEach(id => {
+    const def = DASH_BLOCK_DEFS.find(b => b.id === id)
+    if (!def) return
+    const block = document.createElement('div')
+    block.className = `dash-block dash-block--${def.size}`
+    block.dataset.id = id
+    block.draggable = true
+    block.innerHTML = `<span class="dash-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></span>`
+    grid.appendChild(block)
+  })
+  attachDashDragHandlers(grid)
 }
 
 function populateDashBlocks() {

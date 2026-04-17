@@ -2,19 +2,11 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-B-u6VpP8.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Capteurs Réseau - Weenat Proto</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Tableau de bord - Weenat Proto</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-    <script type="module" crossorigin src="/weenat-proto/assets/main-5C_gURf8.js"></script>
-    <script type="module" crossorigin src="/weenat-proto/assets/orgs-b3kLTQ0f.js"></script>
-    <script type="module" crossorigin src="/weenat-proto/assets/plots-CEyFXpqF.js"></script>
-    <script type="module" crossorigin src="/weenat-proto/assets/sensors-BafoiuOm.js"></script>
-    <script type="module" crossorigin src="/weenat-proto/assets/members-U142UPu4.js"></script>
-    <script type="module" crossorigin src="/weenat-proto/assets/main-BV6oqXk2.js"></script>
-    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CLyq8R6Y.css">
+    <link rel="stylesheet" href="/src/styles/main.css" />
   </head>
   <body>
     <div id="app">
@@ -32,132 +24,27 @@
 </svg>
           <button id="add-btn">+</button>
         </div>
-        <div id="nav-links">
-          <div class="nav-section" data-section="exploitation">Mon exploitation</div>
-
-          <div class="nav-group exploitation">
-        <a href="parcelles.html" ><i class="bi bi-geo-alt"></i> Parcelles</a>
-        <a href="capteurs.html" ><i class="bi bi-broadcast"></i> Capteurs</a>
-        <a href="previsions.html" ><i class="bi bi-cloud-sun"></i> Prévisions</a>
-        <a href="integrations.html" ><i class="bi bi-plug"></i> Intégrations</a>
-        <a href="membres.html" ><i class="bi bi-people"></i> Membres</a>
-        <a href="parametres.html" ><i class="bi bi-gear"></i> Paramètres</a>
-      </div>
-          <div class="nav-section" data-section="reseau">Mon réseau</div>
-
-          <div class="nav-group reseau">
-        <a href="parcelles-reseau.html" ><i class="bi bi-geo-alt"></i> Parcelles</a>
-        <a href="capteurs-reseau.html" class="active"><i class="bi bi-broadcast"></i> Capteurs</a>
-        <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
-        <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
-        <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
-      </div>
-          <div class="nav-group compte">
-        <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
-        <a href="alertes.html" ><i class="bi bi-bell"></i> Mes alertes</a>
-        <a href="notifications.html" ><i class="bi bi-envelope"></i> Mes notifications</a>
-        <a href="aide.html" ><i class="bi bi-question-circle"></i> Aide</a>
-      </div>
-          <div class="menu-switch">
-            <button id="role-switch" class="role-switch-btn" onclick="switchMenuRole()">
-              <small>Admin réseau ↔ Adhérent réseau</small>
-            </button>
-          </div>
-        </div>
+        <div id="nav-links"></div>
       </nav>
 
       <div id="main-content">
         <div id="topbar">
           <div id="breadcrumb">
             <div id="breadcrumb-context"></div>
-            <div id="breadcrumb-title"></div>
-          </div>
-          <div class="topbar-actions">
-            <button id="export-csv-btn" class="btn-secondary">Exporter</button>
-            <button id="export-btn">Ajouter</button>
+            <div id="breadcrumb-title">Tableau de bord</div>
           </div>
         </div>
-        <div id="controls-row">
-          <div id="metric-controls">
-            <div class="control-group">
-              <span class="control-label">Mesure</span>
-              <select id="metric-selector">
-                <option value="pluie">Pluie</option>
-                <option value="temp">Température</option>
-                <option value="humidite">Humidité relative</option>
-                <option value="vent">Vent</option>
-                <option value="rayonnement">Rayonnement</option>
-                <option value="humidite-sol">Humidité sol</option>
-              </select>
-            </div>
-            <div class="control-group">
-              <span class="control-label">Agrégat</span>
-              <select id="aggregate-selector"></select>
-            </div>
-          </div>
-          <div id="filters">
-            <span class="filters-title">Filtrer</span>
-            <div class="filter-dropdown" id="fd-model">
-              <button class="filter-dropdown-btn" type="button">
-                Modèle <span class="fd-badge" id="badge-model" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-model"></div>
-            </div>
-            <div class="filter-dropdown" id="fd-event">
-              <button class="filter-dropdown-btn" type="button">
-                Événement <span class="fd-badge" id="badge-event" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-event">
-                <label><input type="checkbox" value="capteur couché"> Capteur couché</label>
-                <label><input type="checkbox" value="capteur déplacé"> Capteur déplacé</label>
-                <label><input type="checkbox" value="émissions interrompues"> Émissions interrompues</label>
-                <label><input type="checkbox" value="cuillère bloquée"> Cuillère bloquée</label>
-              </div>
-            </div>
-            <div class="filter-dropdown" id="fd-telecom">
-              <button class="filter-dropdown-btn" type="button">
-                Télécom <span class="fd-badge" id="badge-telecom" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-telecom">
-                <label><input type="checkbox" value="Sigfox"> Sigfox</label>
-                <label><input type="checkbox" value="LoRa"> LoRa</label>
-                <label><input type="checkbox" value="5G"> 5G</label>
-              </div>
-            </div>
-            <div class="filter-dropdown" id="fd-org">
-              <button class="filter-dropdown-btn" type="button">
-                Organisation <span class="fd-badge" id="badge-org" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-org"></div>
-            </div>
-            <div class="filter-dropdown" id="fd-ville">
-              <button class="filter-dropdown-btn" type="button">
-                Ville <span class="fd-badge" id="badge-ville" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-ville"></div>
-            </div>
-            <label class="filter-toggle"><input type="checkbox" id="check-mon-secteur"> Mon secteur</label>
-            <div id="active-filters"></div>
-          </div>
-        </div>
-        <main id="content">
-          <div id="map-container" class="view active" data-view="map">
-            <div id="map" style="width:100%;height:100%"></div>
-            <div id="legend"></div>
-          </div>
-          <div id="list-container" class="view" data-view="list"></div>
-          <div id="admin-container" class="view" data-view="admin">
-            <div id="stats-cards"></div>
-            <div id="admin-table"></div>
-          </div>
+
+        <main id="content" class="tdb-content">
+          <section class="tdb-favorites-section">
+            <div class="tdb-favorites-hd">Indicateurs favoris</div>
+            <div id="tdb-favorites" class="tdb-favorites-row"></div>
+          </section>
+          <section id="tdb-sections"></section>
         </main>
       </div>
-      <div id="view-switcher">
-        <button class="view-btn active" data-view="map">Carte</button>
-        <button class="view-btn" data-view="list">Liste</button>
-        <button class="view-btn" data-view="admin">Administration</button>
-      </div>
     </div>
+    <script type="module" src="/src/pages/tableau-de-bord.js"></script>
     <script src="/src/js/menu-switch.js"></script>
   </body>
 </html>

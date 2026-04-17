@@ -1081,10 +1081,7 @@ function createSensorTable(sensors) {
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
   html += '<th data-column="city">Ville</th>'
-  html += '<th data-column="telecom">Télécom</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
-  html += '<th data-column="networkQuality">Qualité réseau %</th>'
-  html += '<th data-column="messages7d">Messages 7j %</th>'
   html += '<th data-column="org">Organisation</th>'
   html += '<th data-column="event">Événement</th>'
   html += `<th data-column="mesure" class="col-active-header">${metricLabel}<br><small style="font-weight:400">${aggLabel}</small></th>`
@@ -1106,10 +1103,7 @@ function createSensorTable(sensors) {
       <td><strong>${sensor.model}</strong><br><span style="font-size:10px;color:var(--txt3)">${typeName}</span></td>
       <td>${formatSerial(sensor)}</td>
       <td>${city}</td>
-      <td>${sensor.telecom}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
-      <td>${sensor.networkQuality}</td>
-      <td>${sensor.messages7d}</td>
       <td>${org ? org.name : '—'}</td>
       <td>${eventIcon}${sensor.event || ''}</td>
       <td class="col-active num">${mesureHtml}</td>
