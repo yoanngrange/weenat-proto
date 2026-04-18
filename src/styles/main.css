@@ -5065,7 +5065,6 @@ tr.row-selected td {
   background: var(--srf);
   border: 1px solid var(--bdr);
   border-radius: 10px;
-  overflow: hidden;
 }
 .tdb-section-hd {
   display: flex;
@@ -5155,4 +5154,43 @@ tr.row-selected td {
   font-size: 20px;
   font-weight: 700;
   color: var(--txt);
+}
+
+/* Parcel table */
+.tdb-parcels-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.tdb-parcels-table th,
+.tdb-parcels-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bdr2);
+  white-space: nowrap;
+  text-align: left;
+}
+.tdb-parcels-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  background: var(--bg);
+}
+.tdb-parcels-table tbody tr:hover { background: var(--bg); }
+.tdb-parcels-table tbody tr:last-child td { border-bottom: none; }
+.tdb-num { text-align: right !important; font-variant-numeric: tabular-nums; }
+.tdb-plot-link { color: var(--txt); text-decoration: none; font-weight: 500; }
+.tdb-plot-link:hover { color: var(--pri); text-decoration: underline; }
+.tdb-irrig-needed { background: var(--warn2); color: var(--warn); font-weight: 600; }
+.tdb-irrig-needed i { margin-right: 4px; }
+.tdb-irrig-ok { color: var(--txt3); }
+.tdb-win-urgent { background: var(--ok2); color: var(--ok); font-weight: 600; }
+.tdb-win-urgent i { margin-right: 4px; }
+.tdb-parcels-formula {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--txt3);
+  border-top: 1px solid var(--bdr2);
+  font-style: italic;
 }

@@ -1,6 +1,7 @@
 export const PAGE_TITLES = {
   '': { title: 'Parcelles', section: 'exploitation' },
   'index.html': { title: 'Parcelles', section: 'exploitation' },
+  'tableau-de-bord.html': { title: 'Tableau de bord', section: 'exploitation' },
   'parcelles.html': { title: 'Parcelles', section: 'exploitation' },
   'parcelles-reseau.html': { title: 'Parcelles', section: 'reseau' },
   'capteurs.html': { title: 'Capteurs', section: 'exploitation' },
