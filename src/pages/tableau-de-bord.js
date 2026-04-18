@@ -9,10 +9,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const role = localStorage.getItem('menuRole') || 'admin-reseau'
   const isAdherent = role === 'adherent-reseau'
   renderParcelTable(isAdherent)
-  renderTreatmentTable()
   renderPhenologyTable()
+  renderTreatmentTable()
   renderSensorEvents()
+  setupCollapsible()
 })
+
+function setupCollapsible() {
+  document.querySelectorAll('.tdb-section-hd[data-toggle]').forEach(hd => {
+    hd.style.cursor = 'pointer'
+    hd.addEventListener('click', e => {
+      if (e.target.closest('a')) return
+      const body = hd.nextElementSibling
+      const collapsed = body.classList.toggle('tdb-collapsed')
+      hd.querySelector('.tdb-chevron').classList.toggle('tdb-chevron-down', collapsed)
+    })
+  })
+}
 
 function plotAgroData(plot) {
   const s = plot.id
@@ -52,11 +65,11 @@ function renderParcelTable(isAdherent) {
         <th>Parcelle</th>
         <th>Culture</th>
         <th>Texture de sol</th>
-        <th class="tdb-num">Teneur eau J0</th>
+        <th class="tdb-num">Réservoir J0</th>
         <th class="tdb-num">+ Pluie J+7</th>
         <th class="tdb-num">− ETP J+7</th>
         <th class="tdb-num">− Drainage J+7</th>
-        <th class="tdb-num">Teneur eau J+7</th>
+        <th class="tdb-num">Réservoir J+7</th>
         <th class="tdb-num">= Irrigations J+7</th>
       </tr>
     </thead>
@@ -144,32 +157,39 @@ function renderTreatmentTable() {
 
 // ─── Phenology table ──────────────────────────────────────────────────────────
 
+const KEY_STAGE_KEYWORDS = ['floraison', 'nouaison', 'slag', '10 feuilles']
+
+function isKeyStage(stage) {
+  const s = stage.toLowerCase()
+  return KEY_STAGE_KEYWORDS.some(k => s.includes(k))
+}
+
 const PHENOLOGY = {
   'Blé tendre': {
     varieties: ['Bermude', 'Chevignon', 'Oregrain'],
-    stages: ['Tallage (BBCH 25)', 'Épi 1 cm (BBCH 30)', 'Montaison (BBCH 32)', 'Gonflement (BBCH 45)'],
-    nextStages: ['Épi 1 cm', 'Montaison', 'Gonflement', 'Épiaison'],
+    stages: ['Tallage (BBCH 25)', 'SLAG (BBCH 29-30)', 'Montaison (BBCH 32)', 'Gonflement (BBCH 45)'],
+    nextStages: ['SLAG', 'Montaison', 'Gonflement', 'Épiaison'],
     kc: [0.4, 0.5, 0.7, 0.85],
     roots: [40, 60, 80, 90],
   },
   'Maïs': {
     varieties: ['DKC4795', 'Farrandole', 'Ambition'],
-    stages: ['Semis (BBCH 00)', 'Levée (BBCH 09)', '2 feuilles (BBCH 12)', '4 feuilles (BBCH 14)'],
-    nextStages: ['Levée', '2 feuilles', '4 feuilles', '6 feuilles'],
-    kc: [0.3, 0.35, 0.4, 0.5],
-    roots: [10, 20, 30, 40],
+    stages: ['Levée (BBCH 09)', '6 feuilles (BBCH 16)', '10 feuilles (BBCH 18)', 'Floraison mâle (BBCH 65)'],
+    nextStages: ['6 feuilles', '10 feuilles', 'Floraison mâle', 'Nouaison'],
+    kc: [0.35, 0.5, 0.8, 1.2],
+    roots: [20, 40, 60, 80],
   },
   'Orge': {
     varieties: ['Irina', 'KWS Cassia', 'Etincel'],
-    stages: ['Tallage (BBCH 25)', 'Épi 1 cm (BBCH 30)', 'Montaison (BBCH 33)', 'Gonflement (BBCH 45)'],
-    nextStages: ['Épi 1 cm', 'Montaison', 'Gonflement', 'Épiaison'],
+    stages: ['Tallage (BBCH 25)', 'SLAG (BBCH 29-30)', 'Montaison (BBCH 33)', 'Gonflement (BBCH 45)'],
+    nextStages: ['SLAG', 'Montaison', 'Gonflement', 'Épiaison'],
     kc: [0.4, 0.55, 0.7, 0.85],
     roots: [40, 60, 75, 85],
   },
   'Colza': {
     varieties: ['Avatar', 'DK Expower', 'Atlavista'],
-    stages: ['Boutons floraux (BBCH 51)', 'Début floraison (BBCH 60)', 'Pleine floraison (BBCH 65)', 'Chute pétales (BBCH 67)'],
-    nextStages: ['Début floraison', 'Pleine floraison', 'Chute pétales', 'Siliques vertes'],
+    stages: ['Boutons floraux (BBCH 51)', 'Début floraison (BBCH 60)', 'Pleine floraison (BBCH 65)', 'Nouaison (BBCH 70)'],
+    nextStages: ['Début floraison', 'Pleine floraison', 'Nouaison', 'Siliques vertes'],
     kc: [0.8, 1.0, 1.1, 1.05],
     roots: [80, 100, 110, 120],
   },
@@ -203,9 +223,11 @@ function plotPhenologyData(plot) {
   const daysToNext = (s * 2 + 5) % 18 + 4
   const nextDate = new Date('2026-04-18')
   nextDate.setDate(nextDate.getDate() + daysToNext)
-  const nextDateStr = nextDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+  const nextDateStr = nextDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+    .replace(/^(\w)/, c => c.toUpperCase())
+    .replace(/\.?\s(\w)/, (_, c) => `. ${c.toUpperCase()}`)
 
-  return { variety, stage, nextStage, kc, rootDepth, nextDateStr }
+  return { variety, stage, nextStage, kc, rootDepth, nextDateStr, daysToNext }
 }
 
 function renderPhenologyTable() {
@@ -220,10 +242,10 @@ function renderPhenologyTable() {
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop}</td>
       <td>${d.variety}</td>
-      <td>${d.stage}</td>
+      <td class="${isKeyStage(d.stage) ? 'tdb-stage-key' : ''}">${d.stage}</td>
       <td class="tdb-num">${d.kc.toFixed(2)}</td>
       <td class="tdb-num">${d.rootDepth} cm</td>
-      <td>${d.nextDateStr} — ${d.nextStage}</td>
+      <td>${d.nextDateStr} <span class="tdb-next-stage-delta">(dans ${d.daysToNext} j)</span> — <span class="tdb-next-stage-name">${d.nextStage}</span></td>
     </tr>`
   }).join('')
 
@@ -267,9 +289,10 @@ function renderSensorEvents() {
   container.innerHTML = `<table class="tdb-parcels-table">
     <thead>
       <tr>
-        <th>Numéro de série</th>
+        
         <th>Modèle</th>
-        <th>Parcelle</th>
+        <th>Numéro de série</th>
+        <th>Ville</th>
         <th>Événement</th>
       </tr>
     </thead>

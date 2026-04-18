@@ -94,14 +94,6 @@ const METRICS_BY_MODEL = {
   ],
 }
 
-// Irrigation pseudo-metric (manually entered events)
-const IRRIGATION_METRIC = {
-  id: 'irrigation_manual', name: 'Irrigations', unit: 'mm',
-  color: '#0172A4', chartType: 'bar', isCumul: true,
-  cumul: { label: 'Cumul irrigations', unit: 'mm' },
-  base: () => 0,
-}
-
 // Metrics that are "tensiometers" — no conflict check on add
 const TENSIO_MODELS = ['CAPA-30-3', 'CAPA-60-6']
 
@@ -129,9 +121,7 @@ function initState() {
   if (!parcelState.alertes) {
     parcelState.alertes = []
   }
-  if (!parcelState.irrigationEvents) {
-    parcelState.irrigationEvents = []
-  }
+
 }
 
 function saveState(patch) {
@@ -186,47 +176,27 @@ document.addEventListener('DOMContentLoaded', () => {
     href: 'parcelles.html',
   })
 
-  renderWeatherStrip()
   renderCharts()
   renderPanel()
+  initMiniMap()
   initPanelToggle()
   initPeriodControls()
   initTabs()
   initDashGrid()
+  syncStickyChartControls()
 })
 
+function syncStickyChartControls() {
+  const tabBar = document.querySelector('.detail-tab-bar')
+  const update = () => {
+    const top = tabBar.getBoundingClientRect().height + 60
+    document.documentElement.style.setProperty('--sticky-charts-top', top + 'px')
+  }
+  update()
+  new ResizeObserver(update).observe(tabBar)
+}
+
 // ─── Weather strip ────────────────────────────────────────────────────────────
-
-function getAllChartMetrics() {
-  const result = []
-  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  linkedSensors.forEach(s => {
-    const metrics = METRICS_BY_MODEL[s.model]
-    if (metrics) metrics.forEach(m => result.push(m))
-  })
-  result.push(IRRIGATION_METRIC)
-  ALWAYS_METRICS.forEach(m => result.push(m))
-  return result
-}
-
-function renderWeatherStrip() {
-  const container = document.getElementById('weather-strip')
-  container.innerHTML = ''
-  getAllChartMetrics().forEach(m => {
-    const rawVal = m.id === 'irrigation_manual'
-      ? parcelState.irrigationEvents.reduce((s, e) => s + (e.mm || 0), 0)
-      : m.base()
-    const val = typeof rawVal === 'number' ? (Number.isInteger(rawVal) ? rawVal : rawVal.toFixed(1)) : '—'
-    const card = document.createElement('div')
-    card.className = 'latest-card'
-    card.style.borderTop = `3px solid ${m.color}`
-    card.innerHTML = `
-      <div class="latest-card-name" style="color:${m.color}">${m.name}</div>
-      <div class="latest-card-value">${val}<span class="latest-card-unit"> ${m.unit}</span></div>
-    `
-    container.appendChild(card)
-  })
-}
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 
@@ -252,9 +222,6 @@ function renderCharts() {
     metrics.forEach(m => appendChartCard(container, m))
   })
 
-  // Irrigation chart (always shown — manual entries)
-  appendIrrigationChart(container)
-
   // Always-available weather metrics last
   const alwaysHeader = document.createElement('div')
   alwaysHeader.className = 'chart-group-header'
@@ -263,7 +230,6 @@ function renderCharts() {
   ALWAYS_METRICS.forEach(m => appendChartCard(container, m))
 
   drawAllCharts()
-  renderSummaryBlock()
 }
 
 function appendChartCard(container, m) {
@@ -604,7 +570,7 @@ function drawIrrigationChart(svg, color, count, stepMins) {
 
   // Bin events into time steps
   const bins = Array(count).fill(0)
-  parcelState.irrigationEvents.forEach(ev => {
+  ;(parcelState.irrigationEvents || []).forEach(ev => {
     const ts = new Date(ev.isoDate).getTime()
     const age = now - ts
     if (age < 0 || age > totalMs) return
@@ -634,242 +600,6 @@ function drawIrrigationChart(svg, color, count, stepMins) {
   })
 
   svg.innerHTML = lines
-}
-
-function appendIrrigationChart(container) {
-  const m = IRRIGATION_METRIC
-  const events = parcelState.irrigationEvents || []
-  const totalMm = events.reduce((s, e) => s + (e.mm || 0), 0)
-
-  const card = document.createElement('div')
-  card.className = 'chart-card'
-  card.dataset.color       = m.color
-  card.dataset.chartType   = 'bar'
-  card.dataset.isIrrigation = '1'
-
-  card.innerHTML = `
-    <div class="chart-card-header">
-      <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
-      <span class="chart-card-unit">${m.unit}</span>
-    </div>
-    <svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
-    <div class="chart-cumul">
-      <span class="chart-cumul-label">Cumul irrigations</span>
-      <span class="chart-cumul-value irrig-cumul-val">${totalMm.toFixed(1)} mm</span>
-    </div>
-    <div class="irrig-events-list" style="margin-top:6px"></div>
-    <button class="irrig-add-btn action-btn" style="margin-top:6px;width:100%">
-      <i class="bi bi-plus"></i> Ajouter une irrigation
-    </button>
-  `
-  container.appendChild(card)
-
-  renderIrrigEvents(card)
-
-  card.querySelector('.irrig-add-btn').addEventListener('click', () => {
-    showIrrigForm(card)
-  })
-}
-
-function renderIrrigEvents(card) {
-  const list = card.querySelector('.irrig-events-list')
-  const events = parcelState.irrigationEvents || []
-
-  // Show mini calendar for current month + event list below
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
-  const monthName = now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })
-
-  // Map events by day-of-month
-  const byDay = {}
-  events.forEach((e, i) => {
-    const d = new Date(e.isoDate)
-    if (d.getFullYear() === year && d.getMonth() === month) {
-      const day = d.getDate()
-      if (!byDay[day]) byDay[day] = []
-      byDay[day].push(i)
-    }
-  })
-
-  const firstDay = new Date(year, month, 1).getDay() // 0=Sun
-  const startOffset = (firstDay + 6) % 7             // Mon-first
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  const dayHeaders = ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d =>
-    `<div class="irrig-cal-hd">${d}</div>`
-  ).join('')
-
-  let cells = Array(startOffset).fill(`<div class="irrig-cal-cell irrig-cal-empty"></div>`).join('')
-  for (let d = 1; d <= daysInMonth; d++) {
-    const idxs = byDay[d]
-    const hasDot = idxs && idxs.length > 0
-    const total = hasDot ? idxs.reduce((s, i) => s + (events[i]?.mm || 0), 0) : 0
-    cells += `<div class="irrig-cal-cell${hasDot ? ' irrig-cal-has-event' : ''}" data-day="${d}" title="${hasDot ? total.toFixed(0) + ' mm' : ''}">
-      <span class="irrig-cal-day">${d}</span>
-      ${hasDot ? `<span class="irrig-cal-dot" style="background:#0172A4"></span>` : ''}
-    </div>`
-  }
-
-  list.innerHTML = `
-    <div class="irrig-calendar">
-      <div class="irrig-cal-month">${monthName}</div>
-      <div class="irrig-cal-grid">${dayHeaders}${cells}</div>
-    </div>
-    <div class="irrig-event-rows">
-      ${events.length === 0
-        ? '<span class="panel-empty" style="font-size:12px">Aucune irrigation saisie</span>'
-        : events.map((e, i) => `
-          <div class="integ-pill-row" style="margin-top:3px">
-            <span class="integ-pill"><i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${e.mm} mm — ${e.isoDate.replace('T', ' ').slice(0, 16)}</span>
-            <button class="icon-btn remove-irrig-btn" data-idx="${i}" title="Supprimer"><i class="bi bi-x-lg"></i></button>
-          </div>
-        `).join('')
-      }
-    </div>
-  `
-
-  list.querySelectorAll('.remove-irrig-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.idx)
-      const updated = [...parcelState.irrigationEvents]
-      updated.splice(idx, 1)
-      saveState({ irrigationEvents: updated })
-      renderCharts()
-      renderWeatherStrip()
-    })
-  })
-}
-
-function showIrrigForm(card) {
-  if (card.querySelector('.irrig-form')) return
-  const today = new Date().toISOString().slice(0, 16)
-  const form = document.createElement('div')
-  form.className = 'irrig-form alert-create-form'
-  form.style.marginTop = '8px'
-  form.innerHTML = `
-    <div class="alert-form-row">
-      <input type="number" id="irrig-mm" class="inline-edit" placeholder="mm" min="0" step="0.1" style="width:70px">
-      <input type="datetime-local" id="irrig-date" class="inline-edit" value="${today}" style="width:190px">
-    </div>
-    <div class="alert-form-actions">
-      <button id="irrig-save" class="panel-add-btn">Enregistrer</button>
-      <button id="irrig-cancel" class="icon-btn"><i class="bi bi-x"></i></button>
-    </div>
-  `
-  card.appendChild(form)
-
-  form.querySelector('#irrig-save').addEventListener('click', () => {
-    const mm  = parseFloat(form.querySelector('#irrig-mm').value)
-    const dt  = form.querySelector('#irrig-date').value
-    if (!mm || mm <= 0 || !dt) return
-    const updated = [...(parcelState.irrigationEvents || []), { isoDate: dt, mm }]
-    updated.sort((a, b) => a.isoDate.localeCompare(b.isoDate))
-    saveState({ irrigationEvents: updated })
-    renderCharts()
-    renderWeatherStrip()
-  })
-  form.querySelector('#irrig-cancel').addEventListener('click', () => form.remove())
-}
-
-function renderSummaryBlock() {
-  const container = document.getElementById('charts-container')
-  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  let pluieMm = 0
-
-  linkedSensors.forEach(s => {
-    const metrics = METRICS_BY_MODEL[s.model] || []
-    if (metrics.some(m => m.id === 'pluie')) pluieMm = rnd(20, 80)
-  })
-
-  const etpMm   = rndf(15, 60)
-  const irrigMm = (parcelState.irrigationEvents || []).reduce((s, e) => s + (e.mm || 0), 0)
-  const drainageMm = Math.max(0, pluieMm + irrigMm - etpMm)
-  const balanceMm  = pluieMm + irrigMm - etpMm - drainageMm
-
-  const summary = document.createElement('div')
-  summary.className = 'cumul-summary'
-
-  // SVG water balance diagram
-  // Layout: soil rectangle in centre; arrows pointing in/out
-  const W = 480, H = 240
-  const soilY1 = 100, soilY2 = 180, soilX1 = 140, soilX2 = 340
-
-  function arrowUp(x, y1, y2, color, label, val) {
-    // Arrow going upward (loss: ETP)
-    const mx = x
-    return `
-      <line x1="${mx}" y1="${y2}" x2="${mx}" y2="${y1 + 10}" stroke="${color}" stroke-width="3" marker-end="url(#ah-${color.replace('#','')})"/>
-      <text x="${mx}" y="${y1 - 6}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${label}</text>
-      <text x="${mx}" y="${y1 - 20}" text-anchor="middle" fill="${color}" font-size="13" font-weight="700">${val} mm</text>
-    `
-  }
-
-  function arrowDown(x, y1, y2, color, label, val, yLabel) {
-    const mx = x
-    return `
-      <line x1="${mx}" y1="${y1}" x2="${mx}" y2="${y2 - 10}" stroke="${color}" stroke-width="3" marker-end="url(#ad-${color.replace('#','')})"/>
-      <text x="${mx}" y="${yLabel ?? (y1 - 10)}" text-anchor="middle" fill="${color}" font-size="12" font-weight="600">${label}</text>
-      <text x="${mx}" y="${(yLabel ?? (y1 - 10)) - 14}" text-anchor="middle" fill="${color}" font-size="13" font-weight="700">${val} mm</text>
-    `
-  }
-
-  function arrowDef(id, color) {
-    return `<marker id="${id}" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-      <path d="M0,0 L8,4 L0,8 Z" fill="${color}"/>
-    </marker>`
-  }
-
-  const etpColor   = '#c090e0'
-  const pluieColor = '#45b7d1'
-  const irrigColor = '#0172A4'
-  const drainColor = '#7bc4b0'
-  const balColor   = balanceMm >= 0 ? '#2d9e5f' : '#e07050'
-
-  summary.innerHTML = `
-    <div class="water-balance-wrap">
-      <div class="water-balance-title">Bilan hydrique — période sélectionnée</div>
-      <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:520px;display:block;margin:0 auto">
-        <defs>
-          ${arrowDef('ah-' + etpColor.replace('#',''),   etpColor)}
-          ${arrowDef('ad-' + pluieColor.replace('#',''), pluieColor)}
-          ${arrowDef('ad-' + irrigColor.replace('#',''), irrigColor)}
-          ${arrowDef('ad-' + drainColor.replace('#',''), drainColor)}
-        </defs>
-
-        <!-- Soil block -->
-        <rect x="${soilX1}" y="${soilY1}" width="${soilX2 - soilX1}" height="${soilY2 - soilY1}"
-              rx="6" fill="#d4a85855" stroke="#a07030" stroke-width="1.5" stroke-dasharray="4 3"/>
-        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 - 6}" text-anchor="middle"
-              fill="#7a5020" font-size="11">Sol</text>
-        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 + 10}" text-anchor="middle"
-              fill="${balColor}" font-size="14" font-weight="700">
-          ${balanceMm >= 0 ? '+' : ''}${balanceMm.toFixed(0)} mm
-        </text>
-        <text x="${(soilX1 + soilX2) / 2}" y="${(soilY1 + soilY2) / 2 + 24}" text-anchor="middle"
-              fill="${balColor}" font-size="10">bilan net</text>
-
-        <!-- ETP arrow up from soil surface -->
-        ${arrowUp(240, 18, soilY1, etpColor, 'ETP', etpMm.toFixed(1))}
-
-        <!-- Pluie arrow down -->
-        ${arrowDown(160, 10, soilY1, pluieColor, 'Pluie', pluieMm.toFixed(0), 22)}
-
-        <!-- Irrigation arrow down (slightly right of rain) -->
-        ${arrowDown(320, 10, soilY1, irrigColor, 'Irrigation', irrigMm.toFixed(0), 22)}
-
-        <!-- Drainage arrow down from soil bottom -->
-        ${arrowDown(240, soilY2, H - 10, drainColor, 'Drainage', drainageMm.toFixed(0), soilY2 + 20)}
-      </svg>
-      <div class="water-balance-legend">
-        <span style="color:${pluieColor}">&#x25BC; Pluie ${pluieMm.toFixed(0)} mm</span>
-        <span style="color:${irrigColor}">&#x25BC; Irrigation ${irrigMm.toFixed(0)} mm</span>
-        <span style="color:${etpColor}">&#x25B2; ETP ${etpMm.toFixed(1)} mm</span>
-        <span style="color:${drainColor}">&#x25BC; Drainage ${drainageMm.toFixed(0)} mm</span>
-      </div>
-    </div>
-  `
-  container.appendChild(summary)
 }
 
 function genCumulValue(m) {
@@ -1482,6 +1212,7 @@ let _miniMapInitialized = false
 
 function initTabs() {
   const btns = document.querySelectorAll('.detail-tab-btn')
+  const chartControlsBar = document.getElementById('chart-controls-bar')
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
       btns.forEach(b => b.classList.remove('active'))
@@ -1489,11 +1220,8 @@ function initTabs() {
       btn.classList.add('active')
       const paneId = btn.dataset.pane
       document.getElementById(paneId).classList.add('active')
+      if (chartControlsBar) chartControlsBar.style.display = paneId === 'tab-donnees' ? '' : 'none'
 
-      if (paneId === 'tab-donnees' && !_miniMapInitialized) {
-        _miniMapInitialized = true
-        initMiniMap()
-      }
     })
   })
 }
@@ -1616,7 +1344,7 @@ function populateDashBlocks() {
   if (mapEl) {
     mapEl.style.padding = '0 0 8px 0'
     mapEl.innerHTML = '<div class="dash-map-inner" id="dash-map-container"></div>'
-    requestAnimationFrame(() => initDashMap())
+    initDashMap()
   }
 
   // ── Bilan hydrique ──
@@ -1667,23 +1395,35 @@ function initDashMap() {
   const org = orgs.find(o => o.id === parcelBase.orgId)
   if (!org?.lat) return
 
-  _dashMap = L.map(container, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false })
+  const setup = () => {
+    if (_dashMap) return
+    _dashMap = L.map(container, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false })
 
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Esri'
-  }).addTo(_dashMap)
-
-  const latlngs = parcelState.latlngs || parcelBase.latlngs
-  if (Array.isArray(latlngs) && latlngs.length >= 3) {
-    const poly = L.polygon(latlngs, {
-      color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.35
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Esri'
     }).addTo(_dashMap)
-    _dashMap.fitBounds(poly.getBounds(), { padding: [8, 8] })
+
+    const latlngs = parcelState.latlngs || parcelBase.latlngs
+    if (Array.isArray(latlngs) && latlngs.length >= 3) {
+      const poly = L.polygon(latlngs, {
+        color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.35
+      }).addTo(_dashMap)
+      _dashMap.fitBounds(poly.getBounds(), { padding: [8, 8] })
+    } else {
+      _dashMap.setView([org.lat, org.lng], 14)
+      L.circleMarker([org.lat, org.lng], {
+        radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
+      }).addTo(_dashMap)
+    }
+  }
+
+  if (container.offsetWidth > 0) {
+    setup()
   } else {
-    _dashMap.setView([org.lat, org.lng], 14)
-    L.circleMarker([org.lat, org.lng], {
-      radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
-    }).addTo(_dashMap)
+    const ro = new ResizeObserver(() => {
+      if (container.offsetWidth > 0) { ro.disconnect(); setup() }
+    })
+    ro.observe(container)
   }
 }
 

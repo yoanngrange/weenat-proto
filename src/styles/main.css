@@ -36,6 +36,7 @@ html, body {
 
 #main-content {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -228,6 +229,7 @@ color: grey;
 
 #main-content {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   margin-left: 200px;
@@ -895,13 +897,17 @@ th.sort-desc::after {
 #hourly-table {
   margin-top: 20px;
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
 }
 
 #hourly-table th, #hourly-table td {
-  padding: 8px;
+  padding: 8px 4px;
   text-align: center;
   border: 1px solid var(--brd);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #hourly-table th {
@@ -3349,7 +3355,7 @@ td.num {
 
 .chart-controls--sticky {
   position: sticky;
-  top: 104px;
+  top: var(--sticky-charts-top, 64px);
   z-index: 20;
   background: var(--bg);
   padding-top: 10px;
@@ -5069,16 +5075,22 @@ tr.row-selected td {
 .tdb-section-hd {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   padding: 12px 16px;
   font-weight: 600;
   font-size: 14px;
   border-bottom: 1px solid var(--bdr2);
   background: var(--bg);
   color: var(--txt);
+  user-select: none;
 }
+.tdb-hd-left { display: flex; align-items: center; gap: 8px; }
+.tdb-hd-right { display: flex; align-items: center; gap: 12px; }
+.tdb-chevron { font-size: 12px; color: var(--txt3); transition: transform 0.2s; }
+.tdb-chevron-down { transform: rotate(-180deg); }
+.tdb-section-body.tdb-collapsed { display: none; }
 .tdb-section-link {
-  margin-left: auto;
+  margin-left: 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--pri);
@@ -5187,6 +5199,10 @@ tr.row-selected td {
 .tdb-irrig-ok { color: var(--txt3); }
 .tdb-win-urgent { background: var(--ok2); color: var(--ok); font-weight: 600; }
 .tdb-win-urgent i { margin-right: 4px; }
+.tdb-stage-key { background: var(--warn2); color: var(--warn); font-weight: 600; }
+.tdb-next-stage-name { font-weight: 600; color: var(--txt1); }
+.tdb-next-stage-date { font-size: 12px; color: var(--txt2); margin-top: 2px; display: block; }
+.tdb-next-stage-delta { color: var(--txt3); }
 .tdb-parcels-formula {
   padding: 8px 12px;
   font-size: 11px;
