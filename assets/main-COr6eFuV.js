@@ -1,4 +1,4 @@
-import"./main-5C_gURf8.js";import{o as j}from"./orgs-b3kLTQ0f.js";import{p as b}from"./plots-CEyFXpqF.js";import{s as x}from"./sensors-BafoiuOm.js";import{m as W}from"./members-U142UPu4.js";function xe({title:e,contextLabel:n,items:t=[],type:a="sensor",activeItem:l=null,availableMeasures:i=[],defaultFormat:o="csv"}){const d=document.getElementById("export-modal");d&&d.remove();const m=document.createElement("div");m.id="export-modal",m.className="modal",m.innerHTML=`
+import"./main-5C_gURf8.js";import{o as j}from"./orgs-b3kLTQ0f.js";import{p as b}from"./plots-CEyFXpqF.js";import{s as x}from"./sensors-BafoiuOm.js";import{m as W}from"./members-DPSnqfQ_.js";function xe({title:e,contextLabel:n,items:t=[],type:a="sensor",activeItem:l=null,availableMeasures:i=[],defaultFormat:o="csv"}){const d=document.getElementById("export-modal");d&&d.remove();const m=document.createElement("div");m.id="export-modal",m.className="modal",m.innerHTML=`
     <div class="modal-content">
       <h2>${e}</h2>
       <p>Un email contenant les liens de téléchargement sera envoyé à votre adresse.</p>
