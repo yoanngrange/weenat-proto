@@ -6,160 +6,160 @@ export const members = [
   // ── Propriétaire (1M) ─────────────────────────────────────────────────────
   {
     id: 1, prenom: 'Philippe', nom: 'Renard',
-    email: 'philippe.renard@weenat.com',
+    email: 'philippe.renard@breizagri-conseil.fr',
     role: 'propriétaire', statut: 'actif',
-    orgIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
-    parcelIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42]
+    orgIds: [1, 5, 12],
+    parcelIds: [2, 13, 37]
   },
 
   // ── Admins (3M, 1F) ───────────────────────────────────────────────────────
   {
     id: 2, prenom: 'Thomas', nom: 'Bertrand',
-    email: 'thomas.bertrand@weenat.com',
+    email: 'thomas.bertrand@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [1,2,3,4,5],
-    parcelIds: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    orgIds: [3, 9],
+    parcelIds: [4, 10, 28, 41]
   },
   {
     id: 3, prenom: 'Julien', nom: 'Martin',
-    email: 'julien.martin@weenat.com',
+    email: 'julien.martin@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [6,7,8,9,10],
-    parcelIds: [20,21,22,23,24,25,26,27,28,29,30,31]
+    orgIds: [2, 7, 14, 18],
+    parcelIds: [6, 20, 33]
   },
   {
     id: 4, prenom: 'Sophie', nom: 'Dubois',
-    email: 'sophie.dubois@weenat.com',
+    email: 'sophie.dubois@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [11,12,13,14,15],
-    parcelIds: [32,33,34,35,36,37]
+    orgIds: [4, 11, 16, 19, 20],
+    parcelIds: [15, 26, 38, 42]
   },
   {
     id: 5, prenom: 'Nicolas', nom: 'Laurent',
-    email: 'nicolas.laurent@weenat.com',
+    email: 'nicolas.laurent@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [16,17,18,19,20],
-    parcelIds: [38,39,40,41,42]
+    orgIds: [6, 13],
+    parcelIds: []
   },
 
   // ── Agents (15M, 5F) ──────────────────────────────────────────────────────
   {
     id: 6, prenom: 'Alexandre', nom: 'Bernard',
-    email: 'alexandre.bernard@fermedubocage.fr',
+    email: 'alexandre.bernard@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [1, 2]
   },
   {
     id: 7, prenom: 'Maxime', nom: 'Petit',
-    email: 'maxime.petit@fermedubocage.fr',
+    email: 'maxime.petit@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [3, 4]
   },
   {
     id: 8, prenom: 'Claire', nom: 'Moreau',
-    email: 'claire.moreau@fermedubocage.fr',
+    email: 'claire.moreau@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [5, 6]
   },
   {
     id: 9, prenom: 'François', nom: 'Leroy',
-    email: 'francois.leroy@fermedubocage.fr',
+    email: 'francois.leroy@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [7, 8]
   },
   {
     id: 10, prenom: 'Sébastien', nom: 'Girard',
-    email: 'sebastien.girard@fermedubocage.fr',
+    email: 'sebastien.girard@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [9, 10, 11]
   },
   {
     id: 11, prenom: 'Damien', nom: 'Rousseau',
-    email: 'damien.rousseau@fermedubocage.fr',
+    email: 'damien.rousseau@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [12, 13]
   },
   {
     id: 12, prenom: 'Marie', nom: 'Dumont',
-    email: 'marie.dumont@fermedubocage.fr',
+    email: 'marie.dumont@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [1], parcelIds: [14, 15]
   },
   {
     id: 13, prenom: 'Antoine', nom: 'Noël',
-    email: 'antoine.noel@coopbretonne.fr',
+    email: 'antoine.noel@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [2], parcelIds: [16, 17]
   },
   {
     id: 14, prenom: 'Kevin', nom: 'Simon',
-    email: 'kevin.simon@coopbretonne.fr',
+    email: 'kevin.simon@breizagri-conseil.fr',
     role: 'agent', statut: 'inactif',
     orgIds: [2, 3], parcelIds: [18, 19, 20]
   },
   {
     id: 15, prenom: 'Romain', nom: 'Leclerc',
-    email: 'romain.leclerc@explonormande.fr',
+    email: 'romain.leclerc@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [3], parcelIds: [21]
   },
   {
     id: 16, prenom: 'Lucie', nom: 'Fontaine',
-    email: 'lucie.fontaine@agrimanche.fr',
+    email: 'lucie.fontaine@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [4], parcelIds: [22, 23]
   },
   {
     id: 17, prenom: 'Vincent', nom: 'Barbier',
-    email: 'vincent.barbier@fermecotiere.fr',
+    email: 'vincent.barbier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [5], parcelIds: [24, 25]
   },
   {
     id: 18, prenom: 'Christophe', nom: 'Garnier',
-    email: 'christophe.garnier@coopbiobretagne.fr',
+    email: 'christophe.garnier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [6], parcelIds: [26, 27]
   },
   {
     id: 19, prenom: 'Nathalie', nom: 'Perez',
-    email: 'nathalie.perez@explocalvados.fr',
+    email: 'nathalie.perez@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [7, 8], parcelIds: [28, 29]
   },
   {
     id: 20, prenom: 'Arnaud', nom: 'Meyer',
-    email: 'arnaud.meyer@fermeorne.fr',
+    email: 'arnaud.meyer@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [8, 9], parcelIds: [30, 31]
   },
   {
     id: 21, prenom: 'Guillaume', nom: 'Roux',
-    email: 'guillaume.roux@coopnormande.fr',
+    email: 'guillaume.roux@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [10, 11], parcelIds: [32, 33]
   },
   {
     id: 22, prenom: 'Étienne', nom: 'Chevalier',
-    email: 'etienne.chevalier@exploirv.fr',
+    email: 'etienne.chevalier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [12, 13], parcelIds: [34, 35]
   },
   {
     id: 23, prenom: 'Isabelle', nom: 'Schmitt',
-    email: 'isabelle.schmitt@fermenormandebio.fr',
+    email: 'isabelle.schmitt@breizagri-conseil.fr',
     role: 'agent', statut: 'inactif',
     orgIds: [14, 15], parcelIds: [36, 37]
   },
   {
     id: 24, prenom: 'Pierre', nom: 'Thomas',
-    email: 'pierre.thomas@coopbretsud.fr',
+    email: 'pierre.thomas@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [15, 16, 17], parcelIds: [38, 39]
   },
   {
     id: 25, prenom: 'Cédric', nom: 'Morin',
-    email: 'cedric.morin@agrieure.fr',
+    email: 'cedric.morin@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
     orgIds: [18, 19, 20], parcelIds: [40, 41, 42]
   },
@@ -168,31 +168,31 @@ export const members = [
   // Parcelles 1, 5, 15, 30, 40 ont 2 membres (~10%)
   {
     id: 26, prenom: 'Benoît', nom: 'Faure',
-    email: 'benoit.faure@fermedubocage.fr',
+    email: 'benoit.faure@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
     orgIds: [1], parcelIds: [1]
   },
   {
     id: 27, prenom: 'Alice', nom: 'Masson',
-    email: 'alice.masson@fermedubocage.fr',
+    email: 'alice.masson@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
     orgIds: [1], parcelIds: [5]
   },
   {
     id: 28, prenom: 'Laurent', nom: 'Colin',
-    email: 'laurent.colin@coopbretonne.fr',
+    email: 'laurent.colin@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
     orgIds: [2], parcelIds: [15]
   },
   {
     id: 29, prenom: 'Véronique', nom: 'Blanc',
-    email: 'veronique.blanc@fermeorne.fr',
+    email: 'veronique.blanc@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
     orgIds: [8], parcelIds: [30]
   },
   {
     id: 30, prenom: 'Stéphane', nom: 'Denis',
-    email: 'stephane.denis@agrieure.fr',
+    email: 'stephane.denis@breizagri-conseil.fr',
     role: 'lecteur', statut: 'inactif',
     orgIds: [18], parcelIds: [40]
   }

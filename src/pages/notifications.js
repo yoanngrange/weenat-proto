@@ -36,7 +36,7 @@ const TYPE_COLORS = {
 }
 
 const NETWORK_MEMBERS = members
-  .filter(m => m.email.endsWith('@weenat.com'))
+  .filter(m => m.email.endsWith('@breizagri-conseil.fr'))
   .map(m => `${m.prenom} ${m.nom}`)
   .sort()
 

@@ -31,11 +31,6 @@ function orgStatutSimplified(org) {
   return STATUT_SIMPLIFIED[org.statut] || 'inactif'
 }
 
-function orgMemberLimit(org) {
-  const s = orgStatutSimplified(org)
-  if (s === 'actif') return (org.id % 3 === 0) ? 1 : 2
-  return 0
-}
 
 // Local mutable copy — restored from localStorage if available
 const _stored = getStoredOrgs()
@@ -175,9 +170,7 @@ function render() {
   list.forEach(org => {
     const orgParcels = plots.filter(p => p.orgId === org.id)
     const orgSensors = sensors.filter(s => s.orgId === org.id)
-    const allOrgMembers = members.filter(m => m.orgIds.includes(org.id))
-    const limit = orgMemberLimit(org)
-    const orgMembers = allOrgMembers.slice(0, limit)
+    const orgMembers = members.filter(m => m.orgIds.includes(org.id))
 
     const simplified  = orgStatutSimplified(org)
     const statutStyle = STATUT_STYLES[simplified] || { cls: 'statut-inactif', icon: 'bi-circle' }
