@@ -83,8 +83,30 @@
                 Besoin d'aide ? Consultez le centre d'aide
               </a>
             </section>
+            <section class="account-section">
+              <button class="help-chat-btn" id="help-chat-btn">
+                <i class="bi bi-chat-dots-fill"></i>
+                Discuter avec le bot
+              </button>
+            </section>
           </div>
         </main>
+      </div>
+    </div>
+    <div class="help-chat-overlay hidden" id="help-chat-overlay">
+      <div class="help-chat-panel">
+        <div class="help-chat-hd">
+          <i class="bi bi-chat-dots-fill"></i>
+          Assistant Weenat
+          <button class="help-chat-hd-close" id="help-chat-close" aria-label="Fermer">×</button>
+        </div>
+        <div class="help-chat-messages" id="help-chat-messages">
+          <div class="help-chat-msg bot">Bonjour ! Je suis l'assistant Weenat. Comment puis-je vous aider ?</div>
+        </div>
+        <div class="help-chat-ft">
+          <input class="help-chat-input" id="help-chat-input" type="text" placeholder="Posez votre question…" />
+          <button class="help-chat-send" id="help-chat-send"><i class="bi bi-send-fill"></i></button>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/pages/aide.js"></script>

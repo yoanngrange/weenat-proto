@@ -5,19 +5,19 @@
 export const sensors = [
   // ── Org 1 : Ferme du Bocage (parcelles 1–15) ────────────────────────────
   { id: 1,   orgId: 1,  parcelId: 1,  model: "P+",        serial: "WEE-00101", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 90,  event: null },
-  { id: 2,   orgId: 1,  parcelId: 1,  model: "CHP-15/30", serial: "WEE-00102", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 92, messages7d: 95,  event: "capteur couché" },
+  { id: 2,   orgId: 1,  parcelId: 1,  model: "CHP-15/30", serial: "WEE-00102", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 92, messages7d: 95,  event: "capteur couché", depth: 20 },
   { id: 3,   orgId: 1,  parcelId: 2,  model: "P",         serial: "WEE-00103", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 78, messages7d: 88,  event: null },
   { id: 4,   orgId: 1,  parcelId: 2,  model: "TH",        serial: "WEE-00104", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 80, messages7d: 85,  event: null },
-  { id: 5,   orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00105", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 92,  event: "émissions interrompues" },
+  { id: 5,   orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00105", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 92,  event: "émissions interrompues", depth: 50 },
   { id: 6,   orgId: 1,  parcelId: 4,  model: "P+",        serial: "WEE-00106", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 93,  event: null },
   { id: 7,   orgId: 1,  parcelId: 4,  model: "CAPA-30-3", serial: "WEE-00107", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 75, messages7d: 80,  event: null },
   { id: 8,   orgId: 1,  parcelId: 5,  model: "EC",        serial: "WEE-00108", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 87,  event: null },
   { id: 9,   orgId: 1,  parcelId: 6,  model: "T_MINI",    serial: "WEE-00109", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 91,  event: "capteur déplacé" },
   { id: 10,  orgId: 1,  parcelId: 7,  model: "P+",        serial: "WEE-00110", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 94,  event: null },
-  { id: 11,  orgId: 1,  parcelId: 8,  model: "CHP-15/30", serial: "WEE-00111", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 89,  event: null },
+  { id: 11,  orgId: 1,  parcelId: 8,  model: "CHP-15/30", serial: "WEE-00111", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 89,  event: null, depth: 30 },
   { id: 12,  orgId: 1,  parcelId: 9,  model: "P",         serial: "WEE-00112", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 84,  event: "cuillère bloquée" },
   { id: 13,  orgId: 1,  parcelId: 10, model: "PT",        serial: "WEE-00113", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 83, messages7d: 86,  event: null },
-  { id: 14,  orgId: 1,  parcelId: 11, model: "CHP-30/60", serial: "WEE-00114", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 92,  event: null },
+  { id: 14,  orgId: 1,  parcelId: 11, model: "CHP-30/60", serial: "WEE-00114", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 92,  event: null, depth: 40 },
   { id: 15,  orgId: 1,  parcelId: 12, model: "P+",        serial: "WEE-00115", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   { id: 16,  orgId: 1,  parcelId: 13, model: "CAPA-30-3", serial: "WEE-00116", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 76, messages7d: 81,  event: null },
   { id: 17,  orgId: 1,  parcelId: 14, model: "LWS",       serial: "WEE-00117", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 81, messages7d: 85,  event: null },
@@ -54,7 +54,7 @@ export const sensors = [
   { id: 34,  orgId: 8,  parcelId: 31, model: "CHP-15/30", serial: "WEE-00834", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
 
   // ── Org 9 : Agriculteurs Finistériens (parcelles 32–33) ──────────────────
-  { id: 35,  orgId: 9,  parcelId: 32, model: "P+",        serial: "WEE-00935", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 72, messages7d: 78,  event: "batterie faible" },
+  { id: 35,  orgId: 9,  parcelId: 32, model: "P+",        serial: "WEE-00935", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 72, messages7d: 78,  event: null },
   { id: 36,  orgId: 9,  parcelId: 33, model: "CHP-30/60", serial: "WEE-00936", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 68, messages7d: 73,  event: null },
 
   // ── Org 10 : Coopérative Normande (parcelles 34–35) ──────────────────────
@@ -84,7 +84,7 @@ export const sensors = [
 
   // ── Org 16 : Exploitation de la Seine-Maritime ───────────────────────────
   { id: 50,  orgId: 16, parcelId: 38,  model: "CHP-15/30", serial: "WEE-01650", telecom: "LoRa",   lastMessage: "2024-04-10T10:00:00Z", networkQuality: 45, messages7d: 12,  event: "émissions interrompues" },
-  { id: 51,  orgId: 16, parcelId: 125, model: "P+",        serial: "WEE-01651", telecom: "Sigfox", lastMessage: "2024-04-09T10:00:00Z", networkQuality: 40, messages7d: 8,   event: "batterie faible" },
+  { id: 51,  orgId: 16, parcelId: 125, model: "P+",        serial: "WEE-01651", telecom: "Sigfox", lastMessage: "2024-04-09T10:00:00Z", networkQuality: 40, messages7d: 8,   event: "émissions interrompues" },
 
   // ── Org 17 : Ferme Côtière Nord ──────────────────────────────────────────
   { id: 52,  orgId: 17, parcelId: 39,  model: "P+",        serial: "WEE-01752", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 93, messages7d: 96,  event: null },
@@ -134,7 +134,7 @@ export const sensors = [
   { id: 82,  orgId: 24, parcelId: null, model: "CHP-15/30", serial: "WEE-02482", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
   { id: 83,  orgId: 24, parcelId: null, model: "P+",        serial: "WEE-02483", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
   { id: 84,  orgId: 24, parcelId: null, model: "CHP-30/60", serial: "WEE-02484", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 83,  event: null },
-  { id: 85,  orgId: 24, parcelId: null, model: "P+",        serial: "WEE-02485", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: "batterie faible" },
+  { id: 85,  orgId: 24, parcelId: null, model: "P+",        serial: "WEE-02485", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
 
   // ── Org 25 : Groupement Viticole de l'Eure ────────────────────────────────
   { id: 86,  orgId: 25, parcelId: null, model: "P+",        serial: "WEE-02586", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
@@ -158,7 +158,7 @@ export const sensors = [
 
   // ── Org 28 : Ferme Avicole du Bessin ─────────────────────────────────────
   { id: 100, orgId: 28, parcelId: null, model: "P+",        serial: "WEE-02800", telecom: "LoRa",   lastMessage: "2024-03-15T10:00:00Z", networkQuality: 35, messages7d: 5,   event: "émissions interrompues" },
-  { id: 101, orgId: 28, parcelId: null, model: "CHP-15/30", serial: "WEE-02801", telecom: "Sigfox", lastMessage: "2024-03-14T10:00:00Z", networkQuality: 30, messages7d: 3,   event: "batterie faible" },
+  { id: 101, orgId: 28, parcelId: null, model: "CHP-15/30", serial: "WEE-02801", telecom: "Sigfox", lastMessage: "2024-03-14T10:00:00Z", networkQuality: 30, messages7d: 3,   event: "émissions interrompues", depth: 20 },
 
   // ── Org 29 : EARL Primeurs de la Rance ───────────────────────────────────
   { id: 102, orgId: 29, parcelId: null, model: "P+",        serial: "WEE-02902", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
@@ -222,7 +222,7 @@ export const sensors = [
 
   // ── Org 38 : Porcherie de la Baie du Mont ────────────────────────────────
   { id: 144, orgId: 38, parcelId: null, model: "P+",        serial: "WEE-03844", telecom: "LoRa",   lastMessage: "2024-02-20T10:00:00Z", networkQuality: 28, messages7d: 0,   event: "émissions interrompues" },
-  { id: 145, orgId: 38, parcelId: null, model: "CHP-15/30", serial: "WEE-03845", telecom: "Sigfox", lastMessage: "2024-02-18T10:00:00Z", networkQuality: 22, messages7d: 0,   event: "batterie faible" },
+  { id: 145, orgId: 38, parcelId: null, model: "CHP-15/30", serial: "WEE-03845", telecom: "Sigfox", lastMessage: "2024-02-18T10:00:00Z", networkQuality: 22, messages7d: 0,   event: "émissions interrompues", depth: 30 },
 
   // ── Org 39 : Agri Loire-Atlantique Nord ──────────────────────────────────
   { id: 146, orgId: 39, parcelId: null, model: "P+",        serial: "WEE-03946", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
@@ -240,7 +240,7 @@ export const sensors = [
   // ── Capteurs supplémentaires pour densifier certains adhérents ────────────
   // Org 1 (supplémentaires)
   { id: 155, orgId: 1,  parcelId: 13,  model: "P+",        serial: "WEE-00155", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
-  { id: 156, orgId: 1,  parcelId: 14,  model: "CHP-30/60", serial: "WEE-00156", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 156, orgId: 1,  parcelId: 14,  model: "CHP-30/60", serial: "WEE-00156", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null, depth: 50 },
   // Org 2 (supplémentaires)
   { id: 157, orgId: 2,  parcelId: 43,  model: "P+",        serial: "WEE-00257", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 95,  event: null },
   { id: 158, orgId: 2,  parcelId: 44,  model: "CHP-15/30", serial: "WEE-00258", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
@@ -318,5 +318,17 @@ export const sensors = [
   { id: 207, orgId: 12, parcelId: 103, model: "PT",        serial: "WEE-12207", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 89, messages7d: 93,  event: null },
   { id: 208, orgId: 15, parcelId: 120, model: "PAR",       serial: "WEE-15208", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   { id: 209, orgId: 17, parcelId: 130, model: "CHP-15/30", serial: "WEE-17209", telecom: "LoRa",   lastMessage: "2026-04-15T09:00:00Z", networkQuality: 86, messages7d: 90,  event: null },
-  { id: 210, orgId: 20, parcelId: 145, model: "CAPA-60",   serial: "WEE-20210", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 82, messages7d: 86,  event: null }
+  { id: 210, orgId: 20, parcelId: 145, model: "CAPA-60-6", serial: "WEE-20210", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
+
+  // ── Parcelle 3 (Org 1) — configuration 6 tensiomètres sur 2 horizons ─────────
+  // Horizon 1 : 3 × CHP-15/30 à 20 cm
+  { id: 211, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00211", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 91, messages7d: 95,  event: null, depth: 20 },
+  { id: 212, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00212", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 88, messages7d: 93,  event: null, depth: 20 },
+  { id: 213, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00213", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 86, messages7d: 91,  event: null, depth: 20 },
+  // Horizon 2 : 3 × CHP-30/60 à 50 cm (dont id 5 déjà existant)
+  { id: 214, orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00214", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 89, messages7d: 94,  event: null, depth: 50 },
+  { id: 215, orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00215", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 87, messages7d: 92,  event: null, depth: 50 },
+
+  // ── Org 1 — sonde capacitive CAPA-60-6 ────────────────────────────────────
+  { id: 216, orgId: 1,  parcelId: 5,  model: "CAPA-60-6", serial: "WEE-00216", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 83, messages7d: 88,  event: null },
 ]

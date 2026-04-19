@@ -23,10 +23,13 @@ const METRIC_DEFS = {
   rayonnement:      { name: 'Rayonnement',          unit: 'W/m²',      color: '#f5c842', baseVal: () => rnd(0, 900),   cumul: { label: 'Énergie', unit: 'Wh/m²' } },
   etp:              { name: 'ETP',                  unit: 'mm/j',      color: '#c090e0', baseVal: () => rndf(0.5, 5),  cumul: { label: 'Cumul ETP', unit: 'mm' } },
   temperature_min:  { name: 'Température min',      unit: '°C',        color: '#90b0e0', baseVal: () => rnd(-2, 15),   cumul: { label: 'Heures de froid', unit: 'h' } },
-  humidite_sol_15:  { name: 'Hum. sol 15 cm',      unit: '%vol',      color: '#d4a843', baseVal: () => rnd(15, 45)   },
-  humidite_sol_30:  { name: 'Hum. sol 30 cm',      unit: '%vol',      color: '#b88a2c', baseVal: () => rnd(15, 45)   },
-  humidite_sol_60:  { name: 'Hum. sol 60 cm',      unit: '%vol',      color: '#9a7015', baseVal: () => rnd(18, 42)   },
-  humidite_sol_90:  { name: 'Hum. sol 90 cm',      unit: '%vol',      color: '#7c5800', baseVal: () => rnd(20, 40)   },
+  humidite_sol_10:  { name: 'Hum. sol 10 cm',      unit: '%vol',      color: '#f0cc60', baseVal: () => rnd(15, 45)   },
+  humidite_sol_20:  { name: 'Hum. sol 20 cm',      unit: '%vol',      color: '#dab448', baseVal: () => rnd(15, 45)   },
+  humidite_sol_30:  { name: 'Hum. sol 30 cm',      unit: '%vol',      color: '#c09830', baseVal: () => rnd(15, 45)   },
+  humidite_sol_40:  { name: 'Hum. sol 40 cm',      unit: '%vol',      color: '#a87c18', baseVal: () => rnd(17, 43)   },
+  humidite_sol_50:  { name: 'Hum. sol 50 cm',      unit: '%vol',      color: '#906200', baseVal: () => rnd(18, 42)   },
+  humidite_sol_60:  { name: 'Hum. sol 60 cm',      unit: '%vol',      color: '#784800', baseVal: () => rnd(18, 42)   },
+  humidite_sol_90:  { name: 'Hum. sol 90 cm',      unit: '%vol',      color: '#603000', baseVal: () => rnd(20, 40)   },
   temp_sol:         { name: 'Temp. sol',            unit: '°C',        color: '#bb8fce', baseVal: () => rnd(8, 22)    },
   potentiel_hydrique: {
     name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9',
@@ -56,7 +59,7 @@ const METRICS_BY_MODEL = {
   'T_MINI':   ['temperature_min'],
   'W':        ['vent_vitesse', 'vent_rafales', 'vent_direction'],
   'CHP-15/30': ['potentiel_hydrique', 'temp_sol'],
-  'CHP-30/60': ['humidite_sol_30', 'humidite_sol_60', 'temp_sol'],
+  'CHP-30/60': ['potentiel_hydrique', 'temp_sol'],
   'CHP-60/90': ['humidite_sol_60', 'humidite_sol_90', 'temp_sol'],
   'CAPA-30-3': ['_capa_vwc', '_capa_temp'],
   'CAPA-60-6': ['_capa_vwc', '_capa_temp'],
@@ -78,17 +81,17 @@ const VIRTUAL_METRICS = {
 // CAPA horizon definitions per model
 const CAPA_HORIZONS = {
   'CAPA-30-3': [
-    { id: 'humidite_sol_15', label: '15 cm', color: '#d4a843' },
-    { id: 'humidite_sol_30', label: '30 cm', color: '#b88a2c' },
-    { id: 'humidite_sol_60', label: '60 cm', color: '#9a7015' },
+    { id: 'humidite_sol_10', label: '10 cm', color: '#f0cc60' },
+    { id: 'humidite_sol_20', label: '20 cm', color: '#c89c30' },
+    { id: 'humidite_sol_30', label: '30 cm', color: '#a07010' },
   ],
   'CAPA-60-6': [
-    { id: 'humidite_sol_15', label: '15 cm', color: '#e8c050' },
-    { id: 'humidite_sol_30', label: '30 cm', color: '#c8a030' },
-    { id: 'humidite_sol_60', label: '60 cm', color: '#a88010' },
-    { id: 'humidite_sol_90', label: '90 cm', color: '#886000' },
-    { id: 'tensio_120',       label: '120 cm', color: '#684000' },
-    { id: 'tensio_150',       label: '150 cm', color: '#482000' },
+    { id: 'humidite_sol_10', label: '10 cm', color: '#f0d070' },
+    { id: 'humidite_sol_20', label: '20 cm', color: '#d8b050' },
+    { id: 'humidite_sol_30', label: '30 cm', color: '#c09030' },
+    { id: 'humidite_sol_40', label: '40 cm', color: '#a87010' },
+    { id: 'humidite_sol_50', label: '50 cm', color: '#905200' },
+    { id: 'humidite_sol_60', label: '60 cm', color: '#783400' },
   ],
 }
 
@@ -557,8 +560,11 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
       // Soil water potential: slow changes, unit kPa (0-200)
       return Math.max(5, Math.min(195, base * n()))
     }
-    case 'humidite_sol_15':
+    case 'humidite_sol_10':
+    case 'humidite_sol_20':
     case 'humidite_sol_30':
+    case 'humidite_sol_40':
+    case 'humidite_sol_50':
     case 'humidite_sol_60':
     case 'humidite_sol_90': {
       // Soil moisture: stable with slow drift
@@ -936,19 +942,21 @@ function renderConfig() {
   }
 
   if (isCHP) {
-    const depths = model === 'CHP-15/30' ? [15, 30] : model === 'CHP-30/60' ? [30, 60] : [60, 90]
+    const range   = model === 'CHP-15/30' ? [15, 30] : model === 'CHP-30/60' ? [30, 60] : [60, 90]
+    const defDepth = sensor.depth ?? range[0]
     html += `
       <div class="config-section">
-        <div class="config-section-title">Profondeurs d'installation</div>
-        ${depths.map((d, i) => `
-          <div class="form-row">
-            <label>Capteur ${i+1}</label>
-            <div style="display:flex;align-items:center;gap:6px">
-              <input type="number" class="inline-edit" value="${d}" step="5" min="0" max="300" style="width:70px">
-              <span style="font-size:12px;color:var(--txt2)">cm</span>
-            </div>
+        <div class="config-section-title">Profondeur d'installation</div>
+        <div style="font-size:12px;color:var(--txt2);margin-bottom:8px">
+          Ce modèle peut être installé de ${range[0]} à ${range[1]} cm.
+        </div>
+        <div class="form-row">
+          <label>Profondeur</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" id="chp-depth-input" class="inline-edit" value="${defDepth}" step="5" min="${range[0]}" max="${range[1]}" style="width:70px">
+            <span style="font-size:12px;color:var(--txt2)">cm</span>
           </div>
-        `).join('')}
+        </div>
         <button class="action-btn" style="margin-top:6px" onclick="showToastConfig()"><i class="bi bi-check-lg"></i> Enregistrer</button>
       </div>
     `

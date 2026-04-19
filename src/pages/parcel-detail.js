@@ -45,32 +45,31 @@ const METRICS_BY_MODEL = {
     { id: 'dpv',      name: 'DPV',          unit: 'kPa',color: '#a8d8b0', base: () => rndf(0.1, 2.5) },
   ],
   'CHP-15/30': [
-    { id: 'sol15', name: 'Hum. sol 15 cm', unit: '%vol', color: '#d4a843', base: () => rnd(15, 45) },
-    { id: 'sol30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#b88a2c', base: () => rnd(15, 45) },
-    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CHP-30/60': [
-    { id: 'sol30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#b88a2c', base: () => rnd(15, 45) },
-    { id: 'sol60', name: 'Hum. sol 60 cm', unit: '%vol', color: '#9a7015', base: () => rnd(18, 42) },
-    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CHP-60/90': [
-    { id: 'sol60', name: 'Hum. sol 60 cm', unit: '%vol', color: '#9a7015', base: () => rnd(18, 42) },
-    { id: 'sol90', name: 'Hum. sol 90 cm', unit: '%vol', color: '#7c5800', base: () => rnd(20, 40) },
-    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CAPA-30-3': [
-    { id: 'tensio30', name: 'Tension 30 cm', unit: 'cbar', color: '#98d8c8', base: () => rnd(10, 80) },
-    { id: 'tensio60', name: 'Tension 60 cm', unit: 'cbar', color: '#78b8a8', base: () => rnd(10, 80) },
-    { id: 'tensio90', name: 'Tension 90 cm', unit: 'cbar', color: '#589888', base: () => rnd(10, 80) },
+    { id: 'vwc10', name: 'Hum. sol 10 cm', unit: '%vol', color: '#f0cc60', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Hum. sol 20 cm', unit: '%vol', color: '#c89c30', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#a07010', base: () => rnd(15, 45) },
+    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
   ],
   'CAPA-60-6': [
-    { id: 'tensio30',  name: 'Tension 30 cm',  unit: 'cbar', color: '#98d8c8', base: () => rnd(10, 80) },
-    { id: 'tensio60',  name: 'Tension 60 cm',  unit: 'cbar', color: '#78b8a8', base: () => rnd(10, 80) },
-    { id: 'tensio90',  name: 'Tension 90 cm',  unit: 'cbar', color: '#589888', base: () => rnd(10, 80) },
-    { id: 'tensio120', name: 'Tension 120 cm', unit: 'cbar', color: '#387868', base: () => rnd(10, 80) },
-    { id: 'tensio150', name: 'Tension 150 cm', unit: 'cbar', color: '#185848', base: () => rnd(10, 80) },
-    { id: 'tensio180', name: 'Tension 180 cm', unit: 'cbar', color: '#003828', base: () => rnd(10, 80) },
+    { id: 'vwc10', name: 'Hum. sol 10 cm', unit: '%vol', color: '#f0d070', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Hum. sol 20 cm', unit: '%vol', color: '#d8b050', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#c09030', base: () => rnd(15, 45) },
+    { id: 'vwc40', name: 'Hum. sol 40 cm', unit: '%vol', color: '#a87010', base: () => rnd(17, 43) },
+    { id: 'vwc50', name: 'Hum. sol 50 cm', unit: '%vol', color: '#905200', base: () => rnd(18, 42) },
+    { id: 'vwc60', name: 'Hum. sol 60 cm', unit: '%vol', color: '#783400', base: () => rnd(18, 42) },
+    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
   ],
   'T_MINI': [
     { id: 'tmin', name: 'Temp. min', unit: '°C', color: '#90b0e0', base: () => rnd(-2, 15), cumul: { label: 'Heures de froid', unit: 'h' } },
@@ -94,8 +93,8 @@ const METRICS_BY_MODEL = {
   ],
 }
 
-// Metrics that are "tensiometers" — no conflict check on add
-const TENSIO_MODELS = ['CAPA-30-3', 'CAPA-60-6']
+// CHP tensiometers: multiple can coexist on the same parcel — skip conflict check
+const TENSIO_MODELS = ['CHP-15/30', 'CHP-30/60', 'CHP-60/90']
 
 const ALL_INTEGRATIONS = [
   'Modèles Arvalis — PRÉVI-LIS / MILÉOS', 'Xarvio', 'Pixagri', 'VitiMeteo',
@@ -843,7 +842,11 @@ function renderLinkedSensors() {
   if (linked.length === 0) {
     html += `<div class="panel-empty" style="margin-bottom:8px">Aucun capteur lié</div>`
   } else {
-    html += linked.map(s => `
+    // Group CHP sensors by depth for display
+    const chps = linked.filter(s => TENSIO_MODELS.includes(s.model))
+    const others = linked.filter(s => !TENSIO_MODELS.includes(s.model))
+
+    html += others.map(s => `
       <div class="sensor-linked-row">
         <a href="capteur-detail.html?id=${s.id}" class="sensor-link-model">${s.model}</a>
         <span class="sensor-link-serial">${s.serial}</span>
@@ -852,6 +855,29 @@ function renderLinkedSensors() {
         </button>
       </div>
     `).join('')
+
+    if (chps.length > 0) {
+      // Group by depth
+      const byDepth = {}
+      chps.forEach(s => {
+        const d = s.depth != null ? `${s.depth} cm` : s.model
+        if (!byDepth[d]) byDepth[d] = []
+        byDepth[d].push(s)
+      })
+      html += `<div style="font-size:11px;font-weight:600;color:var(--txt2);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">Tensiomètres par horizon</div>`
+      Object.entries(byDepth).forEach(([depth, sensors]) => {
+        html += `<div style="font-size:11px;color:var(--txt2);margin:4px 0 2px">— ${depth}</div>`
+        html += sensors.map(s => `
+          <div class="sensor-linked-row" style="padding-left:12px">
+            <a href="capteur-detail.html?id=${s.id}" class="sensor-link-model">${s.model}</a>
+            <span class="sensor-link-serial">${s.serial}</span>
+            <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+        `).join('')
+      })
+    }
   }
 
   if (available.length > 0) {
@@ -906,17 +932,7 @@ function renderLinkedSensors() {
           if (!ok) return
         }
       } else {
-        // Tensiometer: ask for depth info
-        const depths = prompt(
-          `Profondeur(s) d'installation du ${sensor.model} (ex : 30, 60, 90 cm) :`,
-          '30, 60, 90'
-        )
-        if (depths === null) return
-        // Store depth info alongside the sensor
-        const extra = getParcel(parcelId)
-        const tensioDepths = extra.tensioDepths || {}
-        tensioDepths[id] = depths
-        patchParcel(parcelId, { tensioDepths })
+        // CHP tensiometer: depth is configured on the sensor itself, nothing to prompt
       }
 
       saveState({ linkedSensorIds: [...parcelState.linkedSensorIds, id] })
