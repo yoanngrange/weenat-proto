@@ -26,11 +26,9 @@ const ALWAYS_METRICS = [
 
 const METRICS_BY_MODEL = {
   'P+':       [
-    { id: 'pluie',       name: 'Pluie',       unit: 'mm',   color: '#45b7d1', base: () => rnd(0, 8),    cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
-    { id: 'temp',        name: 'Température', unit: '°C',   color: '#e07050', base: () => rnd(10, 28),  cumul: { label: 'DJC',        unit: '°j' } },
-    { id: 'humidite',    name: 'Humidité air', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90)  },
-    { id: 'vent',        name: 'Vent',         unit: 'km/h', color: '#7bc4b0', base: () => rnd(0, 35)  },
-    { id: 'dpv',         name: 'DPV',          unit: 'kPa',  color: '#a8d8b0', base: () => rndf(0.1, 2.5) },
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'humidite', name: 'Humidité air', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
   ],
   'PT': [
     { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
@@ -81,8 +79,10 @@ const METRICS_BY_MODEL = {
     { id: 'tgel', name: 'Temp. feuille', unit: '°C', color: '#a0d8a0', base: () => rnd(-3, 12), cumul: { label: 'Heures de gel', unit: 'h' } },
   ],
   'W': [
-    { id: 'vent',     name: 'Vent – vitesse', unit: 'km/h', color: '#7bc4b0', base: () => rnd(0, 40) },
-    { id: 'rafales',  name: 'Vent – rafales', unit: 'km/h', color: '#5aa490', base: () => rnd(5, 60) },
+    { id: 'vent',          name: 'Vent – vitesse',           unit: 'km/h', color: '#7bc4b0', base: () => rnd(0, 40)  },
+    { id: 'dir',           name: 'Vent – direction',         unit: '°',    color: '#3a8070', base: () => rnd(0, 360) },
+    { id: 'rafales',       name: 'Vent – rafales',           unit: 'km/h', color: '#5aa490', base: () => rnd(5, 60)  },
+    { id: 'dir_rafales',   name: 'Vent – direction rafales', unit: '°',    color: '#1a6050', base: () => rnd(0, 360) },
   ],
   'EC': [
     { id: 'ec',   name: 'Conductivité', unit: 'mS/cm', color: '#f0a030', base: () => rndf(0.1, 3) },

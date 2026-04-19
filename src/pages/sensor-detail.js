@@ -17,9 +17,10 @@ const METRIC_DEFS = {
   temperature:      { name: 'Température',          unit: '°C',        color: '#e07050', baseVal: () => rnd(10, 28),   cumul: { label: 'Degrés-jours (DJC)', unit: '°j'  } },
   humidite_air:     { name: 'Humidité air',         unit: '%',         color: '#4ecdc4', baseVal: () => rnd(40, 90)   },
   dpv:              { name: 'DPV',                  unit: 'kPa',       color: '#a8d8b0', baseVal: () => rndf(0.1, 2.5) },
-  vent_vitesse:     { name: 'Vent – vitesse',       unit: 'km/h',      color: '#7bc4b0', baseVal: () => rnd(0, 40)    },
-  vent_rafales:     { name: 'Vent – rafales',       unit: 'km/h',      color: '#5aa490', baseVal: () => rnd(5, 60)    },
-  vent_direction:   { name: 'Direction vent',       unit: '°',         color: '#3a8070', baseVal: () => rnd(0, 360)   },
+  vent_vitesse:            { name: 'Vent – vitesse',            unit: 'km/h', color: '#7bc4b0', baseVal: () => rnd(0, 40)   },
+  vent_rafales:            { name: 'Vent – rafales',            unit: 'km/h', color: '#5aa490', baseVal: () => rnd(5, 60)   },
+  vent_direction:          { name: 'Vent – direction',          unit: '°',    color: '#3a8070', baseVal: () => rnd(0, 360)  },
+  vent_direction_rafales:  { name: 'Vent – direction rafales',  unit: '°',    color: '#1a6050', baseVal: () => rnd(0, 360)  },
   rayonnement:      { name: 'Rayonnement',          unit: 'W/m²',      color: '#f5c842', baseVal: () => rnd(0, 900),   cumul: { label: 'Énergie', unit: 'Wh/m²' } },
   etp:              { name: 'ETP',                  unit: 'mm/j',      color: '#c090e0', baseVal: () => rndf(0.5, 5),  cumul: { label: 'Cumul ETP', unit: 'mm' } },
   temperature_min:  { name: 'Température min',      unit: '°C',        color: '#90b0e0', baseVal: () => rnd(-2, 15),   cumul: { label: 'Heures de froid', unit: 'h' } },
@@ -52,18 +53,18 @@ const METRIC_DEFS = {
 }
 
 const METRICS_BY_MODEL = {
-  'P+':       ['pluie', 'temperature', 'humidite_air', 'dpv', 'vent_vitesse', 'vent_rafales', 'rayonnement', 'etp'],
+  'P+':       ['pluie', 'temperature', 'humidite_air'],
   'PT':       ['pluie', 'temperature'],
   'P':        ['pluie'],
   'TH':       ['temperature', 'humidite_air', 'dpv', 'temp_rosee'],
   'T_MINI':   ['temperature_min'],
-  'W':        ['vent_vitesse', 'vent_rafales', 'vent_direction'],
+  'W':        ['vent_vitesse', 'vent_direction', 'vent_rafales', 'vent_direction_rafales'],
   'CHP-15/30': ['potentiel_hydrique', 'temp_sol'],
   'CHP-30/60': ['potentiel_hydrique', 'temp_sol'],
   'CHP-60/90': ['humidite_sol_60', 'humidite_sol_90', 'temp_sol'],
   'CAPA-30-3': ['_capa_vwc', '_capa_temp'],
   'CAPA-60-6': ['_capa_vwc', '_capa_temp'],
-  'EC':       ['humidite_sol_15', 'temp_sol', 'conductivite'],
+  'EC':       ['humidite_sol_30', 'temp_sol', 'conductivite'],
   'LWS':      ['_lws_intensite', '_lws_duree'],
   'PYRANO':   ['rayonnement'],
   'PAR':      ['par'],
@@ -165,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function renderLatestStrip() {
   const container = document.getElementById('latest-strip')
+  if (!container) return
   const metrics   = getMetrics(sensor)
 
   metrics.forEach(m => {
@@ -597,8 +599,8 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
       const v = base * (0.6 + sf * 0.8) * n()
       return Math.max(0, v)
     }
-    case 'vent_direction': {
-      // Wind direction: slow wander
+    case 'vent_direction':
+    case 'vent_direction_rafales': {
       return (base + (Math.random() - 0.5) * 60 + 360) % 360
     }
     default:
