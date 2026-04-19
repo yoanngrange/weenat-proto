@@ -8,10 +8,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-    <script type="module" crossorigin src="/weenat-proto/assets/aide-Cd8kiJJN.js"></script>
-    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-CTHWNdRj.js">
+    <script type="module" crossorigin src="/weenat-proto/assets/aide-BeZcHhN0.js"></script>
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-DdpHcqUd.js">
     <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
-    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CqZvGAmD.css">
+    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CaE-y60m.css">
   </head>
   <body>
     <div id="app">
@@ -86,8 +86,30 @@
                 Besoin d'aide ? Consultez le centre d'aide
               </a>
             </section>
+            <section class="account-section">
+              <button class="help-chat-btn" id="help-chat-btn">
+                <i class="bi bi-chat-dots-fill"></i>
+                Discuter avec le bot
+              </button>
+            </section>
           </div>
         </main>
+      </div>
+    </div>
+    <div class="help-chat-overlay hidden" id="help-chat-overlay">
+      <div class="help-chat-panel">
+        <div class="help-chat-hd">
+          <i class="bi bi-chat-dots-fill"></i>
+          Assistant Weenat
+          <button class="help-chat-hd-close" id="help-chat-close" aria-label="Fermer">×</button>
+        </div>
+        <div class="help-chat-messages" id="help-chat-messages">
+          <div class="help-chat-msg bot">Bonjour ! Je suis l'assistant Weenat. Comment puis-je vous aider ?</div>
+        </div>
+        <div class="help-chat-ft">
+          <input class="help-chat-input" id="help-chat-input" type="text" placeholder="Posez votre question…" />
+          <button class="help-chat-send" id="help-chat-send"><i class="bi bi-send-fill"></i></button>
+        </div>
       </div>
     </div>
     <script src="/src/js/menu-switch.js"></script>
