@@ -44,31 +44,35 @@ const MODEL_METRICS_PARCEL = {
   'P+':        ['pluie', 'temp', 'humidite'],
   'TH':        ['temp', 'humidite'],
   'T_MINI':    ['temp-sol'],
-  'T_GEL':     ['temp-gel'],
+  'T_GEL':     ['temp-seche', 'temp-humide'],
   'W':         ['vent'],
   'PYRANO':    ['rayonnement'],
   'PAR':       ['rayonnement'],
   'LWS':       ['humectation'],
-  'CHP-15/30': ['humidite-sol'],
-  'CHP-30/60': ['humidite-sol'],
-  'CHP-60/90': ['humidite-sol'],
-  'CAPA-30-3': ['humidite-sol'],
-  'CAPA-60-6': ['humidite-sol'],
+  'CHP-15/30': ['potentiel-hydrique', 'temp-sol'],
+  'CHP-30/60': ['potentiel-hydrique', 'temp-sol'],
+  'CHP-60/90': ['potentiel-hydrique', 'temp-sol'],
+  'CAPA-30-3': ['teneur-eau', 'temp-sol'],
+  'CAPA-60-6': ['teneur-eau', 'temp-sol'],
   'SMV':       ['humidite-sol'],
-  'EC':        [],
+  'EC':        ['conductivite'],
 }
 
 // Labels des métriques parcel (ordre d'affichage dans le sélecteur)
 const PARCEL_METRIC_OPTIONS = {
-  'pluie':        'Pluie',
-  'temp':         'Température air',
-  'humidite':     'Humidité air',
-  'humidite-sol': 'Humidité sol',
-  'vent':         'Vent',
-  'rayonnement':  'Rayonnement',
-  'temp-sol':     'Temp. sol',
-  'temp-gel':     'Temp. gel',
-  'humectation':  'Humectation foliaire',
+  'pluie':             'Pluie',
+  'temp':              'Température air',
+  'humidite':          'Humidité air',
+  'vent':              'Vent',
+  'rayonnement':       'Rayonnement',
+  'humectation':       'Humectation foliaire',
+  'potentiel-hydrique':'Potentiel hydrique',
+  'teneur-eau':        'Teneur en eau sol',
+  'humidite-sol':      'Humidité sol',
+  'temp-sol':          'Température sol',
+  'temp-seche':        'Température sèche',
+  'temp-humide':       'Température humide',
+  'conductivite':      'Conductivité électrique',
 }
 
 const metricAggregates = {
@@ -132,6 +136,32 @@ const metricAggregates = {
     { value: 'today', label: "Aujourd'hui" },
     { value: '7jours', label: '7 jours' },
     { value: '30jours', label: '30 jours' }
+  ],
+  'potentiel-hydrique': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+  ],
+  'teneur-eau': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+  ],
+  'temp-seche': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' }
+  ],
+  'temp-humide': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' }
+  ],
+  'conductivite': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
   ]
 }
 
@@ -968,12 +998,56 @@ function computeMetricValue(parcel, metric, aggregate) {
     }
   }
 
-  if (metric === 'temp-gel') {
+  if (metric === 'temp-seche') {
     const base = Math.round(-1 + parcel.degresJour / 300)
     switch (aggregate) {
       case 'reel': return base + noise
       case 'min-jour': return base - 2 + noise
       case 'max-jour': return base + 3 + noise
+      default: return base
+    }
+  }
+
+  if (metric === 'temp-humide') {
+    const base = Math.round(-3 + parcel.degresJour / 320)
+    switch (aggregate) {
+      case 'reel': return base + noise
+      case 'min-jour': return base - 2 + noise
+      case 'max-jour': return base + 2 + noise
+      default: return base
+    }
+  }
+
+  if (metric === 'potentiel-hydrique') {
+    // kPa : 0 = saturé, -1500 = point de flétrissement
+    const base = -Math.round(20 + (100 - parcel.reserveHydrique) * 8 + (parcel.id % 40))
+    switch (aggregate) {
+      case 'reel': return base + noise * 5
+      case 'min-jour': return base + 15 + noise * 3
+      case 'max-jour': return base - 20 + noise * 5
+      case 'moyenne-7': return base + 5 + noise * 2
+      default: return base
+    }
+  }
+
+  if (metric === 'teneur-eau') {
+    // m³/m³ exprimé en %, typiquement 10–45%
+    const base = Math.min(45, Math.max(10, Math.round(parcel.reserveHydrique * 0.4 + 10)))
+    switch (aggregate) {
+      case 'reel': return Math.min(45, Math.max(5, base + noise))
+      case 'min-jour': return Math.max(5, base - 8 + noise)
+      case 'max-jour': return Math.min(45, base + 5 + noise)
+      case 'moyenne-7': return Math.min(45, Math.max(5, base - 2 + noise * 0.3))
+      default: return base
+    }
+  }
+
+  if (metric === 'conductivite') {
+    // dS/m
+    const base = +(0.5 + (parcel.id % 20) * 0.07).toFixed(1)
+    switch (aggregate) {
+      case 'reel': return +(base + noise * 0.05).toFixed(1)
+      case 'moyenne-7': return +(base + noise * 0.02).toFixed(1)
       default: return base
     }
   }
@@ -1017,8 +1091,12 @@ function getMetricUnit(metric) {
   if (metric === 'rayonnement') return 'W/m²'
   if (metric === 'humidite-sol') return '%'
   if (metric === 'temp-sol') return '°C'
-  if (metric === 'temp-gel') return '°C'
+  if (metric === 'temp-seche') return '°C'
+  if (metric === 'temp-humide') return '°C'
   if (metric === 'humectation') return 'h'
+  if (metric === 'potentiel-hydrique') return 'kPa'
+  if (metric === 'teneur-eau') return '%'
+  if (metric === 'conductivite') return 'dS/m'
   return ''
 }
 
@@ -1078,7 +1156,7 @@ function getMetricColor(parcel, metric) {
     return '#24B066'
   }
 
-  if (metric === 'temp-sol' || metric === 'temp-gel') {
+  if (metric === 'temp-sol' || metric === 'temp-seche' || metric === 'temp-humide') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
     if (v < 5) return '#74b9ff'
     if (v < 15) return '#f39c12'
@@ -1090,6 +1168,28 @@ function getMetricColor(parcel, metric) {
     if (v < 2) return '#74b9ff'
     if (v < 6) return '#f39c12'
     return '#0984e3'
+  }
+
+  if (metric === 'potentiel-hydrique') {
+    // Plus négatif = plus sec
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < -300) return '#E05252'
+    if (v < -100) return '#FBAF05'
+    return '#24B066'
+  }
+
+  if (metric === 'teneur-eau') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 15) return '#E05252'
+    if (v < 30) return '#FBAF05'
+    return '#24B066'
+  }
+
+  if (metric === 'conductivite') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v > 1.5) return '#E05252'
+    if (v > 0.8) return '#FBAF05'
+    return '#24B066'
   }
 
   return '#0172A4'
