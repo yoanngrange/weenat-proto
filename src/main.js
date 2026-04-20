@@ -54,7 +54,7 @@ const MODEL_METRICS = {
   'CHP-60/90': ['potentiel-hydrique', 'temp-sol'],
   'CAPA-30-3': ['teneur-eau', 'temp-sol'],
   'CAPA-60-6': ['teneur-eau', 'temp-sol'],
-  'SMV':       ['humidite-sol'],
+  'SMV':       ['pluie', 'temp', 'humidite'],
   'EC':        ['conductivite'],
 }
 
@@ -1326,9 +1326,9 @@ const EVENT_ICONS = {
 function computeSensorValue(sensor, metric, aggregate) {
   const n = (seed) => Math.round(Math.sin(sensor.id * 1.9 + seed) * 3)
 
-  const PLUIE_MODELS   = new Set(['P', 'PT', 'P+'])
-  const TEMP_MODELS    = new Set(['TH', 'PT', 'P+'])
-  const HUM_MODELS     = new Set(['TH', 'PT', 'P+'])
+  const PLUIE_MODELS   = new Set(['P', 'PT', 'P+', 'SMV'])
+  const TEMP_MODELS    = new Set(['TH', 'PT', 'P+', 'SMV'])
+  const HUM_MODELS     = new Set(['TH', 'PT', 'P+', 'SMV'])
   const VENT_MODELS    = new Set(['W', 'PT', 'P+'])
   const RAY_MODELS     = new Set(['PYRANO', 'PAR'])
   const CHP_MODELS     = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90'])
@@ -1364,12 +1364,6 @@ function computeSensorValue(sensor, metric, aggregate) {
     const base = 200 + (sensor.id % 300)
     const vals = { reel: base + n(1) * 10, today: base * 3 + n(2) * 50, '7jours': base * 20 + n(3) * 100 }
     return [vals[aggregate] ?? base, 'Wh/m²']
-  }
-  if (metric === 'humidite-sol') {
-    if (sensor.model !== 'SMV') return null
-    const base = 30 + (sensor.id % 50)
-    const vals = { reel: Math.min(100, base + n(1)), 'min-jour': Math.max(5, base - 15 + n(2)), 'max-jour': Math.min(100, base + 10 + n(3)), 'moyenne-7': Math.min(100, base - 3 + n(4)) }
-    return [vals[aggregate] ?? base, '%']
   }
   if (metric === 'potentiel-hydrique') {
     if (!CHP_MODELS.has(sensor.model)) return null
