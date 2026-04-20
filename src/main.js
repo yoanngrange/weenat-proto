@@ -68,7 +68,6 @@ const METRIC_LABELS = {
   'humectation':       'Humectation foliaire',
   'potentiel-hydrique':'Potentiel hydrique',
   'teneur-eau':        'Teneur en eau sol',
-  'humidite-sol':      'Humidité sol',
   'temp-sol':          'Température sol',
   'temp-seche':        'Température sèche',
   'temp-humide':       'Température humide',
@@ -114,12 +113,6 @@ const metricAggregates = {
     { value: 'reel', label: 'Temps réel' },
     { value: 'today', label: "Aujourd'hui (cumul)" },
     { value: '7jours', label: '7 jours (cumul)' }
-  ],
-  'humidite-sol': [
-    { value: 'reel', label: 'Temps réel' },
-    { value: 'min-jour', label: 'Min du jour' },
-    { value: 'max-jour', label: 'Max du jour' },
-    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
   ],
   'temp-sol': [
     { value: 'reel', label: 'Temps réel' },
@@ -980,16 +973,6 @@ function computeMetricValue(parcel, metric, aggregate) {
     }
   }
 
-  if (metric === 'humidite-sol') {
-    const base = Math.min(100, Math.max(5, parcel.reserveHydrique))
-    switch (aggregate) {
-      case 'reel': return Math.min(100, Math.max(5, base + noise))
-      case 'min-jour': return Math.max(5, base - 12 + noise)
-      case 'max-jour': return Math.min(100, base + 8 + noise)
-      case 'moyenne-7': return Math.min(100, Math.max(5, base - 3 + noise * 0.3))
-      default: return base
-    }
-  }
 
   if (metric === 'temp-sol') {
     const base = Math.round(8 + parcel.degresJour / 160)
@@ -1093,7 +1076,6 @@ function getMetricUnit(metric) {
   if (metric === 'ru') return '%'
   if (metric === 'vent') return 'km/h'
   if (metric === 'rayonnement') return 'W/m²'
-  if (metric === 'humidite-sol') return '%'
   if (metric === 'temp-sol') return '°C'
   if (metric === 'temp-seche') return '°C'
   if (metric === 'temp-humide') return '°C'
@@ -1153,12 +1135,6 @@ function getMetricColor(parcel, metric) {
     return '#e07050'
   }
 
-  if (metric === 'humidite-sol') {
-    const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 30) return '#E05252'
-    if (v < 60) return '#FBAF05'
-    return '#24B066'
-  }
 
   if (metric === 'temp-sol' || metric === 'temp-seche' || metric === 'temp-humide') {
     const v = computeMetricValue(parcel, metric, currentAggregate)

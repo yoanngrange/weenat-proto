@@ -5,17 +5,17 @@ import { plots } from '../data/plots.js'
 const ALERTS_ADMIN = [
   { id: 1, name: 'Pluie forte > 10 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
   { id: 2, name: 'Gel précoce < 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [3] },
-  { id: 3, name: 'Humidité sol critique', statut: 'inactif', metric: 'humidite-sol', created: '2026-02-20', lastTriggered: null, sensorIds: [5], parcelIds: [4, 5] },
+  { id: 3, name: 'Teneur en eau critique', statut: 'inactif', metric: 'teneur-eau', created: '2026-02-20', lastTriggered: null, sensorIds: [5], parcelIds: [4, 5] },
   { id: 4, name: 'Vent violent > 80 km/h', statut: 'actif', metric: 'vent', created: '2025-09-01', lastTriggered: '2026-02-28', sensorIds: [1, 4], parcelIds: [] },
   { id: 5, name: 'Rayonnement faible', statut: 'inactif', metric: 'rayonnement', created: '2026-03-01', lastTriggered: null, sensorIds: [], parcelIds: [1] },
   { id: 6, name: 'DPV élevé > 2 kPa', statut: 'actif', metric: 'temperature', created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2], parcelIds: [2, 3] },
-  { id: 7, name: 'Potentiel hydrique > 100 kPa', statut: 'actif', metric: 'humidite-sol', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6], parcelIds: [6] },
+  { id: 7, name: 'Potentiel hydrique > 100 kPa', statut: 'actif', metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6], parcelIds: [6] },
 ]
 
 const ALERTS_ADHERENT = [
   { id: 1, name: 'Gel précoce < 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-15', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [1] },
   { id: 2, name: 'Pluie forte > 15 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-20', lastTriggered: '2026-04-10', sensorIds: [1], parcelIds: [2] },
-  { id: 3, name: 'Humidité sol basse < 30%', statut: 'inactif', metric: 'humidite-sol', created: '2026-03-05', lastTriggered: null, sensorIds: [5], parcelIds: [] },
+  { id: 3, name: 'Teneur en eau basse < 30%', statut: 'inactif', metric: 'teneur-eau', created: '2026-03-05', lastTriggered: null, sensorIds: [5], parcelIds: [] },
 ]
 
 const ALERTS = (localStorage.getItem('menuRole') === 'adherent-reseau') ? ALERTS_ADHERENT : ALERTS_ADMIN
@@ -27,8 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 
 const METRIC_LABELS = {
-  'pluie': 'Pluie', 'temperature': 'Température', 'humidite-sol': 'Humidité sol',
-  'vent': 'Vent', 'rayonnement': 'Rayonnement', 'humidite': 'Humidité air',
+  'pluie': 'Pluie', 'temperature': 'Température', 'teneur-eau': 'Teneur en eau sol',
+  'potentiel-hydrique': 'Potentiel hydrique', 'vent': 'Vent', 'rayonnement': 'Rayonnement',
+  'humidite': 'Humidité air',
 }
 
 let selectedStatuts = []
