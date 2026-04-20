@@ -776,40 +776,18 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         if (!parcel) return
 
         const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
-
-        if (!sensorVal) {
-          // Le capteur ne mesure pas cette métrique : point discret, pas de tooltip
-          const circle = L.circleMarker([parcel.lat, parcel.lng], {
-            radius: 4, color: '#888', fillColor: '#bbb', fillOpacity: 0.45, weight: 1
-          }).addTo(map)
-          circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
-          markers.push(circle)
-          return
-        }
-
-        const valText  = `${sensorVal[0]} ${sensorVal[1]}`
         const eventStr = sensor.event ? `<br><span style="color:var(--warn)">⚠ ${sensor.event}</span>` : ''
+        const valLine = sensorVal ? `<br>${sensorVal[0]} ${sensorVal[1]}` : ''
 
         const circle = L.circleMarker([parcel.lat, parcel.lng], {
           radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
         }).addTo(map)
         circle.bindTooltip(
-          `<strong>${sensor.serial} · ${sensor.model}</strong><br>${valText}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
+          `<strong>${sensor.serial} · ${sensor.model}</strong>${valLine}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
           { sticky: true, opacity: 0.95 }
         )
         circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
         markers.push(circle)
-
-        const label = L.marker([parcel.lat, parcel.lng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
-            iconSize: [0, 0],
-            iconAnchor: [0, 24],
-          }),
-          interactive: false,
-        }).addTo(map)
-        markers.push(label)
       })
     }
   }
