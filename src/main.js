@@ -37,6 +37,40 @@ const pageType = (() => {
   return ''
 })()
 
+// Mapping modèle → métriques disponibles au niveau parcelle
+const MODEL_METRICS_PARCEL = {
+  'P':         ['pluie'],
+  'PT':        ['pluie', 'temp', 'humidite'],
+  'P+':        ['pluie', 'temp', 'humidite'],
+  'TH':        ['temp', 'humidite'],
+  'T_MINI':    ['temp-sol'],
+  'T_GEL':     ['temp-gel'],
+  'W':         ['vent'],
+  'PYRANO':    ['rayonnement'],
+  'PAR':       ['rayonnement'],
+  'LWS':       ['humectation'],
+  'CHP-15/30': ['humidite-sol'],
+  'CHP-30/60': ['humidite-sol'],
+  'CHP-60/90': ['humidite-sol'],
+  'CAPA-30-3': ['humidite-sol'],
+  'CAPA-60-6': ['humidite-sol'],
+  'SMV':       ['humidite-sol'],
+  'EC':        [],
+}
+
+// Labels des métriques parcel (ordre d'affichage dans le sélecteur)
+const PARCEL_METRIC_OPTIONS = {
+  'pluie':        'Pluie',
+  'temp':         'Température air',
+  'humidite':     'Humidité air',
+  'humidite-sol': 'Humidité sol',
+  'vent':         'Vent',
+  'rayonnement':  'Rayonnement',
+  'temp-sol':     'Temp. sol',
+  'temp-gel':     'Temp. gel',
+  'humectation':  'Humectation foliaire',
+}
+
 const metricAggregates = {
   pluie: [
     { value: 'today', label: "Aujourd'hui" },
@@ -82,6 +116,22 @@ const metricAggregates = {
     { value: 'min-jour', label: 'Min du jour' },
     { value: 'max-jour', label: 'Max du jour' },
     { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+  ],
+  'temp-sol': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+  ],
+  'temp-gel': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' }
+  ],
+  'humectation': [
+    { value: 'today', label: "Aujourd'hui" },
+    { value: '7jours', label: '7 jours' },
+    { value: '30jours', label: '30 jours' }
   ]
 }
 
@@ -572,6 +622,36 @@ function updateBreadcrumb() {
   titleEl.textContent = meta.title
 }
 
+// Calcule les métriques disponibles pour les parcelles visibles (via capteurs liés)
+function getAvailableParcelMetrics(parcels) {
+  const available = new Set()
+  parcels.forEach(parcel => {
+    sensors.filter(s => s.parcelId === parcel.id).forEach(s => {
+      ;(MODEL_METRICS_PARCEL[s.model] || []).forEach(m => available.add(m))
+    })
+  })
+  return Object.keys(PARCEL_METRIC_OPTIONS).filter(m => available.has(m))
+}
+
+// Peuple dynamiquement le sélecteur de métrique sur les pages parcelles
+function updateMetricSelector(parcels) {
+  const sel = document.getElementById('metric-selector')
+  if (!sel || !pageType.startsWith('parcelles')) return
+
+  const available = getAvailableParcelMetrics(parcels)
+  if (available.length === 0) return
+
+  sel.innerHTML = available
+    .map(m => `<option value="${m}">${PARCEL_METRIC_OPTIONS[m]}</option>`)
+    .join('')
+
+  if (!available.includes(currentMetric)) {
+    currentMetric = available[0]
+  }
+  sel.value = currentMetric
+  updateAggregateOptions()
+}
+
 // Update content based on role and section
 function updateContent() {
   updateBreadcrumb()
@@ -580,6 +660,8 @@ function updateContent() {
   if (metricControls) metricControls.style.display = currentView === 'admin' ? 'none' : ''
 
   const { parcels: filteredParcels, sensors: filteredSensors } = getFilteredData()
+
+  updateMetricSelector(filteredParcels)
 
   if (currentView === 'map') {
     updateMap(filteredParcels, filteredSensors)
@@ -657,32 +739,43 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
     if (currentView === 'map') {
       filteredSensors.forEach(sensor => {
         const parcel = plots.find(p => p.id === sensor.parcelId)
-        if (parcel) {
-          const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
-          const valText   = sensorVal ? `${sensorVal[0]} ${sensorVal[1]}` : `${sensor.networkQuality}%`
-          const eventStr  = sensor.event ? `<br><span style="color:var(--warn)">⚠ ${sensor.event}</span>` : ''
+        if (!parcel) return
 
+        const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
+
+        if (!sensorVal) {
+          // Le capteur ne mesure pas cette métrique : point discret, pas de tooltip
           const circle = L.circleMarker([parcel.lat, parcel.lng], {
-            radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
+            radius: 4, color: '#888', fillColor: '#bbb', fillOpacity: 0.45, weight: 1
           }).addTo(map)
-          circle.bindTooltip(
-            `<strong>${sensor.serial} · ${sensor.model}</strong><br>${valText}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
-            { sticky: true, opacity: 0.95 }
-          )
           circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
           markers.push(circle)
-
-          const label = L.marker([parcel.lat, parcel.lng], {
-            icon: L.divIcon({
-              className: '',
-              html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
-              iconSize: [0, 0],
-              iconAnchor: [0, 24],
-            }),
-            interactive: false,
-          }).addTo(map)
-          markers.push(label)
+          return
         }
+
+        const valText  = `${sensorVal[0]} ${sensorVal[1]}`
+        const eventStr = sensor.event ? `<br><span style="color:var(--warn)">⚠ ${sensor.event}</span>` : ''
+
+        const circle = L.circleMarker([parcel.lat, parcel.lng], {
+          radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
+        }).addTo(map)
+        circle.bindTooltip(
+          `<strong>${sensor.serial} · ${sensor.model}</strong><br>${valText}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
+          { sticky: true, opacity: 0.95 }
+        )
+        circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
+        markers.push(circle)
+
+        const label = L.marker([parcel.lat, parcel.lng], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
+            iconSize: [0, 0],
+            iconAnchor: [0, 24],
+          }),
+          interactive: false,
+        }).addTo(map)
+        markers.push(label)
       })
     }
   }
@@ -832,6 +925,69 @@ function computeMetricValue(parcel, metric, aggregate) {
     return parcel.reserveHydrique
   }
 
+  if (metric === 'vent') {
+    const base = 8 + (parcel.id % 18)
+    switch (aggregate) {
+      case 'reel': return Math.max(0, base + noise)
+      case 'max-jour': return Math.max(0, base + 12 + noise)
+      case 'moyenne-7': return Math.max(0, base + 3 + noise * 0.5)
+      case 'moyenne-30': return Math.max(0, base + 1 + noise * 0.3)
+      default: return base
+    }
+  }
+
+  if (metric === 'rayonnement') {
+    const base = 150 + parcel.degresJour / 5
+    switch (aggregate) {
+      case 'reel': return Math.round(base + noise * 15)
+      case 'today': return Math.round(base * 3 + noise * 50)
+      case '7jours': return Math.round(base * 18 + noise * 80)
+      default: return Math.round(base)
+    }
+  }
+
+  if (metric === 'humidite-sol') {
+    const base = Math.min(100, Math.max(5, parcel.reserveHydrique))
+    switch (aggregate) {
+      case 'reel': return Math.min(100, Math.max(5, base + noise))
+      case 'min-jour': return Math.max(5, base - 12 + noise)
+      case 'max-jour': return Math.min(100, base + 8 + noise)
+      case 'moyenne-7': return Math.min(100, Math.max(5, base - 3 + noise * 0.3))
+      default: return base
+    }
+  }
+
+  if (metric === 'temp-sol') {
+    const base = Math.round(8 + parcel.degresJour / 160)
+    switch (aggregate) {
+      case 'reel': return base + noise
+      case 'min-jour': return base - 3 + noise
+      case 'max-jour': return base + 4 + noise
+      case 'moyenne-7': return base + 1 + noise * 0.3
+      default: return base
+    }
+  }
+
+  if (metric === 'temp-gel') {
+    const base = Math.round(-1 + parcel.degresJour / 300)
+    switch (aggregate) {
+      case 'reel': return base + noise
+      case 'min-jour': return base - 2 + noise
+      case 'max-jour': return base + 3 + noise
+      default: return base
+    }
+  }
+
+  if (metric === 'humectation') {
+    const base = Math.round(parcel.reserveHydrique / 10)
+    switch (aggregate) {
+      case 'today': return Math.max(0, base + noise)
+      case '7jours': return Math.max(0, base * 5 + noise)
+      case '30jours': return Math.max(0, base * 18 + noise)
+      default: return base
+    }
+  }
+
   return parcel.reserveHydrique
 }
 
@@ -857,7 +1013,13 @@ function getMetricUnit(metric) {
   if (metric === 'humidite') return '%'
   if (metric === 'etat-hydrique') return 'mm'
   if (metric === 'ru') return '%'
-  return '%'
+  if (metric === 'vent') return 'km/h'
+  if (metric === 'rayonnement') return 'W/m²'
+  if (metric === 'humidite-sol') return '%'
+  if (metric === 'temp-sol') return '°C'
+  if (metric === 'temp-gel') return '°C'
+  if (metric === 'humectation') return 'h'
+  return ''
 }
 
 function getMetricColor(parcel, metric) {
@@ -893,6 +1055,41 @@ function getMetricColor(parcel, metric) {
     if (parcel.reserveHydrique < 30) return '#E05252'
     if (parcel.reserveHydrique < 60) return '#FBAF05'
     return '#24B066'
+  }
+
+  if (metric === 'vent') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 15) return '#74b9ff'
+    if (v < 30) return '#f39c12'
+    return '#e74c3c'
+  }
+
+  if (metric === 'rayonnement') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 200) return '#74b9ff'
+    if (v < 400) return '#f8e840'
+    return '#e07050'
+  }
+
+  if (metric === 'humidite-sol') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 30) return '#E05252'
+    if (v < 60) return '#FBAF05'
+    return '#24B066'
+  }
+
+  if (metric === 'temp-sol' || metric === 'temp-gel') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 5) return '#74b9ff'
+    if (v < 15) return '#f39c12'
+    return '#e74c3c'
+  }
+
+  if (metric === 'humectation') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 2) return '#74b9ff'
+    if (v < 6) return '#f39c12'
+    return '#0984e3'
   }
 
   return '#0172A4'
