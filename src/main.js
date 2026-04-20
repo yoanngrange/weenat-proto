@@ -781,9 +781,9 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
           const label = L.marker([parcel.lat, parcel.lng], {
             icon: L.divIcon({
               className: '',
-              html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
+              html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri);transform:translate(-50%,calc(-100% - 8px))">${valText}</div>`,
               iconSize: [0, 0],
-              iconAnchor: [0, 24],
+              iconAnchor: [0, 0],
             }),
             interactive: false,
           }).addTo(map)
