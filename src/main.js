@@ -48,7 +48,7 @@ const MODEL_METRICS = {
   'W':         ['vent'],
   'PYRANO':    ['rayonnement'],
   'PAR':       ['rayonnement'],
-  'LWS':       ['humectation'],
+  'LWS':       ['intensite-humectation', 'duree-humectation'],
   'CHP-15/30': ['potentiel-hydrique', 'temp-sol'],
   'CHP-30/60': ['potentiel-hydrique', 'temp-sol'],
   'CHP-60/90': ['potentiel-hydrique', 'temp-sol'],
@@ -61,17 +61,18 @@ const MODEL_METRICS = {
 // Labels de toutes les métriques (ordre d'affichage dans le sélecteur)
 const METRIC_LABELS = {
   'pluie':             'Pluie',
-  'temp':              'Température air',
-  'humidite':          'Humidité air',
-  'vent':              'Vent',
-  'rayonnement':       'Rayonnement',
-  'humectation':       'Humectation foliaire',
-  'potentiel-hydrique':'Potentiel hydrique',
-  'teneur-eau':        'Teneur en eau sol',
-  'temp-sol':          'Température sol',
-  'temp-seche':        'Température sèche',
-  'temp-humide':       'Température humide',
-  'conductivite':      'Conductivité électrique',
+  'temp':                   'Température',
+  'humidite':               'Humidité',
+  'vent':                   'Vent',
+  'rayonnement':            'Rayonnement',
+  'intensite-humectation':  "Intensité d'humectation foliaire",
+  'duree-humectation':      "Durée d'humectation foliaire",
+  'potentiel-hydrique':     'Potentiel hydrique',
+  'teneur-eau':             'Teneur en eau du sol',
+  'temp-sol':               'Température du sol',
+  'temp-seche':             'Température sèche',
+  'temp-humide':            'Température humide',
+  'conductivite':           'Électro-conductivité',
 }
 
 const metricAggregates = {
@@ -125,7 +126,13 @@ const metricAggregates = {
     { value: 'min-jour', label: 'Min du jour' },
     { value: 'max-jour', label: 'Max du jour' }
   ],
-  'humectation': [
+  'intensite-humectation': [
+    { value: 'reel', label: 'Temps réel' },
+    { value: 'min-jour', label: 'Min du jour' },
+    { value: 'max-jour', label: 'Max du jour' },
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+  ],
+  'duree-humectation': [
     { value: 'today', label: "Aujourd'hui" },
     { value: '7jours', label: '7 jours' },
     { value: '30jours', label: '30 jours' }
@@ -710,7 +717,7 @@ function initMap() {
 
   map.invalidateSize()
 
-  updateLegend()
+
 }
 
 function updateMap(filteredParcels = plots, filteredSensors = sensors) {
@@ -739,7 +746,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         const label = L.marker([labelLat, labelLng], {
           icon: L.divIcon({
             className: '',
-            html: `<div class="map-value-badge" style="border-color:${color};color:${color}">${value}<span class="map-value-badge-unit"> ${unit}</span></div>`,
+            html: `<div class="map-value-badge" style="border-color:${color};color:${color}">${fmtMetricValue(value, currentMetric)}</div>`,
             iconSize: [0, 0],
             iconAnchor: [0, 0],
           }),
@@ -821,7 +828,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
     }
   }
 
-  updateLegend()
+
 }
 
 function createParcelLayer(parcel) {
@@ -892,10 +899,20 @@ function getShapeLatLngs(parcel) {
   return [[lat, lng]]
 }
 
+function fmtDuree(decimalHours) {
+  const h = Math.floor(decimalHours)
+  const m = Math.round((decimalHours - h) * 60)
+  return `${h}h ${String(m).padStart(2, '0')}min`
+}
+
+function fmtMetricValue(value, metric) {
+  if (metric === 'duree-humectation') return fmtDuree(value)
+  return `${value} ${getMetricUnit(metric)}`
+}
+
 function getMetricTooltipValue(parcel) {
   const value = computeMetricValue(parcel, currentMetric, currentAggregate)
-  const unit = getMetricUnit(currentMetric)
-  return `${getAggregateLabel(currentAggregate)} : ${value} ${unit}`
+  return `${getAggregateLabel(currentAggregate)} : ${fmtMetricValue(value, currentMetric)}`
 }
 
 function computeMetricValue(parcel, metric, aggregate) {
@@ -1039,13 +1056,25 @@ function computeMetricValue(parcel, metric, aggregate) {
     }
   }
 
-  if (metric === 'humectation') {
-    const base = Math.round(parcel.reserveHydrique / 10)
+  if (metric === 'intensite-humectation') {
+    const base = Math.min(100, Math.max(0, Math.round(parcel.reserveHydrique / 2)))
     switch (aggregate) {
-      case 'today': return Math.max(0, base + noise)
-      case '7jours': return Math.max(0, base * 5 + noise)
-      case '30jours': return Math.max(0, base * 18 + noise)
+      case 'reel': return Math.min(100, Math.max(0, base + noise * 2))
+      case 'min-jour': return Math.max(0, base - 20 + noise)
+      case 'max-jour': return Math.min(100, base + 15 + noise)
+      case 'moyenne-7': return Math.min(100, Math.max(0, base - 5 + noise))
       default: return base
+    }
+  }
+
+  if (metric === 'duree-humectation') {
+    const base = Math.max(0, parcel.reserveHydrique / 20)
+    switch (aggregate) {
+      case 'today': return Math.max(0, +(base + noise * 0.25).toFixed(2))
+      case 'yesterday': return Math.max(0, +(base - 0.5 + noise * 0.25).toFixed(2))
+      case '7jours': return Math.max(0, +(base * 5 + noise * 0.5).toFixed(2))
+      case '30jours': return Math.max(0, +(base * 18 + noise).toFixed(2))
+      default: return +base.toFixed(2)
     }
   }
 
@@ -1079,7 +1108,8 @@ function getMetricUnit(metric) {
   if (metric === 'temp-sol') return '°C'
   if (metric === 'temp-seche') return '°C'
   if (metric === 'temp-humide') return '°C'
-  if (metric === 'humectation') return 'h'
+  if (metric === 'intensite-humectation') return '%'
+  if (metric === 'duree-humectation') return ''
   if (metric === 'potentiel-hydrique') return 'kPa'
   if (metric === 'teneur-eau') return '%'
   if (metric === 'conductivite') return 'dS/m'
@@ -1143,7 +1173,14 @@ function getMetricColor(parcel, metric) {
     return '#e74c3c'
   }
 
-  if (metric === 'humectation') {
+  if (metric === 'intensite-humectation') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 30) return '#74b9ff'
+    if (v < 70) return '#f39c12'
+    return '#0984e3'
+  }
+
+  if (metric === 'duree-humectation') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
     if (v < 2) return '#74b9ff'
     if (v < 6) return '#f39c12'
@@ -1195,15 +1232,6 @@ function getSensorMetricDisplay(sensor, metric) {
   return `Qualité réseau: ${sensor.networkQuality}%`
 }
 
-function updateLegend() {
-  const legend = document.getElementById('legend')
-  if (!legend || pageType.startsWith('parcelles')) return
-  legend.innerHTML = `
-    <div><div class="color-box" style="background-color: #24B066;"></div>Bon</div>
-    <div><div class="color-box" style="background-color: #FBAF05;"></div>Moyen</div>
-    <div><div class="color-box" style="background-color: #E05252;"></div>Faible</div>
-  `
-}
 
 function animateView(element) {
   if (!element) return
@@ -1377,11 +1405,23 @@ function computeSensorValue(sensor, metric, aggregate) {
     const vals = { reel: +(base + n(1) * 0.05).toFixed(2), 'min-jour': +(base - 0.1 + n(2) * 0.03).toFixed(2), 'max-jour': +(base + 0.2 + n(3) * 0.05).toFixed(2), 'moyenne-7': +(base + n(4) * 0.02).toFixed(2) }
     return [vals[aggregate] ?? base, 'dS/m']
   }
-  if (metric === 'humectation') {
+  if (metric === 'intensite-humectation') {
     if (sensor.model !== 'LWS') return null
-    const base = 3 + (sensor.id % 7)
-    const vals = { reel: base + n(1), 'min-jour': Math.max(0, base - 3 + n(2)), 'max-jour': base + 5 + n(3), 'moyenne-7': base + 1 + n(4) }
-    return [vals[aggregate] ?? base, 'h']
+    const base = Math.min(100, 40 + (sensor.id % 40))
+    const vals = { reel: Math.min(100, base + n(1) * 3), 'min-jour': Math.max(0, base - 20 + n(2)), 'max-jour': Math.min(100, base + 15 + n(3)), 'moyenne-7': Math.min(100, base - 5 + n(4)) }
+    return [vals[aggregate] ?? base, '%']
+  }
+  if (metric === 'duree-humectation') {
+    if (sensor.model !== 'LWS') return null
+    const base = 2 + (sensor.id % 8)
+    const decVal = {
+      today: Math.max(0, base + n(1) * 0.25),
+      yesterday: Math.max(0, base - 0.5 + n(2) * 0.25),
+      '7jours': Math.max(0, base * 5 + n(3) * 0.5),
+      '30jours': Math.max(0, base * 18 + n(4))
+    }
+    const v = decVal[aggregate] ?? base
+    return [fmtDuree(v), '']
   }
   return null
 }
@@ -1699,7 +1739,7 @@ function initSensorAdminTable(container) {
 function createParcelMetricTable(parcels) {
   const aggregates = metricAggregates[currentMetric] || []
   const unit = getMetricUnit(currentMetric)
-  const metricLabel = { pluie: 'Pluie', temp: 'Température', humidite: 'Humidité', 'etat-hydrique': 'État hydrique' }[currentMetric] || currentMetric
+  const metricLabel = METRIC_LABELS[currentMetric] || currentMetric
 
   let html = '<table id="parcel-table"><thead><tr>'
   html += '<th data-column="name">Parcelle</th>'
@@ -1736,7 +1776,7 @@ function createParcelMetricTable(parcels) {
     aggregates.forEach(agg => {
       const val = computeMetricValue(parcel, currentMetric, agg.value)
       const isActive = agg.value === currentAggregate
-      html += `<td class="num${isActive ? ' col-active' : ''}">${val} ${unit}</td>`
+      html += `<td class="num${isActive ? ' col-active' : ''}">${fmtMetricValue(val, currentMetric)}</td>`
     })
     html += '</tr>'
   })
