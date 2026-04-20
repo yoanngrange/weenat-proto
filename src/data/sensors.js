@@ -331,4 +331,12 @@ export const sensors = [
 
   // ── Org 1 — sonde capacitive CAPA-60-6 ────────────────────────────────────
   { id: 216, orgId: 1,  parcelId: 5,  model: "CAPA-60-6", serial: "WEE-00216", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 83, messages7d: 88,  event: null },
+
+  // ── T_GEL — org 1 (exploitation) ─────────────────────────────────────────
+  { id: 217, orgId: 1,  parcelId: 1,  model: "T_GEL",    serial: "WEE-00217", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 90, messages7d: 94,  event: null },
+  { id: 218, orgId: 1,  parcelId: 12, model: "T_GEL",    serial: "WEE-00218", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 87, messages7d: 91,  event: null },
+
+  // ── T_GEL — réseau (orgs 7 et 10) ────────────────────────────────────────
+  { id: 219, orgId: 7,  parcelId: 28, model: "T_GEL",    serial: "WEE-00719", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
+  { id: 220, orgId: 10, parcelId: 34, model: "T_GEL",    serial: "WEE-01020", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
 ]
