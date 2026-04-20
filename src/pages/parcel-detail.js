@@ -40,7 +40,6 @@ const METRICS_BY_MODEL = {
   'TH': [
     { id: 'temp',     name: 'Température',  unit: '°C', color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
     { id: 'humidite', name: 'Humidité air', unit: '%',  color: '#4ecdc4', base: () => rnd(40, 90) },
-    { id: 'dpv',      name: 'DPV',          unit: 'kPa',color: '#a8d8b0', base: () => rndf(0.1, 2.5) },
   ],
   'CHP-15/30': [
     { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
@@ -70,13 +69,14 @@ const METRICS_BY_MODEL = {
     { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
   ],
   'T_MINI': [
-    { id: 'tmin', name: 'Temp. min', unit: '°C', color: '#90b0e0', base: () => rnd(-2, 15), cumul: { label: 'Heures de froid', unit: 'h' } },
+    { id: 'tsol', name: 'Temp. sol', unit: '°C', color: '#bb8fce', base: () => rnd(8, 22) },
   ],
   'LWS': [
     { id: 'humec', name: 'Humectation feuille', unit: 'h', color: '#78d8a0', base: () => rnd(0, 12) },
   ],
   'T_GEL': [
-    { id: 'tgel', name: 'Temp. feuille', unit: '°C', color: '#a0d8a0', base: () => rnd(-3, 12), cumul: { label: 'Heures de gel', unit: 'h' } },
+    { id: 'tseche',  name: 'Temp. sèche',  unit: '°C', color: '#e07050', base: () => rnd(-2, 12) },
+    { id: 'thumide', name: 'Temp. humide', unit: '°C', color: '#4ecdc4', base: () => rnd(-4, 10) },
   ],
   'W': [
     { id: 'vent',          name: 'Vent – vitesse',           unit: 'km/h', color: '#7bc4b0', base: () => rnd(0, 40)  },
@@ -276,7 +276,7 @@ function getTooltip() {
 // Temperature gets a blue→red gradient. Others: desaturated→full.
 function getGradientColors(color, metricId) {
   if (metricId === 'temp' || metricId === 'temperature') return ['#6eb4d4', '#e07050']
-  if (metricId === 'tmin') return ['#aecce8', '#5580c0']
+  if (metricId === 'tseche' || metricId === 'thumide') return ['#6eb4d4', '#e07050']
   if (metricId === 'temp_rosee') return ['#a0d0f0', '#4090c0']
   // Default: mix towards white at the low end
   return [blendWithWhite(color, 0.55), color]
@@ -353,7 +353,8 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
     case 'temp': {
       return ((base - 6) + tf * 12) * n()
     }
-    case 'tmin': {
+    case 'tseche':
+    case 'thumide': {
       return ((base - 4) + tf * 8) * n()
     }
     case 'temp_rosee': {
@@ -373,9 +374,7 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
     case 'etp': {
       return Math.max(0, sf * base * 1.5 * n())
     }
-    case 'dpv': {
-      return Math.max(0, (sf * base * 1.4 + 0.05) * n())
-    }
+
     case 'humec': {
       return Math.max(0, base * Math.max(0, 0.8 - sf * 1.2) * n())
     }
@@ -848,7 +847,7 @@ function renderLinkedSensors() {
 
     html += others.map(s => `
       <div class="sensor-linked-row">
-        <a href="capteur-detail.html?id=${s.id}" class="sensor-link-model">${s.model}</a>
+        <span class="sensor-link-model">${s.model}</span>
         <span class="sensor-link-serial">${s.serial}</span>
         <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
           <i class="bi bi-x-lg"></i>
@@ -869,7 +868,7 @@ function renderLinkedSensors() {
         html += `<div style="font-size:11px;color:var(--txt2);margin:4px 0 2px">— ${depth}</div>`
         html += sensors.map(s => `
           <div class="sensor-linked-row" style="padding-left:12px">
-            <a href="capteur-detail.html?id=${s.id}" class="sensor-link-model">${s.model}</a>
+            <span class="sensor-link-model">${s.model}</span>
             <span class="sensor-link-serial">${s.serial}</span>
             <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
               <i class="bi bi-x-lg"></i>
