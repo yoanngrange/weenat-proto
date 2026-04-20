@@ -1,3 +1,62 @@
+function shapeToLatlngs(plot) {
+  const { lat, lng, id } = plot
+  const shape = plot.shape ?? { type: 'rectangle', width: 180, height: 130 }
+  const LAT_M = 1 / 111111
+  const LNG_M = 1 / (111111 * Math.cos(lat * Math.PI / 180))
+
+  if (shape.type === 'polygon') {
+    const raw = shape.points
+    const maxX = Math.max(...raw.map(p => p[0]))
+    const maxY = Math.max(...raw.map(p => p[1]))
+    const aspect = maxX / maxY
+    const h = Math.sqrt(plot.area * 10000 / aspect)
+    const w = aspect * h
+    return raw.map(([x, y]) => [
+      +(lat + (0.5 - y / maxY) * h * LAT_M).toFixed(6),
+      +(lng + (x / maxX - 0.5) * w * LNG_M).toFixed(6),
+    ])
+  }
+
+  const w = shape.width ?? 180
+  const h = shape.height ?? 130
+  const dlat = h / 2 * LAT_M
+  const dlng = w / 2 * LNG_M
+  const v = id % 4
+
+  if (v === 0) {
+    return [
+      [+(lat + dlat).toFixed(6), +(lng - dlng).toFixed(6)],
+      [+(lat + dlat).toFixed(6), +(lng + dlng).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng + dlng).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng - dlng).toFixed(6)],
+    ]
+  } else if (v === 1) {
+    // Trapèze : haut plus étroit et décalé
+    return [
+      [+(lat + dlat).toFixed(6), +(lng - dlng * 0.68).toFixed(6)],
+      [+(lat + dlat).toFixed(6), +(lng + dlng * 0.78).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng + dlng).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng - dlng).toFixed(6)],
+    ]
+  } else if (v === 2) {
+    // Parallélogramme : décalage latéral
+    return [
+      [+(lat + dlat).toFixed(6), +(lng - dlng + dlng * 0.22).toFixed(6)],
+      [+(lat + dlat).toFixed(6), +(lng + dlng + dlng * 0.22).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng + dlng).toFixed(6)],
+      [+(lat - dlat).toFixed(6), +(lng - dlng).toFixed(6)],
+    ]
+  } else {
+    // Quadrilatère irrégulier
+    return [
+      [+(lat + dlat).toFixed(6),        +(lng - dlng).toFixed(6)],
+      [+(lat + dlat * 0.88).toFixed(6), +(lng + dlng).toFixed(6)],
+      [+(lat - dlat).toFixed(6),        +(lng + dlng * 0.91).toFixed(6)],
+      [+(lat - dlat * 0.93).toFixed(6), +(lng - dlng * 1.07).toFixed(6)],
+    ]
+  }
+}
+
 export const plots = [
   // ── Ferme du Bocage (orgId:1) ─────────────────────────────────────────────
   // Zone rurale autour de Saint-Aubin-du-Cormier (Ille-et-Vilaine, ~48.15°N -1.18°W)
@@ -290,4 +349,8 @@ export const plots = [
   { id: 147, orgId: 20, name: "Centrale 4",      lat: 48.0461, lng: -2.9861, area: 9.4,  crop: "Maïs",               reserveHydrique: 78, degresJour: 1200, texture: "Limon argileux",   irrigation: "Pivot",             integrations: [], shape: { type: "rectangle", width: 221, height: 160 } },
   { id: 148, orgId: 20, name: "Centrale 5",      lat: 48.0861, lng: -2.9461, area: 4.3,  crop: "Colza",              reserveHydrique: 63, degresJour: 1220, texture: "Sable limoneux",  irrigation: "Pas d'irrigation",  integrations: [], shape: { type: "rectangle", width: 149, height: 107 } },
   { id: 149, orgId: 20, name: "Centrale 6",      lat: 48.0661, lng: -3.0061, area: 6.9,  crop: "Prairie permanente", reserveHydrique: 89, degresJour: 1050, texture: "Limon",            irrigation: "Pas d'irrigation",  integrations: [], shape: { type: "rectangle", width: 191, height: 137 } }
-];
+]
+
+plots.forEach(p => {
+  if (!p.latlngs) p.latlngs = shapeToLatlngs(p)
+})
