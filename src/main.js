@@ -756,19 +756,6 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       }
     })
   } else {
-    filteredParcels.forEach(parcel => {
-      const color = getMetricColor(parcel, currentMetric)
-      const metricValue = getMetricDisplay(parcel, currentMetric)
-      const marker = L.circleMarker([parcel.lat, parcel.lng], {
-        color: color,
-        fillColor: color,
-        fillOpacity: 0.8,
-        radius: 8
-      }).addTo(map)
-      marker.on('click', () => { window.location.href = `parcelle-detail.html?id=${parcel.id}` })
-      marker.bindTooltip(`<strong>${parcel.name}</strong><br>${metricValue}<br>${parcel.crop} · ${parcel.area} ha`, { sticky: true, opacity: 0.95 })
-      markers.push(marker)
-    })
 
     if (currentView === 'map') {
       filteredSensors.forEach(sensor => {
