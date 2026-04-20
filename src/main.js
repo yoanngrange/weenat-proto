@@ -788,6 +788,20 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         )
         circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
         markers.push(circle)
+
+        if (sensorVal) {
+          const valText = `${sensorVal[0]} ${sensorVal[1]}`
+          const label = L.marker([parcel.lat, parcel.lng], {
+            icon: L.divIcon({
+              className: '',
+              html: `<div class="map-value-badge" style="border-color:var(--pri);color:var(--pri)">${valText}</div>`,
+              iconSize: [0, 0],
+              iconAnchor: [0, 24],
+            }),
+            interactive: false,
+          }).addTo(map)
+          markers.push(label)
+        }
       })
     }
   }
