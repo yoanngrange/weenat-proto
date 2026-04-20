@@ -37,8 +37,8 @@ const pageType = (() => {
   return ''
 })()
 
-// Mapping modèle → métriques disponibles au niveau parcelle
-const MODEL_METRICS_PARCEL = {
+// Mapping modèle → métriques disponibles (commun capteurs et parcelles)
+const MODEL_METRICS = {
   'P':         ['pluie'],
   'PT':        ['pluie', 'temp', 'humidite'],
   'P+':        ['pluie', 'temp', 'humidite'],
@@ -58,8 +58,8 @@ const MODEL_METRICS_PARCEL = {
   'EC':        ['conductivite'],
 }
 
-// Labels des métriques parcel (ordre d'affichage dans le sélecteur)
-const PARCEL_METRIC_OPTIONS = {
+// Labels de toutes les métriques (ordre d'affichage dans le sélecteur)
+const METRIC_LABELS = {
   'pluie':             'Pluie',
   'temp':              'Température air',
   'humidite':          'Humidité air',
@@ -652,27 +652,31 @@ function updateBreadcrumb() {
   titleEl.textContent = meta.title
 }
 
-// Calcule les métriques disponibles pour les parcelles visibles (via capteurs liés)
-function getAvailableParcelMetrics(parcels) {
+// Calcule les métriques disponibles à partir d'une liste de capteurs
+function getAvailableMetrics(sensorList) {
   const available = new Set()
-  parcels.forEach(parcel => {
-    sensors.filter(s => s.parcelId === parcel.id).forEach(s => {
-      ;(MODEL_METRICS_PARCEL[s.model] || []).forEach(m => available.add(m))
-    })
+  sensorList.forEach(s => {
+    ;(MODEL_METRICS[s.model] || []).forEach(m => available.add(m))
   })
-  return Object.keys(PARCEL_METRIC_OPTIONS).filter(m => available.has(m))
+  return Object.keys(METRIC_LABELS).filter(m => available.has(m))
 }
 
-// Peuple dynamiquement le sélecteur de métrique sur les pages parcelles
-function updateMetricSelector(parcels) {
+// Peuple dynamiquement le sélecteur de métrique (capteurs et parcelles)
+function updateMetricSelector(filteredParcels, filteredSensors) {
   const sel = document.getElementById('metric-selector')
-  if (!sel || !pageType.startsWith('parcelles')) return
+  if (!sel) return
 
-  const available = getAvailableParcelMetrics(parcels)
+  // Sur les pages capteurs : métriques des capteurs visibles
+  // Sur les pages parcelles : métriques des capteurs liés aux parcelles visibles
+  const sensorList = pageType.startsWith('parcelles')
+    ? sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    : filteredSensors
+
+  const available = getAvailableMetrics(sensorList)
   if (available.length === 0) return
 
   sel.innerHTML = available
-    .map(m => `<option value="${m}">${PARCEL_METRIC_OPTIONS[m]}</option>`)
+    .map(m => `<option value="${m}">${METRIC_LABELS[m]}</option>`)
     .join('')
 
   if (!available.includes(currentMetric)) {
@@ -691,7 +695,7 @@ function updateContent() {
 
   const { parcels: filteredParcels, sensors: filteredSensors } = getFilteredData()
 
-  updateMetricSelector(filteredParcels)
+  updateMetricSelector(filteredParcels, filteredSensors)
 
   if (currentView === 'map') {
     updateMap(filteredParcels, filteredSensors)
@@ -1322,12 +1326,14 @@ const EVENT_ICONS = {
 function computeSensorValue(sensor, metric, aggregate) {
   const n = (seed) => Math.round(Math.sin(sensor.id * 1.9 + seed) * 3)
 
-  const PLUIE_MODELS  = new Set(['P', 'PT', 'P+'])
-  const TEMP_MODELS   = new Set(['TH', 'PT', 'P+', 'T_MINI'])
-  const HUM_MODELS    = new Set(['TH', 'PT', 'P+'])
-  const VENT_MODELS   = new Set(['W', 'PT', 'P+'])
-  const RAY_MODELS    = new Set(['PYRANO', 'PAR'])
-  const SOL_MODELS    = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6'])
+  const PLUIE_MODELS   = new Set(['P', 'PT', 'P+'])
+  const TEMP_MODELS    = new Set(['TH', 'PT', 'P+'])
+  const HUM_MODELS     = new Set(['TH', 'PT', 'P+'])
+  const VENT_MODELS    = new Set(['W', 'PT', 'P+'])
+  const RAY_MODELS     = new Set(['PYRANO', 'PAR'])
+  const CHP_MODELS     = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90'])
+  const CAPA_MODELS    = new Set(['CAPA-30-3', 'CAPA-60-6'])
+  const TEMP_SOL_MODELS = new Set(['T_MINI', 'CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6'])
 
   if (metric === 'pluie') {
     if (!PLUIE_MODELS.has(sensor.model)) return null
@@ -1357,20 +1363,61 @@ function computeSensorValue(sensor, metric, aggregate) {
     if (!RAY_MODELS.has(sensor.model)) return null
     const base = 200 + (sensor.id % 300)
     const vals = { reel: base + n(1) * 10, today: base * 3 + n(2) * 50, '7jours': base * 20 + n(3) * 100 }
-    return [vals[aggregate] ?? base, metric === 'reel' ? 'W/m²' : 'Wh/m²']
+    return [vals[aggregate] ?? base, 'Wh/m²']
   }
   if (metric === 'humidite-sol') {
-    if (!SOL_MODELS.has(sensor.model)) return null
+    if (sensor.model !== 'SMV') return null
     const base = 30 + (sensor.id % 50)
     const vals = { reel: Math.min(100, base + n(1)), 'min-jour': Math.max(5, base - 15 + n(2)), 'max-jour': Math.min(100, base + 10 + n(3)), 'moyenne-7': Math.min(100, base - 3 + n(4)) }
     return [vals[aggregate] ?? base, '%']
+  }
+  if (metric === 'potentiel-hydrique') {
+    if (!CHP_MODELS.has(sensor.model)) return null
+    const base = -150 - (sensor.id % 200)
+    const vals = { reel: base + n(1) * 5, 'min-jour': base - 50 + n(2) * 5, 'max-jour': base + 30 + n(3) * 5, 'moyenne-7': base - 20 + n(4) * 3 }
+    return [vals[aggregate] ?? base, 'hPa']
+  }
+  if (metric === 'teneur-eau') {
+    if (!CAPA_MODELS.has(sensor.model)) return null
+    const base = 25 + (sensor.id % 20)
+    const vals = { reel: Math.min(50, base + n(1)), 'min-jour': Math.max(5, base - 10 + n(2)), 'max-jour': Math.min(50, base + 8 + n(3)), 'moyenne-7': Math.min(50, base - 3 + n(4)) }
+    return [vals[aggregate] ?? base, '%']
+  }
+  if (metric === 'temp-sol') {
+    if (!TEMP_SOL_MODELS.has(sensor.model)) return null
+    const base = 8 + (sensor.id % 10)
+    const vals = { reel: base + n(1), 'min-jour': base - 3 + n(2), 'max-jour': base + 4 + n(3), 'moyenne-7': base + 1 + n(4) }
+    return [vals[aggregate] ?? base, '°C']
+  }
+  if (metric === 'temp-seche') {
+    if (sensor.model !== 'T_GEL') return null
+    const base = 2 + (sensor.id % 8)
+    const vals = { reel: base + n(1), 'min-jour': base - 5 + n(2), 'max-jour': base + 3 + n(3), 'moyenne-7': base + n(4) }
+    return [vals[aggregate] ?? base, '°C']
+  }
+  if (metric === 'temp-humide') {
+    if (sensor.model !== 'T_GEL') return null
+    const base = 1 + (sensor.id % 6)
+    const vals = { reel: base + n(1), 'min-jour': base - 3 + n(2), 'max-jour': base + 2 + n(3), 'moyenne-7': base + n(4) }
+    return [vals[aggregate] ?? base, '°C']
+  }
+  if (metric === 'conductivite') {
+    if (sensor.model !== 'EC') return null
+    const base = (0.5 + (sensor.id % 15) / 10)
+    const vals = { reel: +(base + n(1) * 0.05).toFixed(2), 'min-jour': +(base - 0.1 + n(2) * 0.03).toFixed(2), 'max-jour': +(base + 0.2 + n(3) * 0.05).toFixed(2), 'moyenne-7': +(base + n(4) * 0.02).toFixed(2) }
+    return [vals[aggregate] ?? base, 'dS/m']
+  }
+  if (metric === 'humectation') {
+    if (sensor.model !== 'LWS') return null
+    const base = 3 + (sensor.id % 7)
+    const vals = { reel: base + n(1), 'min-jour': Math.max(0, base - 3 + n(2)), 'max-jour': base + 5 + n(3), 'moyenne-7': base + 1 + n(4) }
+    return [vals[aggregate] ?? base, 'h']
   }
   return null
 }
 
 function createSensorTable(sensors) {
-  const metricLabels = { pluie: 'Pluie', temp: 'Température', humidite: 'Humidité rel.', vent: 'Vent', rayonnement: 'Rayonnement', 'humidite-sol': 'Humidité sol' }
-  const metricLabel = metricLabels[currentMetric] || 'Mesure'
+  const metricLabel = METRIC_LABELS[currentMetric] || 'Mesure'
   const aggLabel = getAggregateLabel(currentAggregate)
 
   let html = '<table id="sensor-table"><thead><tr>'
