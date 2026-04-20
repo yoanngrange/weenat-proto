@@ -50,14 +50,16 @@ const METRIC_DEFS = {
   par:              { name: 'PAR',                  unit: 'µmol/m²/s', color: '#f8e840', baseVal: () => rnd(0, 2000)  },
   temperature_gel:  { name: 'Temp. feuille/gel',    unit: '°C',        color: '#a0d8a0', baseVal: () => rnd(-3, 12),   cumul: { label: 'Heures de gel', unit: 'h' } },
   temp_rosee:       { name: 'Température de rosée', unit: '°C',        color: '#7ec8e0', baseVal: () => rnd(4, 16)    },
+  temp_seche:       { name: 'Température sèche',    unit: '°C',        color: '#e07050', baseVal: () => rnd(-5, 10)   },
+  temp_humide:      { name: 'Température humide',   unit: '°C',        color: '#60b8d0', baseVal: () => rnd(-7, 8)    },
 }
 
 const METRICS_BY_MODEL = {
   'P+':       ['pluie', 'temperature', 'humidite_air'],
   'PT':       ['pluie', 'temperature'],
   'P':        ['pluie'],
-  'TH':       ['temperature', 'humidite_air', 'dpv', 'temp_rosee'],
-  'T_MINI':   ['temperature_min'],
+  'TH':       ['temperature', 'humidite_air'],
+  'T_MINI':   ['temp_sol'],
   'W':        ['vent_vitesse', 'vent_direction', 'vent_rafales', 'vent_direction_rafales'],
   'CHP-15/30': ['potentiel_hydrique', 'temp_sol'],
   'CHP-30/60': ['potentiel_hydrique', 'temp_sol'],
@@ -68,7 +70,7 @@ const METRICS_BY_MODEL = {
   'LWS':      ['_lws_intensite', '_lws_duree'],
   'PYRANO':   ['rayonnement'],
   'PAR':      ['par'],
-  'T_GEL':    ['temperature_gel'],
+  'T_GEL':    ['temp_seche', 'temp_humide'],
 }
 
 // Virtual metric keys for multi-horizon charts
@@ -1033,7 +1035,7 @@ function renderLinkedPlots() {
   } else {
     html += linked.map(p => `
       <div class="sensor-linked-row">
-        <a href="parcelle-detail.html?id=${p.id}" class="sensor-link-model" style="color:var(--pri);text-decoration:none">${p.name}</a>
+        <span class="sensor-link-model">${p.name}</span>
         <span class="sensor-link-serial" style="color:var(--txt3)">${p.area ? p.area + ' ha' : ''}</span>
         <button class="remove-plot-btn icon-btn" data-id="${p.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
       </div>
