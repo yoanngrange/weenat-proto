@@ -58,104 +58,96 @@ function shapeToLatlngs(plot) {
 }
 
 export const plots = [
-  // ── Ferme du Bocage (orgId:1) ─────────────────────────────────────────────
-  // Zone rurale autour de Saint-Aubin-du-Cormier (Ille-et-Vilaine, ~48.15°N -1.18°W)
-  // Cluster A – Bloc du Bourg : 5 parcelles contiguës ou adjacentes
+  // ── Ferme du Bocage (orgId:1) — contours RPG réels, Morbihan ────────────────
   {
-    id: 1, orgId: 1, name: "Le Grand Pré", lat: 48.1507, lng: -1.1858,
+    id: 1, orgId: 1, name: "Le Grand Pré", lat: 48.0970, lng: -2.4885,
     area: 8.4, crop: "Blé tendre", reserveHydrique: 72, degresJour: 1210, texture: "Limon argileux",
     irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Mono-Culture"],
-    latlngs: [[48.1518,-1.1875],[48.1521,-1.1843],[48.1497,-1.1840],[48.1493,-1.1873]]
+    latlngs: [[48.098485,-2.491716],[48.094864,-2.489461],[48.095270,-2.485384],[48.099325,-2.487466]]
   },
   {
-    id: 2, orgId: 1, name: "Les Trois Arpents", lat: 48.1508, lng: -1.1822,
+    id: 2, orgId: 1, name: "Les Trois Arpents", lat: 48.1014, lng: -2.4809,
     area: 5.2, crop: "Maïs", reserveHydrique: 58, degresJour: 1140, texture: "Limon argilo-sableux",
     irrigation: "Pivot", integrations: ["IRRÉ-LIS Mono-Culture"],
-    latlngs: [[48.1521,-1.1843],[48.1519,-1.1805],[48.1495,-1.1806],[48.1497,-1.1840]]
+    latlngs: [[48.100716,-2.483735],[48.099760,-2.478227],[48.101643,-2.477836],[48.102367,-2.481090],[48.101701,-2.481133],[48.102106,-2.483562]]
   },
   {
-    id: 3, orgId: 1, name: "La Petite Lande", lat: 48.1480, lng: -1.1860,
+    id: 3, orgId: 1, name: "La Petite Lande", lat: 48.0930, lng: -2.4674,
     area: 3.9, crop: "Orge", reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
     irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Mono-Culture"],
-    latlngs: [[48.1493,-1.1873],[48.1497,-1.1840],[48.1477,-1.1843],[48.1473,-1.1878]]
+    latlngs: [[48.091107,-2.471167],[48.089614,-2.469996],[48.090574,-2.468027],[48.091426,-2.465101],[48.092813,-2.462121],[48.094447,-2.463718],[48.094660,-2.465793],[48.095229,-2.467070],[48.095122,-2.469358],[48.094092,-2.470102],[48.094056,-2.469251]]
   },
   {
-    id: 4, orgId: 1, name: "Les Courtils", lat: 48.1480, lng: -1.1823,
+    id: 4, orgId: 1, name: "Les Courtils", lat: 48.1053, lng: -2.4739,
     area: 4.5, crop: "Colza", reserveHydrique: 81, degresJour: 960, texture: "Limono-argileux fin",
     irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Multi-Cultures"],
-    latlngs: [[48.1497,-1.1840],[48.1495,-1.1806],[48.1471,-1.1810],[48.1473,-1.1843]]
+    latlngs: [[48.104397,-2.477657],[48.103118,-2.476486],[48.103047,-2.474092],[48.105214,-2.473134],[48.105108,-2.471059],[48.107772,-2.469836],[48.108128,-2.474997]]
   },
   {
-    id: 5, orgId: 1, name: "La Grande Pièce", lat: 48.1530, lng: -1.1905,
+    id: 5, orgId: 1, name: "La Grande Pièce", lat: 48.1072, lng: -2.5542,
     area: 11.2, crop: "Blé tendre", reserveHydrique: 76, degresJour: 1195, texture: "Limon fin",
     irrigation: "Enrouleur", integrations: ["IRRÉ-LIS Multi-Cultures"],
-    latlngs: [[48.1543,-1.1935],[48.1545,-1.1878],[48.1518,-1.1875],[48.1514,-1.1933]]
+    latlngs: [[48.105663,-2.557473],[48.104843,-2.552900],[48.109237,-2.550558],[48.108964,-2.555651]]
   },
-
-  // Cluster B – Les Hautes Terres : 3 parcelles à ~4 km au NE, 2 contiguës
   {
-    id: 6, orgId: 1, name: "Le Champ du Moulin", lat: 48.1714, lng: -1.1475,
+    id: 6, orgId: 1, name: "Le Champ du Moulin", lat: 48.1183, lng: -2.5873,
     area: 6.3, crop: "Prairie permanente", reserveHydrique: 88, degresJour: 1050, texture: "Limon très fin",
     irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Mono-Culture"],
-    latlngs: [[48.1729,-1.1502],[48.1728,-1.1452],[48.1700,-1.1454],[48.1701,-1.1503]]
+    latlngs: [[48.118758,-2.592324],[48.116395,-2.591008],[48.116800,-2.586810],[48.118387,-2.582511],[48.119434,-2.584028],[48.119805,-2.587215]]
   },
   {
-    id: 7, orgId: 1, name: "La Croix", lat: 48.1688, lng: -1.1477,
+    id: 7, orgId: 1, name: "La Croix", lat: 48.1285, lng: -2.5837,
     area: 4.1, crop: "Lin", reserveHydrique: 55, degresJour: 1010, texture: "Sable",
     irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Mono-Culture"],
-    latlngs: [[48.1700,-1.1503],[48.1700,-1.1454],[48.1678,-1.1457],[48.1677,-1.1504]]
+    latlngs: [[48.130063,-2.587041],[48.127025,-2.585169],[48.125978,-2.583298],[48.126451,-2.582893],[48.127194,-2.583551],[48.129388,-2.578847],[48.130435,-2.583703],[48.131076,-2.585220]]
   },
   {
-    id: 8, orgId: 1, name: "La Lande", lat: 48.1754, lng: -1.1395,
+    id: 8, orgId: 1, name: "La Lande", lat: 48.1283, lng: -2.6216,
     area: 8.7, crop: "Colza", reserveHydrique: 69, degresJour: 980, texture: "Argile limoneuse",
     irrigation: "Rampe", integrations: ["DeciTrait"],
-    latlngs: [[48.1771,-1.1422],[48.1770,-1.1370],[48.1739,-1.1373],[48.1740,-1.1424]]
+    latlngs: [[48.127261,-2.626268],[48.125100,-2.621766],[48.127700,-2.619085],[48.128612,-2.620350],[48.129557,-2.619338],[48.131245,-2.622525]]
   },
-
-  // Cluster C – La Rivière : 3 parcelles à ~3 km au SO, 2 contiguës
   {
-    id: 9, orgId: 1, name: "Le Marais Bas", lat: 48.1238, lng: -1.2170,
+    id: 9, orgId: 1, name: "Le Marais Bas", lat: 48.1517, lng: -2.6123,
     area: 7.5, crop: "Betterave sucrière", reserveHydrique: 90, degresJour: 1100, texture: "Limon",
     irrigation: "Goutte à goutte", integrations: ["DeciTrait"],
-    latlngs: [[48.1253,-1.2194],[48.1254,-1.2148],[48.1224,-1.2150],[48.1222,-1.2196]]
+    latlngs: [[48.152435,-2.614382],[48.150411,-2.613851],[48.151102,-2.608944],[48.152689,-2.611903]]
   },
   {
-    id: 10, orgId: 1, name: "La Côte", lat: 48.1206, lng: -1.2172,
+    id: 10, orgId: 1, name: "La Côte", lat: 48.1599, lng: -2.5204,
     area: 5.1, crop: "Pomme de terre", reserveHydrique: 62, degresJour: 1055, texture: "Limon sableux",
     irrigation: "Couverture intégrale", integrations: ["Limacapt"],
-    latlngs: [[48.1222,-1.2196],[48.1224,-1.2150],[48.1192,-1.2153],[48.1190,-1.2198]]
+    latlngs: [[48.159600,-2.523138],[48.158134,-2.522951],[48.158283,-2.520530],[48.159525,-2.518965],[48.160793,-2.518705],[48.161066,-2.518109],[48.161364,-2.518630],[48.160619,-2.520456],[48.159650,-2.521685]]
   },
   {
-    id: 11, orgId: 1, name: "Le Pré du Val", lat: 48.1177, lng: -1.2152,
+    id: 11, orgId: 1, name: "Le Pré du Val", lat: 48.0499, lng: -2.6495,
     area: 4.8, crop: "Maïs", reserveHydrique: 74, degresJour: 1130, texture: "Sable limoneux",
     irrigation: "Micro aspersion", integrations: [],
-    latlngs: [[48.1190,-1.2153],[48.1192,-1.2115],[48.1163,-1.2118],[48.1161,-1.2157]]
+    latlngs: [[48.051148,-2.656116],[48.048581,-2.652550],[48.046491,-2.646296],[48.049571,-2.646187],[48.053458,-2.646132]]
   },
-
-  // Isolées – parcelles éloignées (parcellaire éclaté)
   {
-    id: 12, orgId: 1, name: "Le Bois Rond", lat: 48.1800, lng: -1.1318,
+    id: 12, orgId: 1, name: "Le Bois Rond", lat: 48.0245, lng: -2.8096,
     area: 9.1, crop: "Avoine", reserveHydrique: 67, degresJour: 1165, texture: "Limon",
     irrigation: "Pas d'irrigation", integrations: [],
-    latlngs: [[48.1815,-1.1345],[48.1814,-1.1295],[48.1786,-1.1298],[48.1787,-1.1348]]
+    latlngs: [[48.027302,-2.817552],[48.026173,-2.820127],[48.023802,-2.822027],[48.022729,-2.822238],[48.020414,-2.814386],[48.020696,-2.813036],[48.021966,-2.811136],[48.021373,-2.809700],[48.021994,-2.807463],[48.022757,-2.806872],[48.022531,-2.805099],[48.022869,-2.801932],[48.023095,-2.799948],[48.024422,-2.800370],[48.024676,-2.802439],[48.026032,-2.803832],[48.028234,-2.804338],[48.031876,-2.806829],[48.032045,-2.808349],[48.025721,-2.815062]]
   },
   {
-    id: 13, orgId: 1, name: "Les Haies", lat: 48.1355, lng: -1.2362,
+    id: 13, orgId: 1, name: "Les Haies", lat: 48.1617, lng: -2.3045,
     area: 4.3, crop: "Pois de printemps", reserveHydrique: 79, degresJour: 930, texture: "Argile",
     irrigation: "Gravitaire", integrations: [],
-    latlngs: [[48.1370,-1.2385],[48.1372,-1.2343],[48.1341,-1.2345],[48.1339,-1.2387]]
+    latlngs: [[48.165234,-2.313084],[48.162307,-2.309561],[48.160214,-2.306935],[48.158120,-2.301843],[48.158996,-2.301010],[48.160107,-2.301363],[48.160513,-2.300242],[48.161560,-2.301683],[48.163098,-2.300081],[48.163931,-2.301106],[48.164401,-2.302740],[48.162735,-2.305014],[48.163696,-2.306615],[48.166516,-2.311611]]
   },
   {
-    id: 14, orgId: 1, name: "Le Clos", lat: 48.0912, lng: -1.1828,
+    id: 14, orgId: 1, name: "Le Clos", lat: 48.2190, lng: -2.4655,
     area: 5.7, crop: "Tournesol", reserveHydrique: 53, degresJour: 1270, texture: "Sable limoneux",
     irrigation: "Goutte à goutte enterré", integrations: [],
-    latlngs: [[48.0926,-1.1851],[48.0928,-1.1808],[48.0900,-1.1810],[48.0897,-1.1854]]
+    latlngs: [[48.221011,-2.467585],[48.218677,-2.468331],[48.217922,-2.466477],[48.218403,-2.465885],[48.217991,-2.465087],[48.217613,-2.462923],[48.219381,-2.462151]]
   },
   {
-    id: 15, orgId: 1, name: "La Plaine", lat: 48.1655, lng: -1.2108,
+    id: 15, orgId: 1, name: "La Plaine", lat: 47.9560, lng: -2.4438,
     area: 12.3, crop: "Blé tendre", reserveHydrique: 83, degresJour: 1185, texture: "Limon argileux",
     irrigation: "Enrouleur", integrations: [],
-    latlngs: [[48.1674,-1.2141],[48.1676,-1.2079],[48.1637,-1.2083],[48.1635,-1.2145]]
+    latlngs: [[47.954506,-2.441870],[47.954370,-2.438666],[47.955467,-2.438492],[47.955797,-2.438710],[47.955652,-2.440000],[47.956467,-2.440130],[47.956497,-2.439290],[47.957147,-2.439870],[47.957157,-2.440957],[47.956351,-2.440928],[47.956147,-2.442291]]
   },
 
   // ── Coopérative Bretonne (orgId:2) ────────────────────────────────────────
