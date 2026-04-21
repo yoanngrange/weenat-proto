@@ -148,8 +148,8 @@ function populateIntegrationsGrid(filter = '', adherentMode = false) {
         </div>
         <p class="integ-card-desc">${integration.description}</p>
         <div class="integ-card-badges">
-          ${!adherentMode && orgCount > 0 ? `<span class="integ-plot-badge integ-plot-org" title="Parcelles réseau"><i class="bi bi-geo-alt"></i> ${orgCount} réseau</span>` : ''}
-          ${!adherentMode && adherentCount > 0 ? `<span class="integ-plot-badge integ-plot-adh" title="Parcelles adhérents"><i class="bi bi-people"></i> ${adherentCount} adhérents</span>` : ''}
+          ${!adherentMode && orgCount > 0 ? `<span class="integ-plot-badge integ-plot-org"><i class="bi bi-geo-alt"></i> Activée sur ${orgCount} parcelle${orgCount > 1 ? 's' : ''} de mon exploitation</span>` : ''}
+          ${!adherentMode && adherentCount > 0 ? `<span class="integ-plot-badge integ-plot-adh"><i class="bi bi-people"></i> Activée sur ${adherentCount} parcelle${adherentCount > 1 ? 's' : ''} de mon réseau</span>` : ''}
         </div>
       </div>
     `

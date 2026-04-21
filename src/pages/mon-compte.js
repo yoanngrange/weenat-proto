@@ -6,6 +6,7 @@ const PROFILES = {
     prenom: 'Jean', nom: 'Dupont',
     email: 'jean.dupont@ferme-du-bocage.fr',
     tel: '+33 6 12 34 56 78',
+    extraPhones: [{ nom: 'Sophie Dupont', numero: '+33 6 98 76 54 32' }],
     apiKeys: [
       { id: 1, name: 'Application mobile', created: '2026-01-10' },
       { id: 2, name: 'Intégration Agreo',  created: '2026-02-28' },
@@ -17,6 +18,7 @@ const PROFILES = {
     prenom: 'Marie', nom: 'Martin',
     email: 'marie.martin@ferme-du-bocage.fr',
     tel: '+33 7 52 18 93 46',
+    extraPhones: [],
     apiKeys: [
       { id: 1, name: 'Application mobile', created: '2026-02-14' },
     ]
@@ -105,11 +107,23 @@ function renderMonCompte() {
 
       <!-- Téléphone -->
       <section class="account-section">
-        <div class="account-section-title">Téléphone</div>
+        <div class="account-section-title" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <span>Téléphone</span>
+          ${(profile.extraPhones || []).length < 4 ? `<button class="btn-secondary" id="add-extra-phone-btn" style="font-size:12px"><i class="bi bi-plus"></i> Ajouter un numéro</button>` : ''}
+        </div>
         <div class="account-field-row">
-          <label class="account-label">Numéro</label>
+          <label class="account-label">Numéro principal</label>
           <input type="tel" class="account-input" value="${profile.tel}" id="field-tel">
           <button class="account-save-btn" data-field="tel"><i class="bi bi-check-lg"></i></button>
+        </div>
+        <div id="extra-phones-list">
+          ${(profile.extraPhones || []).map((p, i) => `
+          <div class="account-field-row extra-phone-row" data-index="${i}">
+            <input type="text" class="account-input" style="max-width:160px" placeholder="Nom" value="${p.nom}" data-extra-phone-nom="${i}">
+            <input type="tel" class="account-input" placeholder="Numéro" value="${p.numero}" data-extra-phone-num="${i}">
+            <button class="account-save-btn extra-phone-save" data-index="${i}"><i class="bi bi-check-lg"></i></button>
+            <button class="icon-btn remove-extra-phone" data-index="${i}" title="Supprimer"><i class="bi bi-x-lg"></i></button>
+          </div>`).join('')}
         </div>
       </section>
 
@@ -151,6 +165,12 @@ function renderMonCompte() {
           </label>
           <button class="account-save-btn" data-field="units"><i class="bi bi-check-lg"></i></button>
         </div>
+      </section>
+
+      <!-- Smartphones autorisés -->
+      <section class="account-section">
+        <div class="account-section-title">Smartphones autorisés</div>
+        <div id="smartphones-list"></div>
       </section>
 
       <!-- Clés d'API -->
@@ -302,6 +322,69 @@ function initApiKeys() {
   })
 }
 
+const MAX_EXTRA_PHONES = 4
+
+function initExtraPhones() {
+  const profile = getProfile()
+  if (!profile.extraPhones) profile.extraPhones = []
+
+  document.getElementById('add-extra-phone-btn')?.addEventListener('click', () => {
+    if (profile.extraPhones.length >= MAX_EXTRA_PHONES) return
+    profile.extraPhones.push({ nom: '', numero: '' })
+    renderMonCompte()
+  })
+
+  document.querySelectorAll('.remove-extra-phone').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index)
+      profile.extraPhones.splice(i, 1)
+      renderMonCompte()
+    })
+  })
+
+  document.querySelectorAll('.extra-phone-save').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.index)
+      const nom    = document.querySelector(`[data-extra-phone-nom="${i}"]`)?.value.trim() || ''
+      const numero = document.querySelector(`[data-extra-phone-num="${i}"]`)?.value.trim() || ''
+      profile.extraPhones[i] = { nom, numero }
+      showToast('Numéro enregistré.')
+    })
+  })
+}
+
+let smartphones = [
+  { id: 'A1B2-3C4D', model: 'iPhone 15 Pro' },
+  { id: 'E5F6-7G8H', model: 'Samsung Galaxy S24' },
+  { id: 'I9J0-K1L2', model: 'Google Pixel 8' },
+]
+
+function renderSmartphones() {
+  const list = document.getElementById('smartphones-list')
+  if (!list) return
+  if (!smartphones.length) {
+    list.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:4px 0">Aucun smartphone autorisé.</div>'
+    return
+  }
+  list.innerHTML = smartphones.map((d, i) => `
+    <div class="account-field-row" style="align-items:center">
+      <span class="account-label" style="font-family:monospace;font-size:12px;color:var(--txt3)">${d.id}</span>
+      <span class="account-value">${d.model}</span>
+      <button class="icon-btn remove-smartphone" data-index="${i}" title="Révoquer" style="color:var(--err)"><i class="bi bi-trash"></i></button>
+    </div>`).join('')
+  list.querySelectorAll('.remove-smartphone').forEach(btn => {
+    btn.addEventListener('click', () => {
+      smartphones.splice(parseInt(btn.dataset.index), 1)
+      renderSmartphones()
+      showToast('Smartphone révoqué.')
+    })
+  })
+}
+
+function initSmartphones() {
+  renderSmartphones()
+}
+
 function bindEvents() {
   document.querySelectorAll('.account-save-btn').forEach(btn => {
     btn.addEventListener('click', () => showToast('Modifications enregistrées.'))
@@ -315,6 +398,8 @@ function bindEvents() {
   )
 
   initApiKeys()
+  initExtraPhones()
+  initSmartphones()
 
   document.getElementById('delete-account-btn')?.addEventListener('click', () => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.')) return

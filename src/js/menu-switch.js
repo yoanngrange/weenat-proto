@@ -7,14 +7,14 @@ const menuData = {
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
       { href: 'integrations.html', icon: 'bi-plug', text: 'Intégrations' },
       { href: 'membres.html', icon: 'bi-people', text: 'Membres' },
+      { href: 'facturation.html', icon: 'bi-receipt', text: 'Facturation' },
       { href: 'parametres.html', icon: 'bi-gear', text: 'Paramètres' }
     ],
     reseau: [
       { href: 'parcelles-reseau.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs-reseau.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'adherents.html', icon: 'bi-person-plus', text: 'Adhérents' },
-      { href: 'facturation.html', icon: 'bi-receipt', text: 'Facturation' },
-      { href: 'parametres-reseau.html', icon: 'bi-gear', text: 'Paramètres' }
+      { href: 'parametres-reseau.html', icon: 'bi-info-circle', text: 'Informations' }
     ]
   },
   'adherent-reseau': {

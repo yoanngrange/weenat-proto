@@ -130,13 +130,17 @@ function renderTreatmentTable() {
 
   const rows = myPlots.map(p => {
     const d = plotTreatmentData(p)
+    const risk = d.daysAgo > 21 ? { cls: 'risk-red', label: 'Élevé' }
+               : d.daysAgo > 16 ? { cls: 'risk-orange', label: 'Modéré' }
+               : { cls: 'risk-green', label: 'Faible' }
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop}</td>
       <td class="tdb-num">${d.pluie7past} mm</td>
       <td>il y a ${d.daysAgo} jr</td>
       <td>${d.product}</td>
-      <td class="${d.isUrgent ? 'tdb-win-urgent' : ''}">${d.isUrgent ? '<i class="bi bi-alarm-fill"></i> ' : ''}${d.winDateStr} — ${d.winHour}:00 — ${d.winDur}h</td>
+      <td class="${d.isUrgent ? 'tdb-win-urgent' : ''}">${d.isUrgent ? '<i class="bi bi-alarm-fill"></i> ' : ''}${d.winDateStr} — ${d.winHour}:00 → ${(d.winHour + d.winDur) % 24}:00</td>
+      <td><span class="risk-badge ${risk.cls}">${risk.label}</span></td>
     </tr>`
   }).join('')
 
@@ -149,6 +153,7 @@ function renderTreatmentTable() {
         <th>Dernier traitement</th>
         <th>Dernier produit</th>
         <th>Prochaine fenêtre favorable</th>
+        <th>Risque</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>

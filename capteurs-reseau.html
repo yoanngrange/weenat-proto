@@ -44,7 +44,7 @@
         <a href="capteurs-reseau.html" class="active"><i class="bi bi-broadcast"></i> Capteurs</a>
         <a href="adherents.html" ><i class="bi bi-person-plus"></i> Adhérents</a>
         <a href="facturation.html" ><i class="bi bi-receipt"></i> Facturation</a>
-        <a href="parametres-reseau.html" ><i class="bi bi-gear"></i> Paramètres</a>
+        <a href="parametres-reseau.html" ><i class="bi bi-info-circle"></i> Informations</a>
       </div>
           <div class="nav-group compte">
         <a href="mon-compte.html" ><i class="bi bi-person"></i> Mon compte</a>
@@ -84,6 +84,12 @@
           </div>
           <div id="filters">
             <span class="filters-title">Filtrer</span>
+            <div class="filter-dropdown" id="fd-exploitation">
+              <button class="filter-dropdown-btn" type="button">
+                Exploitation <span class="fd-badge" id="badge-org" hidden></span>
+              </button>
+              <div class="filter-dropdown-panel" id="panel-org"></div>
+            </div>
             <div class="filter-dropdown" id="fd-model">
               <button class="filter-dropdown-btn" type="button">
                 Modèle <span class="fd-badge" id="badge-model" hidden></span>
@@ -111,12 +117,6 @@
                 <label><input type="checkbox" value="5G"> 5G</label>
               </div>
             </div>
-            <div class="filter-dropdown" id="fd-org">
-              <button class="filter-dropdown-btn" type="button">
-                Organisation <span class="fd-badge" id="badge-org" hidden></span>
-              </button>
-              <div class="filter-dropdown-panel" id="panel-org"></div>
-            </div>
             <div class="filter-dropdown" id="fd-ville">
               <button class="filter-dropdown-btn" type="button">
                 Ville <span class="fd-badge" id="badge-ville" hidden></span>
@@ -124,6 +124,7 @@
               <div class="filter-dropdown-panel" id="panel-ville"></div>
             </div>
             <label class="filter-toggle"><input type="checkbox" id="check-mon-secteur"> Mon secteur</label>
+            <label class="filter-toggle"><input type="checkbox" id="check-mes-favoris"> Mes favoris</label>
             <div id="active-filters"></div>
           </div>
         </div>

@@ -14,18 +14,18 @@ const STATUT_SIMPLIFIED = {
   'invitation en attente': 'invité',
   'inactif':               'inactif',
   'désactivé':             'inactif',
-  'demande en attente':    'demandeur',
+  'demande en attente':    "demande d'essai",
 }
 
 const STATUT_STYLES = {
-  'actif':      { cls: 'statut-actif',   icon: 'bi-check-circle-fill' },
-  'en essai':   { cls: 'statut-essai',   icon: 'bi-clock' },
-  'invité':     { cls: 'statut-invite',  icon: 'bi-envelope' },
-  'inactif':    { cls: 'statut-inactif', icon: 'bi-circle' },
-  'demandeur':  { cls: 'statut-attente', icon: 'bi-hourglass' },
+  'actif':           { cls: 'statut-actif',   icon: 'bi-check-circle-fill' },
+  'en essai':        { cls: 'statut-essai',   icon: 'bi-clock' },
+  'invité':          { cls: 'statut-invite',  icon: 'bi-envelope' },
+  'inactif':         { cls: 'statut-inactif', icon: 'bi-circle' },
+  "demande d'essai": { cls: 'statut-attente', icon: 'bi-hourglass' },
 }
 
-const STATUT_FILTER_OPTIONS = ['actif', 'en essai', 'invité', 'demandeur', 'inactif']
+const STATUT_FILTER_OPTIONS = ['actif', 'en essai', 'invité', "demande d'essai", 'inactif']
 
 function orgStatutSimplified(org) {
   return STATUT_SIMPLIFIED[org.statut] || 'inactif'
@@ -45,7 +45,7 @@ const localOrgs = _stored || orgs.map((o, i) => {
 const PLANS = ['Essential', 'Plus', 'Expert']
 
 let selectedPlans   = []
-let selectedStatuts = ['actif', 'en essai', 'invité', 'demandeur']
+let selectedStatuts = ['actif', 'en essai', 'invité', "demande d'essai"]
 let currentSort     = { column: null, direction: 'asc' }
 let selectedIds     = new Set()
 
@@ -61,7 +61,7 @@ function initFilters() {
   const plans = [...new Set(localOrgs.map(o => o.plan))].sort()
 
   makeCheckboxPanel('panel-plan',   plans,   v => { selectedPlans   = v }, 'badge-plan')
-  makeCheckboxPanel('panel-statut', STATUT_FILTER_OPTIONS, v => { selectedStatuts = v }, 'badge-statut', ['actif', 'en essai', 'invité', 'demandeur'])
+  makeCheckboxPanel('panel-statut', STATUT_FILTER_OPTIONS, v => { selectedStatuts = v }, 'badge-statut', ['actif', 'en essai', 'invité', "demande d'essai"])
 
   document.querySelectorAll('.filter-dropdown-btn').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -176,8 +176,9 @@ function render() {
     const statutStyle = STATUT_STYLES[simplified] || { cls: 'statut-inactif', icon: 'bi-circle' }
     const isDisabled  = simplified === 'inactif'
 
-    const membresHtml = orgMembers.length
-      ? orgMembers.map(m => `<div class="admin-item-row"><a href="adherent-detail.html?id=${org.id}" class="admin-link">${m.prenom} ${m.nom}</a><button class="icon-btn remove-member-org" data-member-id="${m.id}" data-org-id="${org.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
+    const firstMember = orgMembers[0]
+    const membresHtml = firstMember
+      ? `<div class="admin-item-row"><a href="adherent-detail.html?id=${org.id}" class="admin-link">${firstMember.prenom} ${firstMember.nom}</a><button class="icon-btn remove-member-org" data-member-id="${firstMember.id}" data-org-id="${org.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`
       : '<span class="tag-none">—</span>'
 
     const currentPropNom = `${org.prenomProprietaire} ${org.nomProprietaire}`.trim()
@@ -204,7 +205,13 @@ function render() {
       <td class="member-email">${org.codeAdherent}</td>
       <td>${proprietaireHtml}</td>
       <td><span class="plan-badge plan-badge--${(org.plan||'').toLowerCase()}">${org.plan}</span></td>
-      <td><span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${simplified}</span></td>
+      <td>
+        <span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${simplified}</span>
+        ${simplified === "demande d'essai" ? `
+          <button class="icon-btn accept-trial-btn" data-id="${org.id}" title="Accepter" style="color:var(--ok);margin-left:6px"><i class="bi bi-check-circle-fill"></i></button>
+          <button class="icon-btn reject-trial-btn" data-id="${org.id}" title="Rejeter" style="color:var(--err)"><i class="bi bi-x-circle-fill"></i></button>
+        ` : ''}
+      </td>
       <td class="member-email">${formatDate(org.dateAdhesion)}</td>
       <td class="member-email">${org.ville}</td>
       <td class="member-email">${org.departement}</td>
@@ -234,6 +241,22 @@ function render() {
         org.nomProprietaire    = member.nom
         persist()
       }
+    })
+  })
+
+  // Accept / reject trial request
+  tbody.querySelectorAll('.accept-trial-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const org = localOrgs.find(o => o.id === parseInt(btn.dataset.id))
+      if (org) { org.statut = 'actif en essai'; persist(); render() }
+    })
+  })
+  tbody.querySelectorAll('.reject-trial-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const org = localOrgs.find(o => o.id === parseInt(btn.dataset.id))
+      if (org) { org.statut = 'désactivé'; persist(); render() }
     })
   })
 
@@ -289,7 +312,7 @@ function updateActionBar() {
           ${members.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
         </select>
       </label>
-      <button id="bulk-delete-btn" class="btn-secondary" style="color:var(--err)"><i class="bi bi-trash"></i> Supprimer</button>
+      <button id="bulk-delete-btn" class="btn-secondary" style="color:var(--err)"><i class="bi bi-trash"></i> Désactiver</button>
       <button id="bulk-save-btn" class="btn-secondary" style="color:var(--ok)"><i class="bi bi-check-lg"></i> Enregistrer</button>
       <button id="bulk-cancel-btn" class="btn-secondary">Annuler</button>
     </div>
@@ -313,7 +336,7 @@ function updateActionBar() {
     showToast('Membre associé aux adhérents sélectionnés.'); render()
   })
   bar.querySelector('#bulk-delete-btn')?.addEventListener('click', () => {
-    if (!confirm(`Supprimer ${selectedIds.size} adhérent(s) ?`)) return
+    if (!confirm(`Désactiver ${selectedIds.size} adhérent(s) ?`)) return
     selectedIds.forEach(id => {
       const idx = localOrgs.findIndex(x => x.id === id)
       if (idx !== -1) localOrgs.splice(idx, 1)
@@ -355,21 +378,21 @@ function updateStats(list) {
   const enEssai    = list.filter(o => orgStatutSimplified(o) === 'en essai').length
   const inactifs   = list.filter(o => orgStatutSimplified(o) === 'inactif').length
   const invites    = list.filter(o => orgStatutSimplified(o) === 'invité').length
-  const demandeurs = list.filter(o => orgStatutSimplified(o) === 'demandeur').length
+  const demandeurs = list.filter(o => orgStatutSimplified(o) === "demande d'essai").length
+  const PLAN_COLORS = { 'Plus': '#00B093', 'Expert': '#006798' }
   const plans = PLANS.filter(p => p !== 'Essential')
-  const byPlan = plans.map(p => ({ label: p, value: list.filter(o => o.plan === p).length }))
+  const byPlan = plans.map(p => ({ label: p, value: list.filter(o => o.plan === p).length, color: PLAN_COLORS[p] }))
 
   document.getElementById('stats-cards').innerHTML = [
     { label: 'Adhérents',   value: total },
     { label: 'Actifs',      value: actifs },
     { label: 'En essai',    value: enEssai },
     { label: 'Invités',     value: invites,    warn: invites > 0 },
-    { label: 'Demandeurs',  value: demandeurs, warn: demandeurs > 0 },
-    { label: 'Inactifs',    value: inactifs,   warn: inactifs > 0 },
-    ...byPlan.map(p => ({ label: p.label, value: p.value }))
+    { label: "Demande d'essai", value: demandeurs, warn: demandeurs > 0 },
+    ...byPlan.map(p => ({ label: p.label, value: p.value, color: p.color }))
   ].map(s => `
-    <div class="stat-card${s.warn ? ' warn' : ''}">
-      <div class="stat-label">${s.label}</div>
+    <div class="stat-card${s.warn ? ' warn' : ''}" ${s.color ? `style="border-top-color:${s.color}"` : ''}>
+      <div class="stat-label" ${s.color ? `style="color:${s.color}"` : ''}>${s.label}</div>
       <div class="stat-value">${s.value}</div>
     </div>
   `).join('')

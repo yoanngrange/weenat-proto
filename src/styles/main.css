@@ -608,13 +608,13 @@ th.sort-desc::after {
 }
 
 .integ-plot-org {
-  background: var(--pri2);
-  color: var(--pri);
+  background: #FFF3E0;
+  color: #C25A00;
 }
 
 .integ-plot-adh {
-  background: var(--ok2);
-  color: var(--ok);
+  background: #EDE7F6;
+  color: #5E35B1;
 }
 
 .integ-active-pill {
@@ -1988,7 +1988,7 @@ td.num {
 /* ── Integrations grid — logo-left cards ── */
 #integrations-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 10px;
   padding: 16px;
 }
@@ -3295,8 +3295,8 @@ td.num {
 }
 
 .plan-essential { background: var(--bdr2); color: var(--txt2); }
-.plan-plus      { background: var(--pri2); color: var(--pri); }
-.plan-expert    { background: #E8D5F5;     color: #6B21A8; }
+.plan-plus      { background: #E6F7F4; color: #00B093; }
+.plan-expert    { background: #E6EFF4; color: #006798; }
 
 .statut-essai   { background: var(--warn2); color: var(--warn); }
 .statut-attente { background: #FEF9EC;      color: #B45309; }
@@ -4235,8 +4235,8 @@ td.num {
 }
 
 .plan-badge--essential { background: #e0f2fe; color: #0369a1; }
-.plan-badge--plus      { background: #f0fdf4; color: #15803d; }
-.plan-badge--expert    { background: #faf5ff; color: #7c3aed; }
+.plan-badge--plus      { background: #E6F7F4; color: #00B093; }
+.plan-badge--expert    { background: #E6EFF4; color: #006798; }
 
 /* ── Sensor config panel ─────────────────────────────────────────────────── */
 
@@ -5315,6 +5315,10 @@ tr.row-selected td {
 .tdb-irrig-ok { color: var(--txt3); }
 .tdb-win-urgent { background: var(--ok2); color: var(--ok); font-weight: 600; }
 .tdb-win-urgent i { margin-right: 4px; }
+.risk-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.risk-green  { background: #E6F7F0; color: #1a7a4a; }
+.risk-orange { background: #FEF3E2; color: #B45309; }
+.risk-red    { background: #FEE8E8; color: #C0392B; }
 .tdb-stage-key { background: var(--warn2); color: var(--warn); font-weight: 600; }
 .tdb-next-stage-name { font-weight: 600; color: var(--txt1); }
 .tdb-next-stage-date { font-size: 12px; color: var(--txt2); margin-top: 2px; display: block; }

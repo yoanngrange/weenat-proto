@@ -59,10 +59,6 @@ function renderBillingPage() {
               <div class="billing-stat-value">${CONTRACT.licencesIntegrations}</div>
               <div class="billing-stat-label">Licences intégrations</div>
             </div>
-            <div class="billing-stat-card billing-stat-card--total">
-              <div class="billing-stat-value">${CONTRACT.licencesTotal}</div>
-              <div class="billing-stat-label">Total licences</div>
-            </div>
           </div>
         </div>
 
@@ -83,10 +79,6 @@ function renderBillingPage() {
             <div class="billing-contract-item">
               <span class="billing-contract-label">N° contrat</span>
               <span class="billing-contract-value billing-contract-mono">${CONTRACT.numero}</span>
-            </div>
-            <div class="billing-contract-item">
-              <span class="billing-contract-label">Tarif</span>
-              <span class="billing-contract-value">${CONTRACT.prixUnitaire} € HT / mois / licence</span>
             </div>
           </div>
         </div>

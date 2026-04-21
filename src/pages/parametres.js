@@ -22,7 +22,7 @@ const SUBSCRIPTION_PLANS = [
     name: 'Weenat Plus',
     price: '14 €/mois',
     features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API'],
-    color: 'var(--pri)',
+    color: '#00B093',
     current: true
   },
   {
@@ -30,7 +30,7 @@ const SUBSCRIPTION_PLANS = [
     name: 'Weenat Expert',
     price: '25 €/mois',
     features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API','Multi-exploitation', 'Accès réseau adhérents', 'Modèles agronomiques avancés', 'Support prioritaire', 'Formation incluse'],
-    color: '#6B21A8'
+    color: '#006798'
   }
 ]
 
@@ -81,10 +81,6 @@ function renderForm() {
         <div class="param-field">
           <label class="param-label">Ville</label>
           <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${org.ville || ''}">
-        </div>
-        <div class="param-field">
-          <label class="param-label">SIRET</label>
-          <input type="text" class="param-input" id="org-siret" placeholder="14 chiffres" value="${org.siret || ''}">
         </div>
       </div>
 

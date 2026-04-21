@@ -361,9 +361,7 @@ function updateStats(list) {
   document.getElementById('stats-cards').innerHTML = [
     { label: 'Membres', value: total },
     { label: 'Actifs', value: actifs },
-    { label: 'Inactifs', value: inactifs, warn: inactifs > 0 },
     { label: 'Invités', value: invites },
-    { label: 'Désactivés', value: desactives, warn: desactives > 0 },
   ].map(s => `
     <div class="stat-card${s.warn ? ' warn' : ''}">
       <div class="stat-label">${s.label}</div>

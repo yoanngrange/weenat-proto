@@ -25,8 +25,16 @@ let selectedTelecoms = []
 let selectedOrgs = []
 let selectedVilles = []
 let filterMonSecteur = false
+let filterMonFavoris = false
 
 const MON_SECTEUR_DEPTS = new Set(["Ille-et-Vilaine", "Morbihan", "Côtes-d'Armor"])
+
+const favoritePlotIds   = new Set(JSON.parse(localStorage.getItem('favPlots')   || '[1,3,5,8,12]'))
+const favoriteSensorIds = new Set(JSON.parse(localStorage.getItem('favSensors') || '[1,4,7,10]'))
+function saveFavorites() {
+  localStorage.setItem('favPlots',   JSON.stringify([...favoritePlotIds]))
+  localStorage.setItem('favSensors', JSON.stringify([...favoriteSensorIds]))
+}
 let map
 let markers = []
 
@@ -275,6 +283,15 @@ function initFilters() {
   if (monSecteurCb) {
     monSecteurCb.addEventListener('change', () => {
       filterMonSecteur = monSecteurCb.checked
+      updateContent()
+    })
+  }
+
+  // Mes favoris checkbox
+  const favorisСb = document.getElementById('check-mes-favoris')
+  if (favorisСb) {
+    favorisСb.addEventListener('change', () => {
+      filterMonFavoris = favorisСb.checked
       updateContent()
     })
   }
@@ -584,6 +601,11 @@ function getFilteredData() {
     filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
   }
 
+  if (filterMonFavoris) {
+    filteredParcels = filteredParcels.filter(p => favoritePlotIds.has(p.id))
+    filteredSensors = filteredSensors.filter(s => favoriteSensorIds.has(s.id))
+  }
+
   if (selectedOrgs.length > 0) {
     filteredSensors = filteredSensors.filter(s => {
       const parcel = plots.find(p => p.id === s.parcelId)
@@ -612,11 +634,11 @@ const PAGE_TITLES = {
   'capteurs-reseau.html': { title: 'Capteurs', section: 'reseau' },
   'membres.html': { title: 'Membres', section: 'exploitation' },
   'adherents.html': { title: 'Adhérents', section: 'reseau' },
-  'facturation.html': { title: 'Facturation', section: 'reseau' },
+  'facturation.html': { title: 'Facturation', section: 'exploitation' },
   'previsions.html': { title: 'Prévisions', section: 'exploitation' },
   'integrations.html': { title: 'Intégrations', section: 'exploitation' },
   'parametres.html': { title: 'Paramètres', section: 'exploitation' },
-  'parametres-reseau.html': { title: 'Paramètres', section: 'reseau' },
+  'parametres-reseau.html': { title: 'Informations', section: 'reseau' },
   'informations.html': { title: 'Informations', section: 'reseau' },
   'alertes.html': { title: 'Mes alertes', section: null },
   'notifications.html': { title: 'Mes notifications', section: null },
@@ -1626,7 +1648,14 @@ function updateFilterChips() {
 }
 
 function createAdminTable(sensorList) {
-  let html = '<table id="admin-sensor-table"><thead><tr>'
+  let html = `
+    <div id="sensor-bulk-bar" class="bulk-bar hidden">
+      <span id="sensor-bulk-count"></span>
+      <div class="bulk-actions">
+        <button class="btn-secondary btn-sm" id="sensor-bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
+      </div>
+    </div>`
+  html += '<table id="admin-sensor-table"><thead><tr>'
   html += '<th class="col-check"><input type="checkbox" id="check-all-admin-sensor"></th>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
@@ -1684,13 +1713,39 @@ function createAdminTable(sensorList) {
   return html
 }
 
+function updateSensorBulkBar(container) {
+  const checked = container.querySelectorAll('.sensor-admin-check:checked')
+  const bar = container.querySelector('#sensor-bulk-bar')
+  const countEl = container.querySelector('#sensor-bulk-count')
+  if (!bar) return
+  if (checked.length > 0) {
+    bar.classList.remove('hidden')
+    if (countEl) countEl.textContent = `${checked.length} sélectionné${checked.length > 1 ? 's' : ''}`
+  } else {
+    bar.classList.add('hidden')
+  }
+}
+
 function initSensorAdminTable(container) {
   const checkAll = container.querySelector('#check-all-admin-sensor')
   if (checkAll) {
     checkAll.addEventListener('change', () => {
       container.querySelectorAll('.sensor-admin-check').forEach(cb => { cb.checked = checkAll.checked })
+      updateSensorBulkBar(container)
     })
   }
+
+  container.querySelectorAll('.sensor-admin-check').forEach(cb => {
+    cb.addEventListener('change', () => updateSensorBulkBar(container))
+  })
+
+  container.querySelector('#sensor-bulk-fav-btn')?.addEventListener('click', () => {
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    if (!ids.length) return
+    ids.forEach(id => favoriteSensorIds.add(id))
+    saveFavorites()
+    showToast(`${ids.length} capteur${ids.length > 1 ? 's' : ''} ajouté${ids.length > 1 ? 's' : ''} aux favoris`)
+  })
 
   container.querySelectorAll('.remove-parcel-sensor-admin').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -1820,6 +1875,7 @@ function createParcelAdminTable(parcels) {
         <button class="btn-secondary btn-sm" id="bulk-integ-btn"><i class="bi bi-plug"></i> Activer une intégration</button>
         <button class="btn-secondary btn-sm" id="bulk-alert-btn"><i class="bi bi-bell"></i> Créer une alerte</button>
         <button class="btn-secondary btn-sm" id="bulk-member-btn"><i class="bi bi-person"></i> Associer à un membre</button>
+        <button class="btn-secondary btn-sm" id="bulk-sensor-btn"><i class="bi bi-broadcast"></i> Lier un capteur</button>
         <button class="btn-secondary btn-sm" id="bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
         <button class="btn-secondary btn-sm bulk-archive-btn" id="bulk-archive-btn"><i class="bi bi-archive"></i> Archiver</button>
         <button class="btn-secondary btn-sm bulk-danger-btn" id="bulk-delete-btn"><i class="bi bi-trash"></i> Supprimer</button>
@@ -2093,10 +2149,22 @@ function initParcelAdminTable(container) {
     }
   })
 
+  // Lier un capteur
+  container.querySelector('#bulk-sensor-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    const val = prompt('N° de série du capteur à lier :')
+    if (val?.trim()) {
+      showToast(`Capteur « ${val.trim()} » lié à ${checked.length} parcelle${checked.length > 1 ? 's' : ''}`)
+    }
+  })
+
   // Ajouter aux favoris
   container.querySelector('#bulk-fav-btn')?.addEventListener('click', () => {
     const checked = getCheckedAdminIds(container)
     if (!checked.length) return
+    checked.forEach(id => favoritePlotIds.add(id))
+    saveFavorites()
     showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} ajoutée${checked.length > 1 ? 's' : ''} aux favoris`)
   })
 

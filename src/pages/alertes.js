@@ -10,6 +10,8 @@ const ALERTS_ADMIN = [
   { id: 5, name: 'Rayonnement faible', statut: 'inactif', metric: 'rayonnement', created: '2026-03-01', lastTriggered: null, sensorIds: [], parcelIds: [1] },
   { id: 6, name: 'DPV élevé > 2 kPa', statut: 'actif', metric: 'temperature', created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2], parcelIds: [2, 3] },
   { id: 7, name: 'Potentiel hydrique > 100 kPa', statut: 'actif', metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6], parcelIds: [6] },
+  { id: 8, name: 'Température humide < 0°C', statut: 'actif', metric: 'temp-humide', created: '2026-01-10', lastTriggered: '2026-03-05', sensorIds: [3], parcelIds: [1], phones: ['+33 6 12 34 56 78', '+33 7 52 18 93 46'] },
+  { id: 9, name: 'Température sèche > 35°C', statut: 'actif', metric: 'temp-seche', created: '2026-02-15', lastTriggered: '2026-04-18', sensorIds: [4], parcelIds: [3], phones: ['+33 6 12 34 56 78'] },
 ]
 
 const ALERTS_ADHERENT = [
@@ -29,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const METRIC_LABELS = {
   'pluie': 'Pluie', 'temperature': 'Température', 'teneur-eau': 'Teneur en eau sol',
   'potentiel-hydrique': 'Potentiel hydrique', 'vent': 'Vent', 'rayonnement': 'Rayonnement',
-  'humidite': 'Humidité air',
+  'humidite': 'Humidité air', 'temp-humide': 'Température humide', 'temp-seche': 'Température sèche',
 }
 
 let selectedStatuts = []
@@ -153,7 +155,7 @@ function render() {
   tbody.innerHTML = ''
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--txt3)">Aucune alerte.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--txt3)">Aucune alerte.</td></tr>'
     return
   }
 
@@ -181,6 +183,7 @@ function render() {
       <td class="admin-links-cell">${cibleHtml}</td>
       <td>${METRIC_LABELS[alert.metric] || alert.metric}</td>
       <td style="color:var(--txt3);font-style:italic;font-size:12px">Lorem ipsum dolor sit amet</td>
+      <td class="member-email">${(alert.phones || []).join('<br>') || '—'}</td>
       <td>
         <label class="toggle-switch" title="${isActif ? 'Désactiver' : 'Activer'}">
           <input type="checkbox" class="alert-toggle" data-id="${alert.id}"${isActif ? ' checked' : ''}>
