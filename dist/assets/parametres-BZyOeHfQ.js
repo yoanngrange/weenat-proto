@@ -1,4 +1,4 @@
-import"./main-DdpHcqUd.js";import{u as t}from"./breadcrumb-DEBQjfiD.js";import{m as o}from"./members-DPSnqfQ_.js";import{o as l}from"./orgs-b3kLTQ0f.js";import{n as i}from"./network-YzWdS0n_.js";document.addEventListener("DOMContentLoaded",()=>{t(),m()});const c=["Arboriculture","Viticulture","Maraîchage","Grandes cultures","Polyculture-Élevage","Pépiniériste","Floriculture","Trufficulture","Organismes publics / semi-publics","Coopérative","Négoce","Concessionnaire","Semencier","Laboratoire / Institut / Recherche","Autre"],n=[{id:"plus",name:"Weenat Plus",price:"14 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API"],color:"var(--pri)",current:!0},{id:"expert",name:"Weenat Expert",price:"25 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API","Multi-exploitation","Accès réseau adhérents","Modèles agronomiques avancés","Support prioritaire","Formation incluse"],color:"#6B21A8"}],d=(localStorage.getItem("menuRole")||"admin-reseau")==="admin-reseau",r=d?{...l[0],name:i.nom,siret:i.siret,adresse:i.siege.adresse,codePostal:i.siege.codePostal,ville:i.siege.ville}:l[0]||{name:"Ferme du Bocage",ville:"Rennes"},p=o.filter(a=>a.role==="propriétaire"||a.role==="admin");function m(){const a=document.getElementById("parametres-form");a&&(a.innerHTML=`
+import"./main-BX3ETblS.js";import{u as t}from"./breadcrumb-DEBQjfiD.js";import{m as o}from"./members-DPSnqfQ_.js";import{o as l}from"./orgs-b3kLTQ0f.js";import{n as i}from"./network-YzWdS0n_.js";document.addEventListener("DOMContentLoaded",()=>{t(),p()});const c=["Arboriculture","Viticulture","Maraîchage","Grandes cultures","Polyculture-Élevage","Pépiniériste","Floriculture","Trufficulture","Organismes publics / semi-publics","Coopérative","Négoce","Concessionnaire","Semencier","Laboratoire / Institut / Recherche","Autre"],n=[{id:"plus",name:"Weenat Plus",price:"14 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API"],color:"#00B093",current:!0},{id:"expert",name:"Weenat Expert",price:"25 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API","Multi-exploitation","Accès réseau adhérents","Modèles agronomiques avancés","Support prioritaire","Formation incluse"],color:"#006798"}],d=(localStorage.getItem("menuRole")||"admin-reseau")==="admin-reseau",r=d?{...l[0],name:i.nom,adresse:i.siege.adresse,codePostal:i.siege.codePostal,ville:i.siege.ville}:l[0]||{name:"Ferme du Bocage",ville:"Rennes"},m=o.filter(a=>a.role==="propriétaire"||a.role==="admin");function p(){const a=document.getElementById("parametres-form");a&&(a.innerHTML=`
     <div class="param-section">
       <div class="param-section-title">Mon exploitation</div>
 
@@ -10,7 +10,7 @@ import"./main-DdpHcqUd.js";import{u as t}from"./breadcrumb-DEBQjfiD.js";import{m
         <div class="param-field">
           <label class="param-label">Propriétaire</label>
           <select class="param-input" id="org-owner">
-            ${p.map(e=>`<option value="${e.id}">${e.prenom} ${e.nom}</option>`).join("")}
+            ${m.map(e=>`<option value="${e.id}">${e.prenom} ${e.nom}</option>`).join("")}
           </select>
         </div>
         <div class="param-field param-field--wide">
@@ -34,10 +34,6 @@ import"./main-DdpHcqUd.js";import{u as t}from"./breadcrumb-DEBQjfiD.js";import{m
         <div class="param-field">
           <label class="param-label">Ville</label>
           <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${r.ville||""}">
-        </div>
-        <div class="param-field">
-          <label class="param-label">SIRET</label>
-          <input type="text" class="param-input" id="org-siret" placeholder="14 chiffres" value="${r.siret||""}">
         </div>
       </div>
 
