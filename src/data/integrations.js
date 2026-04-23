@@ -47,7 +47,7 @@ export const integrations = [
     description: "Bilan hydrique mono-culture pour l'optimisation de l'irrigation.",
     descriptionLong: "Connectez votre pluviomètre ou station météo Weenat afin d'obtenir un bilan hydrique dédié à l'optimisation du pilotage de l'irrigation (version mono-culture).",
     sensors: ['P+', 'PT', 'P'],
-    connected: true
+    connected: false
   },
   {
     id: 'irre-lis-multi',
