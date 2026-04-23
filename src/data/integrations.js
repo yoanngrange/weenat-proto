@@ -27,7 +27,7 @@ export const integrations = [
     description: "Détection des risques maladies et ravageurs, optimisation des traitements.",
     descriptionLong: "Connectez votre station météo Weenat afin de détecter les risques maladies et ravageurs et d'optimiser vos traitements phytosanitaires grâce aux modèles Syngenta.",
     sensors: ['P+', 'PT'],
-    connected: true
+    connected: false
   },
   {
     id: 'decitrait',
