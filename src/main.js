@@ -24,6 +24,8 @@ let selectedEvents = []
 let selectedTelecoms = []
 let selectedOrgs = []
 let selectedVilles = []
+let selectedParcelNames = []
+let selectedMemberNames = []
 let filterMonSecteur = false
 let filterMonFavoris = false
 
@@ -240,6 +242,7 @@ function initViewSwitcher() {
 }
 
 function updateView() {
+  updateFiltersVisibility()
   document.querySelectorAll('.view').forEach(view => {
     view.classList.toggle('active', view.dataset.view === currentView)
   })
@@ -342,7 +345,10 @@ function makeCheckboxPanel(panelId, values, stateRef, badgeId, searchable = fals
     const searchHtml = searchable
       ? `<input type="text" class="filter-search" placeholder="Rechercher…" autocomplete="off">`
       : ''
-    panel.innerHTML = searchHtml + `<div class="filter-items">${buildItems(values)}</div>`
+    const allLabel = `<label class="filter-all-label"><input type="checkbox" class="cb-all-generic"> Tous</label>`
+    panel.innerHTML = searchHtml + allLabel + `<div class="filter-items">${buildItems(values)}</div>`
+
+    const cbAll = panel.querySelector('.cb-all-generic')
 
     if (searchable) {
       const input = panel.querySelector('.filter-search')
@@ -354,12 +360,23 @@ function makeCheckboxPanel(panelId, values, stateRef, badgeId, searchable = fals
         bindCheckboxes()
       })
     }
+
+    cbAll?.addEventListener('change', () => {
+      panel.querySelectorAll('.filter-items input[type=checkbox]').forEach(cb => { cb.checked = cbAll.checked })
+      const checked = cbAll.checked ? values : []
+      stateRef.set(checked)
+      updateBadge(badgeId, checked.length)
+      updateContent()
+    })
   }
 
   function bindCheckboxes() {
-    panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    const cbs = panel.querySelectorAll('.filter-items input[type=checkbox]')
+    const cbAll = panel.querySelector('.cb-all-generic')
+    cbs.forEach(cb => {
       cb.addEventListener('change', () => {
-        const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value)
+        const checked = Array.from(cbs).filter(c => c.checked).map(i => i.value)
+        if (cbAll) cbAll.checked = checked.length === (values?.length || 0)
         stateRef.set(checked)
         updateBadge(badgeId, checked.length)
         updateContent()
@@ -396,21 +413,49 @@ function populateFilterDropdowns() {
   makeCheckboxPanel('panel-telecom', null,
     { set: v => { selectedTelecoms = v } }, 'badge-telecom')
 
-  // Org panel for capteurs (network-only)
+  // Org panel for capteurs (network-only) — with search and "Tous"
   const panelOrg = document.getElementById('panel-org')
   if (panelOrg) {
-    panelOrg.innerHTML = ''
-    orgs.forEach(org => {
-      const lbl = document.createElement('label')
-      lbl.innerHTML = `<input type="checkbox" value="${org.id}"> ${org.name}`
-      panelOrg.appendChild(lbl)
-    })
-    panelOrg.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        selectedOrgs = Array.from(panelOrg.querySelectorAll('input:checked')).map(i => Number(i.value))
-        updateBadge('badge-org', selectedOrgs.length)
-        updateContent()
+    const orgValues = orgs.map(o => ({ id: o.id, name: o.name }))
+
+    function buildOrgItems(list) {
+      return list.map(o => `<label><input type="checkbox" value="${o.id}"${selectedOrgs.includes(o.id) ? ' checked' : ''}> ${o.name}</label>`).join('')
+    }
+
+    panelOrg.innerHTML = `
+      <input type="text" class="filter-search" placeholder="Rechercher une exploitation…" autocomplete="off">
+      <label class="filter-all-label"><input type="checkbox" class="cb-all-org"> Toutes</label>
+      <div class="filter-items">${buildOrgItems(orgValues)}</div>
+    `
+
+    const searchInput = panelOrg.querySelector('.filter-search')
+    const itemsEl = panelOrg.querySelector('.filter-items')
+    const cbAllOrg = panelOrg.querySelector('.cb-all-org')
+
+    function bindOrgCheckboxes() {
+      itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          selectedOrgs = Array.from(itemsEl.querySelectorAll('input:checked')).map(i => Number(i.value))
+          cbAllOrg.checked = selectedOrgs.length === orgs.length
+          updateBadge('badge-org', selectedOrgs.length)
+          updateContent()
+        })
       })
+    }
+    bindOrgCheckboxes()
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.toLowerCase()
+      const filtered = orgValues.filter(o => o.name.toLowerCase().includes(q))
+      itemsEl.innerHTML = buildOrgItems(filtered)
+      bindOrgCheckboxes()
+    })
+
+    cbAllOrg.addEventListener('change', () => {
+      itemsEl.querySelectorAll('input[type=checkbox]').forEach(cb => { cb.checked = cbAllOrg.checked })
+      selectedOrgs = cbAllOrg.checked ? orgs.map(o => o.id) : []
+      updateBadge('badge-org', selectedOrgs.length)
+      updateContent()
     })
   }
 
@@ -418,6 +463,22 @@ function populateFilterDropdowns() {
   const allVilles = [...new Set(orgs.map(o => o.ville).filter(Boolean))].sort()
   makeCheckboxPanel('panel-ville', allVilles,
     { set: v => { selectedVilles = v } }, 'badge-ville', false)
+
+  // Parcelle panel for capteurs
+  const panelParcel = document.getElementById('panel-parcel-filter')
+  if (panelParcel) {
+    const allParcels = plots.map(p => p.name).sort()
+    makeCheckboxPanel('panel-parcel-filter', allParcels,
+      { set: v => { selectedParcelNames = v; updateContent() } }, 'badge-parcel-filter', true)
+  }
+
+  // Membre panel for capteurs
+  const panelMember = document.getElementById('panel-member-filter')
+  if (panelMember) {
+    const allMemberNames = members.map(m => `${m.prenom} ${m.nom}`).sort()
+    makeCheckboxPanel('panel-member-filter', allMemberNames,
+      { set: v => { selectedMemberNames = v; updateContent() } }, 'badge-member-filter', true)
+  }
 }
 
 function updateBadge(id, count) {
@@ -437,10 +498,13 @@ function initFilterDropdownToggle() {
       e.stopPropagation()
       const dropdown = btn.closest('.filter-dropdown')
       const isOpen = dropdown.classList.contains('open')
-      // Close all
       document.querySelectorAll('.filter-dropdown.open').forEach(d => d.classList.remove('open'))
       if (!isOpen) dropdown.classList.add('open')
     })
+  })
+  // Clic dans le panel (input search, checkboxes…) ne doit pas fermer le dropdown
+  document.querySelectorAll('.filter-dropdown-panel').forEach(panel => {
+    panel.addEventListener('click', e => e.stopPropagation())
   })
   document.addEventListener('click', () => {
     document.querySelectorAll('.filter-dropdown.open').forEach(d => d.classList.remove('open'))
@@ -468,10 +532,10 @@ function updateFiltersVisibility() {
     el.style.display = currentRole === 'admin' ? 'block' : 'none'
   })
 
-  // Vue admin inaccessible pour l'adhérent sur les pages réseau
+  // Vue admin inaccessible pour l'adhérent (toutes sections capteurs)
   const adminViewBtn = document.querySelector('.view-btn[data-view="admin"]')
   if (adminViewBtn) {
-    const canSeeAdmin = currentRole === 'admin' || currentSection !== 'reseau'
+    const canSeeAdmin = currentRole === 'admin'
     adminViewBtn.style.display = canSeeAdmin ? '' : 'none'
     if (!canSeeAdmin && currentView === 'admin') {
       currentView = 'list'
@@ -621,6 +685,21 @@ function getFilteredData() {
       return villeOrgIds.has(parcel ? parcel.orgId : s.orgId)
     })
     filteredParcels = filteredParcels.filter(p => villeOrgIds.has(p.orgId))
+  }
+
+  if (selectedParcelNames.length > 0) {
+    const parcelIds = new Set(plots.filter(p => selectedParcelNames.includes(p.name)).map(p => p.id))
+    filteredSensors = filteredSensors.filter(s => parcelIds.has(s.parcelId))
+    filteredParcels = filteredParcels.filter(p => parcelIds.has(p.id))
+  }
+
+  if (selectedMemberNames.length > 0) {
+    const memberParcelIds = new Set(
+      members.filter(m => selectedMemberNames.includes(`${m.prenom} ${m.nom}`))
+        .flatMap(m => m.parcelIds)
+    )
+    filteredSensors = filteredSensors.filter(s => memberParcelIds.has(s.parcelId))
+    filteredParcels = filteredParcels.filter(p => memberParcelIds.has(p.id))
   }
 
   updateFilterChips()
@@ -1246,15 +1325,32 @@ function renderList(filteredParcels, filteredSensors) {
   container.innerHTML = ''
 
   if (pageType.startsWith('parcelles')) {
-    if (filteredParcels.length > 0) {
-      container.innerHTML = createParcelMetricTable(filteredParcels)
+    // Default sort: metric value descending
+    const sorted = !currentSort.column
+      ? [...filteredParcels].sort((a, b) => {
+          const av = computeMetricValue(a, currentMetric, currentAggregate) || 0
+          const bv = computeMetricValue(b, currentMetric, currentAggregate) || 0
+          return bv - av
+        })
+      : filteredParcels
+    if (sorted.length > 0) {
+      container.innerHTML = createParcelMetricTable(sorted)
     } else {
       container.innerHTML = '<p class="empty-state">Aucune parcelle ne correspond aux filtres sélectionnés.</p>'
     }
   } else {
-    // Capteurs pages: sensor table only (no parcel metric table)
-    if (filteredSensors.length > 0) {
-      container.innerHTML += createSensorTable(filteredSensors)
+    // Default sort: last message (most recent first) or metric value descending
+    const sorted = !currentSort.column
+      ? [...filteredSensors].sort((a, b) => {
+          const av = computeSensorValue(a, currentMetric, currentAggregate)
+          const bv = computeSensorValue(b, currentMetric, currentAggregate)
+          const an = av ? av[0] : -Infinity
+          const bn = bv ? bv[0] : -Infinity
+          return bn - an
+        })
+      : filteredSensors
+    if (sorted.length > 0) {
+      container.innerHTML += createSensorTable(sorted)
     } else {
       container.innerHTML = '<p class="empty-state">Aucun capteur ne correspond aux filtres sélectionnés.</p>'
     }
@@ -1307,13 +1403,7 @@ function getPlotDisplayName(plot) {
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 function formatSerial(sensor) {
-  const id = sensor.id
-  const c1 = CHARS[id % CHARS.length]
-  const num = String(400 + (id * 37) % 500).padStart(3, '0')
-  const c2 = CHARS[(id * 7) % CHARS.length]
-  const c3 = CHARS[(id * 13) % CHARS.length]
-  const d1 = (id * 3) % 10
-  return `${c1}${num}${c2}${c3}${d1}`
+  return sensor.serial || `WEE-${String(sensor.id).padStart(5, '0')}`
 }
 
 function getSensorAge(sensor) {
@@ -1652,7 +1742,30 @@ function createAdminTable(sensorList) {
     <div id="sensor-bulk-bar" class="bulk-bar hidden">
       <span id="sensor-bulk-count"></span>
       <div class="bulk-actions">
-        <button class="btn-secondary btn-sm" id="sensor-bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
+        <label class="bulk-action-group">
+          <span>Organisation</span>
+          <select id="sensor-bulk-org-sel" class="bulk-select">
+            <option value="">— choisir —</option>
+            ${orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+          </select>
+        </label>
+        <label class="bulk-action-group">
+          <span>Parcelle</span>
+          <select id="sensor-bulk-parcel-sel" class="bulk-select">
+            <option value="">— choisir —</option>
+            ${plots.slice(0, 50).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+          </select>
+        </label>
+        <label class="bulk-action-group">
+          <span>Membre</span>
+          <select id="sensor-bulk-member-sel" class="bulk-select">
+            <option value="">— choisir —</option>
+            ${members.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
+          </select>
+        </label>
+        <button class="btn-secondary btn-sm" id="sensor-bulk-stop-event-btn"><i class="bi bi-x-circle"></i> Arrêter l'événement</button>
+        <button class="btn-secondary btn-sm" id="sensor-bulk-hibernate-btn"><i class="bi bi-moon"></i> Hibernation</button>
+        <button class="btn-secondary btn-sm" id="sensor-bulk-fav-btn"><i class="bi bi-star"></i> Favoris</button>
       </div>
     </div>`
   html += '<table id="admin-sensor-table"><thead><tr>'
@@ -1745,6 +1858,48 @@ function initSensorAdminTable(container) {
     ids.forEach(id => favoriteSensorIds.add(id))
     saveFavorites()
     showToast(`${ids.length} capteur${ids.length > 1 ? 's' : ''} ajouté${ids.length > 1 ? 's' : ''} aux favoris`)
+  })
+
+  container.querySelector('#sensor-bulk-org-sel')?.addEventListener('change', e => {
+    const orgId = parseInt(e.target.value); if (!orgId) return
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.orgId = orgId })
+    e.target.value = ''
+    showToast(`Organisation assignée à ${ids.length} capteur${ids.length > 1 ? 's' : ''}.`)
+    updateContent()
+  })
+
+  container.querySelector('#sensor-bulk-parcel-sel')?.addEventListener('change', e => {
+    const parcelId = parseInt(e.target.value); if (!parcelId) return
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.parcelId = parcelId })
+    e.target.value = ''
+    showToast(`Parcelle assignée à ${ids.length} capteur${ids.length > 1 ? 's' : ''}.`)
+    updateContent()
+  })
+
+  container.querySelector('#sensor-bulk-member-sel')?.addEventListener('change', e => {
+    const memberId = parseInt(e.target.value); if (!memberId) return
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    const m = members.find(x => x.id === memberId)
+    showToast(`${ids.length} capteur${ids.length > 1 ? 's' : ''} associé${ids.length > 1 ? 's' : ''} à ${m?.prenom} ${m?.nom}.`)
+    e.target.value = ''
+  })
+
+  container.querySelector('#sensor-bulk-stop-event-btn')?.addEventListener('click', () => {
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    if (!ids.length) return
+    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.event = null })
+    showToast(`Événement arrêté sur ${ids.length} capteur${ids.length > 1 ? 's' : ''}.`)
+    updateContent()
+  })
+
+  container.querySelector('#sensor-bulk-hibernate-btn')?.addEventListener('click', () => {
+    const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
+    if (!ids.length) return
+    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.event = 'hibernation' })
+    showToast(`${ids.length} capteur${ids.length > 1 ? 's' : ''} mis en hibernation.`)
+    updateContent()
   })
 
   container.querySelectorAll('.remove-parcel-sensor-admin').forEach(btn => {

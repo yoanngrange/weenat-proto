@@ -1,6 +1,7 @@
 // 30 membres : 1 propriétaire, 4 admins, 20 agents, 5 lecteurs
-// 25% femmes (8), 75% hommes (22)
-// ~90% des parcelles sont associées à un seul membre
+// Propriétaire et admins n'ont pas d'organisation associée (orgIds: [])
+// Seuls les agents ont une organisation (1 max)
+// Statuts variés : actif, inactif, invité
 
 export const members = [
   // ── Propriétaire (1M) ─────────────────────────────────────────────────────
@@ -8,7 +9,7 @@ export const members = [
     id: 1, prenom: 'Philippe', nom: 'Renard',
     email: 'philippe.renard@breizagri-conseil.fr',
     role: 'propriétaire', statut: 'actif',
-    orgIds: [1, 5, 12],
+    orgIds: [],
     parcelIds: [2, 13, 37]
   },
 
@@ -17,32 +18,32 @@ export const members = [
     id: 2, prenom: 'Thomas', nom: 'Bertrand',
     email: 'thomas.bertrand@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [3, 9],
+    orgIds: [],
     parcelIds: [4, 10, 28, 41]
   },
   {
     id: 3, prenom: 'Julien', nom: 'Martin',
     email: 'julien.martin@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [2, 7, 14, 18],
+    orgIds: [],
     parcelIds: [6, 20, 33]
   },
   {
     id: 4, prenom: 'Sophie', nom: 'Dubois',
     email: 'sophie.dubois@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [4, 11, 16, 19, 20],
+    orgIds: [],
     parcelIds: [15, 26, 38, 42]
   },
   {
     id: 5, prenom: 'Nicolas', nom: 'Laurent',
     email: 'nicolas.laurent@breizagri-conseil.fr',
     role: 'admin', statut: 'actif',
-    orgIds: [6, 13],
+    orgIds: [],
     parcelIds: []
   },
 
-  // ── Agents (15M, 5F) ──────────────────────────────────────────────────────
+  // ── Agents (15M, 5F) — 1 organisation max chacun ──────────────────────────
   {
     id: 6, prenom: 'Alexandre', nom: 'Bernard',
     email: 'alexandre.bernard@breizagri-conseil.fr',
@@ -52,148 +53,147 @@ export const members = [
   {
     id: 7, prenom: 'Maxime', nom: 'Petit',
     email: 'maxime.petit@breizagri-conseil.fr',
-    role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [3, 4]
+    role: 'agent', statut: 'invité',
+    orgIds: [2], parcelIds: [3, 4]
   },
   {
     id: 8, prenom: 'Claire', nom: 'Moreau',
     email: 'claire.moreau@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [5, 6]
+    orgIds: [3], parcelIds: [5, 6]
   },
   {
     id: 9, prenom: 'François', nom: 'Leroy',
     email: 'francois.leroy@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [7, 8]
+    orgIds: [4], parcelIds: [7, 8]
   },
   {
     id: 10, prenom: 'Sébastien', nom: 'Girard',
     email: 'sebastien.girard@breizagri-conseil.fr',
-    role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [9, 10, 11]
+    role: 'agent', statut: 'invité',
+    orgIds: [5], parcelIds: [9, 10, 11]
   },
   {
     id: 11, prenom: 'Damien', nom: 'Rousseau',
     email: 'damien.rousseau@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [12, 13]
+    orgIds: [6], parcelIds: [12, 13]
   },
   {
     id: 12, prenom: 'Marie', nom: 'Dumont',
     email: 'marie.dumont@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [1], parcelIds: [14, 15]
+    orgIds: [7], parcelIds: [14, 15]
   },
   {
     id: 13, prenom: 'Antoine', nom: 'Noël',
     email: 'antoine.noel@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [2], parcelIds: [16, 17]
+    orgIds: [8], parcelIds: [16, 17]
   },
   {
     id: 14, prenom: 'Kevin', nom: 'Simon',
     email: 'kevin.simon@breizagri-conseil.fr',
     role: 'agent', statut: 'inactif',
-    orgIds: [2, 3], parcelIds: [18, 19, 20]
+    orgIds: [9], parcelIds: [18, 19, 20]
   },
   {
     id: 15, prenom: 'Romain', nom: 'Leclerc',
     email: 'romain.leclerc@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [3], parcelIds: [21]
+    orgIds: [10], parcelIds: [21]
   },
   {
     id: 16, prenom: 'Lucie', nom: 'Fontaine',
     email: 'lucie.fontaine@breizagri-conseil.fr',
-    role: 'agent', statut: 'actif',
-    orgIds: [4], parcelIds: [22, 23]
+    role: 'agent', statut: 'invité',
+    orgIds: [11], parcelIds: [22, 23]
   },
   {
     id: 17, prenom: 'Vincent', nom: 'Barbier',
     email: 'vincent.barbier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [5], parcelIds: [24, 25]
+    orgIds: [12], parcelIds: [24, 25]
   },
   {
     id: 18, prenom: 'Christophe', nom: 'Garnier',
     email: 'christophe.garnier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [6], parcelIds: [26, 27]
+    orgIds: [13], parcelIds: [26, 27]
   },
   {
     id: 19, prenom: 'Nathalie', nom: 'Perez',
     email: 'nathalie.perez@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [7, 8], parcelIds: [28, 29]
+    orgIds: [14], parcelIds: [28, 29]
   },
   {
     id: 20, prenom: 'Arnaud', nom: 'Meyer',
     email: 'arnaud.meyer@breizagri-conseil.fr',
-    role: 'agent', statut: 'actif',
-    orgIds: [8, 9], parcelIds: [30, 31]
+    role: 'agent', statut: 'inactif',
+    orgIds: [15], parcelIds: [30, 31]
   },
   {
     id: 21, prenom: 'Guillaume', nom: 'Roux',
     email: 'guillaume.roux@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [10, 11], parcelIds: [32, 33]
+    orgIds: [16], parcelIds: [32, 33]
   },
   {
     id: 22, prenom: 'Étienne', nom: 'Chevalier',
     email: 'etienne.chevalier@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [12, 13], parcelIds: [34, 35]
+    orgIds: [17], parcelIds: [34, 35]
   },
   {
     id: 23, prenom: 'Isabelle', nom: 'Schmitt',
     email: 'isabelle.schmitt@breizagri-conseil.fr',
-    role: 'agent', statut: 'inactif',
-    orgIds: [14, 15], parcelIds: [36, 37]
+    role: 'agent', statut: 'invité',
+    orgIds: [18], parcelIds: [36, 37]
   },
   {
     id: 24, prenom: 'Pierre', nom: 'Thomas',
     email: 'pierre.thomas@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [15, 16, 17], parcelIds: [38, 39]
+    orgIds: [19], parcelIds: [38, 39]
   },
   {
     id: 25, prenom: 'Cédric', nom: 'Morin',
     email: 'cedric.morin@breizagri-conseil.fr',
     role: 'agent', statut: 'actif',
-    orgIds: [18, 19, 20], parcelIds: [40, 41, 42]
+    orgIds: [20], parcelIds: [40, 41, 42]
   },
 
   // ── Lecteurs (3M, 2F) ─────────────────────────────────────────────────────
-  // Parcelles 1, 5, 15, 30, 40 ont 2 membres (~10%)
   {
     id: 26, prenom: 'Benoît', nom: 'Faure',
     email: 'benoit.faure@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
-    orgIds: [1], parcelIds: [1]
+    orgIds: [], parcelIds: [1]
   },
   {
     id: 27, prenom: 'Alice', nom: 'Masson',
     email: 'alice.masson@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
-    orgIds: [1], parcelIds: [5]
+    orgIds: [], parcelIds: [5]
   },
   {
     id: 28, prenom: 'Laurent', nom: 'Colin',
     email: 'laurent.colin@breizagri-conseil.fr',
-    role: 'lecteur', statut: 'actif',
-    orgIds: [2], parcelIds: [15]
+    role: 'lecteur', statut: 'invité',
+    orgIds: [], parcelIds: [15]
   },
   {
     id: 29, prenom: 'Véronique', nom: 'Blanc',
     email: 'veronique.blanc@breizagri-conseil.fr',
     role: 'lecteur', statut: 'actif',
-    orgIds: [8], parcelIds: [30]
+    orgIds: [], parcelIds: [30]
   },
   {
     id: 30, prenom: 'Stéphane', nom: 'Denis',
     email: 'stephane.denis@breizagri-conseil.fr',
     role: 'lecteur', statut: 'inactif',
-    orgIds: [18], parcelIds: [40]
+    orgIds: [], parcelIds: [40]
   }
 ]

@@ -70,28 +70,59 @@
             <option value="">Choisir une parcelle ou un capteur</option>
           </select>
         </div>
-        <main id="content">
+        <main id="content" style="overflow-y:auto">
+
+          <!-- Cartes jours -->
           <div id="forecast"></div>
-          <table id="hourly-table">
-            <thead>
-              <tr>
-                <th>Heure</th>
-                <th>Météo</th>
-                <th>Pluie</th>
-                <th>Temp</th>
-                <th>Humidité</th>
-                <th>Vent</th>
-                <th data-col="winddir">Dir. vent</th>
-                <th>DPV</th>
-                <th>Rayonnement</th>
-                <th>Nuages</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Lignes horaires -->
-            </tbody>
-          </table>
-          <div class="badge">AROME</div>
+
+          <!-- Bandeau horaire + courbe + tableau -->
+          <div id="hourly-section" style="padding:0 20px 32px">
+            <div id="hourly-header">
+              <div>
+                <div id="hourly-day-label" style="font-weight:700;font-size:15px"></div>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+                  <span style="font-size:12px;color:var(--txt2)">Prévisions heure par heure</span>
+                  <span class="badge" style="background:#1a1a2e;color:#fff;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.05em">AROME</span>
+                </div>
+              </div>
+              <div id="metric-picker" style="display:flex;align-items:center;gap:6px">
+                <select id="hourly-metric-sel" class="param-input" style="width:160px">
+                  <option value="temp">🌡 Température</option>
+                  <option value="pluie">🌧 Pluie</option>
+                  <option value="humidity">💧 Humidité</option>
+                  <option value="wind">💨 Vent</option>
+                  <option value="radiation">☀️ Rayonnement</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Bandeau scroll -->
+            <div id="hourly-strip-wrap">
+              <div id="hourly-strip"></div>
+            </div>
+
+            <!-- Courbe SVG -->
+            <div id="hourly-curve-wrap">
+              <svg id="hourly-curve" width="100%" height="80" preserveAspectRatio="none"></svg>
+            </div>
+
+            <!-- Tableau -->
+            <table id="hourly-table">
+              <thead>
+                <tr>
+                  <th>Horaire</th>
+                  <th>Pluie</th>
+                  <th>Température</th>
+                  <th>Humidité</th>
+                  <th>Vent</th>
+                  <th>Déficit de pression de vapeur</th>
+                  <th>Rayonnement solaire</th>
+                  <th>Couverture nuageuse</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </main>
       </div>
     </div>

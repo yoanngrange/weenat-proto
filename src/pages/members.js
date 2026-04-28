@@ -13,19 +13,15 @@ const ROLE_COLORS = {
 }
 
 const ROLES = ['propriétaire', 'admin', 'agent', 'lecteur']
-const STATUTS = ['actif', 'inactif', 'invité', 'désactivé']
+const STATUTS = ['actif', 'inactif', 'invité']
 
-// Local mutable copy — restored from localStorage if available
-const _stored = getStoredMembers()
-const localMembers = _stored || members.map((m, i) => ({
-  ...m,
-  statut: m.statut || (
-    m.role === 'propriétaire' ? 'actif' :
-    i % 7 === 0 ? 'inactif' :
-    i % 11 === 0 ? 'invité' :
-    i % 17 === 0 ? 'désactivé' : 'actif'
-  )
-}))
+// Versionner pour invalider le cache localStorage si les données source changent
+const DATA_VERSION = 'v4'
+const _storedRaw = getStoredMembers()
+const _stored = (_storedRaw && _storedRaw._version === DATA_VERSION) ? _storedRaw.data : null
+
+// Local mutable copy — fresh from source data (statuts déjà définis dans members.js)
+const localMembers = _stored || members.map(m => ({ ...m }))
 
 let selectedRoles   = []
 let selectedStatuts = ['actif', 'invité']
@@ -63,6 +59,9 @@ function initFilters() {
       if (!open) dd.classList.add('open')
     })
   })
+  document.querySelectorAll('.filter-dropdown-panel').forEach(panel => {
+    panel.addEventListener('click', e => e.stopPropagation())
+  })
   document.addEventListener('click', () => {
     document.querySelectorAll('.filter-dropdown.open').forEach(d => d.classList.remove('open'))
   })
@@ -91,20 +90,39 @@ function initFilters() {
 function makeCheckboxPanel(panelId, values, onChange, badgeId, preChecked = []) {
   const panel = document.getElementById(panelId)
   if (!panel) return
-  panel.innerHTML = values.map(v =>
-    `<label><input type="checkbox" value="${v}"${preChecked.includes(v) ? ' checked' : ''}> ${v}</label>`
-  ).join('')
+
+  const buildItems = () => [
+    `<label class="filter-all-label"><input type="checkbox" class="cb-all"> Tous</label>`,
+    ...values.map(v => `<label><input type="checkbox" value="${v}"${preChecked.includes(v) ? ' checked' : ''}> ${v}</label>`)
+  ].join('')
+
+  panel.innerHTML = buildItems()
   if (preChecked.length) onChange(preChecked)
   updateBadge(badgeId, preChecked.length)
 
-  panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value)
+  function bindAll() {
+    const cbAll = panel.querySelector('.cb-all')
+    const cbs = () => panel.querySelectorAll('input[type=checkbox]:not(.cb-all)')
+
+    cbAll?.addEventListener('change', () => {
+      cbs().forEach(cb => { cb.checked = cbAll.checked })
+      const checked = cbAll.checked ? values : []
       onChange(checked)
       updateBadge(badgeId, checked.length)
       render()
     })
-  })
+
+    cbs().forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checked = Array.from(cbs()).filter(c => c.checked).map(i => i.value)
+        if (cbAll) cbAll.checked = checked.length === values.length
+        onChange(checked)
+        updateBadge(badgeId, checked.length)
+        render()
+      })
+    })
+  }
+  bindAll()
 }
 
 function updateBadge(id, count) {
@@ -123,7 +141,7 @@ function getFiltered() {
   return list
 }
 
-function persist() { saveMembers(localMembers) }
+function persist() { saveMembers({ _version: DATA_VERSION, data: localMembers }) }
 
 function render() {
   const list = getFiltered()
@@ -156,14 +174,17 @@ function render() {
   }
 
   list.forEach(m => {
-    const memberOrgs    = orgs.filter(o => m.orgIds.includes(o.id))
+    const isAgent = m.role === 'agent'
+    const memberOrgs    = isAgent ? orgs.filter(o => m.orgIds.includes(o.id)) : []
     const memberParcels = plots.filter(p => m.parcelIds.includes(p.id))
     const excluded = m.excludedSensorIds || []
     const memberSensors = sensors.filter(s => m.parcelIds.includes(s.parcelId) && !excluded.includes(s.id))
 
-    const orgsHtml = memberOrgs.length
-      ? memberOrgs.map(o => `<div class="admin-item-row"><a href="adherents.html" class="admin-link">${o.name}</a><button class="icon-btn remove-org" data-member-id="${m.id}" data-org-id="${o.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
-      : '<span class="tag-none">—</span>'
+    const orgsHtml = !isAgent
+      ? '<span class="tag-none" style="color:var(--txt3);font-size:11px">—</span>'
+      : memberOrgs.length
+        ? memberOrgs.map(o => `<div class="admin-item-row"><a href="adherents.html" class="admin-link">${o.name}</a><button class="icon-btn remove-org" data-member-id="${m.id}" data-org-id="${o.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
+        : '<span class="tag-none">—</span>'
     const parcelsHtml = memberParcels.length
       ? memberParcels.map(p => `<div class="admin-item-row"><a href="parcelle-detail.html?id=${p.id}" class="admin-link">${p.name}</a><button class="icon-btn remove-parcel" data-member-id="${m.id}" data-parcel-id="${p.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
       : '<span class="tag-none">—</span>'
@@ -171,9 +192,7 @@ function render() {
       ? memberSensors.map(s => `<div class="admin-item-row"><a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial} <span class="member-sensor-model">${s.model}</span></a><button class="icon-btn remove-sensor" data-member-id="${m.id}" data-sensor-id="${s.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
       : '<span class="tag-none">—</span>'
 
-    const isDisabled = m.statut === 'désactivé'
     const tr = document.createElement('tr')
-    if (isDisabled) tr.style.opacity = '0.5'
     if (selectedIds.has(m.id)) tr.classList.add('row-selected')
     tr.innerHTML = `
       <td class="col-check"><input type="checkbox" class="row-cb" data-id="${m.id}"${selectedIds.has(m.id) ? ' checked' : ''}></td>

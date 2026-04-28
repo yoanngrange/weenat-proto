@@ -64,6 +64,9 @@ function initFilters() {
       if (!open) dd.classList.add('open')
     })
   })
+  document.querySelectorAll('.filter-dropdown-panel').forEach(panel => {
+    panel.addEventListener('click', e => e.stopPropagation())
+  })
   document.addEventListener('click', () => {
     document.querySelectorAll('.filter-dropdown.open').forEach(d => d.classList.remove('open'))
   })
@@ -72,7 +75,12 @@ function initFilters() {
     const allIds = getFiltered().map(a => a.id)
     if (this.checked) allIds.forEach(id => selectedIds.add(id))
     else selectedIds.clear()
-    render()
+    // Mettre à jour visuellement les checkboxes et la barre sans re-rendre tout
+    document.querySelectorAll('#alertes-table tbody .row-cb').forEach(cb => {
+      cb.checked = selectedIds.has(parseInt(cb.dataset.id))
+      cb.closest('tr').classList.toggle('row-selected', cb.checked)
+    })
+    updateAlertActionBar()
   })
 
   document.getElementById('alertes-table')?.addEventListener('click', e => {
@@ -89,14 +97,31 @@ function initFilters() {
 function makeCheckboxPanel(panelId, values, onChange, badgeId, preChecked = []) {
   const panel = document.getElementById(panelId)
   if (!panel) return
-  panel.innerHTML = values.map(v =>
-    `<label><input type="checkbox" value="${v}"${preChecked.includes(v) ? ' checked' : ''}> ${v}</label>`
-  ).join('')
+
+  const buildItems = () => [
+    `<label class="filter-all-label"><input type="checkbox" class="cb-all"> Tous</label>`,
+    ...values.map(v => `<label><input type="checkbox" value="${v}"${preChecked.includes(v) ? ' checked' : ''}> ${v}</label>`)
+  ].join('')
+
+  panel.innerHTML = buildItems()
   if (preChecked.length) onChange(preChecked)
   updateBadge(badgeId, preChecked.length)
-  panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
+
+  const cbAll = panel.querySelector('.cb-all')
+  const cbs = () => panel.querySelectorAll('input[type=checkbox]:not(.cb-all)')
+
+  cbAll?.addEventListener('change', () => {
+    cbs().forEach(cb => { cb.checked = cbAll.checked })
+    const checked = cbAll.checked ? values : []
+    onChange(checked)
+    updateBadge(badgeId, checked.length)
+    render()
+  })
+
+  cbs().forEach(cb => {
     cb.addEventListener('change', () => {
-      const checked = Array.from(panel.querySelectorAll('input:checked')).map(i => i.value)
+      const checked = Array.from(cbs()).filter(c => c.checked).map(i => i.value)
+      if (cbAll) cbAll.checked = checked.length === values.length
       onChange(checked)
       updateBadge(badgeId, checked.length)
     })
@@ -156,28 +181,30 @@ function render() {
 
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="padding:32px;text-align:center;color:var(--txt3)">Aucune alerte.</td></tr>'
+    updateAlertActionBar()
     return
   }
 
   list.forEach(alert => {
     const alertSensors = sensors.filter(s => alert.sensorIds.includes(s.id))
     const alertParcels = plots.filter(p => alert.parcelIds.includes(p.id))
+    const isActif = alert.statut === 'actif'
 
     const sensorsHtml = alertSensors.length
-      ? alertSensors.map(s => `<div class="admin-item-row"><span class="admin-link" style="cursor:default">${s.serial}</span><button class="icon-btn remove-alert-sensor" data-id="${alert.id}" data-sensor="${s.id}" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
+      ? alertSensors.map(s => `<div class="admin-item-row"><span class="admin-link" style="cursor:default">${s.serial}</span><button class="icon-btn" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
       : ''
     const parcelsHtml = alertParcels.length
       ? alertParcels.map(p => `<div class="admin-item-row"><span class="admin-link" style="cursor:default">${p.name}</span><button class="icon-btn" title="Retirer"><i class="bi bi-x-lg"></i></button></div>`).join('')
       : ''
     const cibleHtml = (sensorsHtml + parcelsHtml) || '<span class="tag-none">—</span>'
 
-    const isActif = alert.statut === 'actif'
-
     const tr = document.createElement('tr')
     if (selectedIds.has(alert.id)) tr.classList.add('row-selected')
     tr.innerHTML = `
       <td class="col-check"><input type="checkbox" class="row-cb" data-id="${alert.id}"${selectedIds.has(alert.id) ? ' checked' : ''}></td>
-      <td data-column="name" style="font-weight:500">${alert.name}</td>
+      <td data-column="name" style="font-weight:500">
+        <a href="alerte-config.html?id=${alert.id}" class="admin-link">${alert.name}</a>
+      </td>
       <td class="member-email">${fmtDate(alert.created)}</td>
       <td class="member-email">${fmtDate(alert.lastTriggered)}</td>
       <td class="admin-links-cell">${cibleHtml}</td>
@@ -198,7 +225,7 @@ function render() {
     cb.addEventListener('change', () => {
       const id = parseInt(cb.dataset.id)
       if (cb.checked) selectedIds.add(id); else selectedIds.delete(id)
-      render()
+      updateAlertActionBar()
     })
   })
 
@@ -213,8 +240,97 @@ function render() {
     })
   })
 
+  // Sync select-all state
+  const allIds = list.map(a => a.id)
+  const selAll = document.getElementById('select-all-alertes')
+  if (selAll) {
+    selAll.checked = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+    selAll.indeterminate = !selAll.checked && allIds.some(id => selectedIds.has(id))
+  }
+
   document.querySelectorAll('#alertes-table th[data-column]').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc')
     if (th.dataset.column === currentSort.column) th.classList.add(`sort-${currentSort.direction}`)
+  })
+
+  updateAlertActionBar()
+}
+
+function updateAlertActionBar() {
+  let bar = document.getElementById('alert-action-bar')
+  if (!bar) {
+    bar = document.createElement('div')
+    bar.id = 'alert-action-bar'
+    bar.className = 'bulk-bar hidden'
+    const statsEl = document.getElementById('stats-cards')
+    if (statsEl) statsEl.insertAdjacentElement('afterend', bar)
+  }
+
+  if (selectedIds.size === 0) {
+    bar.classList.add('hidden')
+    return
+  }
+
+  const selectedAlerts = ALERTS.filter(a => selectedIds.has(a.id))
+  const allActif   = selectedAlerts.every(a => a.statut === 'actif')
+  const allInactif = selectedAlerts.every(a => a.statut === 'inactif')
+  const toggleLabel = allActif ? 'Désactiver' : allInactif ? 'Activer' : 'Activer / Désactiver'
+  const toggleIcon  = allActif ? 'bi-toggle-off' : 'bi-toggle-on'
+
+  bar.classList.remove('hidden')
+  bar.innerHTML = `
+    <span class="bulk-count">${selectedIds.size} sélectionnée${selectedIds.size > 1 ? 's' : ''}</span>
+    <div class="bulk-actions">
+      <button class="btn-secondary btn-sm" id="alert-bulk-toggle">
+        <i class="bi ${toggleIcon}"></i> ${toggleLabel}
+      </button>
+      <label class="bulk-action-group">
+        <span>Lier une parcelle</span>
+        <select id="alert-bulk-parcel" class="bulk-select">
+          <option value="">— choisir —</option>
+          ${plots.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </label>
+      <label class="bulk-action-group">
+        <span>Lier un capteur</span>
+        <select id="alert-bulk-sensor" class="bulk-select">
+          <option value="">— choisir —</option>
+          ${sensors.slice(0, 60).map(s => `<option value="${s.id}">${s.serial} (${s.model})</option>`).join('')}
+        </select>
+      </label>
+      <button class="btn-secondary btn-sm" id="alert-bulk-cancel">Annuler</button>
+    </div>
+  `
+
+  bar.querySelector('#alert-bulk-toggle').addEventListener('click', () => {
+    const newStatut = allActif ? 'inactif' : 'actif'
+    selectedAlerts.forEach(a => { a.statut = newStatut })
+    showToast(`${selectedIds.size} alerte${selectedIds.size > 1 ? 's' : ''} ${newStatut === 'actif' ? 'activée' : 'désactivée'}${selectedIds.size > 1 ? 's' : ''}.`)
+    render()
+  })
+
+  bar.querySelector('#alert-bulk-parcel').addEventListener('change', e => {
+    const pid = parseInt(e.target.value)
+    if (!pid) return
+    const p = plots.find(x => x.id === pid)
+    selectedAlerts.forEach(a => { if (!a.parcelIds.includes(pid)) a.parcelIds.push(pid) })
+    e.target.value = ''
+    showToast(`Parcelle "${p?.name}" liée à ${selectedIds.size} alerte${selectedIds.size > 1 ? 's' : ''}.`)
+    render()
+  })
+
+  bar.querySelector('#alert-bulk-sensor').addEventListener('change', e => {
+    const sid = parseInt(e.target.value)
+    if (!sid) return
+    const s = sensors.find(x => x.id === sid)
+    selectedAlerts.forEach(a => { if (!a.sensorIds.includes(sid)) a.sensorIds.push(sid) })
+    e.target.value = ''
+    showToast(`Capteur "${s?.serial}" lié à ${selectedIds.size} alerte${selectedIds.size > 1 ? 's' : ''}.`)
+    render()
+  })
+
+  bar.querySelector('#alert-bulk-cancel').addEventListener('click', () => {
+    selectedIds.clear()
+    render()
   })
 }

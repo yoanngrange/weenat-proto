@@ -7,7 +7,22 @@ import { network } from '../data/network.js'
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
   renderForm()
+  initParamMap()
 })
+
+function initParamMap() {
+  const mapEl = document.getElementById('param-map')
+  if (!mapEl || !window.L) return
+  const lat = org.lat || 48.117
+  const lng = org.lng || -1.678
+  const map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 13)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map)
+  const marker = L.marker([lat, lng], { draggable: false }).addTo(map)
+  marker.bindPopup(`<strong>${org.name || 'Mon exploitation'}</strong>`).openPopup()
+}
 
 const PROFESSIONS = [
   'Arboriculture', 'Viticulture', 'Maraîchage', 'Grandes cultures', 'Polyculture-Élevage',
@@ -29,7 +44,7 @@ const SUBSCRIPTION_PLANS = [
     id: 'expert',
     name: 'Weenat Expert',
     price: '25 €/mois',
-    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API','Multi-exploitation', 'Accès réseau adhérents', 'Modèles agronomiques avancés', 'Support prioritaire', 'Formation incluse'],
+    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', 'Capteurs et fonctionnalités Irrigation'],
     color: '#006798'
   }
 ]
@@ -87,6 +102,16 @@ function renderForm() {
       <button class="btn-primary" id="save-org-btn" style="margin-top:16px">
         <i class="bi bi-check-lg"></i> Enregistrer
       </button>
+    </div>
+
+    <div class="param-section" style="padding:0;overflow:hidden;border-radius:8px;border:1px solid var(--bdr)">
+      <div style="padding:10px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--bdr);background:var(--bg2)">
+        <i class="bi bi-geo-alt" style="color:var(--pri)"></i> Localisation de l'exploitation
+      </div>
+      <div id="param-map" style="height:260px"></div>
+      <div style="padding:8px 14px;font-size:12px;color:var(--txt2)">
+        <i class="bi bi-info-circle"></i> Position calculée depuis l'adresse renseignée.
+      </div>
     </div>
 
     <div class="param-section">

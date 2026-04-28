@@ -738,85 +738,187 @@ th.sort-desc::after {
   cursor: pointer;
 }
 
+/* ── Forecast day cards (v2) ──────────────────────────────────────────────── */
 #forecast {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   overflow-x: auto;
-  padding: 20px;
+  padding: 16px 20px 12px;
+  scrollbar-width: thin;
 }
 
-.forecast-day {
-  min-width: 160px;
-  background-color: var(--srf);
+.fc2-card {
+  min-width: 170px;
+  flex: 1 0 170px;
+  background: var(--srf);
   border: 1px solid var(--bdr);
-  padding: 12px 12px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-radius: 10px;
+  padding: 12px 14px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color .15s, box-shadow .15s;
+  position: relative;
 }
+.fc2-card:hover { border-color: var(--pri); }
+.fc2-card--active { border-color: var(--pri); box-shadow: 0 0 0 2px color-mix(in srgb, var(--pri) 20%, transparent); }
 
-.forecast-day:hover {
-  border-color: var(--pri);
-}
-
-.forecast-day--active {
-  border-color: var(--pri);
-  box-shadow: 0 0 0 2px var(--pri2);
-}
-
-.fc-date {
+.fc2-date {
   font-size: 12px;
-  font-weight: 700;
   color: var(--txt2);
-  text-align: center;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
-
-.fc-atmogram {
-  display: flex;
-  justify-content: center;
-  margin: 4px 0;
-  overflow: hidden;
+.fc2-today-badge {
+  display: inline-block;
+  background: var(--pri);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 6px;
 }
-
-.fc-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.fc2-icon {
+  margin: 4px 0 8px;
 }
-
-.fc-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
+.fc2-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
 }
-
-.fc-row i {
-  width: 14px;
-  text-align: center;
-  font-size: 12px;
-}
-
-.fc-val {
-  color: var(--txt);
-  font-size: 12px;
-}
-
-.fc-unit {
+.fc2-cell { }
+.fc2-cell--wide { grid-column: 1 / -1; }
+.fc2-label {
   font-size: 10px;
   color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  margin-bottom: 1px;
+}
+.fc2-val {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt);
+}
+.fc2-unit { font-size: 11px; color: var(--txt3); font-weight: 400; }
+.fc2-tmin { color: #60A5FA; }
+.fc2-tmax { color: #F59E0B; }
+
+/* ── Hourly section ───────────────────────────────────────────────────────── */
+#hourly-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
 }
 
-.fc-temp-max { color: #e07050; font-weight: 700; }
-.fc-temp-min { color: #6eb4d4; font-weight: 700; }
-.fc-temp-time { font-size: 10px; color: var(--txt3); margin-left: 2px; }
+#hourly-strip-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--bdr);
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  background: var(--srf);
+  scrollbar-width: thin;
+}
 
-.sparkline {
-  margin-top: 10px;
+#hourly-strip {
+  display: flex;
+  min-width: max-content;
+}
+
+.hs-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 10px 6px;
+  border-right: 1px solid var(--bdr);
+  min-width: 52px;
+  position: relative;
+  cursor: default;
+}
+.hs-col:last-child { border-right: none; }
+.hs-col--now {
+  background: color-mix(in srgb, var(--pri) 6%, var(--srf));
+}
+.hs-now-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--pri);
+  position: absolute;
+  top: 4px;
+}
+.hs-time {
+  font-size: 11px;
+  color: var(--txt3);
+  margin-top: 4px;
+}
+.hs-col--now .hs-time { color: var(--pri); font-weight: 700; }
+.hs-icon { line-height: 1; }
+.hs-val {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#hourly-curve-wrap {
+  border: 1px solid var(--bdr);
+  border-top: none;
+  border-bottom: none;
+  background: var(--srf);
+  overflow: hidden;
+}
+#hourly-curve {
+  display: block;
+  width: 100%;
+  height: 80px;
+}
+
+/* ── Hourly table ─────────────────────────────────────────────────────────── */
+#hourly-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid var(--bdr);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+#hourly-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt2);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--bdr);
+  white-space: nowrap;
+}
+#hourly-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--bdr2);
+  color: var(--txt);
+}
+#hourly-table tr:last-child td { border-bottom: none; }
+#hourly-table tr:hover td { background: var(--bg2); }
+.ht-row--now td { background: color-mix(in srgb, var(--pri) 5%, var(--srf)) !important; font-weight: 600; }
+.ht-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  color: var(--txt2);
+}
+.ht-icon { flex-shrink: 0; }
+.ht-now-badge {
+  font-size: 10px;
+  background: var(--pri);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  margin-left: 4px;
 }
 
 .badge {
@@ -4218,7 +4320,31 @@ td.num {
 
 .billing-amount {
   font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
+
+/* ── Billing address tabs ─────────────────────────────────────────────────── */
+.billing-addr-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--bdr);
+  margin: 12px 0 16px;
+}
+.billing-addr-tab {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--txt2);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.billing-addr-tab:hover { color: var(--txt); }
+.billing-addr-tab.active { color: var(--pri); border-bottom-color: var(--pri); }
 
 .billing-actions-cell {
   display: flex;
@@ -5330,3 +5456,29 @@ tr.row-selected td {
   border-top: 1px solid var(--bdr2);
   font-style: italic;
 }
+
+
+/* ── Filter "Tous" option ─────────────────────────────────────────────────── */
+.filter-all-label {
+  border-bottom: 1px solid var(--bdr2);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  font-weight: 600;
+}
+
+/* ── Tensio multi-curve chart ─────────────────────────────────────────────── */
+.tensio-multi-card {
+  border-left: 3px solid var(--pri);
+}
+.tensio-toggle-btn.active {
+  background: var(--pri);
+  color: #fff;
+  border-color: var(--pri);
+}
+.tensio-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+

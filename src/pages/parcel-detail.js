@@ -199,13 +199,18 @@ function syncStickyChartControls() {
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 
+let tensioViewMode = 'capteur' // 'capteur' | 'horizon'
+
 function renderCharts() {
   const container = document.getElementById('charts-container')
   container.innerHTML = ''
 
-  // Sensor-specific metrics first
   const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  linkedSensors.forEach(s => {
+  const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
+  const otherSensors  = linkedSensors.filter(s => !TENSIO_MODELS.includes(s.model))
+
+  // Non-tensio sensors: one group header + charts per sensor
+  otherSensors.forEach(s => {
     const metrics = METRICS_BY_MODEL[s.model]
     if (!metrics) return
 
@@ -221,6 +226,31 @@ function renderCharts() {
     metrics.forEach(m => appendChartCard(container, m))
   })
 
+  // Tensio sensors: grouped, one chart per metric with multiple curves
+  if (tensioSensors.length > 0) {
+    const tensioHeader = document.createElement('div')
+    tensioHeader.className = 'chart-group-header'
+    tensioHeader.innerHTML = `
+      <i class="bi bi-broadcast" style="color:var(--pri)"></i>
+      <strong>Tensiomètres</strong>
+      <span class="chart-group-serial">${tensioSensors.length} capteur${tensioSensors.length > 1 ? 's' : ''}</span>
+      <div class="tensio-view-toggle" style="margin-left:auto;display:flex;gap:4px">
+        <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'capteur' ? ' active' : ''}" data-mode="capteur">Par capteur</button>
+        <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'horizon' ? ' active' : ''}" data-mode="horizon">Par horizon</button>
+      </div>
+    `
+    container.appendChild(tensioHeader)
+
+    tensioHeader.querySelectorAll('.tensio-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        tensioViewMode = btn.dataset.mode
+        renderCharts()
+      })
+    })
+
+    appendTensioCharts(container, tensioSensors)
+  }
+
   // Always-available weather metrics last
   const alwaysHeader = document.createElement('div')
   alwaysHeader.className = 'chart-group-header'
@@ -229,6 +259,81 @@ function renderCharts() {
   ALWAYS_METRICS.forEach(m => appendChartCard(container, m))
 
   drawAllCharts()
+}
+
+const TENSIO_COLORS = ['#5b8dd9', '#e07050', '#4ecdc4', '#f5c842', '#c090e0', '#78d8a0']
+
+// Retourne les 2 profondeurs mesurées par un capteur CHP
+// CHP-X/Y avec depth=D → profondeurs [D-X, D]
+function tensioHorizons(sensor) {
+  const match = sensor.model.match(/CHP-(\d+)\/(\d+)/)
+  if (!match) return [{ depth: sensor.depth || 30, label: `${sensor.depth || 30} cm`, sensor }]
+  const upper = parseInt(match[1])
+  const d = sensor.depth || parseInt(match[2])
+  return [
+    { depth: d - upper, label: `${d - upper} cm`, sensor },
+    { depth: d,         label: `${d} cm`,          sensor }
+  ]
+}
+
+function appendTensioCharts(container, tensioSensors) {
+  const metricsToShow = ['pothydr', 'tsol']
+  const metricDefs = {
+    pothydr: { name: 'Potentiel hydrique', unit: 'kPa', baseFor: d => 20 + d * 0.8 + Math.random() * 30 },
+    tsol:    { name: 'Temp. sol',          unit: '°C',  baseFor: d => 10 + Math.random() * 6 }
+  }
+
+  // Construire les "courbes" selon le mode
+  let curves
+  if (tensioViewMode === 'capteur') {
+    // 1 courbe par capteur
+    curves = tensioSensors.map((s, i) => ({
+      label: s.serial,
+      color: TENSIO_COLORS[i % TENSIO_COLORS.length],
+      depth: s.depth || 30,
+      sensor: s,
+    }))
+  } else {
+    // 1 courbe par horizon unique (depth) — dédupliqué
+    const horizonMap = new Map()
+    tensioSensors.forEach(s => {
+      tensioHorizons(s).forEach(h => {
+        if (!horizonMap.has(h.depth)) horizonMap.set(h.depth, h)
+      })
+    })
+    const sorted = [...horizonMap.values()].sort((a, b) => a.depth - b.depth)
+    curves = sorted.map((h, i) => ({
+      label: h.label,
+      color: TENSIO_COLORS[i % TENSIO_COLORS.length],
+      depth: h.depth,
+      sensor: h.sensor,
+    }))
+  }
+
+  metricsToShow.forEach(metricId => {
+    const def = metricDefs[metricId]
+    const card = document.createElement('div')
+    card.className = 'chart-card tensio-multi-card'
+    card.dataset.tensioMetric = metricId
+    card.dataset.tensioCurves = JSON.stringify(curves.map(c => ({ depth: c.depth, color: c.color })))
+
+    const legend = curves.map(c =>
+      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2)">
+        <span style="display:inline-block;width:20px;height:2px;background:${c.color};vertical-align:middle;border-radius:1px"></span>
+        ${c.label}
+      </span>`
+    ).join('')
+
+    card.innerHTML = `
+      <div class="chart-card-header">
+        <span class="chart-card-name" style="color:${curves[0]?.color || TENSIO_COLORS[0]}">${def.name}</span>
+        <span class="chart-card-unit">${def.unit}</span>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0 2px">${legend}</div>
+      <svg class="chart-svg tensio-svg" data-metric="${metricId}" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+    `
+    container.appendChild(card)
+  })
 }
 
 function appendChartCard(container, m) {
@@ -395,8 +500,16 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
 function drawAllCharts() {
   const count = getDisplayCount()
   const step  = getStepMinutes()
+  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
 
   document.querySelectorAll('.chart-card').forEach(card => {
+    if (card.classList.contains('tensio-multi-card')) {
+      const svg = card.querySelector('.tensio-svg')
+      const curves = JSON.parse(card.dataset.tensioCurves || '[]')
+      if (svg && curves.length > 0) drawTensioMultiChart(svg, curves, count, step)
+      return
+    }
     const base      = parseFloat(card.dataset.base)
     const color     = card.dataset.color
     const isCumul   = card.dataset.cumul === '1'
@@ -410,6 +523,57 @@ function drawAllCharts() {
       drawChart(card.querySelector('.chart-svg'), base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
     }
   })
+}
+
+// curves: [{ depth, color }] — déjà calculé par appendTensioCharts selon le mode
+function drawTensioMultiChart(svg, curves, count, step) {
+  const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
+  const innerW = W - PAD.l - PAD.r
+  const innerH = H - PAD.t - PAD.b
+
+  // Générer une série de valeurs par courbe, basée sur la profondeur
+  const allSeries = curves.map(c => {
+    const base = 20 + c.depth * 0.8 + Math.random() * 20
+    return Array.from({ length: count }, (_, idx) => {
+      const minsAgo = (count - 1 - idx) * step
+      return Math.max(0, genRealisticVal('pothydr', base, minsAgo))
+    })
+  })
+
+  const allVals = allSeries.flat()
+  const minV = Math.min(...allVals)
+  const maxV = Math.max(...allVals)
+  const range = maxV - minV || 1
+
+  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
+
+  const clipId = `tc-${Math.random().toString(36).slice(2)}`
+  let out = `<defs><clipPath id="${clipId}"><rect x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}"/></clipPath></defs>`
+
+  // Grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.t + (i / 4) * innerH
+    const v = maxV - (i / 4) * range
+    out += `<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W - PAD.r}" y2="${y.toFixed(1)}" stroke="var(--bdr2)" stroke-width="1"/>`
+    out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${v.toFixed(0)}</text>`
+  }
+
+  // Draw one curve per entry in curves[]
+  allSeries.forEach((vals, ci) => {
+    const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
+    const path = smoothPath(pts)
+    out += `<path d="${path}" fill="none" stroke="${curves[ci].color}" stroke-width="2" stroke-linecap="round" clip-path="url(#${clipId})"/>`
+  })
+
+  // X labels
+  const labelStep = Math.max(1, Math.floor(count / 6))
+  for (let i = 0; i < count; i += labelStep) {
+    const minsAgo = (count - 1 - i) * step
+    out += `<text x="${xOf(i).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+  }
+
+  svg.innerHTML = out
 }
 
 function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '') {

@@ -85,45 +85,85 @@ function renderBillingPage() {
       </div>
 
       <div class="billing-top-right">
-        <!-- Billing address form -->
         <div class="billing-section">
-          <h2 class="billing-section-title"><i class="bi bi-building"></i> Adresse de facturation</h2>
-      <form id="billing-addr-form" autocomplete="off">
-        <div class="billing-form-grid">
-          <div class="form-row billing-form-full">
-            <label for="bf-societe">Raison sociale</label>
-            <input id="bf-societe" type="text" value="${esc(BILLING_ADDR.societe)}" placeholder="Nom de la société">
+          <div class="billing-section-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span><i class="bi bi-building"></i> Adresses</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:400;cursor:pointer">
+              <input type="checkbox" id="same-delivery-addr" checked>
+              Même adresse de livraison
+            </label>
           </div>
-          <div class="form-row billing-form-full">
-            <label for="bf-adresse">Adresse postale</label>
-            <input id="bf-adresse" type="text" value="${esc(BILLING_ADDR.adresse)}" placeholder="Numéro et rue">
+
+          <!-- Onglets -->
+          <div class="billing-addr-tabs" id="billing-addr-tabs">
+            <button class="billing-addr-tab active" data-tab="facturation">Facturation</button>
+            <button class="billing-addr-tab" data-tab="livraison" id="tab-livraison" style="display:none">Livraison</button>
           </div>
-          <div class="form-row">
-            <label for="bf-cp">Code postal</label>
-            <input id="bf-cp" type="text" value="${esc(BILLING_ADDR.cp)}" placeholder="00000">
+
+          <!-- Onglet facturation -->
+          <div id="tab-content-facturation" class="billing-addr-tab-content">
+            <form id="billing-addr-form" autocomplete="off">
+              <div class="billing-form-grid">
+                <div class="form-row billing-form-full">
+                  <label for="bf-societe">Raison sociale</label>
+                  <input id="bf-societe" type="text" value="${esc(BILLING_ADDR.societe)}" placeholder="Nom de la société">
+                </div>
+                <div class="form-row billing-form-full">
+                  <label for="bf-adresse">Adresse postale</label>
+                  <input id="bf-adresse" type="text" value="${esc(BILLING_ADDR.adresse)}" placeholder="Numéro et rue">
+                </div>
+                <div class="form-row">
+                  <label for="bf-cp">Code postal</label>
+                  <input id="bf-cp" type="text" value="${esc(BILLING_ADDR.cp)}" placeholder="00000">
+                </div>
+                <div class="form-row">
+                  <label for="bf-ville">Ville</label>
+                  <input id="bf-ville" type="text" value="${esc(BILLING_ADDR.ville)}" placeholder="Ville">
+                </div>
+                <div class="form-row billing-form-full">
+                  <label for="bf-pays">Pays</label>
+                  <select id="bf-pays">
+                    ${COUNTRIES.map(c => `<option value="${c.code}"${c.code === BILLING_ADDR.pays ? ' selected' : ''}>${c.label}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-row billing-form-full" id="bf-siret-row">
+                  <label for="bf-siret" id="bf-siret-label">SIRET</label>
+                  <input id="bf-siret" type="text" value="${esc(BILLING_ADDR.siret)}" placeholder="14 chiffres">
+                </div>
+              </div>
+            </form>
           </div>
-          <div class="form-row">
-            <label for="bf-ville">Ville</label>
-            <input id="bf-ville" type="text" value="${esc(BILLING_ADDR.ville)}" placeholder="Ville">
+
+          <!-- Onglet livraison -->
+          <div id="tab-content-livraison" class="billing-addr-tab-content" style="display:none">
+            <form id="delivery-addr-form" autocomplete="off">
+              <div class="billing-form-grid">
+                <div class="form-row billing-form-full">
+                  <label for="dl-nom">Nom / Raison sociale</label>
+                  <input id="dl-nom" type="text" placeholder="Destinataire">
+                </div>
+                <div class="form-row billing-form-full">
+                  <label for="dl-adresse">Adresse postale</label>
+                  <input id="dl-adresse" type="text" placeholder="Numéro et rue">
+                </div>
+                <div class="form-row">
+                  <label for="dl-cp">Code postal</label>
+                  <input id="dl-cp" type="text" placeholder="00000">
+                </div>
+                <div class="form-row">
+                  <label for="dl-ville">Ville</label>
+                  <input id="dl-ville" type="text" placeholder="Ville">
+                </div>
+              </div>
+            </form>
           </div>
-          <div class="form-row billing-form-full">
-            <label for="bf-pays">Pays</label>
-            <select id="bf-pays">
-              ${COUNTRIES.map(c => `<option value="${c.code}"${c.code === BILLING_ADDR.pays ? ' selected' : ''}>${c.label}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-row billing-form-full" id="bf-siret-row">
-            <label for="bf-siret" id="bf-siret-label">SIRET</label>
-            <input id="bf-siret" type="text" value="${esc(BILLING_ADDR.siret)}" placeholder="14 chiffres">
-          </div>
-        </div>
+
           <div class="form-actions" style="margin-top:16px">
             <button type="button" id="billing-addr-save" class="btn-primary">
               <i class="bi bi-check-lg"></i> Enregistrer
             </button>
             <button type="button" id="billing-addr-cancel" class="btn-secondary">Annuler</button>
           </div>
-        </form>
         </div>
       </div>
     </div>
@@ -137,7 +177,7 @@ function renderBillingPage() {
             <tr>
               <th>N° facture</th>
               <th>Date d'émission</th>
-              <th>Montant HT</th>
+              <th style="text-align:right">Montant HT</th>
               <th>Date de règlement</th>
               <th>Statut</th>
               <th>Actions</th>
@@ -148,7 +188,7 @@ function renderBillingPage() {
               <tr>
                 <td class="billing-invoice-num">${inv.numero}</td>
                 <td>${formatDate(inv.dateEmission)}</td>
-                <td class="billing-amount">${inv.montant.toFixed(2)} € HT</td>
+                <td class="billing-amount">${inv.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</td>
                 <td>${inv.dateReglement ? formatDate(inv.dateReglement) : '<span style="color:var(--txt3)">—</span>'}</td>
                 <td>${invoiceStatusBadge(inv.statut)}</td>
                 <td class="billing-actions-cell">
@@ -185,8 +225,35 @@ function bindEvents() {
     updateTaxField(paysSelect.value)
   }
 
+  // Onglets adresses
+  const tabBtns = document.querySelectorAll('.billing-addr-tab')
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabBtns.forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      document.querySelectorAll('.billing-addr-tab-content').forEach(c => c.style.display = 'none')
+      document.getElementById(`tab-content-${btn.dataset.tab}`).style.display = ''
+    })
+  })
+
+  // Checkbox "même adresse"
+  const sameDelivery = document.getElementById('same-delivery-addr')
+  const tabLivraison = document.getElementById('tab-livraison')
+  if (sameDelivery && tabLivraison) {
+    sameDelivery.addEventListener('change', () => {
+      tabLivraison.style.display = sameDelivery.checked ? 'none' : ''
+      if (!sameDelivery.checked) tabLivraison.click()
+      else {
+        tabBtns.forEach(b => b.classList.remove('active'))
+        document.querySelector('[data-tab="facturation"]').classList.add('active')
+        document.querySelectorAll('.billing-addr-tab-content').forEach(c => c.style.display = 'none')
+        document.getElementById('tab-content-facturation').style.display = ''
+      }
+    })
+  }
+
   document.getElementById('billing-addr-save')?.addEventListener('click', () => {
-    showToast('Adresse de facturation enregistrée.')
+    showToast('Adresse enregistrée.')
   })
   document.getElementById('billing-addr-cancel')?.addEventListener('click', () => {
     document.getElementById('bf-societe').value = BILLING_ADDR.societe
@@ -232,6 +299,8 @@ function updateTaxField(pays) {
 function generateInvoices() {
   const invoices = []
   const now      = new Date('2026-04-15')
+  const MONTHLY_AMOUNTS = [150, 250, 100, 150, 250, 150, 100, 250, 150, 100]
+
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const yyyy = d.getFullYear()
@@ -243,10 +312,14 @@ function generateInvoices() {
     const dateReglement = statut === 'payée'
       ? isoDate(new Date(d.getFullYear(), d.getMonth(), 18))
       : null
+
+    const isDecember = d.getMonth() === 11
+    const montant = isDecember ? 1980 : MONTHLY_AMOUNTS[i % MONTHLY_AMOUNTS.length]
+
     invoices.push({
       numero:         `FAC-${yyyy}-${mm}`,
       dateEmission:   isoDate(new Date(d.getFullYear(), d.getMonth(), 1)),
-      montant:        CONTRACT.licencesTotal * CONTRACT.prixUnitaire,
+      montant,
       dateReglement,
       statut,
     })
