@@ -37,6 +37,11 @@ const METRICS_BY_MODEL = {
   'P': [
     { id: 'pluie', name: 'Pluie', unit: 'mm', color: '#45b7d1', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
   ],
+  'SMV': [
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'humidite', name: 'Humidité air', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
+  ],
   'TH': [
     { id: 'temp',     name: 'Température',  unit: '°C', color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
     { id: 'humidite', name: 'Humidité air', unit: '%',  color: '#4ecdc4', base: () => rnd(40, 90) },
@@ -263,17 +268,11 @@ function renderCharts() {
 
 const TENSIO_COLORS = ['#5b8dd9', '#e07050', '#4ecdc4', '#f5c842', '#c090e0', '#78d8a0']
 
-// Retourne les 2 profondeurs mesurées par un capteur CHP
-// CHP-X/Y avec depth=D → profondeurs [D-X, D]
+// Chaque capteur CHP a UN seul horizon d'installation : son champ `depth`
+// "Par horizon" groupe par cette valeur pour fusionner les capteurs au même niveau
 function tensioHorizons(sensor) {
-  const match = sensor.model.match(/CHP-(\d+)\/(\d+)/)
-  if (!match) return [{ depth: sensor.depth || 30, label: `${sensor.depth || 30} cm`, sensor }]
-  const upper = parseInt(match[1])
-  const d = sensor.depth || parseInt(match[2])
-  return [
-    { depth: d - upper, label: `${d - upper} cm`, sensor },
-    { depth: d,         label: `${d} cm`,          sensor }
-  ]
+  const d = sensor.depth || 30
+  return [{ depth: d, label: `${d} cm`, sensor }]
 }
 
 function appendTensioCharts(container, tensioSensors) {

@@ -405,7 +405,7 @@ function populateFilterDropdowns() {
     { set: v => { selectedIntegrations = v } }, 'badge-integration', true)
 
   // Capteurs filters (capteurs.html uses checkbox dropdowns too)
-  const allModels = ['P', 'PT', 'P+', 'CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6', 'TH', 'T_MINI', 'T_GEL', 'W', 'PYRANO', 'PAR', 'LWS', 'EC']
+  const allModels = ['P', 'PT', 'P+', 'SMV', 'CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6', 'TH', 'T_MINI', 'T_GEL', 'W', 'PYRANO', 'PAR', 'LWS', 'EC']
   makeCheckboxPanel('panel-model', allModels,
     { set: v => { selectedModels = v } }, 'badge-model')
   makeCheckboxPanel('panel-event', null,
@@ -571,7 +571,10 @@ function getFilteredData() {
     } else {
       // Adhérent Mon exploitation : son org uniquement
       filteredParcels = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
-      filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+      filteredSensors = sensors.filter(s =>
+        filteredParcels.some(p => p.id === s.parcelId) ||
+        (s.parcelId === null && s.orgId === ADHERENT_ORG_ID)
+      )
     }
   } else {
     // Admin réseau
@@ -580,9 +583,13 @@ function getFilteredData() {
       filteredParcels = plots
       filteredSensors = sensors
     } else {
-      // Admin Mon exploitation : son org uniquement
+      // Admin Mon exploitation : son org uniquement (orgId=1)
+      // Inclut les capteurs sans parcelle mais appartenant à l'org (ex : SMV)
       filteredParcels = plots.filter(p => p.orgId === 1)
-      filteredSensors = sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+      filteredSensors = sensors.filter(s =>
+        filteredParcels.some(p => p.id === s.parcelId) ||
+        (s.parcelId === null && s.orgId === 1)
+      )
     }
   }
 
@@ -1362,6 +1369,7 @@ function renderList(filteredParcels, filteredSensors) {
 // Model type mapping
 const MODEL_TYPE = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'SMV': 'Station météo virtuelle',
   'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
   'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
   'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',

@@ -321,7 +321,7 @@ export const sensors = [
   { id: 210, orgId: 20, parcelId: 145, model: "CAPA-60-6", serial: "WEE-20210", telecom: "Sigfox", lastMessage: "2026-04-15T09:00:00Z", networkQuality: 82, messages7d: 86,  event: null },
 
   // ── Parcelle 3 (Org 1) — configuration 6 tensiomètres sur 2 horizons ─────────
-  // Horizon 1 : 3 × CHP-15/30 à 20 cm
+  // Horizon 1 : 3 × CHP-15/30 installés à 20 cm
   { id: 211, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00211", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 91, messages7d: 95,  event: null, depth: 20 },
   { id: 212, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00212", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 88, messages7d: 93,  event: null, depth: 20 },
   { id: 213, orgId: 1,  parcelId: 3,  model: "CHP-15/30", serial: "WEE-00213", telecom: "LoRa",   lastMessage: "2026-04-19T08:00:00Z", networkQuality: 86, messages7d: 91,  event: null, depth: 20 },
@@ -339,4 +339,26 @@ export const sensors = [
   // ── T_GEL — réseau (orgs 7 et 10) ────────────────────────────────────────
   { id: 219, orgId: 7,  parcelId: 28, model: "T_GEL",    serial: "WEE-00719", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
   { id: 220, orgId: 10, parcelId: 34, model: "T_GEL",    serial: "WEE-01020", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
+
+  // ── SMV (Station Météo Virtuelle) — Breiz'Agri Conseil (5 stations réseau) ─
+  { id: 221, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00101", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 222, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00102", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 223, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00103", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 224, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00104", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 225, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00105", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+
+  // ── SMV — exploitations adhérentes (0 à 2 par org) ───────────────────────
+  { id: 226, orgId: 2,  parcelId: null, model: "SMV", serial: "SMV-00201", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 227, orgId: 2,  parcelId: null, model: "SMV", serial: "SMV-00202", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 228, orgId: 4,  parcelId: null, model: "SMV", serial: "SMV-00401", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 229, orgId: 5,  parcelId: null, model: "SMV", serial: "SMV-00501", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 230, orgId: 7,  parcelId: null, model: "SMV", serial: "SMV-00701", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 231, orgId: 7,  parcelId: null, model: "SMV", serial: "SMV-00702", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 232, orgId: 9,  parcelId: null, model: "SMV", serial: "SMV-00901", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 233, orgId: 11, parcelId: null, model: "SMV", serial: "SMV-01101", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 234, orgId: 13, parcelId: null, model: "SMV", serial: "SMV-01301", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 235, orgId: 13, parcelId: null, model: "SMV", serial: "SMV-01302", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 236, orgId: 15, parcelId: null, model: "SMV", serial: "SMV-01501", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 237, orgId: 18, parcelId: null, model: "SMV", serial: "SMV-01801", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 238, orgId: 20, parcelId: null, model: "SMV", serial: "SMV-02001", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
 ]
