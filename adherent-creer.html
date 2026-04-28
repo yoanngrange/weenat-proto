@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-B-u6VpP8.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ajouter un adhérent - Weenat Proto</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
+    <script type="module" crossorigin src="/weenat-proto/assets/adherent-creer-CxXpsko5.js"></script>
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-BfTBtz6r.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
+    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CI7JXGzU.css">
+  </head>
+  <body>
+    <div id="app">
+      <nav id="sidebar" data-role="admin-reseau">
+        <div class="sidebar-header">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="6" fill="#0172A4"/></svg>
+          <button id="add-btn">+</button>
+        </div>
+        <div id="nav-links"></div>
+      </nav>
+
+      <div id="main-content">
+        <div id="topbar">
+          <div id="breadcrumb">
+            <div id="breadcrumb-context">Adhérents</div>
+            <div id="breadcrumb-title">Ajouter un adhérent</div>
+          </div>
+          <div class="topbar-actions">
+            <button class="btn-secondary" onclick="window.location.href='adherents.html'">Annuler</button>
+          </div>
+        </div>
+        <main id="content" style="padding:32px;overflow-y:auto">
+          <div style="max-width:640px">
+            <div class="param-section">
+              <div class="param-section-title">Informations de l'adhérent</div>
+              <div class="param-form-grid">
+                <div class="param-field">
+                  <label class="param-label">Prénom <span style="color:var(--err)">*</span></label>
+                  <input type="text" class="param-input" id="a-prenom" placeholder="Prénom" autofocus>
+                </div>
+                <div class="param-field">
+                  <label class="param-label">Nom <span style="color:var(--err)">*</span></label>
+                  <input type="text" class="param-input" id="a-nom" placeholder="Nom de famille">
+                </div>
+                <div class="param-field param-field--wide">
+                  <label class="param-label">Email <span style="color:var(--err)">*</span></label>
+                  <input type="email" class="param-input" id="a-email" placeholder="prenom.nom@exploitation.fr">
+                </div>
+                <div class="param-field param-field--wide">
+                  <label class="param-label">Nom de l'exploitation <span style="color:var(--err)">*</span></label>
+                  <input type="text" class="param-input" id="a-exploitation" placeholder="ex : EARL du Bocage">
+                </div>
+                <div class="param-field">
+                  <label class="param-label">Numéro de téléphone <span style="color:var(--err)">*</span></label>
+                  <input type="tel" class="param-input" id="a-telephone" placeholder="+33 6 …">
+                </div>
+                <div class="param-field">
+                  <label class="param-label">Code adhérent <span style="color:var(--txt3);font-size:11px">(optionnel)</span></label>
+                  <input type="text" class="param-input" id="a-code" placeholder="ex : ADZ-001-2026">
+                </div>
+                <div class="param-field param-field--wide">
+                  <label class="param-label">Abonnement <span style="color:var(--err)">*</span></label>
+                  <div style="display:flex;gap:12px;margin-top:6px">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:12px 18px;border:2px solid var(--bdr);border-radius:8px;flex:1;transition:border-color .15s" id="plan-plus-box">
+                      <input type="radio" name="a-plan" value="Plus" checked style="accent-color:var(--ok)">
+                      <span>
+                        <span style="font-weight:600;color:var(--ok)">Weenat Plus</span>
+                        <span style="display:block;font-size:12px;color:var(--txt2)">Fonctionnalités essentielles</span>
+                      </span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:12px 18px;border:2px solid var(--bdr);border-radius:8px;flex:1;transition:border-color .15s" id="plan-expert-box">
+                      <input type="radio" name="a-plan" value="Expert" style="accent-color:var(--pri)">
+                      <span>
+                        <span style="font-weight:600;color:var(--pri)">Weenat Expert</span>
+                        <span style="display:block;font-size:12px;color:var(--txt2)">Fonctionnalités avancées</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div id="form-error" style="display:none;color:var(--err);font-size:13px;margin-top:12px;padding:10px 14px;background:color-mix(in srgb, var(--err) 10%, var(--bg));border-radius:6px;border:1px solid color-mix(in srgb, var(--err) 30%, transparent)">
+                <i class="bi bi-exclamation-circle"></i> <span id="form-error-msg"></span>
+              </div>
+
+              <div class="form-actions" style="margin-top:24px;display:flex;gap:12px;align-items:center">
+                <button class="btn-primary" id="save-btn">
+                  <i class="bi bi-building-add"></i> Ajouter l'adhérent
+                </button>
+                <button class="btn-secondary" onclick="window.location.href='adherents.html'">Annuler</button>
+              </div>
+            </div>
+
+            <div id="success-banner" style="display:none;padding:16px;background:color-mix(in srgb, var(--ok) 12%, var(--bg));border:1px solid color-mix(in srgb, var(--ok) 30%, transparent);border-radius:8px;margin-top:16px">
+              <div style="font-weight:600;color:var(--ok)"><i class="bi bi-check-circle-fill"></i> Adhérent ajouté avec succès</div>
+              <div style="font-size:13px;color:var(--txt2);margin-top:4px">Un email d'invitation a été envoyé à l'adhérent.</div>
+              <div style="margin-top:12px;display:flex;gap:8px">
+                <button class="btn-primary btn-sm" onclick="window.location.href='adherents.html'">Voir la liste</button>
+                <button class="btn-secondary btn-sm" id="add-another-btn">Ajouter un autre adhérent</button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+    <script src="js/menu-switch.js"></script>
+  </body>
+</html>
