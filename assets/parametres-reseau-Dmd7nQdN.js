@@ -1,4 +1,4 @@
-import"./main-BfTBtz6r.js";import{o as f}from"./orgs-b3kLTQ0f.js";import{s as b}from"./sensors-BDvn67Xy.js";import{p as h}from"./plots-DnwHiJsH.js";import{n as a}from"./network-YzWdS0n_.js";import{u as y}from"./breadcrumb-DEBQjfiD.js";const e={nom:a.nom,description:a.description,email:a.email,telephone:a.telephone,siteWeb:a.siteWeb,siege:{...a.siege},antennes:a.antennes.map(s=>({...s}))};document.addEventListener("DOMContentLoaded",()=>{y(),g(),l()});const w=["Grand Ouest","Météo Sud","Comptoirs du Nord","Réseaux Landais","Grande Beauce"];function g(){const s=document.getElementById("settings-form-col");s.innerHTML=`
+import"./main-BfTBtz6r.js";import{o as f}from"./orgs-Cx4wNzLL.js";import{s as b}from"./sensors-CeUIY8ag.js";import{p as h}from"./plots-Dwluc99O.js";import{n as a}from"./network-YzWdS0n_.js";import{u as y}from"./breadcrumb-DEBQjfiD.js";const e={nom:a.nom,description:a.description,email:a.email,telephone:a.telephone,siteWeb:a.siteWeb,siege:{...a.siege},antennes:a.antennes.map(s=>({...s}))};document.addEventListener("DOMContentLoaded",()=>{y(),g(),l()});const w=["Grand Ouest","Météo Sud","Comptoirs du Nord","Réseaux Landais","Grande Beauce"];function g(){const s=document.getElementById("settings-form-col");s.innerHTML=`
     <h2>Configurer le réseau</h2>
     <form id="network-form" autocomplete="off">
 
@@ -37,6 +37,7 @@ import"./main-BfTBtz6r.js";import{o as f}from"./orgs-b3kLTQ0f.js";import{s as b}
             <span class="toggle-knob"></span>
           </label>
         </div>
+        <!-- Méta-réseaux — désactivé pour l'instant
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bdr)">
           <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px">Méta-réseaux</div>
           <p style="font-size:12px;color:var(--txt3);margin-bottom:10px">
@@ -52,6 +53,7 @@ import"./main-BfTBtz6r.js";import{o as f}from"./orgs-b3kLTQ0f.js";import{s as b}
             </div>
           `).join("")}
         </div>
+        -->
       </fieldset>
 
       <fieldset>

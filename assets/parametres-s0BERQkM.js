@@ -1,4 +1,4 @@
-import"./main-BfTBtz6r.js";import{u as o}from"./breadcrumb-DEBQjfiD.js";import{m as n}from"./members-DEd9yWse.js";import{o as s}from"./orgs-b3kLTQ0f.js";import{n as t}from"./network-YzWdS0n_.js";document.addEventListener("DOMContentLoaded",()=>{o(),v(),c()});function c(){const a=document.getElementById("param-map");if(!a||!window.L)return;const e=i.lat||48.117,r=i.lng||-1.678,l=L.map(a,{zoomControl:!0,scrollWheelZoom:!1}).setView([e,r],13);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors",maxZoom:18}).addTo(l),L.marker([e,r],{draggable:!1}).addTo(l).bindPopup(`<strong>${i.name||"Mon exploitation"}</strong>`).openPopup()}const d=["Arboriculture","Viticulture","Maraîchage","Grandes cultures","Polyculture-Élevage","Pépiniériste","Floriculture","Trufficulture","Organismes publics / semi-publics","Coopérative","Négoce","Concessionnaire","Semencier","Laboratoire / Institut / Recherche","Autre"],p=[{id:"plus",name:"Weenat Plus",price:"14 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API"],color:"#00B093",current:!0},{id:"expert",name:"Weenat Expert",price:"25 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API","Capteurs et fonctionnalités Irrigation"],color:"#006798"}],m=(localStorage.getItem("menuRole")||"admin-reseau")==="admin-reseau",i=m?{...s[0],name:t.nom,adresse:t.siege.adresse,codePostal:t.siege.codePostal,ville:t.siege.ville}:s[0]||{name:"Ferme du Bocage",ville:"Rennes",lat:48.1,lng:-1.7},u=n.filter(a=>a.role==="propriétaire"||a.role==="admin");function v(){const a=document.getElementById("parametres-form");a&&(a.innerHTML=`
+import"./main-BfTBtz6r.js";import{u as o}from"./breadcrumb-DEBQjfiD.js";import{m as n}from"./members-DEd9yWse.js";import{o as s}from"./orgs-Cx4wNzLL.js";import{n as t}from"./network-YzWdS0n_.js";document.addEventListener("DOMContentLoaded",()=>{o(),b(),d()});function d(){const a=document.getElementById("param-map");if(!a||!window.L)return;const e=i.lat||48.117,r=i.lng||-1.678,l=L.map(a,{zoomControl:!0,scrollWheelZoom:!1}).setView([e,r],13);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors",maxZoom:18}).addTo(l),L.marker([e,r],{draggable:!1}).addTo(l).bindPopup(`<strong>${i.name||"Mon exploitation"}</strong>`).openPopup()}const c=["Arboriculture","Viticulture","Maraîchage","Grandes cultures","Polyculture-Élevage","Pépiniériste","Floriculture","Trufficulture","Organismes publics / semi-publics","Coopérative","Négoce","Concessionnaire","Semencier","Laboratoire / Institut / Recherche","Autre"],p=[{id:"plus",name:"Weenat Plus",price:"14 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API"],color:"#00B093",current:!0},{id:"expert",name:"Weenat Expert",price:"25 €/mois",features:["Historique illimité","Alertes","Intégrations","Exports","Accès API","Capteurs et fonctionnalités Irrigation"],color:"#006798"}],m=(localStorage.getItem("menuRole")||"admin-reseau")==="admin-reseau",u=s.find(a=>a.id===100)||{},i=m?{...u,name:t.nom,adresse:t.siege.adresse,codePostal:t.siege.codePostal,ville:t.siege.ville}:s.find(a=>a.id===1)||{name:"Ferme du Bocage",ville:"Rennes",lat:48.1,lng:-1.7},v=n.filter(a=>a.role==="propriétaire"||a.role==="admin");function b(){const a=document.getElementById("parametres-form");a&&(a.innerHTML=`
     <div class="param-section">
       <div class="param-section-title">Mon exploitation</div>
 
@@ -10,13 +10,13 @@ import"./main-BfTBtz6r.js";import{u as o}from"./breadcrumb-DEBQjfiD.js";import{m
         <div class="param-field">
           <label class="param-label">Propriétaire</label>
           <select class="param-input" id="org-owner">
-            ${u.map(e=>`<option value="${e.id}">${e.prenom} ${e.nom}</option>`).join("")}
+            ${v.map(e=>`<option value="${e.id}">${e.prenom} ${e.nom}</option>`).join("")}
           </select>
         </div>
         <div class="param-field param-field--wide">
           <label class="param-label">Métiers</label>
           <div class="param-chips" id="profession-chips">
-            ${d.map(e=>`
+            ${c.map(e=>`
               <label class="param-chip">
                 <input type="checkbox" value="${e}"> ${e}
               </label>
@@ -68,4 +68,4 @@ import"./main-BfTBtz6r.js";import{u as o}from"./breadcrumb-DEBQjfiD.js";import{m
         `).join("")}
       </div>
     </div>
-  `,document.getElementById("save-org-btn").addEventListener("click",()=>{b("Paramètres enregistrés.")}))}function b(a){const e=document.createElement("div");e.className="toast",e.textContent=a,document.body.appendChild(e),setTimeout(()=>e.remove(),3e3)}
+  `,document.getElementById("save-org-btn").addEventListener("click",()=>{g("Paramètres enregistrés.")}))}function g(a){const e=document.createElement("div");e.className="toast",e.textContent=a,document.body.appendChild(e),setTimeout(()=>e.remove(),3e3)}
