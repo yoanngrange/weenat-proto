@@ -68,6 +68,7 @@ function renderForm() {
             <span class="toggle-knob"></span>
           </label>
         </div>
+        <!-- Méta-réseaux — désactivé pour l'instant
         <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bdr)">
           <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px">Méta-réseaux</div>
           <p style="font-size:12px;color:var(--txt3);margin-bottom:10px">
@@ -83,6 +84,7 @@ function renderForm() {
             </div>
           `).join('')}
         </div>
+        -->
       </fieldset>
 
       <fieldset>

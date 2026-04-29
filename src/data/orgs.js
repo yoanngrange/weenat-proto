@@ -1,5 +1,18 @@
 export const orgs = [
-  // ── Orgs 1-20 : Existants, enrichis ──────────────────────────────────────
+  // ── Org 100 : Breiz'Agri Conseil — exploitation propre du réseau ──────────
+  {
+    id: 100, name: "Breiz'Agri Conseil",
+    proprietaire: "Philippe Renard", prenomProprietaire: "Philippe", nomProprietaire: "Renard",
+    email: "contact@breizagri-conseil.fr", telephone: "02 99 00 12 34",
+    lat: 48.117, lng: -1.678, departement: "Ille-et-Vilaine", ville: "Rennes",
+    adresse: "14 Avenue de la Bretagne, 35000 Rennes",
+    siret: "82345678900001",
+    plan: "Expert", statut: "actif",
+    codeAdherent: null, dateAdhesion: "2020-01-01",
+    nbMembres: 5
+  },
+
+  // ── Orgs 1-20 : Exploitations adhérentes ─────────────────────────────────
   {
     id: 1, name: "Ferme du Bocage",
     proprietaire: "Jean Dupont", prenomProprietaire: "Jean", nomProprietaire: "Dupont",

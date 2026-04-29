@@ -340,12 +340,25 @@ export const sensors = [
   { id: 219, orgId: 7,  parcelId: 28, model: "T_GEL",    serial: "WEE-00719", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 85, messages7d: 89,  event: null },
   { id: 220, orgId: 10, parcelId: 34, model: "T_GEL",    serial: "WEE-01020", telecom: "Sigfox", lastMessage: "2026-04-19T08:00:00Z", networkQuality: 88, messages7d: 92,  event: null },
 
-  // ── SMV (Station Météo Virtuelle) — Breiz'Agri Conseil (5 stations réseau) ─
-  { id: 221, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00101", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
-  { id: 222, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00102", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
-  { id: 223, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00103", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
-  { id: 224, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00104", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
-  { id: 225, orgId: 1,  parcelId: null, model: "SMV", serial: "SMV-00105", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  // ── Breiz'Agri Conseil — capteurs sur parcelles de référence (orgId=100) ───
+  { id: 239, orgId: 100, parcelId: 200, model: "P+",        serial: "WEE-10001", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 95, messages7d: 96,  event: null },
+  { id: 240, orgId: 100, parcelId: 200, model: "CHP-30/60", serial: "WEE-10002", telecom: "Sigfox", lastMessage: "2026-04-30T08:00:00Z", networkQuality: 92, messages7d: 94,  event: null, depth: 50 },
+  { id: 241, orgId: 100, parcelId: 201, model: "P+",        serial: "WEE-10003", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 88, messages7d: 91,  event: null },
+  { id: 242, orgId: 100, parcelId: 201, model: "CAPA-30-3", serial: "WEE-10004", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 90, messages7d: 93,  event: null },
+  { id: 243, orgId: 100, parcelId: 202, model: "P+",        serial: "WEE-10005", telecom: "Sigfox", lastMessage: "2026-04-30T08:00:00Z", networkQuality: 87, messages7d: 89,  event: null },
+  { id: 244, orgId: 100, parcelId: 203, model: "TH",        serial: "WEE-10006", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 93, messages7d: 95,  event: null },
+  { id: 245, orgId: 100, parcelId: 204, model: "P+",        serial: "WEE-10007", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 91, messages7d: 93,  event: null },
+  { id: 246, orgId: 100, parcelId: 204, model: "CHP-15/30", serial: "WEE-10008", telecom: "Sigfox", lastMessage: "2026-04-30T08:00:00Z", networkQuality: 89, messages7d: 92,  event: null, depth: 20 },
+  { id: 247, orgId: 100, parcelId: 205, model: "T_GEL",     serial: "WEE-10009", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 94, messages7d: 96,  event: null },
+  { id: 248, orgId: 100, parcelId: 206, model: "P+",        serial: "WEE-10010", telecom: "Sigfox", lastMessage: "2026-04-30T08:00:00Z", networkQuality: 86, messages7d: 88,  event: null },
+  { id: 249, orgId: 100, parcelId: 206, model: "CHP-60/90", serial: "WEE-10011", telecom: "LoRa",   lastMessage: "2026-04-30T08:00:00Z", networkQuality: 91, messages7d: 94,  event: null, depth: 80 },
+
+  // ── SMV (Station Météo Virtuelle) — Breiz'Agri Conseil (orgId=100) ─────────
+  { id: 221, orgId: 100, parcelId: null, model: "SMV", serial: "SMV-00101", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 222, orgId: 100, parcelId: null, model: "SMV", serial: "SMV-00102", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 223, orgId: 100, parcelId: null, model: "SMV", serial: "SMV-00103", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 224, orgId: 100, parcelId: null, model: "SMV", serial: "SMV-00104", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
+  { id: 225, orgId: 100, parcelId: null, model: "SMV", serial: "SMV-00105", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },
 
   // ── SMV — exploitations adhérentes (0 à 2 par org) ───────────────────────
   { id: 226, orgId: 2,  parcelId: null, model: "SMV", serial: "SMV-00201", telecom: "Virtual", lastMessage: "2026-04-28T09:00:00Z", networkQuality: 100, messages7d: 168, event: null },

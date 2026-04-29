@@ -51,9 +51,10 @@ const SUBSCRIPTION_PLANS = [
 
 // Current org — depends on role
 const isAdmin = (localStorage.getItem('menuRole') || 'admin-reseau') === 'admin-reseau'
+const adminOrg = orgs.find(o => o.id === 100) || {}
 const org = isAdmin
-  ? { ...orgs[0], name: network.nom, siret: network.siret, adresse: network.siege.adresse, codePostal: network.siege.codePostal, ville: network.siege.ville, pays: network.siege.pays }
-  : orgs[0] || { name: 'Ferme du Bocage', ville: 'Rennes', lat: 48.1, lng: -1.7 }
+  ? { ...adminOrg, name: network.nom, siret: network.siret, adresse: network.siege.adresse, codePostal: network.siege.codePostal, ville: network.siege.ville, pays: network.siege.pays }
+  : orgs.find(o => o.id === 1) || { name: 'Ferme du Bocage', ville: 'Rennes', lat: 48.1, lng: -1.7 }
 const owners = members.filter(m => m.role === 'propriétaire' || m.role === 'admin')
 
 function renderForm() {

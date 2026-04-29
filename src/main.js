@@ -6,7 +6,8 @@ import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
 
 let currentRole = 'admin' // 'admin' or 'adherent'
-const ADHERENT_ORG_ID = 1
+const ADHERENT_ORG_ID = 1   // Ferme du Bocage (exploitation de l'adhérent)
+const ADMIN_ORG_ID    = 100  // Breiz'Agri Conseil (exploitation propre du réseau)
 let currentSection = 'exploitation'
 let currentView = 'map'
 let currentMetric = 'pluie'
@@ -532,10 +533,11 @@ function updateFiltersVisibility() {
     el.style.display = currentRole === 'admin' ? 'block' : 'none'
   })
 
-  // Vue admin inaccessible pour l'adhérent (toutes sections capteurs)
+  // Vue admin : cachée uniquement pour l'adhérent sur la section réseau
+  // (il peut administrer sa propre exploitation, pas les capteurs du réseau)
   const adminViewBtn = document.querySelector('.view-btn[data-view="admin"]')
   if (adminViewBtn) {
-    const canSeeAdmin = currentRole === 'admin'
+    const canSeeAdmin = currentRole === 'admin' || currentSection === 'exploitation'
     adminViewBtn.style.display = canSeeAdmin ? '' : 'none'
     if (!canSeeAdmin && currentView === 'admin') {
       currentView = 'list'
@@ -583,13 +585,10 @@ function getFilteredData() {
       filteredParcels = plots
       filteredSensors = sensors
     } else {
-      // Admin Mon exploitation : son org uniquement (orgId=1)
-      // Inclut les capteurs sans parcelle mais appartenant à l'org (ex : SMV)
-      filteredParcels = plots.filter(p => p.orgId === 1)
-      filteredSensors = sensors.filter(s =>
-        filteredParcels.some(p => p.id === s.parcelId) ||
-        (s.parcelId === null && s.orgId === 1)
-      )
+      // Admin Mon exploitation : org 100 (Breiz'Agri Conseil)
+      // Pas de parcelles propres — uniquement les SMV sans parcelle
+      filteredParcels = plots.filter(p => p.orgId === ADMIN_ORG_ID)
+      filteredSensors = sensors.filter(s => s.orgId === ADMIN_ORG_ID)
     }
   }
 
