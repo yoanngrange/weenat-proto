@@ -2041,6 +2041,7 @@ function createParcelAdminTable(parcels) {
         <button class="btn-secondary btn-sm" id="bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
         <button class="btn-secondary btn-sm bulk-archive-btn" id="bulk-archive-btn"><i class="bi bi-archive"></i> Archiver</button>
         <button class="btn-secondary btn-sm bulk-danger-btn" id="bulk-delete-btn"><i class="bi bi-trash"></i> Supprimer</button>
+        <button class="btn-secondary btn-sm" id="bulk-org-btn"><i class="bi bi-building"></i> Changer d'organisation propriétaire</button>
         <button class="btn-secondary btn-sm" id="bulk-save-btn" style="color:var(--ok)"><i class="bi bi-check-lg"></i> Enregistrer</button>
       </div>
     </div>
@@ -2049,6 +2050,7 @@ function createParcelAdminTable(parcels) {
   html += '<table id="parcel-admin-table"><thead><tr>'
   html += '<th><input type="checkbox" id="check-all-admin"></th>'
   html += '<th data-column="name">Parcelle</th>'
+  html += '<th data-column="org">Organisation</th>'
   html += '<th class="col-minimap">Contour</th>'
   html += '<th data-column="area">Surface (ha)</th>'
   html += '<th data-column="crop">Culture</th>'
@@ -2093,12 +2095,18 @@ function createParcelAdminTable(parcels) {
           </div>`).join('')
       : '<span class="tag-none">—</span>'
 
+    const parcelOrg = orgs.find(o => o.id === parcel.orgId)
+    const orgSelectHtml = `<select class="inline-edit" data-field="orgId" data-id="${parcel.id}" data-type="number">
+      ${orgs.map(o => `<option value="${o.id}"${o.id === parcel.orgId ? ' selected' : ''}>${o.name}</option>`).join('')}
+    </select>`
+
     html += `<tr>
       <td><input type="checkbox" class="parcel-admin-check" data-id="${parcel.id}"></td>
       <td>
         <a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${getPlotDisplayName(parcel)}</a>
         ${cityName ? `<div class="admin-city-name">${cityName}</div>` : ''}
       </td>
+      <td>${orgSelectHtml}</td>
       <td class="col-minimap">${(!parcel.latlngs && parcel.id % 14 === 0)
         ? `<div class="point-parcel-cell"><i class="bi bi-geo-alt-fill"></i><span>Point GPS</span></div>`
         : `<div class="admin-minimap" data-parcel-id="${parcel.id}" data-latlngs="${encodeURIComponent(JSON.stringify(parcel.latlngs || []))}" data-lat="${parcel.lat}" data-lng="${parcel.lng}"></div>`
@@ -2195,7 +2203,7 @@ function initParcelAdminTable(container) {
       const plot = plots.find(p => p.id === id)
       if (!plot) return
       container.querySelectorAll(`.inline-edit[data-id="${id}"]`).forEach(input => {
-        const val = input.type === 'number' ? Number(input.value) : input.value
+        const val = (input.type === 'number' || input.dataset.type === 'number') ? Number(input.value) : input.value
         plot[input.dataset.field] = val
       })
       btn.classList.add('hidden')
@@ -2353,6 +2361,23 @@ function initParcelAdminTable(container) {
     initParcelAdminTable(container)
   })
 
+  // Changer d'organisation propriétaire
+  container.querySelector('#bulk-org-btn')?.addEventListener('click', () => {
+    const checked = getCheckedAdminIds(container)
+    if (!checked.length) return
+    showBulkOrgPickerModal(checked.length, orgId => {
+      checked.forEach(id => {
+        const plot = plots.find(p => p.id === id)
+        if (plot) plot.orgId = orgId
+      })
+      const org = orgs.find(o => o.id === orgId)
+      showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} transférée${checked.length > 1 ? 's' : ''} à « ${org?.name ?? orgId} »`)
+      const { parcels } = getFilteredData()
+      container.innerHTML = createParcelAdminTable(parcels)
+      initParcelAdminTable(container)
+    })
+  })
+
   container.querySelector('#bulk-save-btn')?.addEventListener('click', () => {
     showToast('Modifications enregistrées.')
   })
@@ -2360,6 +2385,32 @@ function initParcelAdminTable(container) {
 
 function getCheckedAdminIds(container) {
   return Array.from(container.querySelectorAll('.parcel-admin-check:checked')).map(cb => Number(cb.dataset.id))
+}
+
+function showBulkOrgPickerModal(count, onConfirm) {
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center'
+  overlay.innerHTML = `
+    <div style="background:#fff;padding:1.5rem;border-radius:10px;min-width:340px;box-shadow:0 4px 24px rgba(0,0,0,.25)">
+      <h3 style="margin:0 0 .75rem;font-size:1rem">Changer d'organisation propriétaire</h3>
+      <p style="margin:0 0 1rem;color:#666;font-size:.875rem">${count} parcelle${count > 1 ? 's' : ''} sélectionnée${count > 1 ? 's' : ''}</p>
+      <select id="bulk-org-select" style="width:100%;padding:.5rem .75rem;margin-bottom:1.25rem;border:1px solid #ccc;border-radius:6px;font-size:.875rem">
+        ${orgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+      </select>
+      <div style="display:flex;gap:.5rem;justify-content:flex-end">
+        <button id="bulk-org-cancel" class="btn-secondary btn-sm">Annuler</button>
+        <button id="bulk-org-confirm" class="btn-primary btn-sm">Confirmer</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+  overlay.querySelector('#bulk-org-cancel').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+  overlay.querySelector('#bulk-org-confirm').addEventListener('click', () => {
+    const orgId = Number(overlay.querySelector('#bulk-org-select').value)
+    overlay.remove()
+    onConfirm(orgId)
+  })
 }
 
 function showToast(msg, duration = 3000) {

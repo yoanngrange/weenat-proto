@@ -113,6 +113,7 @@ function getMetrics(s) {
 
 // ─── Period state ─────────────────────────────────────────────────────────────
 
+let compareSensorId = null
 let currentPeriod = '7d'
 let customFrom = null
 let customTo   = null
@@ -161,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPanel()
   initPanelToggle()
   initPeriodControls()
+  initCompareControl()
   initMiniMap()
 })
 
@@ -205,45 +207,98 @@ function renderLatestStrip() {
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 
-function renderCharts() {
-  const container = document.getElementById('charts-container')
-  container.innerHTML = ''
-  const metrics = getMetrics(sensor)
+function makeSensorChartCard(m) {
+  const card = document.createElement('div')
+  card.className = 'chart-card'
+  card.dataset.base       = m.current
+  card.dataset.color      = m.color
+  card.dataset.cumul      = m.isCumul ? '1' : ''
+  card.dataset.metricId   = m.id
+  card.dataset.metricName = m.name
+  card.dataset.metricUnit = m.unit
+  const cumulHtml = m.cumul
+    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label}</span><span class="chart-cumul-value">${generateCumulValue(m)} ${m.cumul.unit}</span></div>`
+    : ''
+  const isTempMetric = m.id === 'temperature' || m.id === 'temperature_min'
+  const tempExtraHtml = isTempMetric ? renderTempThresholdHtml(m.id) : ''
+  card.innerHTML = `
+    <div class="chart-card-header">
+      <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
+      <span class="chart-card-unit">${m.unit}</span>
+    </div>
+    <svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+    ${cumulHtml}
+    ${tempExtraHtml}
+  `
+  return card
+}
 
+function renderChartsContent(container, targetSensor) {
+  const metrics = getMetrics(targetSensor)
   metrics.forEach(m => {
     if (m.isVirtual) {
-      renderVirtualChart(container, m)
+      renderVirtualChart(container, m, targetSensor)
       return
     }
-
-    const card = document.createElement('div')
-    card.className = 'chart-card'
-    card.dataset.base       = m.current
-    card.dataset.color      = m.color
-    card.dataset.cumul      = m.isCumul ? '1' : ''
-    card.dataset.metricId   = m.id
-    card.dataset.metricName = m.name
-    card.dataset.metricUnit = m.unit
-
-    const cumulHtml = m.cumul
-      ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label}</span><span class="chart-cumul-value">${generateCumulValue(m)} ${m.cumul.unit}</span></div>`
-      : ''
-
-    // Cold hours + degree-days row below temperature charts
-    const isTempMetric = m.id === 'temperature' || m.id === 'temperature_min'
-    const tempExtraHtml = isTempMetric ? renderTempThresholdHtml(m.id) : ''
-
-    card.innerHTML = `
-      <div class="chart-card-header">
-        <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
-        <span class="chart-card-unit">${m.unit}</span>
-      </div>
-      <svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
-      ${cumulHtml}
-      ${tempExtraHtml}
-    `
-    container.appendChild(card)
+    container.appendChild(makeSensorChartCard(m))
   })
+}
+
+function appendMetricToSlot(slot, m, targetSensor) {
+  if (m.isVirtual) {
+    renderVirtualChart(slot, m, targetSensor)
+  } else {
+    slot.appendChild(makeSensorChartCard(m))
+  }
+}
+
+function renderCharts() {
+  const mainContainer = document.getElementById('charts-container')
+  mainContainer.innerHTML = ''
+
+  if (compareSensorId) {
+    mainContainer.className = 'compare-rows'
+
+    const compareSensor = sensors.find(s => s.id === compareSensorId)
+    const headerRow = document.createElement('div')
+    headerRow.className = 'compare-header-row'
+    headerRow.innerHTML = `
+      <div class="compare-col-header"><span>${sensor.model} — ${sensor.serial}</span></div>
+      <div class="compare-col-header">
+        <span>${compareSensor ? `${compareSensor.model} — ${compareSensor.serial}` : 'Capteur'}</span>
+        <button class="icon-btn compare-close-btn" title="Fermer la comparaison"><i class="bi bi-x-lg"></i></button>
+      </div>`
+    mainContainer.appendChild(headerRow)
+    headerRow.querySelector('.compare-close-btn')?.addEventListener('click', () => {
+      compareSensorId = null
+      updateCompareBtn()
+      renderCharts()
+    })
+
+    const leftMetrics  = getMetrics(sensor)
+    const rightMetrics = compareSensor ? getMetrics(compareSensor) : []
+    const leftIds = leftMetrics.map(m => m.id)
+    const allIds  = [...leftIds, ...rightMetrics.map(m => m.id).filter(id => !leftIds.includes(id))]
+
+    allIds.forEach(id => {
+      const leftM  = leftMetrics.find(m => m.id === id)
+      const rightM = rightMetrics.find(m => m.id === id)
+      const row = document.createElement('div')
+      row.className = 'compare-row'
+      const leftSlot = document.createElement('div')
+      if (leftM) appendMetricToSlot(leftSlot, leftM, sensor)
+      else leftSlot.innerHTML = '<div class="compare-chart-empty">—</div>'
+      const rightSlot = document.createElement('div')
+      if (rightM) appendMetricToSlot(rightSlot, rightM, compareSensor)
+      else rightSlot.innerHTML = '<div class="compare-chart-empty">—</div>'
+      row.appendChild(leftSlot)
+      row.appendChild(rightSlot)
+      mainContainer.appendChild(row)
+    })
+  } else {
+    mainContainer.className = 'charts-stack'
+    renderChartsContent(mainContainer, sensor)
+  }
 
   drawAllCharts()
   bindTempThresholds()
@@ -294,12 +349,12 @@ function bindTempThresholds() {
   })
 }
 
-function renderVirtualChart(container, m) {
+function renderVirtualChart(container, m, targetSensor) {
   const card = document.createElement('div')
   card.className = 'chart-card chart-card--multi'
 
   if (m.id === '_capa_vwc' || m.id === '_capa_temp') {
-    const horizons = CAPA_HORIZONS[sensor.model] || []
+    const horizons = CAPA_HORIZONS[targetSensor.model] || []
     const isVwc    = m.id === '_capa_vwc'
     const title    = isVwc ? 'Humidité sol par horizon' : 'Temp. sol par horizon'
     const unit     = isVwc ? '%vol' : '°C'
@@ -315,7 +370,7 @@ function renderVirtualChart(container, m) {
       </div>
       <div class="multi-chart-legend">${legendHtml}</div>
       <svg class="chart-svg chart-svg--multi" width="100%" height="200" viewBox="0 0 600 200" preserveAspectRatio="none"
-           data-virtual="${m.id}" data-model="${sensor.model}"></svg>
+           data-virtual="${m.id}" data-model="${targetSensor.model}"></svg>
     `
     container.appendChild(card)
 
@@ -766,6 +821,73 @@ function applyCustomDates() {
     customTo   = new Date(to + 'T23:59:59')
     if (customFrom < customTo) renderCharts()
   }
+}
+
+// ─── Compare control ──────────────────────────────────────────────────────────
+
+function initCompareControl() {
+  updateCompareBtn()
+}
+
+function updateCompareBtn() {
+  const wrap = document.getElementById('compare-control')
+  if (!wrap) return
+  if (compareSensorId) {
+    const s = sensors.find(x => x.id === compareSensorId)
+    const name = s ? `${s.model} — ${s.serial}` : 'Capteur'
+    wrap.innerHTML = `<button class="compare-btn compare-btn--active" id="compare-open-btn"><i class="bi bi-layout-split"></i> ${name} <i class="bi bi-x-lg compare-clear-icon" style="opacity:.7"></i></button>`
+    wrap.querySelector('.compare-clear-icon')?.addEventListener('click', e => {
+      e.stopPropagation()
+      compareSensorId = null
+      updateCompareBtn()
+      renderCharts()
+    })
+    wrap.querySelector('#compare-open-btn')?.addEventListener('click', openCompareDropdown)
+  } else {
+    wrap.innerHTML = `<button class="compare-btn" id="compare-open-btn"><i class="bi bi-layout-split"></i> Comparer avec…</button>`
+    wrap.querySelector('#compare-open-btn')?.addEventListener('click', openCompareDropdown)
+  }
+}
+
+function openCompareDropdown() {
+  const existing = document.getElementById('compare-dropdown')
+  if (existing) { existing.remove(); return }
+  const wrap = document.getElementById('compare-control')
+  const otherSensors = sensors.filter(s => s.id !== sensorId)
+  const dropdown = document.createElement('div')
+  dropdown.id = 'compare-dropdown'
+  dropdown.className = 'compare-dropdown'
+  dropdown.innerHTML = `
+    <input class="compare-search-input" type="text" placeholder="Rechercher un capteur…">
+    <div class="compare-dropdown-list">
+      ${otherSensors.map(s => `<div class="compare-dropdown-item${s.id === compareSensorId ? ' active' : ''}" data-id="${s.id}"><i class="bi bi-broadcast"></i> ${s.model} — ${s.serial}</div>`).join('')}
+    </div>
+  `
+  wrap.appendChild(dropdown)
+  const searchInput = dropdown.querySelector('.compare-search-input')
+  searchInput.focus()
+  searchInput.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase()
+    dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none'
+    })
+  })
+  dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      compareSensorId = parseInt(item.dataset.id)
+      dropdown.remove()
+      updateCompareBtn()
+      renderCharts()
+    })
+  })
+  setTimeout(() => {
+    document.addEventListener('click', function closeHandler(e) {
+      if (!dropdown.contains(e.target) && !wrap.contains(e.target)) {
+        dropdown.remove()
+        document.removeEventListener('click', closeHandler)
+      }
+    })
+  }, 0)
 }
 
 // ─── Right panel ──────────────────────────────────────────────────────────────

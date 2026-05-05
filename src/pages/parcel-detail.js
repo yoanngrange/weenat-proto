@@ -185,32 +185,20 @@ document.addEventListener('DOMContentLoaded', () => {
   initMiniMap()
   initPanelToggle()
   initPeriodControls()
+  initCompareControl()
   initTabs()
   initDashGrid()
-  syncStickyChartControls()
 })
-
-function syncStickyChartControls() {
-  const tabBar = document.querySelector('.detail-tab-bar')
-  const update = () => {
-    const top = tabBar.getBoundingClientRect().height + 60
-    document.documentElement.style.setProperty('--sticky-charts-top', top + 'px')
-  }
-  update()
-  new ResizeObserver(update).observe(tabBar)
-}
 
 // ─── Weather strip ────────────────────────────────────────────────────────────
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
 
 let tensioViewMode = 'capteur' // 'capteur' | 'horizon'
+let compareParcelId = null
 
-function renderCharts() {
-  const container = document.getElementById('charts-container')
-  container.innerHTML = ''
-
-  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+function renderChartsContent(container, linkedSensorIds) {
+  const linkedSensors = allSensors.filter(s => linkedSensorIds.includes(s.id))
   const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
   const otherSensors  = linkedSensors.filter(s => !TENSIO_MODELS.includes(s.model))
 
@@ -262,6 +250,72 @@ function renderCharts() {
   alwaysHeader.innerHTML = `<i class="bi bi-cloud-sun" style="color:var(--pri)"></i> <strong>Données météo</strong> <span class="chart-group-serial">Station de référence</span>`
   container.appendChild(alwaysHeader)
   ALWAYS_METRICS.forEach(m => appendChartCard(container, m))
+}
+
+function getParcelFlatMetrics(linkedSensorIds) {
+  const linkedSensors = allSensors.filter(s => linkedSensorIds.includes(s.id))
+  const seenIds = new Set()
+  const metrics = []
+  linkedSensors.forEach(s => {
+    ;(METRICS_BY_MODEL[s.model] || []).forEach(m => {
+      if (!seenIds.has(m.id)) { seenIds.add(m.id); metrics.push(m) }
+    })
+  })
+  ALWAYS_METRICS.forEach(m => {
+    if (!seenIds.has(m.id)) { seenIds.add(m.id); metrics.push(m) }
+  })
+  return metrics
+}
+
+function renderCharts() {
+  const mainContainer = document.getElementById('charts-container')
+  mainContainer.innerHTML = ''
+
+  if (compareParcelId) {
+    mainContainer.className = 'compare-rows'
+
+    const compareBase = plots.find(p => p.id === compareParcelId)
+    const headerRow = document.createElement('div')
+    headerRow.className = 'compare-header-row'
+    headerRow.innerHTML = `
+      <div class="compare-col-header"><span>${parcelState.name || parcelBase.name}</span></div>
+      <div class="compare-col-header">
+        <span>${compareBase?.name || 'Parcelle'}</span>
+        <button class="icon-btn compare-close-btn" title="Fermer la comparaison"><i class="bi bi-x-lg"></i></button>
+      </div>`
+    mainContainer.appendChild(headerRow)
+    headerRow.querySelector('.compare-close-btn')?.addEventListener('click', () => {
+      compareParcelId = null
+      updateCompareBtn()
+      renderCharts()
+    })
+
+    const leftMetrics = getParcelFlatMetrics(parcelState.linkedSensorIds)
+    const stored = getParcel(compareParcelId)
+    const compareLinkedIds = stored?.linkedSensorIds ?? allSensors.filter(s => s.parcelId === compareParcelId).map(s => s.id)
+    const rightMetrics = getParcelFlatMetrics(compareLinkedIds)
+    const leftIds = leftMetrics.map(m => m.id)
+    const allIds = [...leftIds, ...rightMetrics.map(m => m.id).filter(id => !leftIds.includes(id))]
+
+    allIds.forEach(id => {
+      const leftM  = leftMetrics.find(m => m.id === id)
+      const rightM = rightMetrics.find(m => m.id === id)
+      const row = document.createElement('div')
+      row.className = 'compare-row'
+      const leftSlot = document.createElement('div')
+      if (leftM) appendChartCard(leftSlot, leftM)
+      else leftSlot.innerHTML = '<div class="compare-chart-empty">—</div>'
+      const rightSlot = document.createElement('div')
+      if (rightM) appendChartCard(rightSlot, rightM)
+      else rightSlot.innerHTML = '<div class="compare-chart-empty">—</div>'
+      row.appendChild(leftSlot)
+      row.appendChild(rightSlot)
+      mainContainer.appendChild(row)
+    })
+  } else {
+    mainContainer.className = 'charts-stack'
+    renderChartsContent(mainContainer, parcelState.linkedSensorIds)
+  }
 
   drawAllCharts()
 }
@@ -812,6 +866,72 @@ function applyCustomDates() {
     customTo   = new Date(to + 'T23:59:59')
     if (customFrom < customTo) renderCharts()
   }
+}
+
+// ─── Compare control ──────────────────────────────────────────────────────────
+
+function initCompareControl() {
+  updateCompareBtn()
+}
+
+function updateCompareBtn() {
+  const wrap = document.getElementById('compare-control')
+  if (!wrap) return
+  if (compareParcelId) {
+    const name = plots.find(p => p.id === compareParcelId)?.name || 'Parcelle'
+    wrap.innerHTML = `<button class="compare-btn compare-btn--active" id="compare-open-btn"><i class="bi bi-layout-split"></i> ${name} <i class="bi bi-x-lg compare-clear-icon" style="opacity:.7"></i></button>`
+    wrap.querySelector('.compare-clear-icon')?.addEventListener('click', e => {
+      e.stopPropagation()
+      compareParcelId = null
+      updateCompareBtn()
+      renderCharts()
+    })
+    wrap.querySelector('#compare-open-btn')?.addEventListener('click', openCompareDropdown)
+  } else {
+    wrap.innerHTML = `<button class="compare-btn" id="compare-open-btn"><i class="bi bi-layout-split"></i> Comparer avec…</button>`
+    wrap.querySelector('#compare-open-btn')?.addEventListener('click', openCompareDropdown)
+  }
+}
+
+function openCompareDropdown() {
+  const existing = document.getElementById('compare-dropdown')
+  if (existing) { existing.remove(); return }
+  const wrap = document.getElementById('compare-control')
+  const otherParcels = plots.filter(p => p.id !== parcelId)
+  const dropdown = document.createElement('div')
+  dropdown.id = 'compare-dropdown'
+  dropdown.className = 'compare-dropdown'
+  dropdown.innerHTML = `
+    <input class="compare-search-input" type="text" placeholder="Rechercher une parcelle…">
+    <div class="compare-dropdown-list">
+      ${otherParcels.map(p => `<div class="compare-dropdown-item${p.id === compareParcelId ? ' active' : ''}" data-id="${p.id}"><i class="bi bi-map"></i> ${p.name}</div>`).join('')}
+    </div>
+  `
+  wrap.appendChild(dropdown)
+  const searchInput = dropdown.querySelector('.compare-search-input')
+  searchInput.focus()
+  searchInput.addEventListener('input', e => {
+    const q = e.target.value.toLowerCase()
+    dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none'
+    })
+  })
+  dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      compareParcelId = parseInt(item.dataset.id)
+      dropdown.remove()
+      updateCompareBtn()
+      renderCharts()
+    })
+  })
+  setTimeout(() => {
+    document.addEventListener('click', function closeHandler(e) {
+      if (!dropdown.contains(e.target) && !wrap.contains(e.target)) {
+        dropdown.remove()
+        document.removeEventListener('click', closeHandler)
+      }
+    })
+  }, 0)
 }
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
@@ -1390,16 +1510,12 @@ let _miniMapInitialized = false
 
 function initTabs() {
   const btns = document.querySelectorAll('.detail-tab-btn')
-  const chartControlsBar = document.getElementById('chart-controls-bar')
   btns.forEach(btn => {
     btn.addEventListener('click', () => {
       btns.forEach(b => b.classList.remove('active'))
       document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'))
       btn.classList.add('active')
-      const paneId = btn.dataset.pane
-      document.getElementById(paneId).classList.add('active')
-      if (chartControlsBar) chartControlsBar.style.display = paneId === 'tab-donnees' ? '' : 'none'
-
+      document.getElementById(btn.dataset.pane).classList.add('active')
     })
   })
 }
