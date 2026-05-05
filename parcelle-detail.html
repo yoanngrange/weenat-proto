@@ -8,15 +8,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-BjRZk3B5.js"></script>
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-BfTBtz6r.js">
+  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-CJyNPDlA.js"></script>
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/main-CTKmqMeY.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-Dwluc99O.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-CeUIY8ag.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-Cx4wNzLL.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-DEd9yWse.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-DzkjdUGR.js">
-  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CI7JXGzU.css">
+  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-D-SW6c6U.css">
 
   <body>
     <div id="app">
@@ -84,34 +84,6 @@
           </button>
         </div>
 
-        <div id="chart-controls-bar" class="chart-controls chart-controls--sticky" style="display:none">
-          <div class="period-presets" id="period-presets">
-            <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
-            <button class="period-preset-btn" data-period="hier">Hier</button>
-            <button class="period-preset-btn" data-period="3d">3 jours</button>
-            <button class="period-preset-btn active" data-period="7d">7 jours</button>
-            <button class="period-preset-btn" data-period="30d">30 jours</button>
-            <button class="period-preset-btn" data-period="365d">365 jours</button>
-            <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
-          </div>
-          <div id="custom-date-row" class="custom-date-row" style="display:none">
-            <input type="date" id="date-from">
-            <span class="custom-date-sep">—</span>
-            <input type="date" id="date-to">
-          </div>
-          <select id="time-step" class="time-step-select">
-            <option value="max">Maximal</option>
-            <option value="1h" selected>Horaire</option>
-            <option value="1d">Journalier</option>
-            <option value="1w">Hebdomadaire</option>
-            <option value="1mo">Mensuel</option>
-          </select>
-          <label class="chart-toggle-label">
-            <input type="checkbox" id="toggle-phenologie">
-            <span>Stades phénologiques</span>
-          </label>
-        </div>
-
         <main id="content" class="detail-content">
           <div class="detail-layout" id="detail-layout">
 
@@ -122,6 +94,34 @@
               </div>
 
               <div id="tab-donnees" class="detail-tab-pane">
+                <div id="chart-controls-bar" class="chart-controls chart-controls--sticky">
+                  <div class="period-presets" id="period-presets">
+                    <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
+                    <button class="period-preset-btn" data-period="hier">Hier</button>
+                    <button class="period-preset-btn" data-period="3d">3 jours</button>
+                    <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                    <button class="period-preset-btn" data-period="30d">30 jours</button>
+                    <button class="period-preset-btn" data-period="365d">365 jours</button>
+                    <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
+                  </div>
+                  <div id="custom-date-row" class="custom-date-row" style="display:none">
+                    <input type="date" id="date-from">
+                    <span class="custom-date-sep">—</span>
+                    <input type="date" id="date-to">
+                  </div>
+                  <select id="time-step" class="time-step-select">
+                    <option value="max">Maximal</option>
+                    <option value="1h" selected>Horaire</option>
+                    <option value="1d">Journalier</option>
+                    <option value="1w">Hebdomadaire</option>
+                    <option value="1mo">Mensuel</option>
+                  </select>
+                  <label class="chart-toggle-label">
+                    <input type="checkbox" id="toggle-phenologie">
+                    <span>Stades phénologiques</span>
+                  </label>
+                  <div id="compare-control" class="compare-control-wrap"></div>
+                </div>
                 <div id="charts-container" class="charts-stack"></div>
               </div><!-- #tab-donnees -->
 
