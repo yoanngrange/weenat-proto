@@ -184,7 +184,7 @@ function renderMonCompte() {
 
       <!-- Supprimer le compte -->
       <section class="account-section account-section--danger">
-        <div class="account-section-title">Zone de danger</div>
+        <div class="account-section-title">Données personnelles</div>
         <p class="account-danger-desc">La suppression de votre compte est irréversible. Toutes vos données seront définitivement effacées.</p>
         <button class="btn-danger" id="delete-account-btn"><i class="bi bi-trash"></i> Supprimer mon compte</button>
       </section>
