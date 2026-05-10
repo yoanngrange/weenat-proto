@@ -62,56 +62,56 @@ function renderForm() {
   if (!el) return
 
   el.innerHTML = `
-    <div class="param-section">
-      <div class="param-section-title">Mon exploitation</div>
-
-      <div class="param-form-grid" style="max-width:640px">
-        <div class="param-field">
-          <label class="param-label">Nom de l'exploitation</label>
-          <input type="text" class="param-input" id="org-name" value="${org.name || ''}">
-        </div>
-        <div class="param-field">
-          <label class="param-label">Propriétaire</label>
-          <select class="param-input" id="org-owner">
-            ${owners.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
-          </select>
-        </div>
-        <div class="param-field param-field--wide">
-          <label class="param-label">Métiers</label>
-          <div class="param-chips" id="profession-chips">
-            ${PROFESSIONS.map(p => `
-              <label class="param-chip">
-                <input type="checkbox" value="${p}"> ${p}
-              </label>
-            `).join('')}
+    <div class="param-2col">
+      <div class="param-section">
+        <div class="param-section-title">Mon exploitation</div>
+        <div class="param-form-grid">
+          <div class="param-field">
+            <label class="param-label">Nom de l'exploitation</label>
+            <input type="text" class="param-input" id="org-name" value="${org.name || ''}">
+          </div>
+          <div class="param-field">
+            <label class="param-label">Propriétaire</label>
+            <select class="param-input" id="org-owner">
+              ${owners.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
+            </select>
+          </div>
+          <div class="param-field param-field--wide">
+            <label class="param-label">Métiers</label>
+            <div class="param-chips" id="profession-chips">
+              ${PROFESSIONS.map(p => `
+                <label class="param-chip">
+                  <input type="checkbox" value="${p}"> ${p}
+                </label>
+              `).join('')}
+            </div>
+          </div>
+          <div class="param-field param-field--wide">
+            <label class="param-label">Adresse du siège</label>
+            <input type="text" class="param-input" id="org-address" placeholder="Numéro et rue" value="${org.adresse || ''}">
+          </div>
+          <div class="param-field">
+            <label class="param-label">Code postal</label>
+            <input type="text" class="param-input" id="org-cp" placeholder="00000" value="${org.codePostal || ''}">
+          </div>
+          <div class="param-field">
+            <label class="param-label">Ville</label>
+            <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${org.ville || ''}">
           </div>
         </div>
-        <div class="param-field param-field--wide">
-          <label class="param-label">Adresse du siège</label>
-          <input type="text" class="param-input" id="org-address" placeholder="Numéro et rue" value="${org.adresse || ''}">
-        </div>
-        <div class="param-field">
-          <label class="param-label">Code postal</label>
-          <input type="text" class="param-input" id="org-cp" placeholder="00000" value="${org.codePostal || ''}">
-        </div>
-        <div class="param-field">
-          <label class="param-label">Ville</label>
-          <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${org.ville || ''}">
-        </div>
+        <button class="btn-primary" id="save-org-btn" style="margin-top:16px">
+          <i class="bi bi-check-lg"></i> Enregistrer
+        </button>
       </div>
 
-      <button class="btn-primary" id="save-org-btn" style="margin-top:16px">
-        <i class="bi bi-check-lg"></i> Enregistrer
-      </button>
-    </div>
-
-    <div class="param-section" style="padding:0;overflow:hidden;border-radius:8px;border:1px solid var(--bdr)">
-      <div style="padding:10px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--bdr);background:var(--bg2)">
-        <i class="bi bi-geo-alt" style="color:var(--pri)"></i> Localisation de l'exploitation
-      </div>
-      <div id="param-map" style="height:260px"></div>
-      <div style="padding:8px 14px;font-size:12px;color:var(--txt2)">
-        <i class="bi bi-info-circle"></i> Position calculée depuis l'adresse renseignée.
+      <div class="param-section" style="padding:0;overflow:hidden;border-radius:8px;border:1px solid var(--bdr)">
+        <div style="padding:10px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--bdr);background:var(--bg2)">
+          <i class="bi bi-geo-alt" style="color:var(--pri)"></i> Localisation de l'exploitation
+        </div>
+        <div id="param-map" style="height:100%;min-height:260px"></div>
+        <div style="padding:8px 14px;font-size:12px;color:var(--txt2)">
+          <i class="bi bi-info-circle"></i> Position calculée depuis l'adresse renseignée.
+        </div>
       </div>
     </div>
 

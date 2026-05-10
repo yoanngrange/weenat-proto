@@ -26,7 +26,7 @@ const METRICS = [
   { id: 'temp_rosee',label: 'Température de rosée',unit: '°C', aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
   { id: 'rayonnement',label: 'Rayonnement solaire',unit: 'W/m²',aggs: ['Actuel', 'Journalier'],                               defaultAgg: 'Actuel'           },
   { id: 'rfu',      label: 'Réservoir',            unit: 'mm',  aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
-  { id: 'hum',         label: 'Humidité air',          unit: '%',          aggs: ['Actuel', 'Moyenne du jour'],          defaultAgg: 'Actuel'           },
+  { id: 'hum',         label: 'Humidité',          unit: '%',          aggs: ['Actuel', 'Moyenne du jour'],          defaultAgg: 'Actuel'           },
   { id: 'vent',        label: 'Vent',                  unit: 'km/h',       aggs: ['Actuel', 'Moyen du jour', 'Rafales'], defaultAgg: 'Actuel'           },
   { id: 'par',         label: 'Rayonnement PAR',       unit: 'µmol/m²/s', aggs: ['Actuel', 'Journalier'],               defaultAgg: 'Actuel'           },
   { id: 'humectation', label: 'Humectation foliaire',  unit: '%',          aggs: ['Actuel', 'Heures du jour'],           defaultAgg: 'Actuel'           },

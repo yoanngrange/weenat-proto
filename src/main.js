@@ -910,7 +910,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
     if (isSinglePoint) {
       map.setView(bounds.getCenter(), isCapteurPage ? 10 : 13)
     } else {
-      map.fitBounds(bounds.pad(isCapteurPage ? 0.4 : 0.15), { maxZoom: isCapteurPage ? 10 : 14 })
+      map.fitBounds(bounds.pad(0.15), { maxZoom: isCapteurPage ? 13 : 14 })
     }
   }
 

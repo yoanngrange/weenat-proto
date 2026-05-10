@@ -23,7 +23,7 @@ const ALERTS_ADHERENT = [
 const METRIC_LABELS = {
   'pluie': 'Pluie', 'temperature': 'Température', 'teneur-eau': 'Teneur en eau sol',
   'potentiel-hydrique': 'Potentiel hydrique', 'vent': 'Vent', 'rayonnement': 'Rayonnement',
-  'humidite': 'Humidité air', 'temp-humide': 'Température humide', 'temp-seche': 'Température sèche',
+  'humidite': 'Humidité', 'temp-humide': 'Température humide', 'temp-seche': 'Température sèche',
 }
 
 const METRIC_ICONS = {

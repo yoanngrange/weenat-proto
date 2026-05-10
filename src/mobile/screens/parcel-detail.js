@@ -10,7 +10,7 @@ const CHART_METRICS = {
   temp_rosee:   { label: 'Température de rosée', unit: '°C',   color: '#80c8e8', cumul: false },
   pluie:        { label: 'Pluie',                unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
   temperature:  { label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-  humidite:     { label: 'Humidité air',          unit: '%',    color: '#4ecdc4', cumul: false },
+  humidite:     { label: 'Humidité',          unit: '%',    color: '#4ecdc4', cumul: false },
   pothydr:      { label: 'Potentiel hydrique',   unit: 'kPa',  color: '#5b8dd9', cumul: false },
   teneur:       { label: 'Teneur en eau',         unit: '%vol', color: '#f0c060', cumul: false },
   temp_sol:     { label: 'Température sol',       unit: '°C',   color: '#bb8fce', cumul: false },
@@ -232,6 +232,34 @@ function widgetsView() {
     </div>`
 }
 
+function triggerCsvDownload(content, filename) {
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename })
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(a.href), 100)
+}
+
+function exportCsvParcel(parcel, linkedSensorIds, period) {
+  const sensorMetrics = new Set()
+  linkedSensorIds.forEach(id => {
+    const s = allSensors.find(x => x.id === id)
+    if (s) (SENSOR_MODEL_METRICS[s.model] || []).forEach(m => sensorMetrics.add(m))
+  })
+  const metricIds = [...new Set(['etp', 'rayonnement', 'temp_rosee', ...sensorMetrics])].filter(id => CHART_METRICS[id])
+  const count  = PERIOD_COUNTS[period] || 60
+  const mins   = PERIOD_MINS[period]   || 10080
+  const stepMs = (mins / count) * 60000
+  const end    = new Date()
+  const start  = new Date(end - mins * 60000)
+  const header = ['Horodatage', ...metricIds.map(id => `${CHART_METRICS[id].label} (${CHART_METRICS[id].unit})`)].join(';')
+  const rows   = Array.from({ length: count }, (_, i) => {
+    const ts = new Date(start.getTime() + i * stepMs).toISOString().replace('T', ' ').slice(0, 19)
+    return [ts, ...metricIds.map(id => mockSeries(id, 1)[0].toFixed(2))].join(';')
+  })
+  const name = (parcel.name || 'parcelle').replace(/[^\w]/g, '_')
+  triggerCsvDownload([header, ...rows].join('\r\n'), `${name}_${period}_${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
 function donneesView(linkedSensorIds, period = '7d', step = '1h') {
   const sensorMetrics = new Set()
   linkedSensorIds.forEach(id => {
@@ -255,6 +283,7 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h') {
         <option value="1d"${step === '1d' ? ' selected' : ''}>Journalier</option>
         <option value="1w"${step === '1w' ? ' selected' : ''}>Hebdo</option>
       </select>
+      <button class="m-export-btn" title="Exporter CSV"><i class="bi bi-download"></i></button>
     </div>
     <div class="m-detail-section">
       ${unique.map(id => chartCard(id, period)).join('')}
@@ -311,7 +340,7 @@ function paramsView(parcel, org, linkedSensorIds) {
           <span class="m-list-row-value">${org?.ville || '—'}</span>
         </div>
         <div class="m-list-row m-list-row--last">
-          <a class="m-itinerary-link" href="https://maps.apple.com/?q=${encodeURIComponent(org?.ville || '')}&sll=${parcel.lat},${parcel.lng}" target="_blank">
+          <a class="m-itinerary-link" href="geo:${parcel.lat},${parcel.lng}?q=${parcel.lat},${parcel.lng}" target="_blank">
             <i class="bi bi-signpost-2"></i> Obtenir l'itinéraire
           </a>
         </div>
@@ -442,6 +471,8 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
     layer.querySelector('.m-step-sel')?.addEventListener('change', e => {
       currentStep = e.target.value; renderView()
     })
+    // Export CSV
+    layer.querySelector('.m-export-btn')?.addEventListener('click', () => exportCsvParcel(parcel, linkedSensorIds, currentPeriod))
     // Chart tooltip on hover/touch
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
     // Param rows

@@ -15,10 +15,10 @@ const CONTRACT = {
   plan:                 'Plus',
   anniversaire:         '2022-03-15',
   numero:               'CTR-2022-00418',
-  licencesMembres:      5,
-  licencesAdherents:    3,
+  licencesMembres:      members.length,
+  licencesAdherents:    orgs.length,
   licencesIntegrations: 27,
-  licencesTotal:        8,
+  licencesTotal:        members.length + orgs.length,
   prixUnitaire:         29,   // € HT / mois
 }
 

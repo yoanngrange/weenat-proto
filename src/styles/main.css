@@ -3572,12 +3572,34 @@ td.num {
 /* ── Chart controls bar ── */
 .chart-controls {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 0 8px;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0 0;
   border-bottom: 1px solid var(--bdr2);
   margin-bottom: 4px;
+}
+
+.chart-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+}
+
+.chart-controls-row--actions {
+  padding-top: 4px;
+  border-top: 1px solid var(--bdr2);
+}
+
+.chart-ctrl-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt3);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .chart-controls--sticky {
@@ -3718,6 +3740,45 @@ td.num {
 }
 
 /* ── Editable rows ── */
+.panel-field-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 200px;
+  border: 1px solid var(--bdr);
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--txt);
+  background: var(--bg);
+  text-align: right;
+}
+.panel-field-input:focus {
+  outline: none;
+  border-color: var(--pri);
+  box-shadow: 0 0 0 2px var(--pri2);
+}
+select.panel-field-input { max-width: 220px; cursor: pointer; }
+
+.itinerary-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--pri);
+  text-decoration: none;
+  padding: 2px 0;
+}
+.itinerary-link:hover { text-decoration: underline; }
+
+.param-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 960px) { .param-2col { grid-template-columns: 1fr; } }
+
 .editable-row {
   position: relative;
 }
@@ -3820,26 +3881,48 @@ td.num {
 .sensor-linked-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 5px 0;
+  padding: 7px 0;
   border-bottom: 1px solid var(--bdr2);
-  font-size: 12px;
 }
-
 .sensor-linked-row:last-child { border-bottom: none; }
 
-.sensor-linked-row .sensor-link-model {
-  font-weight: 600;
-  color: var(--pri);
-  text-decoration: none;
-  font-size: 12px;
-}
-
-.sensor-linked-row .sensor-link-serial {
+.sensor-linked-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
+  min-width: 0;
+}
+.sensor-linked-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt);
+}
+.sensor-linked-detail {
+  font-size: 11px;
   color: var(--txt3);
   font-family: var(--mono);
+}
+
+.wind-chart-legend {
+  display: flex;
+  gap: 20px;
+  padding: 6px 14px 8px;
   font-size: 11px;
+  color: var(--txt3);
+  align-items: center;
+}
+.wind-legend-band {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+  background: #7bc4b0;
+  opacity: .3;
+  vertical-align: middle;
+  border-radius: 2px;
+  margin-right: 2px;
 }
 
 /* ── Integration pill rows ── */

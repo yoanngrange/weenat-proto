@@ -28,7 +28,7 @@ const METRICS_BY_MODEL = {
   'P+':       [
     { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
     { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité air', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'humidite', name: 'Humidité', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
   ],
   'PT': [
     { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
@@ -40,58 +40,55 @@ const METRICS_BY_MODEL = {
   'SMV': [
     { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
     { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité air', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'humidite', name: 'Humidité', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
   ],
   'TH': [
     { id: 'temp',     name: 'Température',  unit: '°C', color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité air', unit: '%',  color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'humidite', name: 'Humidité', unit: '%',  color: '#4ecdc4', base: () => rnd(40, 90) },
   ],
   'CHP-15/30': [
     { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CHP-30/60': [
     { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CHP-60/90': [
     { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Temp. sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
   ],
   'CAPA-30-3': [
-    { id: 'vwc10', name: 'Hum. sol 10 cm', unit: '%vol', color: '#f0cc60', base: () => rnd(15, 45) },
-    { id: 'vwc20', name: 'Hum. sol 20 cm', unit: '%vol', color: '#c89c30', base: () => rnd(15, 45) },
-    { id: 'vwc30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#a07010', base: () => rnd(15, 45) },
-    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#f0cc60', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#c89c30', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#a07010', base: () => rnd(15, 45) },
+    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
   ],
   'CAPA-60-6': [
-    { id: 'vwc10', name: 'Hum. sol 10 cm', unit: '%vol', color: '#f0d070', base: () => rnd(15, 45) },
-    { id: 'vwc20', name: 'Hum. sol 20 cm', unit: '%vol', color: '#d8b050', base: () => rnd(15, 45) },
-    { id: 'vwc30', name: 'Hum. sol 30 cm', unit: '%vol', color: '#c09030', base: () => rnd(15, 45) },
-    { id: 'vwc40', name: 'Hum. sol 40 cm', unit: '%vol', color: '#a87010', base: () => rnd(17, 43) },
-    { id: 'vwc50', name: 'Hum. sol 50 cm', unit: '%vol', color: '#905200', base: () => rnd(18, 42) },
-    { id: 'vwc60', name: 'Hum. sol 60 cm', unit: '%vol', color: '#783400', base: () => rnd(18, 42) },
-    { id: 'tsol',  name: 'Temp. sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#f0d070', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#d8b050', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#c09030', base: () => rnd(15, 45) },
+    { id: 'vwc40', name: 'Teneur en eau du sol 40 cm', unit: '%vol', color: '#a87010', base: () => rnd(17, 43) },
+    { id: 'vwc50', name: 'Teneur en eau du sol 50 cm', unit: '%vol', color: '#905200', base: () => rnd(18, 42) },
+    { id: 'vwc60', name: 'Teneur en eau du sol 60 cm', unit: '%vol', color: '#783400', base: () => rnd(18, 42) },
+    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
   ],
   'T_MINI': [
-    { id: 'tsol', name: 'Temp. sol', unit: '°C', color: '#bb8fce', base: () => rnd(8, 22) },
+    { id: 'tsol', name: 'Température du sol', unit: '°C', color: '#bb8fce', base: () => rnd(8, 22) },
   ],
   'LWS': [
-    { id: 'humec', name: 'Humectation feuille', unit: 'h', color: '#78d8a0', base: () => rnd(0, 12) },
+    { id: 'humec', name: 'Humectation foliaire', unit: 'h', color: '#78d8a0', base: () => rnd(0, 12) },
   ],
   'T_GEL': [
     { id: 'tseche',  name: 'Temp. sèche',  unit: '°C', color: '#e07050', base: () => rnd(-2, 12) },
     { id: 'thumide', name: 'Temp. humide', unit: '°C', color: '#4ecdc4', base: () => rnd(-4, 10) },
   ],
   'W': [
-    { id: 'vent',          name: 'Vent – vitesse',           unit: 'km/h', color: '#7bc4b0', base: () => rnd(0, 40)  },
-    { id: 'dir',           name: 'Vent – direction',         unit: '°',    color: '#3a8070', base: () => rnd(0, 360) },
-    { id: 'rafales',       name: 'Vent – rafales',           unit: 'km/h', color: '#5aa490', base: () => rnd(5, 60)  },
-    { id: 'dir_rafales',   name: 'Vent – direction rafales', unit: '°',    color: '#1a6050', base: () => rnd(0, 360) },
+    { id: '_vent', name: 'Vent', unit: 'km/h · direction', color: '#7bc4b0', isWindComposite: true, base: () => rnd(0, 40) },
   ],
   'EC': [
     { id: 'ec',   name: 'Conductivité', unit: 'mS/cm', color: '#f0a030', base: () => rndf(0.1, 3) },
-    { id: 'tsol', name: 'Temp. sol',    unit: '°C',    color: '#bb8fce', base: () => rnd(8, 22) },
+    { id: 'tsol', name: 'Température du sol',    unit: '°C',    color: '#bb8fce', base: () => rnd(8, 22) },
   ],
   'PYRANO': [
     { id: 'rayonnement', name: 'Rayonnement', unit: 'W/m²', color: '#f5c842', base: () => rnd(0, 900), cumul: { label: 'Énergie', unit: 'Wh/m²' } },
@@ -100,6 +97,65 @@ const METRICS_BY_MODEL = {
 
 // CHP tensiometers: multiple can coexist on the same parcel — skip conflict check
 const TENSIO_MODELS = ['CHP-15/30', 'CHP-30/60', 'CHP-60/90']
+
+const MODEL_NAMES = {
+  'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
+  'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
+  'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde fertirrigation',
+}
+
+function renderWindCompositeChart(container) {
+  const count   = Math.max(2, Math.min(200, Math.floor(getPeriodMinutes() / getStepMinutes())))
+  const vitesse = Array.from({length: count}, () => rnd(5, 35))
+  const rafales = vitesse.map(v => Math.min(v + rnd(3, 18), 80))
+  const dirs    = Array.from({length: count}, () => rnd(0, 359))
+
+  const W = 600, H = 200, PL = 46, PR = 16, PT = 16, PB = 28
+  const iW = W - PL - PR, iH = H - PT - PB
+  const maxV = Math.ceil(Math.max(...rafales) / 10) * 10 || 50
+  const xOf = i => PL + (i / Math.max(count - 1, 1)) * iW
+  const yOf = v => PT + iH - (v / maxV) * iH
+
+  const upper  = rafales.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join('L')
+  const lower  = [...vitesse].reverse().map((v, i) => `${xOf(count-1-i).toFixed(1)},${yOf(v).toFixed(1)}`).join('L')
+  const area   = `M${upper}L${lower}Z`
+  const curve  = vitesse.map((v, i) => `${i?'L':'M'}${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join('')
+  const grid   = [0.25,0.5,0.75].map(t => { const y=(PT+iH-t*iH).toFixed(1); return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(0,0,0,.06)" stroke-width="1" stroke-dasharray="3,3"/>` }).join('')
+  const yLbls  = [0,0.5,1].map(t => { const y=PT+iH-t*iH; return `<text x="${PL-4}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--txt3)">${Math.round(t*maxV)}</text>` }).join('')
+
+  const every  = Math.max(1, Math.round(count / 25))
+  const arrows = []
+  for (let i = 0; i < count; i += every) {
+    const x = xOf(i).toFixed(1), y = (PT + iH * 0.35).toFixed(1)
+    arrows.push(`<g transform="translate(${x},${y}) rotate(${dirs[i]})">
+      <line x1="0" y1="6" x2="0" y2="-6" stroke="#3a7090" stroke-width="1.5" opacity=".7"/>
+      <polygon points="0,-9 -2.5,-4 2.5,-4" fill="#3a7090" opacity=".7"/>
+    </g>`)
+  }
+
+  const card = document.createElement('div')
+  card.className = 'chart-card'
+  card.innerHTML = `
+    <div class="chart-card-header">
+      <span class="chart-card-name" style="color:#7bc4b0">Vent</span>
+      <span class="chart-card-unit">km/h · direction</span>
+    </div>
+    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${yLbls}${grid}
+      <path d="${area}" fill="#7bc4b0" opacity=".18"/>
+      <path d="${curve}" fill="none" stroke="#7bc4b0" stroke-width="2" stroke-linejoin="round"/>
+      ${arrows.join('')}
+    </svg>
+    <div class="wind-chart-legend">
+      <span><i class="bi bi-dash" style="color:#7bc4b0;font-size:16px;vertical-align:middle"></i> Vitesse</span>
+      <span><span class="wind-legend-band"></span> Rafales</span>
+      <span><svg width="12" height="14" viewBox="-6 -7 12 14" style="vertical-align:middle"><line x1="0" y1="5" x2="0" y2="-5" stroke="#3a7090" stroke-width="1.5"/><polygon points="0,-7 -2.5,-2 2.5,-2" fill="#3a7090"/></svg> Direction</span>
+    </div>`
+  container.appendChild(card)
+}
 
 const ALL_INTEGRATIONS = [
   'Modèles Arvalis — PRÉVI-LIS / MILÉOS', 'Xarvio', 'Pixagri', 'VitiMeteo',
@@ -188,6 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCompareControl()
   initTabs()
   initDashGrid()
+  document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
 })
 
 // ─── Weather strip ────────────────────────────────────────────────────────────
@@ -216,7 +273,10 @@ function renderChartsContent(container, linkedSensorIds) {
       ${s.event ? `<span class="detail-badge detail-badge--err"><i class="bi bi-exclamation-triangle-fill"></i> ${s.event}</span>` : ''}
     `
     container.appendChild(groupHeader)
-    metrics.forEach(m => appendChartCard(container, m))
+    metrics.forEach(m => {
+      if (m.isWindComposite) { renderWindCompositeChart(container); return }
+      appendChartCard(container, m)
+    })
   })
 
   // Tensio sensors: grouped, one chart per metric with multiple curves
@@ -244,12 +304,13 @@ function renderChartsContent(container, linkedSensorIds) {
     appendTensioCharts(container, tensioSensors)
   }
 
-  // Always-available weather metrics last
+  // Always-available weather metrics last (ETP masqué si pas de temps < journalier)
+  const stepMins = getStepMinutes()
   const alwaysHeader = document.createElement('div')
   alwaysHeader.className = 'chart-group-header'
   alwaysHeader.innerHTML = `<i class="bi bi-cloud-sun" style="color:var(--pri)"></i> <strong>Données météo</strong> <span class="chart-group-serial">Station de référence</span>`
   container.appendChild(alwaysHeader)
-  ALWAYS_METRICS.forEach(m => appendChartCard(container, m))
+  ALWAYS_METRICS.filter(m => !(m.id === 'etp' && stepMins < 1440)).forEach(m => appendChartCard(container, m))
 }
 
 function getParcelFlatMetrics(linkedSensorIds) {
@@ -333,7 +394,7 @@ function appendTensioCharts(container, tensioSensors) {
   const metricsToShow = ['pothydr', 'tsol']
   const metricDefs = {
     pothydr: { name: 'Potentiel hydrique', unit: 'kPa', baseFor: d => 20 + d * 0.8 + Math.random() * 30 },
-    tsol:    { name: 'Temp. sol',          unit: '°C',  baseFor: d => 10 + Math.random() * 6 }
+    tsol:    { name: 'Température du sol',          unit: '°C',  baseFor: d => 10 + Math.random() * 6 }
   }
 
   // Construire les "courbes" selon le mode
@@ -563,6 +624,8 @@ function drawAllCharts() {
       if (svg && curves.length > 0) drawTensioMultiChart(svg, curves, count, step)
       return
     }
+    const svg = card.querySelector('.chart-svg')
+    if (!svg) return  // custom-rendered cards (vent, etc.) — already drawn
     const base      = parseFloat(card.dataset.base)
     const color     = card.dataset.color
     const isCumul   = card.dataset.cumul === '1'
@@ -571,9 +634,9 @@ function drawAllCharts() {
     const metricName = card.dataset.metricName || ''
     const metricUnit = card.dataset.metricUnit || ''
     if (card.dataset.isIrrigation) {
-      drawIrrigationChart(card.querySelector('.chart-svg'), color, count, step)
+      drawIrrigationChart(svg, color, count, step)
     } else {
-      drawChart(card.querySelector('.chart-svg'), base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
+      drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
     }
   })
 }
@@ -942,7 +1005,12 @@ function renderPanel() {
   renderGeolocalisation(org)
   renderLinkedSensors()
   renderIntegrations()
-  renderPanelMembres()
+  const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
+  if (isAdherent) {
+    document.getElementById('panel-membres')?.closest('.panel-section')?.style.setProperty('display', 'none')
+  } else {
+    renderPanelMembres()
+  }
   renderAlertes()
   renderActions()
 }
@@ -976,22 +1044,22 @@ function renderIdentification(org) {
   bindEditable(el, 'irrigation', irrigation,          v => saveState({ irrigation: v }))
 }
 
-function editableRow(label, _value, field, _inputType) {
+function editableRow(label, value, field, inputType = 'text') {
+  const safe = (value || '').replace(/"/g, '&quot;')
   return `
-    <div class="panel-row editable-row" data-field="${field}">
+    <div class="panel-row" data-field="${field}">
       <span class="panel-row-key">${label}</span>
-      <span class="panel-row-val" data-val></span>
-      <button class="edit-field-btn" title="Modifier"><i class="bi bi-pencil"></i></button>
+      <input type="${inputType}" class="panel-field-input" data-val value="${safe}">
     </div>`
 }
 
-function editableSelect(label, _value, field, options, displayClass) {
-  const cls = displayClass ? ` data-display-class="${displayClass}"` : ''
+function editableSelect(label, value, field, options) {
   return `
-    <div class="panel-row editable-row" data-field="${field}" data-options="${encodeURIComponent(JSON.stringify(options))}"${cls}>
+    <div class="panel-row" data-field="${field}">
       <span class="panel-row-key">${label}</span>
-      <span class="panel-row-val" data-val></span>
-      <button class="edit-field-btn" title="Modifier"><i class="bi bi-pencil"></i></button>
+      <select class="panel-field-input" data-val>
+        ${options.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('')}
+      </select>
     </div>`
 }
 
@@ -1004,64 +1072,16 @@ function readonlyRow(label, html) {
 }
 
 function bindEditable(container, field, currentValue, onSave) {
-  const row    = container.querySelector(`[data-field="${field}"]`)
-  if (!row) return
-  const valEl  = row.querySelector('[data-val]')
-  const editBtn = row.querySelector('.edit-field-btn')
-  const options      = row.dataset.options ? JSON.parse(decodeURIComponent(row.dataset.options)) : null
-  const displayClass = row.dataset.displayClass || null
-
-  const setDisplay = v => {
-    if (displayClass) {
-      valEl.innerHTML = `<span class="${displayClass}">${v}</span>`
-    } else {
-      valEl.textContent = v
-    }
+  const input = container.querySelector(`[data-field="${field}"] [data-val]`)
+  if (!input) return
+  const save = () => {
+    const v = input.value?.trim()
+    if (v && v !== currentValue) { currentValue = v; onSave(v) }
   }
-  setDisplay(currentValue)
-
-  editBtn.addEventListener('click', () => {
-    if (row.classList.contains('editing')) return
-    row.classList.add('editing')
-    editBtn.style.display = 'none'
-
-    let input
-    if (options) {
-      input = document.createElement('select')
-      input.className = 'inline-edit'
-      options.forEach(opt => {
-        const o = document.createElement('option')
-        o.value = opt
-        o.textContent = opt
-        if (opt === currentValue) o.selected = true
-        input.appendChild(o)
-      })
-    } else {
-      input = document.createElement('input')
-      input.type = 'text'
-      input.className = 'inline-edit'
-      input.value = currentValue
-    }
-
-    valEl.textContent = ''
-    valEl.appendChild(input)
-    input.focus()
-
-    const commit = () => {
-      const newVal = input.value?.trim() || currentValue
-      currentValue = newVal
-      onSave(newVal)
-      setDisplay(newVal)
-      row.classList.remove('editing')
-      editBtn.style.display = ''
-    }
-
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter')  { e.preventDefault(); commit() }
-      if (e.key === 'Escape') { setDisplay(currentValue); row.classList.remove('editing'); editBtn.style.display = '' }
-    })
-    input.addEventListener('blur', commit)
-  })
+  input.addEventListener('change', save)
+  if (input.tagName === 'INPUT') {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur() } })
+  }
 }
 
 // ─── Géolocalisation ──────────────────────────────────────────────────────────
@@ -1087,7 +1107,12 @@ function renderGeolocalisation(org) {
       <span class="panel-row-key">Coordonnées</span>
       <span class="panel-row-val">${lat != null ? lat.toFixed(4) : '—'}, ${lng != null ? lng.toFixed(4) : '—'}</span>
     </div>
-    <div style="padding:8px 0 4px">
+    ${lat != null ? `<div class="panel-row">
+      <a href="https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}" target="_blank" class="itinerary-link">
+        <i class="bi bi-signpost-2"></i> Obtenir l'itinéraire
+      </a>
+    </div>` : ''}
+    <div style="padding:4px 0 4px">
       <a href="parcelle-modifier-contour.html?id=${parcelId}" class="contour-link">
         <i class="bi bi-pencil-square"></i>
         ${hasShape ? 'Modifier le contour' : 'Tracer le contour'}
@@ -1130,8 +1155,10 @@ function renderLinkedSensors() {
 
     html += others.map(s => `
       <div class="sensor-linked-row">
-        <span class="sensor-link-model">${s.model}</span>
-        <span class="sensor-link-serial">${s.serial}</span>
+        <div class="sensor-linked-info">
+          <span class="sensor-linked-name">${MODEL_NAMES[s.model] || s.model}</span>
+          <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
+        </div>
         <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
           <i class="bi bi-x-lg"></i>
         </button>
@@ -1146,13 +1173,15 @@ function renderLinkedSensors() {
         if (!byDepth[d]) byDepth[d] = []
         byDepth[d].push(s)
       })
-      html += `<div style="font-size:11px;font-weight:600;color:var(--txt2);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">Tensiomètres par horizon</div>`
+      html += `<div style="font-size:11px;font-weight:600;color:var(--txt2);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">Kit de tensiomètres</div>`
       Object.entries(byDepth).forEach(([depth, sensors]) => {
         html += `<div style="font-size:11px;color:var(--txt2);margin:4px 0 2px">— ${depth}</div>`
         html += sensors.map(s => `
           <div class="sensor-linked-row" style="padding-left:12px">
-            <span class="sensor-link-model">${s.model}</span>
-            <span class="sensor-link-serial">${s.serial}</span>
+            <div class="sensor-linked-info">
+              <span class="sensor-linked-name">${MODEL_NAMES[s.model] || s.model}</span>
+              <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
+            </div>
             <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
               <i class="bi bi-x-lg"></i>
             </button>
@@ -1162,19 +1191,20 @@ function renderLinkedSensors() {
     }
   }
 
-  if (available.length > 0) {
-    html += `
-      <div class="panel-add-row">
-        <select id="add-sensor-select" class="panel-add-select">
-          <option value="">Ajouter un capteur…</option>
-          ${available.map(s => `<option value="${s.id}">${s.model} — ${s.serial}</option>`).join('')}
-        </select>
-        <button id="add-sensor-btn" class="panel-add-btn">Ajouter</button>
-      </div>
-    `
-  }
-
   el.innerHTML = html
+
+  // Populate the static add-sensor row (sibling of panel-section-bd)
+  const addRow = document.getElementById('sensor-add-row')
+  const addSel = document.getElementById('add-sensor-select')
+  if (addRow && addSel) {
+    if (available.length > 0) {
+      addSel.innerHTML = '<option value="">Ajouter un capteur…</option>' +
+        available.map(s => `<option value="${s.id}">${MODEL_NAMES[s.model] || s.model} — ${s.serial}</option>`).join('')
+      addRow.style.display = ''
+    } else {
+      addRow.style.display = 'none'
+    }
+  }
 
   // Remove handlers
   el.querySelectorAll('.remove-sensor-btn').forEach(btn => {
@@ -1245,19 +1275,20 @@ function renderIntegrations() {
     `).join('')
   }
 
-  if (inactive.length > 0) {
-    html += `
-      <div class="panel-add-row">
-        <select id="add-integ-select" class="panel-add-select">
-          <option value="">Ajouter une intégration…</option>
-          ${inactive.map(n => `<option value="${encodeURIComponent(n)}">${n}</option>`).join('')}
-        </select>
-        <button id="add-integ-btn" class="panel-add-btn">Ajouter</button>
-      </div>
-    `
-  }
-
   el.innerHTML = html
+
+  // Populate the static add-integ row (sibling of panel-section-bd)
+  const addIntegRow = document.getElementById('integ-add-row')
+  const addIntegSel = document.getElementById('add-integ-select')
+  if (addIntegRow && addIntegSel) {
+    if (inactive.length > 0) {
+      addIntegSel.innerHTML = '<option value="">Ajouter une intégration…</option>' +
+        inactive.map(n => `<option value="${encodeURIComponent(n)}">${n}</option>`).join('')
+      addIntegRow.style.display = ''
+    } else {
+      addIntegRow.style.display = 'none'
+    }
+  }
 
   el.querySelectorAll('.remove-integ-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1456,9 +1487,48 @@ function showCreateAlertForm(container) {
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
+function triggerCsvDownload(content, filename) {
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename })
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(a.href), 100)
+}
+
+function exportCsv() {
+  const mainName    = parcelState.name || parcelBase.name || 'Parcelle'
+  const mainMetrics = getParcelFlatMetrics(parcelState.linkedSensorIds)
+
+  let cols
+  if (compareParcelId) {
+    const cPlot    = plots.find(p => p.id === compareParcelId)
+    const cIds     = allSensors.filter(s => s.parcelId === compareParcelId).map(s => s.id)
+    const cMetrics = getParcelFlatMetrics(cIds)
+    const cName    = cPlot?.name || 'Comparaison'
+    cols = [
+      ...mainMetrics.map(m => ({ h: `[${mainName}] ${m.name} (${m.unit})`, gen: m.base })),
+      ...cMetrics.map(m =>    ({ h: `[${cName}] ${m.name} (${m.unit})`,    gen: m.base })),
+    ]
+  } else {
+    cols = mainMetrics.map(m => ({ h: `${m.name} (${m.unit})`, gen: m.base }))
+  }
+
+  const totalMs = getPeriodMinutes() * 60000
+  const stepMs  = getStepMinutes() * 60000
+  const end     = currentPeriod === 'custom' && customTo   ? customTo   : new Date()
+  const start   = currentPeriod === 'custom' && customFrom ? customFrom : new Date(end - totalMs)
+  const count   = Math.min(Math.ceil((end - start) / stepMs) + 1, 500)
+  const step    = (end - start) / Math.max(count - 1, 1)
+  const header  = ['Horodatage', ...cols.map(c => c.h)].join(';')
+  const rows    = Array.from({ length: count }, (_, i) => {
+    const ts = new Date(start.getTime() + i * step).toISOString().replace('T', ' ').slice(0, 19)
+    return [ts, ...cols.map(c => c.gen())].join(';')
+  })
+  const name = mainName.replace(/[^\w]/g, '_')
+  triggerCsvDownload([header, ...rows].join('\r\n'), `${name}_${currentPeriod}_${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
 function renderActions() {
   document.getElementById('panel-actions').innerHTML = `
-    <button class="action-btn"><i class="bi bi-download"></i> Exporter les données</button>
     <button class="action-btn action-btn--danger"><i class="bi bi-archive"></i> Archiver la parcelle</button>
   `
 }
@@ -1525,7 +1595,7 @@ function initTabs() {
 const DASH_BLOCK_DEFS = [
   { id: 'temp',         size: '1x1', title: 'Température',   icon: 'bi-thermometer-half', color: '#e07050' },
   { id: 'pluie',        size: '1x1', title: 'Pluie (cumul)', icon: 'bi-cloud-rain-heavy', color: '#45b7d1' },
-  { id: 'humidite',     size: '1x1', title: 'Humidité air',  icon: 'bi-droplet-half',     color: '#4ecdc4' },
+  { id: 'humidite',     size: '1x1', title: 'Humidité',  icon: 'bi-droplet-half',     color: '#4ecdc4' },
   { id: 'sensors',      size: '1x2', title: 'Capteurs liés', icon: 'bi-broadcast',        color: '#0172A4' },
   { id: 'map',          size: '1x2', title: 'Localisation',  icon: 'bi-geo-alt',          color: '#6080b0' },
   { id: 'vent',         size: '1x1', title: 'Vent',          icon: 'bi-wind',             color: '#7bc4b0' },

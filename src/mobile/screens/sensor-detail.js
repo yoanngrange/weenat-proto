@@ -25,15 +25,15 @@ const MODEL_BRANDS = {
 const MODEL_METRICS_MAP = {
   'P+':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
                { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité air',         unit: '%',    color: '#4ecdc4', cumul: false }],
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
   'PT':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
                { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  }],
   'P':        [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' }],
   'SMV':      [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
                { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité air',         unit: '%',    color: '#4ecdc4', cumul: false }],
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
   'TH':       [{ id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité air',         unit: '%',    color: '#4ecdc4', cumul: false }],
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
   'T_MINI':   [{ id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
   'T_GEL':    [{ id: 'tseche',      label: 'Température sèche',    unit: '°C',   color: '#e07050', cumul: false },
                { id: 'thumide',     label: 'Température humide',   unit: '°C',   color: '#80c8e8', cumul: false }],
@@ -212,6 +212,29 @@ function computeCumuls(metricId, period, type) {
     </div>`).join('')}</div>`
 }
 
+function triggerCsvDownload(content, filename) {
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: filename })
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(a.href), 100)
+}
+
+function exportCsvSensor(sensor, period) {
+  const metrics = MODEL_METRICS_MAP[sensor.model] || []
+  if (!metrics.length) return
+  const count  = PERIOD_COUNTS[period] || 60
+  const mins   = PERIOD_MINS_S[period] || 10080
+  const stepMs = (mins / count) * 60000
+  const end    = new Date()
+  const start  = new Date(end - mins * 60000)
+  const header = ['Horodatage', ...metrics.map(m => `${m.label} (${m.unit})`)].join(';')
+  const rows   = Array.from({ length: count }, (_, i) => {
+    const ts = new Date(start.getTime() + i * stepMs).toISOString().replace('T', ' ').slice(0, 19)
+    return [ts, ...metrics.map(m => mockSeries(m.id, 1)[0].toFixed(2))].join(';')
+  })
+  triggerCsvDownload([header, ...rows].join('\r\n'), `${sensor.serial}_${period}_${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
 function donneesView(sensor, period = '7d', step = '1h') {
   const metrics = MODEL_METRICS_MAP[sensor.model] || []
   if (!metrics.length) return `<div class="m-empty-state"><i class="bi bi-broadcast"></i><p>Aucune donnée disponible</p></div>`
@@ -242,6 +265,7 @@ function donneesView(sensor, period = '7d', step = '1h') {
         <option value="1d"${step==='1d'?' selected':''}>Journalier</option>
         <option value="1w"${step==='1w'?' selected':''}>Hebdo</option>
       </select>
+      <button class="m-export-btn" title="Exporter CSV"><i class="bi bi-download"></i></button>
     </div>
     <div class="m-detail-section">${cards}</div>`
 }
@@ -288,7 +312,7 @@ function paramsView(sensor) {
           <span class="m-list-row-value">${org?.ville || '—'}</span>
         </div>
         <div class="m-list-row m-list-row--last">
-          <a class="m-itinerary-link" href="https://maps.apple.com/?q=${encodeURIComponent(org?.ville||'')}&sll=${linkedPlot?.lat||0},${linkedPlot?.lng||0}" target="_blank">
+          <a class="m-itinerary-link" href="geo:${linkedPlot?.lat||0},${linkedPlot?.lng||0}?q=${linkedPlot?.lat||0},${linkedPlot?.lng||0}" target="_blank">
             <i class="bi bi-signpost-2"></i> Obtenir l'itinéraire
           </a>
         </div>
@@ -397,6 +421,7 @@ export function initSensorDetail(sensor) {
     layer.querySelector('.m-step-sel')?.addEventListener('change', e => {
       currentStep = e.target.value; renderView()
     })
+    layer.querySelector('.m-export-btn')?.addEventListener('click', () => exportCsvSensor(sensor, currentPeriod))
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => showToast('Fonctionnalité à venir'))

@@ -87,32 +87,39 @@
 
               <div id="tab-donnees" class="detail-tab-pane">
                 <div id="chart-controls-bar" class="chart-controls chart-controls--sticky">
-                  <div class="period-presets" id="period-presets">
-                    <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
-                    <button class="period-preset-btn" data-period="hier">Hier</button>
-                    <button class="period-preset-btn" data-period="3d">3 jours</button>
-                    <button class="period-preset-btn active" data-period="7d">7 jours</button>
-                    <button class="period-preset-btn" data-period="30d">30 jours</button>
-                    <button class="period-preset-btn" data-period="365d">365 jours</button>
-                    <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
+                  <div class="chart-controls-row">
+                    <span class="chart-ctrl-label">Période</span>
+                    <div class="period-presets" id="period-presets">
+                      <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
+                      <button class="period-preset-btn" data-period="hier">Hier</button>
+                      <button class="period-preset-btn" data-period="3d">3 jours</button>
+                      <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                      <button class="period-preset-btn" data-period="30d">30 jours</button>
+                      <button class="period-preset-btn" data-period="365d">365 jours</button>
+                      <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
+                    </div>
+                    <div id="custom-date-row" class="custom-date-row" style="display:none">
+                      <input type="date" id="date-from">
+                      <span class="custom-date-sep">—</span>
+                      <input type="date" id="date-to">
+                    </div>
+                    <span class="chart-ctrl-label">Pas de temps</span>
+                    <select id="time-step" class="time-step-select">
+                      <option value="max">Maximal</option>
+                      <option value="1h" selected>Horaire</option>
+                      <option value="1d">Journalier</option>
+                      <option value="1w">Hebdomadaire</option>
+                      <option value="1mo">Mensuel</option>
+                    </select>
                   </div>
-                  <div id="custom-date-row" class="custom-date-row" style="display:none">
-                    <input type="date" id="date-from">
-                    <span class="custom-date-sep">—</span>
-                    <input type="date" id="date-to">
+                  <div class="chart-controls-row chart-controls-row--actions">
+                    <label class="chart-toggle-label">
+                      <input type="checkbox" id="toggle-phenologie">
+                      <span>Stades phénologiques</span>
+                    </label>
+                    <div id="compare-control" class="compare-control-wrap"></div>
+                    <button class="btn-secondary btn-sm" id="btn-export-csv" style="margin-left:auto"><i class="bi bi-download"></i> Exporter CSV</button>
                   </div>
-                  <select id="time-step" class="time-step-select">
-                    <option value="max">Maximal</option>
-                    <option value="1h" selected>Horaire</option>
-                    <option value="1d">Journalier</option>
-                    <option value="1w">Hebdomadaire</option>
-                    <option value="1mo">Mensuel</option>
-                  </select>
-                  <label class="chart-toggle-label">
-                    <input type="checkbox" id="toggle-phenologie">
-                    <span>Stades phénologiques</span>
-                  </label>
-                  <div id="compare-control" class="compare-control-wrap"></div>
                 </div>
                 <div id="charts-container" class="charts-stack"></div>
               </div><!-- #tab-donnees -->
@@ -136,13 +143,25 @@
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-broadcast"></i> Capteurs liés</div>
                   <div class="panel-section-bd" id="panel-sensors"></div>
+                  <div class="panel-add-row" id="sensor-add-row" style="display:none">
+                    <select id="add-sensor-select" class="panel-add-select">
+                      <option value="">Ajouter un capteur…</option>
+                    </select>
+                    <button id="add-sensor-btn" class="panel-add-btn">Ajouter</button>
+                  </div>
                 </div>
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-plug"></i> Intégrations</div>
                   <div class="panel-section-bd" id="panel-integrations"></div>
+                  <div class="panel-add-row" id="integ-add-row" style="display:none">
+                    <select id="add-integ-select" class="panel-add-select">
+                      <option value="">Ajouter une intégration…</option>
+                    </select>
+                    <button id="add-integ-btn" class="panel-add-btn">Ajouter</button>
+                  </div>
                 </div>
                 <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-people"></i> Membres associés</div>
+                  <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
                   <div class="panel-section-bd" id="panel-membres"></div>
                   <div class="panel-add-row">
                     <select id="add-membre-select" class="panel-add-select">
@@ -152,7 +171,7 @@
                   </div>
                 </div>
                 <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-bell"></i> Alertes</div>
+                  <div class="panel-section-hd"><i class="bi bi-bell"></i> Mes alertes</div>
                   <div class="panel-section-bd" id="panel-alertes"></div>
                 </div>
                 <div class="panel-section">
