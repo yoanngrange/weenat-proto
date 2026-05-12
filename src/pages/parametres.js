@@ -16,8 +16,7 @@ function initParamMap() {
   const lat = org.lat || 48.117
   const lng = org.lng || -1.678
   const map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 13)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors',
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 18
   }).addTo(map)
   const marker = L.marker([lat, lng], { draggable: false }).addTo(map)

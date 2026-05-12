@@ -3,11 +3,13 @@
 import { plots }   from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { orgs }    from '../data/orgs.js'
-import { initCompteScreen }    from './screens/compte.js'
-import { initAlertesScreen }   from './screens/alertes.js'
-import { initDashboardScreen }  from './screens/dashboard.js'
-import { initParcellesScreen }  from './screens/parcelles.js'
-import { initCapteursScreen }   from './screens/capteurs.js'
+import { initCompteScreen }       from './screens/compte.js'
+import { initAlertesScreen }      from './screens/alertes.js'
+import { initDashboardScreen }    from './screens/dashboard.js'
+import { initParcellesScreen }    from './screens/parcelles.js'
+import { initCapteursScreen }     from './screens/capteurs.js'
+import { initExploitationScreen } from './screens/exploitation.js'
+import { initReseauScreen }       from './screens/reseau.js'
 
 // ─── Role (URL param: ?role=admin | ?role=adherent, défaut: admin) ─────────────
 const urlParams = new URLSearchParams(window.location.search)
@@ -57,6 +59,7 @@ const SWIPE_THRESHOLD = 50
 const stack = document.getElementById('screen-stack')
 
 stack.addEventListener('mousedown', e => {
+  if (e.target.closest('.leaflet-container')) { dragStartX = null; return }
   dragStartX = e.clientX
   dragStartY = e.clientY
 })
@@ -78,6 +81,7 @@ stack.addEventListener('mouseleave', () => { dragStartX = null })
 
 // Touch events (real mobile)
 stack.addEventListener('touchstart', e => {
+  if (e.target.closest('.leaflet-container')) { dragStartX = null; return }
   dragStartX = e.touches[0].clientX
   dragStartY = e.touches[0].clientY
 }, { passive: true })
@@ -102,11 +106,29 @@ const PARAM_TABS = [
   ...(role === 'admin' ? [{ id: 'param-reseau', label: 'Mon réseau' }] : []),
 ]
 
+// Screen controllers that expose an onAdd handler
+const paramControllers = {}
+
+function updateParamPlusBtn(activeTabId) {
+  const btn     = document.getElementById('param-plus-btn')
+  const spacer  = document.getElementById('param-plus-spacer')
+  const ctrl    = paramControllers[activeTabId]
+  if (btn && spacer) {
+    if (ctrl?.onAdd) {
+      btn.style.display = ''
+      spacer.style.display = 'none'
+      btn.onclick = ctrl.onAdd
+    } else {
+      btn.style.display = 'none'
+      spacer.style.display = ''
+    }
+  }
+}
+
 function initParamSegment() {
   const segment = document.getElementById('param-segment')
   if (!segment) return
 
-  // Hide réseau tab if adherent
   if (role === 'adherent') {
     document.getElementById('param-reseau')?.style.setProperty('display', 'none')
   }
@@ -121,6 +143,8 @@ function initParamSegment() {
       btn.classList.add('active')
       document.querySelectorAll('.m-subscreen').forEach(s => s.classList.remove('active'))
       document.getElementById(tab.id)?.classList.add('active')
+      updateParamPlusBtn(tab.id)
+      paramControllers[tab.id]?.refresh?.()
     })
     segment.appendChild(btn)
   })
@@ -134,6 +158,8 @@ initParcellesScreen(document.getElementById('screen-parcelles'), role)
 initCapteursScreen(document.getElementById('screen-capteurs'), role)
 initAlertesScreen(document.getElementById('screen-alertes'), role)
 initCompteScreen(document.getElementById('param-compte'), role)
+paramControllers['param-exploitation'] = initExploitationScreen(document.getElementById('param-exploitation'), role)
+paramControllers['param-reseau']       = initReseauScreen(document.getElementById('param-reseau'), role)
 
 // ─── Export for screens ───────────────────────────────────────────────────────
 export { plots, sensors, orgs, navigateTo, activeTab }

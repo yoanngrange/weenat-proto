@@ -12,6 +12,7 @@
   --txt3: #99A8AE;
   --bg: #FAFBFC;
   --srf: #FFFFFF;
+  --bkg: #FAFBFC;
   --bdr: #CCD4D7;
   --bdr2: #E6EAEB;
   --font: 'Inter', system-ui, sans-serif;
@@ -277,17 +278,20 @@ color: grey;
 
 #export-btn,
 #role-switcher {
-  background-color: var(--pri);
-  color: var(--srf);
+  background-color: #0172A4;
+  color: #ffffff;
   border: none;
   padding: 8px 16px;
   border-radius: 4px;
   cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
 }
 
 #export-btn:hover,
 #role-switcher:hover {
   background-color: #015a7a;
+  color: #ffffff;
 }
 
 .btn-secondary {
@@ -1422,9 +1426,7 @@ button {
   transition: background-color 0.3s;
 }
 
-button:hover {
-  background-color: var(--bkg);
-}
+/* removed: overly broad button:hover was overriding styled buttons */
 
 .danger {
   background-color: var(--err) !important;
@@ -2707,6 +2709,15 @@ td.num {
   margin-bottom: 10px;
 }
 .info-section h3 i { margin-right: 6px; }
+
+.info-sharing-list { display: flex; flex-direction: column; gap: 2px; }
+.info-sharing-row {
+  display: flex; align-items: center;
+  padding: 8px 12px; background: var(--bg2); border-radius: 6px;
+  gap: 12px;
+}
+.info-sharing-row:hover { background: var(--bdr2); }
+.info-sharing-name { font-size: 13px; color: var(--txt); }
 
 .info-locations-grid {
   display: grid;

@@ -378,16 +378,16 @@ export function initSensorDetail(sensor) {
   const sensorCity = linkedPlot ? (orgs.find(o => o.id === linkedPlot.orgId)?.ville || '') : ''
   const layer = pushDetail(`
     <div class="m-detail-header">
-      <div class="m-detail-row1">
-        <div class="m-navbar-logo-mark">W</div>
+      <div class="m-detail-topbar">
         <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Capteurs</span></button>
         <button class="m-detail-plus" id="d-plus"><i class="bi bi-plus"></i></button>
       </div>
-      <div class="m-detail-row2">
+      <div class="m-detail-identity">
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
-        <span class="m-d-name">${sensor.serial}</span>
-        <span class="m-d-sep">·</span><span class="m-d-sub">${MODEL_NAMES[sensor.model] || sensor.model}</span>
-        ${sensorCity ? `<span class="m-d-sep">·</span><span class="m-d-commune">${sensorCity}</span>` : ''}
+        <div class="m-detail-title-block">
+          <div class="m-detail-title">${sensor.serial}</div>
+          <div class="m-detail-subtitle">${[MODEL_NAMES[sensor.model] || sensor.model, sensorCity].filter(Boolean).join(' · ')}</div>
+        </div>
       </div>
     </div>
     <div class="m-detail-tabs">

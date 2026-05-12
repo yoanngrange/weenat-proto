@@ -245,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs()
   initDashGrid()
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
+
+  const _sidebar = document.getElementById('sidebar')
+  if (_sidebar) new MutationObserver(() => renderPanelMembres()).observe(_sidebar, { attributes: true, attributeFilter: ['data-role'] })
 })
 
 // ─── Weather strip ────────────────────────────────────────────────────────────
@@ -1005,12 +1008,7 @@ function renderPanel() {
   renderGeolocalisation(org)
   renderLinkedSensors()
   renderIntegrations()
-  const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
-  if (isAdherent) {
-    document.getElementById('panel-membres')?.closest('.panel-section')?.style.setProperty('display', 'none')
-  } else {
-    renderPanelMembres()
-  }
+  renderPanelMembres()
   renderAlertes()
   renderActions()
 }
@@ -1321,6 +1319,13 @@ function renderPanelMembres() {
   initLinkedMemberIds()
   const el     = document.getElementById('panel-membres')
   const linked = members.filter(m => linkedMemberIds.includes(m.id))
+  const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
+  const section = el?.closest('.panel-section')
+  if (isAdherent && linked.length === 0) {
+    if (section) section.style.display = 'none'
+    return
+  }
+  if (section) section.style.display = ''
 
   if (!linked.length) {
     el.innerHTML = '<p class="panel-empty">Aucun membre associé.</p>'

@@ -166,6 +166,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initCompareControl()
   initMiniMap()
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
+
+  const _sidebar2 = document.getElementById('sidebar')
+  if (_sidebar2) new MutationObserver(() => {
+    const p = plots.find(pl => pl.id === sensor.parcelId) || null
+    renderPanelMembres(p)
+  }).observe(_sidebar2, { attributes: true, attributeFilter: ['data-role'] })
 })
 
 // ─── Latest strip ─────────────────────────────────────────────────────────────
@@ -960,12 +966,7 @@ function renderPanel() {
   renderEvents()
   renderMetricsList()
   renderConfig()
-  const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
-  if (isAdherent) {
-    document.getElementById('panel-membres')?.closest('.panel-section')?.style.setProperty('display', 'none')
-  } else {
-    renderPanelMembres(parcel)
-  }
+  renderPanelMembres(parcel)
   renderActions()
   renderMaintenance()
 }
@@ -1299,6 +1300,13 @@ function renderPanelMembres(parcel) {
   const el     = document.getElementById('panel-membres')
   if (!el) return
   const linked = members.filter(m => linkedMemberIds.includes(m.id))
+  const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
+  const section = el?.closest('.panel-section')
+  if (isAdherent && linked.length === 0) {
+    if (section) section.style.display = 'none'
+    return
+  }
+  if (section) section.style.display = ''
 
   if (!linked.length) {
     el.innerHTML = '<p class="panel-empty">Aucun membre associé.</p>'

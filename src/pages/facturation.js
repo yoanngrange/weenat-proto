@@ -16,9 +16,9 @@ const CONTRACT = {
   anniversaire:         '2022-03-15',
   numero:               'CTR-2022-00418',
   licencesMembres:      members.length,
-  licencesAdherents:    orgs.length,
+  licencesAdherents:    orgs.filter(o => o.id !== 100 && o.statut !== 'inactif').length,
   licencesIntegrations: 27,
-  licencesTotal:        members.length + orgs.length,
+  licencesTotal:        members.length + orgs.filter(o => o.id !== 100 && o.statut !== 'inactif').length,
   prixUnitaire:         29,   // € HT / mois
 }
 

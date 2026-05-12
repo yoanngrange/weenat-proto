@@ -2,6 +2,67 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { sensors } from '../data/sensors.js'
 import { plots } from '../data/plots.js'
 
+function generateAlertHistory(alertId) {
+  const scenarios = [
+    { label: 'Seuil dépassé',  desc: 'Conditions déclenchantes vérifiées', duration: '2h34',  resolved: true  },
+    { label: 'Seuil dépassé',  desc: 'Notification SMS envoyée',            duration: '45min', resolved: true  },
+    { label: 'Seuil dépassé',  desc: 'Valeur mesurée hors plage',           duration: '1h20',  resolved: true  },
+    { label: 'Fausse alerte',  desc: 'Pic transitoire — durée < seuil',     duration: null,    resolved: true  },
+    { label: 'Seuil dépassé',  desc: 'Conditions vérifiées sur 3 capteurs', duration: '3h05',  resolved: true  },
+    { label: 'Alerte en cours',desc: 'Conditions vérifiées depuis ce matin', duration: null,   resolved: false },
+  ]
+  const count = 4 + (alertId % 5)
+  const now = Date.now()
+  return Array.from({ length: count }, (_, i) => {
+    const seed = alertId * 17 + i * 7
+    const daysAgo = 1 + i * (2 + seed % 6)
+    const ts = new Date(now - daysAgo * 86400000)
+    const s = scenarios[seed % scenarios.length]
+    return {
+      ts,
+      label: s.label, desc: s.desc, duration: s.duration,
+      resolved: i > 0 ? true : s.resolved,
+    }
+  })
+}
+
+function showHistoryModal(alert) {
+  const existing = document.getElementById('alert-history-modal')
+  if (existing) existing.remove()
+
+  const history = generateAlertHistory(alert.id)
+  const modal = document.createElement('div')
+  modal.id = 'alert-history-modal'
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9000;display:flex;align-items:center;justify-content:center'
+  modal.innerHTML = `
+    <div style="background:var(--bg);border-radius:12px;width:520px;max-width:90vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--bdr);flex-shrink:0">
+        <div>
+          <div style="font-weight:700;font-size:15px">${alert.name}</div>
+          <div style="font-size:12px;color:var(--txt3);margin-top:2px">Historique des déclenchements</div>
+        </div>
+        <button id="close-history" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--txt2);padding:4px"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="overflow-y:auto;padding:8px 20px 16px">
+        ${history.length ? history.map(h => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--bdr2)">
+            <div style="width:8px;height:8px;border-radius:50%;background:${h.resolved ? 'var(--ok)' : '#ff9f0a'};flex-shrink:0;margin-top:5px"></div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                <span style="font-weight:600;font-size:13px">${h.label}</span>
+                <span style="font-size:12px;color:var(--txt3)">${h.ts.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})} ${h.ts.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>
+              </div>
+              <div style="font-size:12px;color:var(--txt2);margin-top:2px">${h.desc}${h.duration ? ` · Durée : ${h.duration}` : ''}</div>
+            </div>
+          </div>`).join('') : '<p style="color:var(--txt3);padding:16px 0;font-size:13px">Aucun déclenchement enregistré.</p>'}
+      </div>
+    </div>`
+
+  document.body.appendChild(modal)
+  modal.querySelector('#close-history').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+}
+
 const ALERTS_ADMIN = [
   { id: 1, name: 'Pluie forte > 10 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
   { id: 2, name: 'Gel précoce < 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [3] },
@@ -206,10 +267,13 @@ function render() {
         <a href="alerte-config.html?id=${alert.id}" class="admin-link">${alert.name}</a>
       </td>
       <td class="member-email">${fmtDate(alert.created)}</td>
-      <td class="member-email">${fmtDate(alert.lastTriggered)}</td>
+      <td class="member-email">
+        ${fmtDate(alert.lastTriggered)}
+        ${alert.lastTriggered ? `<button class="history-btn" data-id="${alert.id}" title="Voir l'historique" style="margin-left:6px;background:none;border:1px solid var(--bdr);border-radius:4px;padding:1px 6px;font-size:11px;cursor:pointer;color:var(--txt2)"><i class="bi bi-clock-history"></i></button>` : ''}
+      </td>
       <td class="admin-links-cell">${cibleHtml}</td>
       <td>${METRIC_LABELS[alert.metric] || alert.metric}</td>
-      <td style="color:var(--txt3);font-style:italic;font-size:12px">Lorem ipsum dolor sit amet</td>
+      <td style="color:var(--txt3);font-style:italic;font-size:12px">—</td>
       <td class="member-email">${(alert.phones || []).join('<br>') || '—'}</td>
       <td>
         <label class="toggle-switch" title="${isActif ? 'Désactiver' : 'Activer'}">
@@ -226,6 +290,14 @@ function render() {
       const id = parseInt(cb.dataset.id)
       if (cb.checked) selectedIds.add(id); else selectedIds.delete(id)
       updateAlertActionBar()
+    })
+  })
+
+  tbody.querySelectorAll('.history-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      const alert = ALERTS.find(a => a.id === parseInt(btn.dataset.id))
+      if (alert) showHistoryModal(alert)
     })
   })
 

@@ -419,16 +419,16 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
   const city = org?.ville || ''
   const layer = pushDetail(`
     <div class="m-detail-header">
-      <div class="m-detail-row1">
-        <div class="m-navbar-logo-mark">W</div>
+      <div class="m-detail-topbar">
         <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Parcelles</span></button>
         <button class="m-detail-plus" id="d-plus"><i class="bi bi-plus"></i></button>
       </div>
-      <div class="m-detail-row2">
+      <div class="m-detail-identity">
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
-        <span class="m-d-name">${parcel.name}</span>
-        ${parcel.crop ? `<span class="m-d-sep">·</span><span class="m-d-sub">${parcel.crop}</span>` : ''}
-        ${city ? `<span class="m-d-sep">·</span><span class="m-d-commune">${city}</span>` : ''}
+        <div class="m-detail-title-block">
+          <div class="m-detail-title">${parcel.name}</div>
+          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[parcel.crop, city].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
       </div>
     </div>
     <div class="m-detail-tabs">

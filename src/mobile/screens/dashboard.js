@@ -1,6 +1,7 @@
 import { plots as allPlots }   from '../../data/plots.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { network }               from '../../data/network.js'
+import { pushDetail, popDetail } from '../nav.js'
 
 const ORG_ID   = { admin: 100, adherent: 1 }
 const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
@@ -11,7 +12,7 @@ const CATALOG = [
   { id: 'bilan_hydrique', title: 'Bilan hydrique',                    icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
   { id: 'previsions',     title: 'Prévisions',                        icon: 'bi-cloud-sun-fill',            color: '#f5a623', active: true,  available: true,  fixed: false },
   { id: 'temps_reel',     title: 'Données temps-réel',                icon: 'bi-activity',                  color: '#ff9f0a', active: false, available: false, fixed: false },
-  { id: 'cumuls',         title: 'Cumuls',                            icon: 'bi-bar-chart-fill',            color: '#bf5af2', active: false, available: false, fixed: false },
+  { id: 'cumuls',         title: 'Cumuls',                            icon: 'bi-bar-chart-fill',            color: '#bf5af2', active: true,  available: true,  fixed: false },
   { id: 'capteurs_fav',   title: 'Capteurs favoris',                  icon: 'bi-star-fill',                 color: '#ff9f0a', active: false, available: false, fixed: false },
   { id: 'parcelles_fav',  title: 'Parcelles favorites',               icon: 'bi-bookmark-fill',             color: '#30d158', active: false, available: false, fixed: false },
   { id: 'mon_secteur',    title: 'Mon secteur',                       icon: 'bi-geo-alt-fill',              color: '#ff6b6b', active: false, available: false, fixed: false },
@@ -81,11 +82,27 @@ function makeForecast() {
     const rainy = w.label === 'Pluie' || w.label === 'Averses'
     const tMin = Math.round(8  + Math.random() * 8)
     const tMax = Math.round(16 + Math.random() * 14)
+    // Generate hourly data for the dedicated day page
+    const hours = Array.from({ length: 24 }, (_, h) => {
+      const dayProg = Math.sin(Math.PI * (h - 6) / 12)  // peaks at 12h
+      const temp = Math.round(tMin + (tMax - tMin) * Math.max(0, dayProg))
+      const pluieH = rainy && (h >= 8 && h <= 16) && Math.random() > 0.6
+        ? +(Math.random() * 3).toFixed(1) : 0
+      return {
+        h,
+        label: `${String(h).padStart(2, '0')}h`,
+        temp,
+        pluie: pluieH,
+        hum:   Math.round(85 - 40 * Math.max(0, dayProg)),
+        vent:  Math.round(10 + Math.random() * 20),
+        icon:  pluieH > 0 ? 'bi-cloud-rain-fill' : (h < 7 || h > 20) ? 'bi-moon-fill' : w.icon,
+      }
+    })
     return {
       dayLabel: d === 0 ? "Aujourd'hui" : d === 1 ? 'Demain'
         : date.toLocaleDateString('fr-FR', { weekday: 'long' }),
       dateStr: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
-      ...w, // spreads: icon, color, label (weather condition)
+      ...w,
       pluie:       rainy ? Math.round(2 + Math.random() * 18) : 0,
       etp:         +(1 + Math.random() * 5).toFixed(1),
       tMin,        tMinHeure: `0${Math.floor(4 + Math.random() * 4)}h`.slice(-3),
@@ -93,17 +110,21 @@ function makeForecast() {
       humMoy:      Math.round(45 + Math.random() * 45),
       ventMoy:     Math.round(10 + Math.random() * 25),
       ventRafales: Math.round(20 + Math.random() * 35),
+      hours,
     }
   })
 }
 
 function makeBilan(plot) {
-  const rfuMax = Math.round(80 + plot.area * 8)
-  const j0     = Math.round(rfuMax * (0.35 + Math.random() * 0.45))
-  const etp7   = Math.round(18 + Math.random() * 22)
-  const pluie7 = Math.round(Math.random() * 20)
-  const j7     = Math.max(0, j0 - etp7 + pluie7)
-  const bilan  = j7 < j0 ? j0 - j7 : 0  // déficit seulement si le réservoir baisse
+  // Same deterministic formula as web tableau-de-bord.js (plotAgroData)
+  const s       = plot.id
+  const rhu     = plot.reserveHydrique || 50
+  const pluie7j = +((s * 2.3 + 7) % 32).toFixed(1)
+  const etp7j   = +((s * 1.1 + 14) % 14 + 10).toFixed(1)
+  const drain7j = +((s * 0.6 + 1) % 6).toFixed(1)
+  const j0      = Math.round(rhu * ((s % 5 + 1) / 10))
+  const j7      = Math.max(0, +(j0 + pluie7j - etp7j - drain7j).toFixed(0))
+  const bilan   = j7 < j0 ? j0 - j7 : 0
   return { j0, j7, bilan }
 }
 
@@ -118,7 +139,7 @@ function buildBilanHydrique(plots, expanded = false) {
   const rows = visible.map(p => {
     const { j0, j7, bilan } = makeBilan(p)
     return `
-      <div class="m-bh-th-n">${p.name}</div>
+      <button class="m-bh-th-n m-bh-plot-link" data-plot-id="${p.id}">${p.name}</button>
       <div class="m-bh-td">${j0}</div>
       <div class="m-bh-td">${j7}</div>
       <div class="m-bh-td">${bilan > 0 ? `${bilan} mm` : ''}</div>`
@@ -173,6 +194,66 @@ function buildPrevisions(plots, sensors, forecast) {
   return `
     <select class="m-prev-select">${opts}</select>
     <div class="m-prev-cards">${cards}</div>`
+}
+
+const CUMULS_METRICS = [
+  { id: 'pluie', label: 'Cumul de pluie',          unit: 'mm',  base: 45,  amp: 80,   needsModels: ['P+','PT','P','SMV'] },
+  { id: 'dj',    label: 'Degrés-jours',             unit: 'DJ',  base: 120, amp: 300,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'dh',    label: 'Degrés-heures',            unit: 'Dh',  base: 800, amp: 2000, needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'hf',    label: 'Heures de froid',          unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'etp',   label: 'Évapotranspiration',       unit: 'mm',  base: 20,  amp: 60,   needsModels: null }, // always
+  { id: 'humec', label: 'Humectation foliaire',     unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
+]
+
+function getAvailableMetrics(subjectVal) {
+  if (!subjectVal) return CUMULS_METRICS
+  if (subjectVal.startsWith('s-')) return CUMULS_METRICS // all metrics for sensors
+  const plotId = +subjectVal.slice(2)
+  const linkedModels = new Set(
+    allSensors.filter(s => s.parcelId === plotId).map(s => s.model)
+  )
+  return CUMULS_METRICS.filter(m =>
+    m.needsModels === null || m.needsModels.some(mod => linkedModels.has(mod))
+  )
+}
+
+function computeCumul(subjectVal, fromDate, metricId) {
+  if (!subjectVal || !fromDate) return null
+  const m   = CUMULS_METRICS.find(x => x.id === metricId) || CUMULS_METRICS[0]
+  const days = Math.max(1, Math.round((Date.now() - new Date(fromDate)) / 86400000))
+  const seed = subjectVal.split('').reduce((a, c) => a + c.charCodeAt(0), 0) + days
+  return +(m.base + (seed % (m.amp * 10)) / 10).toFixed(1)
+}
+
+function buildCumuls(plots, sensors) {
+  const today7 = new Date(); today7.setDate(today7.getDate() - 7)
+  const defaultFrom = today7.toISOString().split('T')[0]
+  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
+  const sensorOpts = sensors.filter(s => s.parcelId).map(s => `<option value="s-${s.id}">${s.serial} (${s.model})</option>`).join('')
+  return `
+    <div class="m-cumuls-form">
+      <select class="m-cumuls-select" id="cumuls-subject">
+        <option value="">Choisir une parcelle ou un capteur…</option>
+        <optgroup label="Parcelles">${plotOpts}</optgroup>
+        ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
+      </select>
+      <div class="m-cumuls-row2">
+        <div class="m-cumuls-field">
+          <span class="m-cumuls-label">Depuis le</span>
+          <input type="date" class="m-cumuls-date" id="cumuls-from" value="${defaultFrom}">
+        </div>
+        <div class="m-cumuls-field">
+          <span class="m-cumuls-label">Métrique</span>
+          <select class="m-cumuls-select m-cumuls-select--sm" id="cumuls-metric">
+            ${CUMULS_METRICS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="m-cumuls-result" id="cumuls-result">
+        <span class="m-cumuls-val" id="cumuls-val">—</span>
+        <span class="m-cumuls-unit" id="cumuls-unit">Sélectionnez un sujet</span>
+      </div>
+    </div>`
 }
 
 function buildMonReseau() {
@@ -331,19 +412,23 @@ export function initDashboardScreen(screenEl, role) {
   const exploitSensors = allSensors.filter(s => plotIds.has(s.parcelId))
   let forecast = makeForecast()
 
+  const collapsedWidgets = new Set()
+
   function widgetCard(w, bodyHtml) {
     const menu = w.fixed ? '' :
       `<button class="m-widget-menu" data-widget="${w.id}" type="button">•••</button>`
+    const collapsed = collapsedWidgets.has(w.id)
     return `
-      <div class="m-widget" data-widget="${w.id}">
-        <div class="m-widget-hd">
+      <div class="m-widget${collapsed ? ' m-widget--collapsed' : ''}" data-widget="${w.id}">
+        <div class="m-widget-hd m-widget-hd--toggle" data-collapse="${w.id}">
           <div class="m-widget-icon-wrap" style="background:${w.color}20;color:${w.color}">
             <i class="bi ${w.icon}"></i>
           </div>
           <span class="m-widget-title">${w.title}</span>
+          <i class="bi ${collapsed ? 'bi-chevron-down' : 'bi-chevron-up'}" style="font-size:14px;color:#636366;flex-shrink:0;margin-left:auto;margin-right:${w.fixed ? '0' : '8px'}"></i>
           ${menu}
         </div>
-        <div class="m-widget-bd">${bodyHtml}</div>
+        <div class="m-widget-bd" style="${collapsed ? 'display:none' : ''}">${bodyHtml}</div>
       </div>`
   }
 
@@ -356,6 +441,7 @@ export function initDashboardScreen(screenEl, role) {
         let body = ''
         if (w.id === 'bilan_hydrique') body = buildBilanHydrique(exploitPlots, false)
         else if (w.id === 'previsions') body = buildPrevisions(exploitPlots, exploitSensors, forecast)
+        else if (w.id === 'cumuls')     body = buildCumuls(exploitPlots, exploitSensors)
         else if (w.id === 'mon_reseau') body = buildMonReseau()
         else if (w.id === 'support')    body = buildSupport()
         return widgetCard(w, body)
@@ -364,39 +450,110 @@ export function initDashboardScreen(screenEl, role) {
     bindEvents()
   }
 
+  function openDayDetail(d) {
+    const title = `${d.dayLabel.charAt(0).toUpperCase() + d.dayLabel.slice(1)} · ${d.dateStr}`
+    const layer = pushDetail(`
+      <div class="m-detail-header">
+        <div class="m-detail-row1">
+          <div class="m-navbar-logo-mark">W</div>
+          <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Prévisions</span></button>
+          <div style="width:32px"></div>
+        </div>
+        <div class="m-detail-row2" style="justify-content:center;padding:4px 16px 0">
+          <i class="bi ${d.icon}" style="color:${d.color};font-size:24px"></i>
+          <span class="m-d-name" style="margin-left:8px">${title}</span>
+        </div>
+      </div>
+      <div class="m-detail-tabs" style="display:none"></div>
+      <div id="detail-content" class="m-detail-content" style="top:84px">
+        <div style="padding:12px 16px 0">
+          <div class="m-prev-detail-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+            <div class="m-prev-detail-stat"><i class="bi bi-cloud-rain"></i><span>Pluie</span><strong>${d.pluie} mm</strong></div>
+            <div class="m-prev-detail-stat"><i class="bi bi-thermometer"></i><span>T° min / max</span><strong>${d.tMin} / ${d.tMax}°C</strong></div>
+            <div class="m-prev-detail-stat"><i class="bi bi-wind"></i><span>Vent</span><strong>${d.ventMoy}/${d.ventRafales}</strong></div>
+          </div>
+          <div class="m-list-section-header">Heure par heure</div>
+          <div style="background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,.07);overflow:hidden;margin-bottom:24px">
+            ${d.hours.map((h, i) => `
+              <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;${i < d.hours.length-1 ? 'border-bottom:.5px solid rgba(0,0,0,.06)' : ''}">
+                <span style="font-size:12px;color:#8e8e93;width:28px;flex-shrink:0">${h.label}</span>
+                <i class="bi ${h.icon}" style="color:#8e8e93;font-size:14px;width:18px;text-align:center;flex-shrink:0"></i>
+                <span style="font-size:14px;font-weight:600;width:40px;flex-shrink:0">${h.temp}°</span>
+                <span style="font-size:12px;color:#45b7d1;width:44px;flex-shrink:0">${h.pluie > 0 ? `${h.pluie}mm` : ''}</span>
+                <span style="font-size:12px;color:#8e8e93">${h.hum}%</span>
+                <span style="font-size:12px;color:#8e8e93;margin-left:auto">${h.vent} km/h</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>`)
+    layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+  }
+
   function bindEvents() {
     screenEl.querySelector('.m-navbar-action')?.addEventListener('click', showCatalog)
+
+    // Widget collapse
+    content.querySelectorAll('.m-widget-hd--toggle').forEach(hd => {
+      hd.addEventListener('click', e => {
+        if (e.target.closest('.m-widget-menu')) return
+        const widgetId = hd.dataset.collapse
+        if (collapsedWidgets.has(widgetId)) collapsedWidgets.delete(widgetId)
+        else collapsedWidgets.add(widgetId)
+        render()
+      })
+    })
 
     content.querySelector('#bh-expand')?.addEventListener('click', () => {
       const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
       if (bd) bd.innerHTML = buildBilanHydrique(exploitPlots, true)
     })
 
+    // Bilan hydrique — lien vers détail parcelle
+    content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
+        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, []))
+      })
+    })
+
+    // Cumuls — filter metrics then recalculate
+    const metricSel = content.querySelector('#cumuls-metric')
+    const updateMetrics = () => {
+      if (!metricSel) return
+      const subj = content.querySelector('#cumuls-subject')?.value
+      const available = getAvailableMetrics(subj)
+      const cur = metricSel.value
+      metricSel.innerHTML = available.map(m =>
+        `<option value="${m.id}"${m.id === cur && available.find(x => x.id === cur) ? ' selected' : ''}>${m.label}</option>`
+      ).join('')
+    }
+    const updateCumul = () => {
+      const subj   = content.querySelector('#cumuls-subject')?.value
+      const from   = content.querySelector('#cumuls-from')?.value
+      const metric = content.querySelector('#cumuls-metric')?.value
+      const valEl  = content.querySelector('#cumuls-val')
+      const unitEl = content.querySelector('#cumuls-unit')
+      if (!valEl || !unitEl) return
+      const v = computeCumul(subj, from, metric)
+      const m = CUMULS_METRICS.find(x => x.id === metric)
+      if (v !== null && subj) {
+        valEl.textContent = v
+        unitEl.textContent = m?.unit || ''
+      } else {
+        valEl.textContent = '—'
+        unitEl.textContent = 'Sélectionnez un sujet'
+      }
+    }
+    content.querySelector('#cumuls-subject')?.addEventListener('change', () => { updateMetrics(); updateCumul() })
+    content.querySelector('#cumuls-from')?.addEventListener('change', updateCumul)
+    content.querySelector('#cumuls-metric')?.addEventListener('change', updateCumul)
+
     content.querySelector('#open-chat-btn')?.addEventListener('click', showChatSheet)
 
     content.querySelectorAll('.m-prev-card').forEach(card => {
       card.addEventListener('click', () => {
         const d = forecast[+card.dataset.day]; if (!d) return
-        const body = `
-          <div class="m-prev-detail">
-            <div class="m-prev-detail-top">
-              <i class="bi ${d.icon}" style="color:${d.color};font-size:40px"></i>
-              <div>
-                <div class="m-prev-detail-cond">${d.label}</div>
-                <div class="m-prev-detail-date">${d.dateStr}</div>
-              </div>
-            </div>
-            <div class="m-prev-detail-grid">
-              <div class="m-prev-detail-stat"><i class="bi bi-cloud-rain"></i><span>Pluie</span><strong>${d.pluie} mm</strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-droplet-half"></i><span>ETP</span><strong>${d.etp} mm</strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-thermometer"></i><span>T° min</span><strong>${d.tMin}°C <small>${d.tMinHeure}</small></strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-thermometer-high"></i><span>T° max</span><strong>${d.tMax}°C <small>${d.tMaxHeure}</small></strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-moisture"></i><span>Humidité</span><strong>${d.humMoy}%</strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-wind"></i><span>Vent moy.</span><strong>${d.ventMoy} km/h</strong></div>
-              <div class="m-prev-detail-stat"><i class="bi bi-wind"></i><span>Rafales</span><strong>${d.ventRafales} km/h</strong></div>
-            </div>
-          </div>`
-        showSheet({ title: d.dayLabel, body, doneLabel: 'Fermer', onDone: () => {} })
+        openDayDetail(d)
       })
     })
 
