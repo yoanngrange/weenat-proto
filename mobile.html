@@ -189,7 +189,7 @@
       font-family: inherit;
       transition: color .1s;
     }
-    .nav-item.active { color: #007aff; }
+    .nav-item.active { color: #0172A4; }
     .nav-item i { font-size: 22px; line-height: 1; }
     .nav-item span { font-size: 10px; font-weight: 500; letter-spacing: -.1px; }
 
@@ -225,6 +225,10 @@
       font-size: 13px;
       font-weight: 800;
       letter-spacing: -.5px;
+    }
+    .m-navbar-favicon {
+      width: 26px; height: 26px; border-radius: 7px;
+      display: block; flex-shrink: 0;
     }
 
     .m-navbar-title {
@@ -335,7 +339,7 @@
     .m-widget-menu:active { background: #f2f2f7; }
     .m-widget-bd { padding: 12px 14px 14px; }
     .m-widget-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px; color: #8e8e93; font-size: 14px; }
-    .m-widget-more { text-align: center; font-size: 13px; color: #007aff; padding-top: 8px; }
+    .m-widget-more { text-align: center; font-size: 13px; color: #0172A4; padding-top: 8px; }
 
     /* Bilan hydrique */
     .m-bh-table {
@@ -361,7 +365,7 @@
     .m-bh-expand {
       width: 100%; padding: 12px; margin-top: 8px;
       border: 1px dashed rgba(0,0,0,.15); border-radius: 10px;
-      background: none; font-size: 14px; color: #007aff;
+      background: none; font-size: 14px; color: #0172A4;
       cursor: pointer; font-family: inherit;
       display: flex; align-items: center; justify-content: center; gap: 6px;
     }
@@ -481,7 +485,7 @@
       font-size: 15px; line-height: 1.4;
     }
     .m-chat-msg--bot  .m-chat-bubble { background: #fff; color: #000; border-bottom-left-radius: 4px; }
-    .m-chat-msg--user .m-chat-bubble { background: #007aff; color: #fff; border-bottom-right-radius: 4px; }
+    .m-chat-msg--user .m-chat-bubble { background: #0172A4; color: #fff; border-bottom-right-radius: 4px; }
 
     /* Typing indicator */
     .m-chat-typing .m-chat-bubble { padding: 12px 16px; }
@@ -504,9 +508,9 @@
       border: 1px solid rgba(0,0,0,.15); border-radius: 22px; background: #f2f2f7;
       color: #000; outline: none; min-height: 42px;
     }
-    .m-chat-input:focus { border-color: #007aff; background: #fff; }
+    .m-chat-input:focus { border-color: #0172A4; background: #fff; }
     .m-chat-send {
-      width: 36px; height: 36px; border-radius: 50%; background: #007aff;
+      width: 36px; height: 36px; border-radius: 50%; background: #0172A4;
       border: none; color: #fff; font-size: 16px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       transition: opacity .15s;
@@ -524,7 +528,7 @@
       display: block;
       padding: 14px 0;
       font-size: 16px;
-      color: #007aff;
+      color: #0172A4;
       text-align: center;
       cursor: pointer;
       border-bottom: .5px solid rgba(0,0,0,.08);
@@ -567,30 +571,41 @@
       -webkit-backdrop-filter: blur(20px) saturate(180%);
       border-bottom: .5px solid rgba(0,0,0,.12);
     }
-    /* Ligne 1 : logo W | lien retour centré | bouton + */
-    .m-detail-row1 {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
+    /* Detail header — topbar : back left, + right */
+    .m-detail-topbar {
+      display: flex; align-items: center; justify-content: space-between;
       height: 44px; padding: 0 12px;
     }
-    .m-detail-row1 .m-navbar-logo-mark { justify-self: start; }
-    .m-detail-row1 .m-detail-back      { justify-self: center; }
-    .m-detail-row1 .m-detail-plus      { justify-self: end; }
-    /* Ligne 2 : ← retour · icône + nom · ⭐ */
-    .m-detail-row2 {
-      display: flex; align-items: center; gap: 8px;
-      padding: 6px 12px 10px;
-      min-height: 44px;
+    /* Detail header — identity row : star + title block */
+    .m-detail-identity {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 12px 10px;
     }
+    .m-detail-title-block { flex: 1; min-width: 0; }
+    .m-detail-title {
+      font-size: 16px; font-weight: 700; color: #000;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .m-detail-subtitle {
+      font-size: 12px; color: #8e8e93; margin-top: 1px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    /* Back button — iOS style */
     .m-detail-back {
-      display: flex; align-items: center; gap: 1px;
-      border: none; background: none; color: #007aff;
-      font-size: 14px; cursor: pointer; font-family: inherit;
-      padding: 0; white-space: nowrap; flex-shrink: 0; min-height: 36px;
+      display: flex; align-items: center; gap: 2px;
+      border: none; background: none; color: #0172A4;
+      font-size: 15px; font-weight: 500; cursor: pointer;
+      font-family: inherit; padding: 4px 0; white-space: nowrap; flex-shrink: 0;
     }
-    .m-detail-back i { font-size: 20px; }
-    /* Ligne 2 : étoile · nom · culture/modèle · commune */
+    .m-detail-back i { font-size: 18px; margin-right: 1px; }
+    .m-detail-back:active { opacity: .6; }
+    /* Kept for backwards compat (detail rows used elsewhere) */
+    .m-detail-row1 {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      align-items: center; height: 44px; padding: 0 12px;
+    }
+    .m-detail-row1 .m-detail-back  { justify-self: center; }
+    .m-detail-row1 .m-detail-plus  { justify-self: end; }
     .m-detail-row2 {
       display: flex; align-items: center;
       padding: 4px 12px 10px; gap: 4px; overflow: hidden;
@@ -598,13 +613,11 @@
     .m-d-name {
       font-size: 15px; font-weight: 600; color: #000;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      flex-shrink: 2; min-width: 30px;
     }
     .m-d-sep { font-size: 13px; color: #c7c7cc; flex-shrink: 0; }
     .m-d-sub {
       font-size: 13px; color: #3c3c43;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      flex-shrink: 3; min-width: 20px;
     }
     .m-d-commune {
       font-size: 13px; color: #8e8e93;
@@ -641,7 +654,7 @@
       border-bottom: 2px solid transparent; font-family: inherit;
       transition: color .15s;
     }
-    .m-detail-tab.active { color: #007aff; border-bottom-color: #007aff; }
+    .m-detail-tab.active { color: #0172A4; border-bottom-color: #0172A4; }
 
     .m-detail-content { }
     .m-detail-section { padding: 12px 0; }
@@ -670,7 +683,7 @@
     .m-export-btn {
       flex-shrink: 0; background: none;
       border: 1px solid rgba(0,0,0,.15); border-radius: 7px;
-      padding: 5px 9px; font-size: 14px; color: #007aff;
+      padding: 5px 9px; font-size: 14px; color: #0172A4;
       cursor: pointer; line-height: 1;
     }
     .m-export-btn:active { background: rgba(0,122,255,.08); }
@@ -710,10 +723,93 @@
       width: calc(100% - 32px); margin: 4px 16px 4px;
       padding: 13px; border: 1px dashed rgba(0,0,0,.15);
       border-radius: 12px; background: none;
-      font-size: 14px; color: #007aff; cursor: pointer;
+      font-size: 14px; color: #0172A4; cursor: pointer;
       font-family: inherit; display: flex; align-items: center;
       justify-content: center; gap: 6px;
     }
+    .m-alert-more-btn {
+      background: none; border: none; padding: 0;
+      font-size: 12px; color: #0172A4; cursor: pointer; font-family: inherit;
+    }
+    .m-sheet-info-rows { padding: 4px 0; }
+    .m-sheet-info-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      gap: 12px; padding: 8px 0; border-bottom: .5px solid rgba(0,0,0,.08);
+      font-size: 13px;
+    }
+    .m-sheet-info-row:last-child { border-bottom: none; }
+    .m-sheet-info-row > span:first-child { color: #8e8e93; flex-shrink: 0; }
+    .m-sheet-info-row > span:last-child { font-weight: 500; text-align: right; }
+
+    /* Alert history */
+    /* Périmètre supprimable */
+    .m-perimetre-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 4px 0; font-size: 13px; font-weight: 500;
+    }
+    .m-perimetre-del {
+      background: none; border: none; color: #ff3b30; cursor: pointer;
+      font-size: 11px; padding: 2px 4px; opacity: .7;
+    }
+    .m-perimetre-del:active { opacity: 1; }
+
+    /* Widget collapse */
+    .m-widget-hd--toggle { cursor: pointer; }
+    .m-widget-hd--toggle:active { background: rgba(0,0,0,.03); }
+    .m-widget--collapsed { }
+
+    .m-history-title {
+      font-size: 12px; font-weight: 700; color: #8e8e93;
+      text-transform: uppercase; letter-spacing: .04em;
+      padding: 14px 0 8px; border-top: .5px solid rgba(0,0,0,.1); margin-top: 8px;
+    }
+    .m-history-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0; border-bottom: .5px solid rgba(0,0,0,.06);
+    }
+    .m-history-row:last-child { border-bottom: none; }
+    .m-history-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+    }
+    .m-history-info { flex: 1; }
+    .m-history-when { font-size: 11px; color: #8e8e93; margin-bottom: 1px; }
+    .m-history-label { font-size: 13px; font-weight: 600; color: #1c1c1e; }
+    .m-history-desc { font-size: 12px; color: #6c6c70; margin-top: 1px; }
+
+    /* Bilan hydrique plot link */
+    .m-bh-plot-link {
+      background: none; border: none; padding: 0; font-family: inherit;
+      font-size: 12px; font-weight: 600; color: #0172A4; cursor: pointer;
+      text-align: left;
+    }
+    .m-bh-plot-link:active { opacity: .6; }
+
+    /* Cumuls widget */
+    .m-cumuls-form { padding: 4px 0 8px; display: flex; flex-direction: column; gap: 10px; }
+    .m-cumuls-select {
+      width: 100%; border: 1px solid rgba(0,0,0,.12); border-radius: 8px;
+      padding: 8px 10px; font-size: 13px; font-family: inherit;
+      background: #f9f9f9; appearance: none; color: #000;
+    }
+    .m-cumuls-row2 { display: flex; gap: 8px; }
+    .m-cumuls-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .m-cumuls-label { font-size: 11px; color: #8e8e93; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+    .m-cumuls-date, .m-cumuls-select--sm {
+      flex: 1; border: 1px solid rgba(0,0,0,.12); border-radius: 8px;
+      padding: 7px 8px; font-size: 12px; font-family: inherit;
+      background: #f9f9f9; color: #000;
+    }
+    .m-cumuls-result {
+      background: linear-gradient(135deg, #bf5af220, #9b59f220);
+      border-radius: 10px; padding: 14px 16px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .m-cumuls-val { font-size: 32px; font-weight: 700; color: #bf5af2; line-height: 1; }
+    .m-cumuls-unit { font-size: 12px; color: #8e8e93; }
+
+    /* m-list-row-col (used in exploitation/reseau screens) */
+    .m-list-row-col { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+    .m-list-row-sub { font-size: 11px; color: #8e8e93; }
 
     /* Mini map in params — isolation pour que les z-index Leaflet ne débordent pas */
     .m-minimap-container {
@@ -879,7 +975,7 @@
 
     .m-itinerary-link {
       display: flex; align-items: center; gap: 6px;
-      font-size: 14px; color: #007aff; text-decoration: none;
+      font-size: 14px; color: #0172A4; text-decoration: none;
       padding: 2px 0;
     }
 
@@ -1006,7 +1102,7 @@
       margin-bottom: 4px;
     }
     .m-compte-name { font-size: 20px; font-weight: 600; color: #000; }
-    .m-compte-avatar-btn { font-size: 14px; color: #007aff; cursor: pointer; }
+    .m-compte-avatar-btn { font-size: 14px; color: #0172A4; cursor: pointer; }
 
     /* ── iOS grouped list ── */
     .m-list-section-header {
@@ -1127,7 +1223,7 @@
       cursor: pointer; padding: 0;
     }
     .m-sheet-cancel { color: #8e8e93; }
-    .m-sheet-done   { color: #007aff; font-weight: 600; }
+    .m-sheet-done   { color: #0172A4; font-weight: 600; }
 
     .m-sheet-body {
       overflow-y: auto;
@@ -1149,7 +1245,7 @@
       outline: none;
     }
     .m-sheet-input--sm { padding: 9px 12px; font-size: 14px; }
-    .m-sheet-input:focus { border-color: #007aff; }
+    .m-sheet-input:focus { border-color: #0172A4; }
 
     .m-sheet-option {
       display: flex; align-items: center; justify-content: space-between;
@@ -1175,7 +1271,7 @@
     .m-sheet-add-phone {
       width: 100%; padding: 12px; border: 1px dashed rgba(0,0,0,.2);
       background: none; border-radius: 10px;
-      font-size: 14px; color: #007aff; cursor: pointer; font-family: inherit;
+      font-size: 14px; color: #0172A4; cursor: pointer; font-family: inherit;
       display: flex; align-items: center; justify-content: center; gap: 6px;
     }
 
@@ -1191,7 +1287,7 @@
     }
     .m-sheet-key-copy {
       width: 100%; padding: 10px; border: none; border-radius: 8px;
-      background: #007aff; color: #fff; font-size: 14px;
+      background: #0172A4; color: #fff; font-size: 14px;
       font-family: inherit; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 6px;
     }
@@ -1235,12 +1331,13 @@
       letter-spacing: .03em;
     }
   </style>
-  <script type="module" crossorigin src="/weenat-proto/assets/mobile-DsZFXKCW.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/mobile-Ch3dUXBk.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-kiLnwOqV.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-C_yA0hbg.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/network-YzWdS0n_.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-Cx4wNzLL.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-DEd9yWse.js">
 </head>
 <body>
 
@@ -1269,7 +1366,7 @@
 
         <div class="m-screen active" id="screen-dashboard" data-tab="dashboard">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><div class="m-navbar-logo-mark">W</div></a>
+            <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Dashboard</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1278,7 +1375,7 @@
 
         <div class="m-screen" id="screen-parcelles" data-tab="parcelles">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><div class="m-navbar-logo-mark">W</div></a>
+            <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Parcelles</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1287,7 +1384,7 @@
 
         <div class="m-screen" id="screen-capteurs" data-tab="capteurs">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><div class="m-navbar-logo-mark">W</div></a>
+            <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Capteurs</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1296,7 +1393,7 @@
 
         <div class="m-screen" id="screen-alertes" data-tab="alertes">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><div class="m-navbar-logo-mark">W</div></a>
+            <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Alertes</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1305,9 +1402,10 @@
 
         <div class="m-screen" id="screen-parametres" data-tab="parametres">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><div class="m-navbar-logo-mark">W</div></a>
+            <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Paramètres</span>
-            <div style="width:32px"></div>
+            <button class="m-navbar-action" id="param-plus-btn" style="display:none"><i class="bi bi-plus"></i></button>
+            <div id="param-plus-spacer" style="width:32px"></div>
           </div>
           <div class="m-segment-wrap">
             <div class="m-segment" id="param-segment"></div>
