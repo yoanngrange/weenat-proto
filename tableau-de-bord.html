@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tableau de bord - Weenat Proto</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-    <script type="module" crossorigin src="/weenat-proto/assets/tableau-de-bord-BMPE94Ux.js"></script>
+    <script type="module" crossorigin src="/weenat-proto/assets/tableau-de-bord-C2PeeDWs.js"></script>
     <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
     <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
-    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-kiLnwOqV.js">
-    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-C_yA0hbg.js">
-    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CfSCGwm6.css">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-DRhdmc2N.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-DDe0aa9W.js">
+    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CdTlRrQV.css">
   </head>
   <body>
     <div id="app">
@@ -44,30 +44,47 @@
           <section class="tdb-section">
             <div class="tdb-section-hd" data-toggle>
               <span class="tdb-hd-left"><i class="bi bi-geo-alt"></i> Bilan hydrique - Parcelles - Mon exploitation</span>
-              <span class="tdb-hd-right"><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
+              <span class="tdb-hd-right"><button class="tdb-strategy-btn" onclick="return false"><i class="bi bi-calendar-check"></i> Saisir une stratégie d'irrigation</button><button class="tdb-widget-menu-btn" title="Options">···</button><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
             </div>
             <div class="tdb-section-body" id="tdb-parcels"></div>
           </section>
           <section class="tdb-section">
             <div class="tdb-section-hd" data-toggle>
+              <span class="tdb-hd-left"><i class="bi bi-cloud-sun"></i> Prévisions météo - Parcelles - Mon exploitation</span>
+              <span class="tdb-hd-right"><button class="tdb-widget-menu-btn" title="Options">···</button><i class="bi bi-chevron-up tdb-chevron"></i></span>
+            </div>
+            <div class="tdb-section-body" id="tdb-forecast"></div>
+          </section>
+          <div class="tdb-row-half">
+            <section class="tdb-section">
+              <div class="tdb-section-hd" data-toggle>
+                <span class="tdb-hd-left"><i class="bi bi-droplet"></i> Traitements phytosanitaires</span>
+                <span class="tdb-hd-right">
+                  <select class="tdb-header-select" id="phyto-type-sel" onclick="event.stopPropagation()">
+                    <option value="herbicide-contact">Herbicides de contact</option>
+                    <option value="fongicide">Fongicides</option>
+                    <option value="herbicide-systemique">Herbicides systémiques</option>
+                    <option value="herbicide-racinaire-antigerminatif">Herbicides racinaires et anti-germinatifs</option>
+                  </select>
+                  <button class="tdb-widget-menu-btn" title="Options">···</button><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i>
+                </span>
+              </div>
+              <div class="tdb-section-body" id="tdb-treatments"></div>
+            </section>
+            <section class="tdb-section">
+              <div class="tdb-section-hd" data-toggle>
+                <span class="tdb-hd-left"><i class="bi bi-broadcast"></i> Capteurs avec événement</span>
+                <span class="tdb-hd-right"><button class="tdb-widget-menu-btn" title="Options">···</button><a href="capteurs.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
+              </div>
+              <div class="tdb-section-body" id="tdb-sensor-events"></div>
+            </section>
+          </div>
+          <section class="tdb-section">
+            <div class="tdb-section-hd" data-toggle>
               <span class="tdb-hd-left"><i class="bi bi-flower1"></i> Phénologie - Parcelles - Mon exploitation</span>
-              <span class="tdb-hd-right"><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
+              <span class="tdb-hd-right"><button class="tdb-widget-menu-btn" title="Options">···</button><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
             </div>
             <div class="tdb-section-body" id="tdb-phenology"></div>
-          </section>
-          <section class="tdb-section">
-            <div class="tdb-section-hd" data-toggle>
-              <span class="tdb-hd-left"><i class="bi bi-droplet"></i> Traitements phytosanitaires - Parcelles - Mon exploitation</span>
-              <span class="tdb-hd-right"><a href="parcelles.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
-            </div>
-            <div class="tdb-section-body" id="tdb-treatments"></div>
-          </section>
-          <section class="tdb-section">
-            <div class="tdb-section-hd" data-toggle>
-              <span class="tdb-hd-left"><i class="bi bi-broadcast"></i> Capteurs avec événement - Mon exploitation</span>
-              <span class="tdb-hd-right"><a href="capteurs.html" class="tdb-section-link">Voir <i class="bi bi-arrow-right"></i></a><i class="bi bi-chevron-up tdb-chevron"></i></span>
-            </div>
-            <div class="tdb-section-body" id="tdb-sensor-events"></div>
           </section>
         </main>
       </div>
