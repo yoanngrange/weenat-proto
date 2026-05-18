@@ -8,23 +8,127 @@ document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
   const role = localStorage.getItem('menuRole') || 'admin-reseau'
   const isAdherent = role === 'adherent-reseau'
+  renderForecastTable()
   renderParcelTable(isAdherent)
   renderPhenologyTable()
   renderTreatmentTable()
   renderSensorEvents()
   setupCollapsible()
+  setupWidgetMenus()
 })
 
 function setupCollapsible() {
   document.querySelectorAll('.tdb-section-hd[data-toggle]').forEach(hd => {
     hd.style.cursor = 'pointer'
     hd.addEventListener('click', e => {
-      if (e.target.closest('a')) return
+      if (e.target.closest('a') || e.target.closest('.tdb-widget-menu-btn') || e.target.closest('.tdb-widget-menu-popup')) return
       const body = hd.nextElementSibling
       const collapsed = body.classList.toggle('tdb-collapsed')
       hd.querySelector('.tdb-chevron').classList.toggle('tdb-chevron-down', collapsed)
     })
   })
+}
+
+function setupWidgetMenus() {
+  document.querySelectorAll('.tdb-widget-menu-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      document.querySelectorAll('.tdb-widget-menu-popup').forEach(p => p.remove())
+      const menu = document.createElement('div')
+      menu.className = 'tdb-widget-menu-popup'
+      menu.innerHTML = `
+        <button class="tdb-widget-menu-item"><i class="bi bi-x-lg"></i> Retirer le widget</button>
+        <button class="tdb-widget-menu-item"><i class="bi bi-arrows-move"></i> Déplacer le widget</button>
+        <button class="tdb-widget-menu-item"><i class="bi bi-gear"></i> Configurer le widget</button>`
+      btn.parentElement.appendChild(menu)
+      menu.querySelectorAll('.tdb-widget-menu-item').forEach(item => {
+        item.addEventListener('click', () => { menu.remove(); alert('Fonctionnalité à venir') })
+      })
+      const close = () => menu.remove()
+      setTimeout(() => document.addEventListener('click', close, { once: true }), 0)
+    })
+  })
+}
+
+const FC_MONTHS_LONG = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+
+function plotForecastDay(plot, dayIdx) {
+  const s = plot.id * 7 + dayIdx * 31
+  const r = v => (Math.sin(s * v) + 1) / 2
+  const rainy = r(0.7) > 0.65
+  return {
+    pluie:   rainy ? +((r(1.3) * 12)).toFixed(1) : 0,
+    tMin:    Math.round(8  + r(2.1) * 8),
+    tMax:    Math.round(16 + r(3.7) * 14),
+    hum:     Math.round(45 + r(4.3) * 45),
+    vent:    Math.round(8  + r(5.1) * 30),
+    etr:     +(0.5 + r(6.7) * 5).toFixed(1),
+  }
+}
+
+function renderForecastTable() {
+  const container = document.getElementById('tdb-forecast')
+  if (!container) return
+
+  const myPlots = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
+  const now = new Date()
+
+  const dayHeaders = [0, 1, 2].map(i => {
+    const d = new Date(now); d.setDate(d.getDate() + i)
+    const label = i === 0 ? `Aujourd'hui ${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
+                : i === 1 ? `Demain ${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
+                : `${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
+    return `<th colspan="4" class="tdb-fc-day-hd">${label}</th>`
+  }).join('')
+
+  const subHeaders = [0, 1, 2].map(() =>
+    `<th class="tdb-num tdb-fc-sub">Pluie</th>
+     <th class="tdb-num tdb-fc-sub">T° min/max</th>
+     <th class="tdb-num tdb-fc-sub">Vent</th>
+     <th class="tdb-num tdb-fc-sub">ETR</th>`
+  ).join('')
+
+  const rows = myPlots.map(p => {
+    const dayCells = [0, 1, 2].map(i => {
+      const f = plotForecastDay(p, i)
+      const pluieCell = f.pluie > 0 ? `<span class="tdb-fc-rain">${f.pluie} mm</span>` : '<span class="tdb-fc-dry">—</span>'
+      return `<td class="tdb-num tdb-fc-cell">${pluieCell}</td>
+        <td class="tdb-num tdb-fc-cell">${f.tMin}°C / ${f.tMax}°C</td>
+        <td class="tdb-num tdb-fc-cell">${f.vent} km/h</td>
+        <td class="tdb-num tdb-fc-cell">${f.etr} mm</td>`
+    }).join('')
+    return `<tr>
+      <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
+      <td>${p.crop || '—'}</td>
+      ${dayCells}
+    </tr>`
+  }).join('')
+
+  container.innerHTML = `<table class="tdb-parcels-table tdb-fc-table">
+    <thead>
+      <tr>
+        <th rowspan="2">Parcelle</th>
+        <th rowspan="2">Culture</th>
+        ${dayHeaders}
+      </tr>
+      <tr class="tdb-fc-sub-row">${subHeaders}</tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`
+}
+
+function plotIrrigationData(plot) {
+  const s = plot.id
+  if (s % 3 === 0) {
+    const mm = Math.round((s * 1.7 + 8) % 30 + 5)
+    const daysAhead = (s % 4) + 1
+    return { planned: true, mm, daysAhead }
+  }
+  return { planned: false }
+}
+
+function thInfo(tooltip) {
+  return `<span class="tdb-th-info" data-tooltip="${tooltip}">i</span>`
 }
 
 function plotAgroData(plot) {
@@ -46,36 +150,44 @@ function renderParcelTable(isAdherent) {
 
   const rows = myPlots.map(p => {
     const d = plotAgroData(p)
+    const irrig = plotIrrigationData(p)
+    const irrigCell = irrig.planned
+      ? `<td class="tdb-num">${irrig.mm} mm <span class="tdb-irrig-days">J+${irrig.daysAhead}</span></td>`
+      : `<td class="tdb-num"><button class="tdb-saisir-btn">Saisir</button></td>`
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
-      <td>${p.crop}</td>
-      <td>${p.texture}</td>
+      <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
+      <td>${p.texture || '<span class="tdb-missing">—</span>'}</td>
+      ${irrigCell}
       <td class="tdb-num">${d.teneurEau} mm</td>
       <td class="tdb-num">${d.pluie7j} mm</td>
       <td class="tdb-num">${d.etp7j} mm</td>
-      <td class="tdb-num">${d.drainage7j} mm</td>
       <td class="tdb-num ${d.teneurEauJ7 < 0 ? 'tdb-irrig-needed' : ''}">${d.teneurEauJ7} mm</td>
       <td class="tdb-num ${d.balance >= 0 ? 'tdb-irrig-ok' : 'tdb-irrig-needed'}">${d.balance >= 0 ? '0 mm' : '<i class="bi bi-droplet-fill"></i> +' + Math.abs(d.balance) + ' mm'}</td>
     </tr>`
   }).join('')
 
-  container.innerHTML = `<table class="tdb-parcels-table">
-    <thead>
-      <tr>
-        <th>Parcelle</th>
-        <th>Culture</th>
-        <th>Texture de sol</th>
-        <th class="tdb-num">Réservoir J0</th>
-        <th class="tdb-num">+ Pluie J+7</th>
-        <th class="tdb-num">− ETP J+7</th>
-        <th class="tdb-num">− Drainage J+7</th>
-        <th class="tdb-num">Réservoir J+7</th>
-        <th class="tdb-num">= Irrigations J+7</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="tdb-parcels-formula">Déficit = pluies + irrigations − ETP − drainage</div>`
+  const headers = [
+    { label: 'Parcelle',         tip: 'Nom de la parcelle' },
+    { label: 'Culture',          tip: 'Culture actuellement en place sur la parcelle' },
+    { label: 'Texture de sol',   tip: 'Texture du sol renseignée pour la parcelle' },
+    { label: 'Irr. planifiées',  tip: 'Irrigations planifiées sur les 7 prochains jours', num: true },
+    { label: 'Rés. J0',         tip: "Niveau estimé du réservoir hydrique aujourd'hui (mm)", num: true },
+    { label: '+ Pluie J+7',     tip: 'Cumul de pluie prévu sur les 7 prochains jours (mm)', num: true },
+    { label: '− ETR J+7',       tip: 'Évapotranspiration réelle prévue sur 7 jours (mm)', num: true },
+    { label: 'Rés. J+7',        tip: 'Niveau estimé du réservoir hydrique dans 7 jours (mm)', num: true },
+    { label: '= Irr. J+7',      tip: 'Volume d\'irrigation nécessaire sur les 7 prochains jours', num: true },
+  ]
+  const headerRow = headers.map(h =>
+    `<th${h.num ? ' class="tdb-num"' : ''}>${h.label}${thInfo(h.tip)}</th>`
+  ).join('')
+
+  container.innerHTML = `
+    <table class="tdb-parcels-table">
+      <thead><tr>${headerRow}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="tdb-parcels-formula">Déficit = pluies + irrigations − ETR − drainage</div>`
 }
 
 // ─── Treatment table ──────────────────────────────────────────────────────────
@@ -135,12 +247,8 @@ function renderTreatmentTable() {
                : { cls: 'risk-green', label: 'Faible' }
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
-      <td>${p.crop}</td>
-      <td class="tdb-num">${d.pluie7past} mm</td>
-      <td>il y a ${d.daysAgo} jr</td>
-      <td>${d.product}</td>
+      <td>${p.crop || '—'}</td>
       <td class="${d.isUrgent ? 'tdb-win-urgent' : ''}">${d.isUrgent ? '<i class="bi bi-alarm-fill"></i> ' : ''}${d.winDateStr} — ${d.winHour}:00 → ${(d.winHour + d.winDur) % 24}:00</td>
-      <td><span class="risk-badge ${risk.cls}">${risk.label}</span></td>
     </tr>`
   }).join('')
 
@@ -149,11 +257,7 @@ function renderTreatmentTable() {
       <tr>
         <th>Parcelle</th>
         <th>Culture</th>
-        <th class="tdb-num">Pluie 7 derniers jours</th>
-        <th>Dernier traitement</th>
-        <th>Dernier produit</th>
         <th>Prochaine fenêtre favorable</th>
-        <th>Risque</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -235,6 +339,11 @@ function plotPhenologyData(plot) {
   return { variety, stage, nextStage, kc, rootDepth, nextDateStr, daysToNext }
 }
 
+const NEXT_STAGE_CROPS = new Set([
+  'Blé tendre', 'Blé dur', 'Maïs', 'Maïs ensilage',
+  'Pomme de terre', 'Carotte', 'Tournesol', 'Pommier',
+])
+
 function renderPhenologyTable() {
   const container = document.getElementById('tdb-phenology')
   if (!container) return
@@ -243,14 +352,22 @@ function renderPhenologyTable() {
 
   const rows = myPlots.map(p => {
     const d = plotPhenologyData(p)
+    const ph = PHENOLOGY[p.crop] || PHENOLOGY_DEFAULT
+    const stageOpts = ph.stages.map(s =>
+      `<option${s === d.stage ? ' selected' : ''}>${s}</option>`
+    ).join('')
+    const showNext = p.crop && NEXT_STAGE_CROPS.has(p.crop)
+    const nextCell = showNext
+      ? `${d.nextDateStr} <span class="tdb-next-stage-delta">(dans ${d.daysToNext} j)</span> — <span class="tdb-next-stage-name">${d.nextStage}</span>`
+      : '—'
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
-      <td>${p.crop}</td>
+      <td>${p.crop || '—'}</td>
       <td>${d.variety}</td>
-      <td class="${isKeyStage(d.stage) ? 'tdb-stage-key' : ''}">${d.stage}</td>
+      <td><select class="tdb-stage-sel ${isKeyStage(d.stage) ? 'tdb-stage-key' : ''}">${stageOpts}</select></td>
       <td class="tdb-num">${d.kc.toFixed(2)}</td>
       <td class="tdb-num">${d.rootDepth} cm</td>
-      <td>${d.nextDateStr} <span class="tdb-next-stage-delta">(dans ${d.daysToNext} j)</span> — <span class="tdb-next-stage-name">${d.nextStage}</span></td>
+      <td>${nextCell}</td>
     </tr>`
   }).join('')
 
@@ -260,9 +377,9 @@ function renderPhenologyTable() {
         <th>Parcelle</th>
         <th>Culture</th>
         <th>Variété</th>
-        <th>Stade phénologique</th>
+        <th>Stade actuel</th>
         <th class="tdb-num">Kc</th>
-        <th class="tdb-num">Profondeur racinaire</th>
+        <th class="tdb-num">Racines</th>
         <th>Prochain stade prévu</th>
       </tr>
     </thead>
@@ -270,11 +387,21 @@ function renderPhenologyTable() {
   </table>`
 }
 
+const SENSOR_EVENT_ICONS = {
+  'capteur couché':          { icon: 'bi-arrow-down-circle-fill', cls: 'tdb-ev-warn' },
+  'émissions interrompues':  { icon: 'bi-wifi-off',               cls: 'tdb-ev-danger' },
+  'capteur déplacé':         { icon: 'bi-geo-alt-fill',            cls: 'tdb-ev-warn' },
+  'cuillère bloquée':        { icon: 'bi-x-octagon-fill',          cls: 'tdb-ev-danger' },
+}
+
 function renderSensorEvents() {
   const container = document.getElementById('tdb-sensor-events')
   if (!container) return
 
-  const mySensors = sensors.filter(s => s.orgId === ADHERENT_ORG_ID && s.event)
+  const mySensors = sensors.filter(s => {
+    const ev = s.event
+    return ev && (Array.isArray(ev) ? ev.length > 0 : true)
+  }).filter(s => s.orgId === ADHERENT_ORG_ID)
 
   if (!mySensors.length) {
     container.closest('.tdb-section').hidden = true
@@ -283,22 +410,26 @@ function renderSensorEvents() {
 
   const rows = mySensors.map(s => {
     const parcel = plots.find(p => p.id === s.parcelId)
+    const evList = Array.isArray(s.event) ? s.event : [s.event]
+    const evBadges = `<div class="tdb-ev-stack">${evList.map(ev => {
+      const cfg = SENSOR_EVENT_ICONS[ev] || { icon: 'bi-exclamation-circle-fill', cls: 'tdb-ev-warn' }
+      return `<span class="tdb-ev-badge ${cfg.cls}"><i class="bi ${cfg.icon}"></i> ${ev}</span>`
+    }).join('')}</div>`
     return `<tr>
-      <td><a href="capteur-detail.html?id=${s.id}" class="tdb-plot-link">${s.serial}</a></td>
       <td>${s.model}</td>
-      <td>${parcel ? parcel.name : '—'}</td>
-      <td class="tdb-irrig-needed">${s.event}</td>
+      <td><a href="capteur-detail.html?id=${s.id}" class="tdb-plot-link">${s.serial}</a></td>
+      <td>${parcel ? (parcel.ville || parcel.name) : '—'}</td>
+      <td class="tdb-ev-cell">${evBadges}</td>
     </tr>`
   }).join('')
 
   container.innerHTML = `<table class="tdb-parcels-table">
     <thead>
       <tr>
-        
         <th>Modèle</th>
         <th>Numéro de série</th>
         <th>Ville</th>
-        <th>Événement</th>
+        <th>Événements</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>

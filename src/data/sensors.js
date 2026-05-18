@@ -8,7 +8,7 @@ export const sensors = [
   { id: 2,   orgId: 1,  parcelId: 1,  model: "CHP-15/30", serial: "WEE-00102", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 92, messages7d: 95,  event: "capteur couché", depth: 20 },
   { id: 3,   orgId: 1,  parcelId: 2,  model: "P",         serial: "WEE-00103", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 78, messages7d: 88,  event: null },
   { id: 4,   orgId: 1,  parcelId: 2,  model: "TH",        serial: "WEE-00104", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 80, messages7d: 85,  event: null },
-  { id: 5,   orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00105", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 92,  event: "émissions interrompues", depth: 50 },
+  { id: 5,   orgId: 1,  parcelId: 3,  model: "CHP-30/60", serial: "WEE-00105", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 90, messages7d: 92,  event: ["émissions interrompues", "cuillère bloquée"], depth: 50 },
   { id: 6,   orgId: 1,  parcelId: 4,  model: "P+",        serial: "WEE-00106", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 93,  event: null },
   { id: 7,   orgId: 1,  parcelId: 4,  model: "CAPA-30-3", serial: "WEE-00107", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 75, messages7d: 80,  event: null },
   { id: 8,   orgId: 1,  parcelId: 5,  model: "EC",        serial: "WEE-00108", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 87,  event: null },

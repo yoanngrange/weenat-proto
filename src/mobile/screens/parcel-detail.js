@@ -511,14 +511,15 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
   // Plus
   layer.querySelector('#d-plus').addEventListener('click', () => {
     const body = `
-      <button class="m-sheet-option" data-a="widget"><i class="bi bi-grid-1x2"></i> Widget</button>
-      <button class="m-sheet-option" data-a="irrigation"><i class="bi bi-droplet"></i> Irrigation</button>
-      <button class="m-sheet-option" data-a="capteur"><i class="bi bi-broadcast"></i> Capteur</button>
-      <button class="m-sheet-option" data-a="alerte"><i class="bi bi-bell"></i> Alerte</button>
-      <button class="m-sheet-option" style="color:#8e8e93" data-a="integration">
+      <a class="m-sheet-link" data-a="widget"><i class="bi bi-grid-1x2"></i> Widget</a>
+      <a class="m-sheet-link" data-a="irrigation"><i class="bi bi-droplet"></i> Irrigation</a>
+      <a class="m-sheet-link" data-a="strategie-irrigation"><i class="bi bi-arrow-repeat"></i> Stratégie d'irrigation</a>
+      <a class="m-sheet-link" data-a="capteur"><i class="bi bi-broadcast"></i> Capteur</a>
+      <a class="m-sheet-link" data-a="alerte"><i class="bi bi-bell"></i> Alerte</a>
+      <a class="m-sheet-link" data-a="integration" style="color:#8e8e93">
         <i class="bi bi-plug"></i> Intégration <span style="font-size:11px">(version web uniquement)</span>
-      </button>
-      <button class="m-sheet-option" data-a="note"><i class="bi bi-pencil"></i> Note</button>`
+      </a>
+      <a class="m-sheet-link" data-a="note"><i class="bi bi-pencil"></i> Note</a>`
     const el = document.createElement('div'); el.innerHTML = body
     const sh = showSheet({ title: 'Ajouter à la parcelle', body: el, doneLabel: 'Fermer', onDone: () => {} })
     el.querySelectorAll('[data-a]').forEach(btn => {

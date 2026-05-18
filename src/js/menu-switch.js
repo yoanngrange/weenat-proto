@@ -146,6 +146,16 @@ function openAddModal() {
             <i class="bi bi-person-plus-fill"></i>
             <span>Membre</span>
           </button>
+          <button class="add-item-btn" data-action="irrigation">
+            <i class="bi bi-droplet-fill"></i>
+            <span>Irrigation</span>
+            <span class="add-item-tip" data-tip="Une irrigation ponctuelle sur une ou plusieurs parcelles">i</span>
+          </button>
+          <button class="add-item-btn" data-action="strategie-irrigation">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Stratégie d'irr.</span>
+            <span class="add-item-tip" data-tip="Récurrence sur toute une saison, sur une ou plusieurs parcelles">i</span>
+          </button>
         </div>
       </div>
 
@@ -187,7 +197,8 @@ function openAddModal() {
     'adherent': 'adherent-creer.html',
   };
   modal.querySelectorAll('.add-item-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', e => {
+      if (e.target.closest('.add-item-tip')) return;
       const route = ACTION_ROUTES[btn.dataset.action];
       modal.remove();
       if (route) window.location.href = route;

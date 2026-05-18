@@ -2055,6 +2055,7 @@ td.num {
   color: var(--txt);
   text-align: center;
   transition: border-color .15s, background .15s;
+  position: relative;
 }
 .add-item-btn i {
   font-size: 22px;
@@ -2064,6 +2065,44 @@ td.num {
   border-color: var(--pri);
   background: var(--pri2);
 }
+
+.add-item-tip {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bdr);
+  color: var(--txt2);
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+.add-item-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #222;
+  color: #fff;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 200;
+  max-width: 220px;
+  white-space: normal;
+  text-align: left;
+}
+.add-item-tip:hover::after { opacity: 1; }
 
 /* ── Integrations cards ───────────────────────────────────────────────────── */
 .filter-pills-row {
@@ -5459,6 +5498,65 @@ tr.row-selected td {
   flex-direction: column;
   gap: 32px;
 }
+.tdb-row-half {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.tdb-row-half > .tdb-section {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Forecast table ── */
+.tdb-fc-table { min-width: 600px; }
+.tdb-fc-day-hd {
+  text-align: center !important;
+  background: var(--pri2);
+  color: var(--pri);
+  border-bottom: 2px solid var(--pri);
+  border-left: 2px solid var(--bdr);
+  padding: 6px 4px;
+}
+.tdb-fc-sub-row .tdb-fc-sub { background: var(--bg); }
+.tdb-fc-sub {
+  font-size: 10px;
+  color: var(--txt3);
+  padding: 4px 6px;
+  text-align: center !important;
+  border-left: 1px solid var(--bdr2);
+}
+.tdb-fc-sub:nth-child(4n+1) { border-left: 2px solid var(--bdr); }
+.tdb-fc-cell {
+  font-size: 12px;
+  padding: 7px 6px;
+  text-align: center !important;
+  border-right: 1px solid var(--bdr2);
+}
+.tdb-fc-cell:last-child { border-right: none; }
+.tdb-fc-rain { color: #2196F3; font-weight: 600; }
+
+/* ── Sensor event badges ── */
+.tdb-ev-cell { vertical-align: top; padding: 6px 10px; }
+.tdb-ev-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 2px 0;
+  white-space: nowrap;
+}
+.tdb-ev-warn   { background: var(--warn2); color: var(--warn); }
+.tdb-ev-danger { background: #fee2e2; color: #c0392b; }
+.tdb-ev-stack  { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+
+/* ── Forecast table — Culture column border ── */
+.tdb-fc-table td:nth-child(2),
+.tdb-fc-table th:nth-child(2) { border-right: 2px solid var(--bdr); }
+.tdb-fc-dry  { color: var(--txt3); }
 
 /* Favorites */
 .tdb-favorites-hd {
@@ -5544,6 +5642,7 @@ tr.row-selected td {
   background: var(--bg);
   color: var(--txt);
   user-select: none;
+  position: relative;
 }
 .tdb-hd-left { display: flex; align-items: center; gap: 8px; }
 .tdb-hd-right { display: flex; align-items: center; gap: 12px; }
@@ -5653,8 +5752,8 @@ tr.row-selected td {
 .tdb-parcels-table tbody tr:hover { background: var(--bg); }
 .tdb-parcels-table tbody tr:last-child td { border-bottom: none; }
 .tdb-num { text-align: right !important; font-variant-numeric: tabular-nums; }
-.tdb-plot-link { color: var(--txt); text-decoration: none; font-weight: 500; }
-.tdb-plot-link:hover { color: var(--pri); text-decoration: underline; }
+.tdb-plot-link { color: var(--pri); text-decoration: underline; font-weight: 500; }
+.tdb-plot-link:hover { opacity: .75; }
 .tdb-irrig-needed { background: var(--warn2); color: var(--warn); font-weight: 600; }
 .tdb-irrig-needed i { margin-right: 4px; }
 .tdb-irrig-ok { color: var(--txt3); }
@@ -5665,6 +5764,31 @@ tr.row-selected td {
 .risk-orange { background: #FEF3E2; color: #B45309; }
 .risk-red    { background: #FEE8E8; color: #C0392B; }
 .tdb-stage-key { background: var(--warn2); color: var(--warn); font-weight: 600; }
+.tdb-stage-sel {
+  padding: 3px 6px;
+  border: 1px solid var(--bdr);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--txt);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+  height: 26px;
+}
+.tdb-stage-sel:focus { border-color: var(--pri); }
+.tdb-header-select {
+  padding: 3px 8px;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--txt);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  height: 28px;
+}
+.tdb-header-select:focus { border-color: var(--pri); }
 .tdb-next-stage-name { font-weight: 600; color: var(--txt1); }
 .tdb-next-stage-date { font-size: 12px; color: var(--txt2); margin-top: 2px; display: block; }
 .tdb-next-stage-delta { color: var(--txt3); }
@@ -5674,6 +5798,194 @@ tr.row-selected td {
   color: var(--txt3);
   border-top: 1px solid var(--bdr2);
   font-style: italic;
+}
+
+/* ── Bilan hydrique toolbar & strategy button ── */
+.tdb-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 12px 6px;
+}
+.tdb-strategy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--pri);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.tdb-strategy-btn:hover { opacity: .85; }
+
+/* ── Column header info tooltip ── */
+.tdb-th-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bdr);
+  color: var(--txt2);
+  font-size: 9px;
+  font-weight: 700;
+  font-style: normal;
+  cursor: help;
+  position: relative;
+  margin-left: 4px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.tdb-th-info::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 200;
+}
+.tdb-th-info:hover::after { opacity: 1; }
+
+/* ── Irrigation cell elements ── */
+.tdb-irrig-days { font-size: 11px; color: var(--txt3); margin-left: 2px; }
+.tdb-saisir-btn {
+  padding: 2px 9px;
+  border: 1px solid var(--pri);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pri);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .12s;
+}
+.tdb-saisir-btn:hover { background: var(--pri2); }
+.tdb-missing { color: var(--txt3); }
+
+/* ── Day navigation in previsions ── */
+.day-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--txt2);
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color .12s, color .12s;
+  flex-shrink: 0;
+}
+.day-nav-btn:hover:not(:disabled) {
+  border-color: var(--pri);
+  color: var(--pri);
+}
+.day-nav-btn:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.tdb-widget-menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--txt2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+.tdb-widget-menu-btn:hover { background: var(--bdr2); }
+.tdb-widget-menu-popup {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--card);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  z-index: 100;
+  min-width: 200px;
+  padding: 4px 0;
+}
+.tdb-widget-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--txt);
+  text-align: left;
+}
+.tdb-widget-menu-item:hover { background: var(--bg); }
+.tdb-widget-menu-item i { font-size: 14px; color: var(--txt2); }
+
+/* ── Wide irrigation buttons in add modal ── */
+.add-modal-grid-full {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.add-item-wide-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--txt);
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.add-item-wide-btn i {
+  font-size: 22px;
+  color: var(--pri);
+  flex-shrink: 0;
+}
+.add-item-wide-btn:hover {
+  border-color: var(--pri);
+  background: var(--pri2);
+}
+.add-item-wide-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.add-item-wide-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.add-item-wide-desc {
+  font-size: 11px;
+  color: var(--txt2);
+  line-height: 1.4;
 }
 
 

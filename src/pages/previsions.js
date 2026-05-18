@@ -9,11 +9,33 @@ const DAYS   = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
 const MONTHS_SHORT = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc']
 
+const MAX_DAY_INDEX = 6
+
+function navigateDay(delta) {
+  const next = selectedDayIndex + delta
+  if (next < 0 || next > MAX_DAY_INDEX) return
+  selectedDayIndex = next
+  document.querySelectorAll('.fc2-card').forEach((c, i) => c.classList.toggle('fc2-card--active', i === selectedDayIndex))
+  generateHourlySection(selectedDayIndex)
+  updateDayNavButtons()
+}
+
+function updateDayNavButtons() {
+  const prev = document.getElementById('prev-day-btn')
+  const next = document.getElementById('next-day-btn')
+  if (prev) prev.disabled = selectedDayIndex === 0
+  if (next) next.disabled = selectedDayIndex === MAX_DAY_INDEX
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
   populateLocationSelect()
   generateForecast()
   generateHourlySection(0)
+  updateDayNavButtons()
+
+  document.getElementById('prev-day-btn')?.addEventListener('click', () => navigateDay(-1))
+  document.getElementById('next-day-btn')?.addEventListener('click', () => navigateDay(1))
 
   document.getElementById('hourly-metric-sel')?.addEventListener('change', e => {
     selectedMetric = e.target.value
@@ -158,6 +180,7 @@ function generateForecast() {
       document.querySelectorAll('.fc2-card').forEach(c => c.classList.remove('fc2-card--active'))
       card.classList.add('fc2-card--active')
       generateHourlySection(i)
+      updateDayNavButtons()
     })
     el.appendChild(card)
   }

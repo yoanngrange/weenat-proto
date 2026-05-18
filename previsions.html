@@ -79,7 +79,11 @@
           <div id="hourly-section" style="padding:0 20px 32px">
             <div id="hourly-header">
               <div>
-                <div id="hourly-day-label" style="font-weight:700;font-size:15px"></div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button id="prev-day-btn" class="day-nav-btn" title="Jour précédent"><i class="bi bi-chevron-left"></i></button>
+                  <div id="hourly-day-label" style="font-weight:700;font-size:15px"></div>
+                  <button id="next-day-btn" class="day-nav-btn" title="Jour suivant"><i class="bi bi-chevron-right"></i></button>
+                </div>
                 <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
                   <span style="font-size:12px;color:var(--txt2)">Prévisions heure par heure</span>
                   <span class="badge" style="background:#1a1a2e;color:#fff;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.05em">AROME</span>

@@ -216,15 +216,9 @@
     .m-navbar-logo-mark {
       width: 26px;
       height: 26px;
-      border-radius: 7px;
-      background: #0172A4;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: -.5px;
     }
     .m-navbar-favicon {
       width: 26px; height: 26px; border-radius: 7px;
@@ -806,6 +800,17 @@
     }
     .m-cumuls-val { font-size: 32px; font-weight: 700; color: #bf5af2; line-height: 1; }
     .m-cumuls-unit { font-size: 12px; color: #8e8e93; }
+    .m-cumuls-saved { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
+    .m-cumuls-saved-card {
+      background: #fff; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);
+      padding: 12px 16px; display: flex; flex-direction: column; gap: 3px;
+    }
+    .m-cumuls-saved-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .m-cumuls-saved-metric { font-size: 13px; font-weight: 600; color: #1c1c1e; }
+    .m-cumuls-saved-val { font-size: 18px; font-weight: 700; color: #1c1c1e; }
+    .m-cumuls-saved-unit { font-size: 12px; font-weight: 400; color: #8e8e93; }
+    .m-cumuls-saved-row2 { font-size: 12px; color: #3a3a3c; }
+    .m-cumuls-saved-row3 { font-size: 11px; color: #8e8e93; }
 
     /* m-list-row-col (used in exploitation/reseau screens) */
     .m-list-row-col { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
@@ -1359,7 +1364,7 @@
 
         <div class="m-screen active" id="screen-dashboard" data-tab="dashboard">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><img src="/favicon.svg" class="m-navbar-favicon" alt="W"></a>
+            <a class="m-navbar-logo"><img src="favicon.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Dashboard</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1368,7 +1373,7 @@
 
         <div class="m-screen" id="screen-parcelles" data-tab="parcelles">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><img src="/favicon.svg" class="m-navbar-favicon" alt="W"></a>
+            <a class="m-navbar-logo"><img src="favicon.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Parcelles</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1377,7 +1382,7 @@
 
         <div class="m-screen" id="screen-capteurs" data-tab="capteurs">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><img src="/favicon.svg" class="m-navbar-favicon" alt="W"></a>
+            <a class="m-navbar-logo"><img src="favicon.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Capteurs</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1386,7 +1391,7 @@
 
         <div class="m-screen" id="screen-alertes" data-tab="alertes">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><img src="/favicon.svg" class="m-navbar-favicon" alt="W"></a>
+            <a class="m-navbar-logo"><img src="favicon.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Alertes</span>
             <button class="m-navbar-action"><i class="bi bi-plus"></i></button>
           </div>
@@ -1395,7 +1400,7 @@
 
         <div class="m-screen" id="screen-parametres" data-tab="parametres">
           <div class="m-navbar">
-            <a class="m-navbar-logo"><img src="/favicon.svg" class="m-navbar-favicon" alt="W"></a>
+            <a class="m-navbar-logo"><img src="favicon.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Paramètres</span>
             <button class="m-navbar-action" id="param-plus-btn" style="display:none"><i class="bi bi-plus"></i></button>
             <div id="param-plus-spacer" style="width:32px"></div>
