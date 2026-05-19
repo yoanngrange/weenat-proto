@@ -1,4 +1,4 @@
-/* empty css             */import{o as j}from"./orgs-Cx4wNzLL.js";import{p as y}from"./plots-DRhdmc2N.js";import{s as A}from"./sensors-DDe0aa9W.js";import{m as F}from"./members-DEd9yWse.js";function Pe({title:e,contextLabel:a,items:n=[],type:t="sensor",activeItem:l=null,availableMeasures:c=[],defaultFormat:u="csv"}){const d=document.getElementById("export-modal");d&&d.remove();const o=document.createElement("div");o.id="export-modal",o.className="modal",o.innerHTML=`
+/* empty css             */import{o as j}from"./orgs-Cx4wNzLL.js";import{p as y}from"./plots-tpnimBNe.js";import{s as A}from"./sensors-DDe0aa9W.js";import{m as F}from"./members-DEd9yWse.js";function Pe({title:e,contextLabel:a,items:n=[],type:t="sensor",activeItem:l=null,availableMeasures:c=[],defaultFormat:u="csv"}){const d=document.getElementById("export-modal");d&&d.remove();const o=document.createElement("div");o.id="export-modal",o.className="modal",o.innerHTML=`
     <div class="modal-content">
       <h2>${e}</h2>
       <p>Un email contenant les liens de téléchargement sera envoyé à votre adresse.</p>
