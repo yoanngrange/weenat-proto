@@ -5919,14 +5919,16 @@ tr.row-selected td {
 .tdb-widget-menu-popup {
   position: absolute;
   right: 0;
-  top: 100%;
-  background: var(--card);
+  top: calc(100% + 4px);
+  background: var(--card, #fff);
+  opacity: 1;
   border: 1px solid var(--bdr);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+  z-index: 9999;
   min-width: 200px;
   padding: 4px 0;
+  isolation: isolate;
 }
 .tdb-widget-menu-item {
   display: flex;

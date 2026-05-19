@@ -9,7 +9,7 @@ const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
 // ─── Widget catalog ───────────────────────────────────────────────────────────
 // fixed:true = toujours en fin de liste, pas de menu (infos réseau + support)
 const CATALOG = [
-  { id: 'bilan_hydrique', title: 'Bilan hydrique',                    icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
+  { id: 'bilan_hydrique', title: 'Irrigations & bilan hydrique',      icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
   { id: 'previsions',     title: 'Prévisions',                        icon: 'bi-cloud-sun-fill',            color: '#f5a623', active: true,  available: true,  fixed: false },
   { id: 'temps_reel',     title: 'Données temps-réel',                icon: 'bi-activity',                  color: '#ff9f0a', active: false, available: false, fixed: false },
   { id: 'cumuls',         title: 'Cumuls',                            icon: 'bi-bar-chart-fill',            color: '#bf5af2', active: true,  available: true,  fixed: false },
@@ -131,6 +131,12 @@ function makeBilan(plot) {
 // ─── Widget HTML builders ─────────────────────────────────────────────────────
 const BH_PAGE = 8
 
+function makePlanif7j(plot) {
+  const s = plot.id
+  if (!plot.irrigation || plot.irrigation === "Pas d'irrigation") return 0
+  return s % 3 === 0 ? Math.round((s * 1.7 + 8) % 30 + 5) : 0
+}
+
 function buildBilanHydrique(plots, expanded = false) {
   if (!plots.length) {
     return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucune parcelle</p></div>`
@@ -138,23 +144,37 @@ function buildBilanHydrique(plots, expanded = false) {
   const visible = expanded ? plots : plots.slice(0, BH_PAGE)
   const rows = visible.map(p => {
     const { j0, j7, bilan } = makeBilan(p)
+    const planif = makePlanif7j(p)
     return `
       <button class="m-bh-th-n m-bh-plot-link" data-plot-id="${p.id}">${p.name}</button>
       <div class="m-bh-td">${j0}</div>
       <div class="m-bh-td">${j7}</div>
-      <div class="m-bh-td">${bilan > 0 ? `${bilan} mm` : ''}</div>`
+      <div class="m-bh-td m-bh-td--reco">${bilan > 0 ? bilan : '—'}</div>
+      <div class="m-bh-td m-bh-td--planif">${planif > 0 ? planif : '—'}</div>`
   }).join('')
   const more = !expanded && plots.length > BH_PAGE
     ? `<button class="m-bh-expand" id="bh-expand">Afficher les ${plots.length - BH_PAGE} autres parcelles <i class="bi bi-chevron-down"></i></button>` : ''
   return `
     <div class="m-bh-table">
-      <div class="m-bh-th"></div>
+      <div class="m-bh-th m-bh-unit-lbl">mm</div>
       <div class="m-bh-th">J0</div>
       <div class="m-bh-th">J+7</div>
-      <div class="m-bh-th">🪣</div>
+      <div class="m-bh-th">Reco 7j</div>
+      <div class="m-bh-th">Planif. 7j</div>
       ${rows}
     </div>
-    ${more}`
+    ${more}
+    <div class="m-bh-actions">
+      <button class="m-bh-action m-bh-action--cal" id="bh-btn-calendar">
+        <i class="bi bi-calendar3"></i> Voir le calendrier des irrigations
+      </button>
+      <button class="m-bh-action" id="bh-btn-irrigation">
+        <i class="bi bi-droplet-fill"></i> Saisir une irrigation
+      </button>
+      <button class="m-bh-action m-bh-action--sec" id="bh-btn-strategie">
+        <i class="bi bi-arrow-repeat"></i> Saisir une stratégie d'irrigation
+      </button>
+    </div>`
 }
 
 function buildPrevisions(plots, sensors, forecast) {
@@ -567,6 +587,17 @@ export function initDashboardScreen(screenEl, role) {
         const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
         if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, []))
       })
+    })
+
+    // Bilan hydrique — boutons irrigation
+    content.querySelector('#bh-btn-calendar')?.addEventListener('click', () => {
+      import('./irrigation.js').then(m => m.openCalendar(exploitPlots, ''))
+    })
+    content.querySelector('#bh-btn-irrigation')?.addEventListener('click', () => {
+      import('./irrigation.js').then(m => m.openIrrigationSaisie(exploitPlots, showToast))
+    })
+    content.querySelector('#bh-btn-strategie')?.addEventListener('click', () => {
+      import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
     })
 
     // Cumuls — filter metrics then recalculate

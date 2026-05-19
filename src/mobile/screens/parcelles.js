@@ -21,6 +21,7 @@ function hasMetric(plot, metricId) {
 
 const METRICS = [
   { id: 'pluie',    label: 'Pluie',               unit: 'mm',  aggs: ["Aujourd'hui", 'Hier', '7 derniers jours', '30 jours'], defaultAgg: '7 derniers jours' },
+  { id: 'irrigation', label: 'Irrigations',       unit: 'mm',  aggs: ['30 derniers jours', '7 derniers jours', "Aujourd'hui", 'Demain', '7 prochains jours', '30 prochains jours', 'Toute la saison'], defaultAgg: "Aujourd'hui" },
   { id: 'etp',      label: 'Évapotranspiration',  unit: 'mm',  aggs: ["Aujourd'hui", '7 derniers jours'],                     defaultAgg: "Aujourd'hui"      },
   { id: 'temp',     label: 'Température air',      unit: '°C',  aggs: ['Actuel', 'Min du jour', 'Max du jour'],                defaultAgg: 'Actuel'           },
   { id: 'temp_rosee',label: 'Température de rosée',unit: '°C', aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
@@ -34,6 +35,7 @@ const METRICS = [
 
 function mockVal(id) {
   switch (id) {
+    case 'irrigation':  return Math.round(Math.random() > 0.4 ? Math.random() * 45 : 0)
     case 'pluie':       return +(Math.random() * 50).toFixed(1)
     case 'etp':         return +(Math.random() * 8).toFixed(1)
     case 'temp':        return +(8 + Math.random() * 22).toFixed(1)
