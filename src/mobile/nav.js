@@ -21,6 +21,8 @@ export function popDetail() {
 }
 
 export function stackDepth() { return stack.length }
+export function hasUnsavedChanges() { return stack.some(l => l.dataset.dirty === 'true') }
+export function clearDirty() { stack.forEach(l => delete l.dataset.dirty) }
 
 window.addEventListener('m-tab-change', () => {
   stack.forEach(layer => layer.remove())

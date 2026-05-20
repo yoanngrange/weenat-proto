@@ -3,6 +3,101 @@ import { showToast, showSheet } from '../ui.js'
 import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 
+const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
+
+const WIDGET_CATALOG = [
+  { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
+  { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
+  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire'] },
+  { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
+  { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
+  { title: 'Irrigation', items: ['Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+]
+
+function openWidgetCatalog() {
+  const sectionsHtml = WIDGET_CATALOG.map(sec => `
+    <div class="m-list-section-header">${sec.title}</div>
+    ${sec.items.map(item => `
+      <div class="m-wcat-item">
+        <span>${item}</span>
+        <button class="m-wcat-add" type="button"><i class="bi bi-plus-circle"></i></button>
+      </div>`).join('')}`).join('')
+
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Retour</span></button>
+        <span style="font-size:17px;font-weight:600">Ajouter un widget</span>
+        <div style="width:44px"></div>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div class="m-detail-content" style="top:52px;overflow-y:auto">
+      <div style="padding:8px 0 32px">${sectionsHtml}</div>
+    </div>`)
+
+  layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+  layer.querySelectorAll('.m-wcat-add').forEach(btn => {
+    btn.addEventListener('click', () => showToast('Widget bientôt disponible'))
+  })
+}
+
+function openAddPage(parcel) {
+  const isAdmin = _role === 'admin'
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Retour</span></button>
+        <span style="font-size:17px;font-weight:600">Ajouter</span>
+        <div style="width:44px"></div>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div id="detail-content" class="m-detail-content" style="top:52px">
+      <div style="padding:20px 16px">
+        <div class="m-add-section-label">Mon exploitation</div>
+        <div class="m-add-grid">
+          <button class="m-add-item" data-action="parcelle"><div class="m-add-icon"><i class="bi bi-geo-alt-fill"></i></div><span>Parcelle</span></button>
+          <button class="m-add-item" data-action="capteur"><div class="m-add-icon"><i class="bi bi-broadcast"></i></div><span>Capteur</span></button>
+          <button class="m-add-item" data-action="station"><div class="m-add-icon"><i class="bi bi-cloud-sun-fill"></i></div><span>Station météo virtuelle</span></button>
+          <button class="m-add-item" data-action="membre"><div class="m-add-icon"><i class="bi bi-person-plus-fill"></i></div><span>Membre</span></button>
+          <button class="m-add-item" data-action="irrigation"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-droplet-fill"></i></div><span>Irrigation</span></button>
+          <button class="m-add-item" data-action="strategie-irrigation"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div><span>Saison d'irr.</span></button>
+          <button class="m-add-item" data-action="calendrier"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-calendar3"></i></div><span>Voir les irrigations</span></button>
+        </div>
+        ${isAdmin ? `
+        <div class="m-add-section-label" style="margin-top:20px">Mon réseau</div>
+        <div class="m-add-grid">
+          <button class="m-add-item" data-action="adherent"><div class="m-add-icon"><i class="bi bi-building"></i></div><span>Adhérent</span></button>
+        </div>` : ''}
+        <div class="m-add-section-label" style="margin-top:20px">Mon compte</div>
+        <div class="m-add-grid">
+          <button class="m-add-item" data-action="alerte"><div class="m-add-icon"><i class="bi bi-bell-fill"></i></div><span>Alerte</span></button>
+          <button class="m-add-item" data-action="export"><div class="m-add-icon"><i class="bi bi-download"></i></div><span>Export de données</span></button>
+        </div>
+      </div>
+    </div>`)
+
+  layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+  layer.querySelectorAll('.m-add-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.action
+      if (action === 'irrigation') {
+        popDetail()
+        import('./irrigation.js').then(m => m.openIrrigationSaisie([parcel], showToast))
+      } else if (action === 'strategie-irrigation') {
+        popDetail()
+        import('./irrigation.js').then(m => m.openIrrigationStrategie([parcel], showToast))
+      } else if (action === 'calendrier') {
+        popDetail()
+        import('./irrigation.js').then(m => m.openCalendar([parcel], ''))
+      } else {
+        showToast('Fonctionnalité à venir')
+      }
+    })
+  })
+}
+
 // ─── Chart helpers ────────────────────────────────────────────────────────────
 const CHART_METRICS = {
   etp:          { label: 'Évapotranspiration',   unit: 'mm/j', color: '#c090e0', cumul: true,  cumulsType: 'etp'   },
@@ -223,12 +318,12 @@ function widgetsView() {
   const PARCEL_WIDGETS = ['Bilan hydrique', 'Stades phénologiques', 'Alertes actives', 'Données temps-réel']
   return `
     <div class="m-detail-section">
+      <button class="m-add-widget-btn"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
       ${PARCEL_WIDGETS.map(name => `
         <div class="m-placeholder-widget">
           <span class="m-placeholder-widget-name">${name}</span>
           <button class="m-widget-menu" type="button">•••</button>
         </div>`).join('')}
-      <button class="m-add-widget-btn"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
     </div>`
 }
 
@@ -483,7 +578,7 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
     layer.querySelectorAll('.m-widget-menu').forEach(btn => {
       btn.addEventListener('click', e => { e.stopPropagation(); showToast('Options widget') })
     })
-    layer.querySelector('.m-add-widget-btn')?.addEventListener('click', () => showToast('Catalogue de widgets — à venir'))
+    layer.querySelector('.m-add-widget-btn')?.addEventListener('click', openWidgetCatalog)
   }
 
   // Tabs
@@ -495,6 +590,9 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
       renderView()
     })
   })
+
+  // Plus button
+  layer.querySelector('#d-plus').addEventListener('click', () => openAddPage(parcel))
 
   // Back
   layer.querySelector('.m-detail-back').addEventListener('click', popDetail)

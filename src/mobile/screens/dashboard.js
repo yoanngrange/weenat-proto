@@ -6,19 +6,21 @@ import { pushDetail, popDetail } from '../nav.js'
 const ORG_ID   = { admin: 100, adherent: 1 }
 const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
 
+// ─── Persistence ──────────────────────────────────────────────────────────────
+const DASH_KEY = 'weenat-m-dash'
+function _loadDash() { try { return JSON.parse(localStorage.getItem(DASH_KEY)) || {} } catch { return {} } }
+function _saveDash(patch) { try { localStorage.setItem(DASH_KEY, JSON.stringify({ ..._loadDash(), ...patch })) } catch {} }
+
 // ─── Widget catalog ───────────────────────────────────────────────────────────
 // fixed:true = toujours en fin de liste, pas de menu (infos réseau + support)
 const CATALOG = [
-  { id: 'bilan_hydrique', title: 'Irrigations & bilan hydrique',      icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
+  { id: 'bilan_hydrique', title: 'Irrigation',      icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
   { id: 'previsions',     title: 'Prévisions',                        icon: 'bi-cloud-sun-fill',            color: '#f5a623', active: true,  available: true,  fixed: false },
-  { id: 'temps_reel',     title: 'Données temps-réel',                icon: 'bi-activity',                  color: '#ff9f0a', active: false, available: false, fixed: false },
   { id: 'cumuls',         title: 'Cumuls',                            icon: 'bi-bar-chart-fill',            color: '#bf5af2', active: true,  available: true,  fixed: false },
-  { id: 'capteurs_fav',   title: 'Capteurs favoris',                  icon: 'bi-star-fill',                 color: '#ff9f0a', active: false, available: false, fixed: false },
-  { id: 'parcelles_fav',  title: 'Parcelles favorites',               icon: 'bi-bookmark-fill',             color: '#30d158', active: false, available: false, fixed: false },
-  { id: 'mon_secteur',    title: 'Mon secteur',                       icon: 'bi-geo-alt-fill',              color: '#ff6b6b', active: false, available: false, fixed: false },
-  { id: 'traitements',    title: 'Traitements phytosanitaires',       icon: 'bi-shield-fill',               color: '#4ecdc4', active: false, available: false, fixed: false },
-  { id: 'cultures',       title: 'Cultures & Stades phénologiques',   icon: 'bi-flower1',                   color: '#a2c4c9', active: false, available: false, fixed: false },
-  { id: 'evenements',     title: 'Capteurs avec événement en cours',  icon: 'bi-exclamation-triangle-fill', color: '#ff3b30', active: false, available: false, fixed: false },
+  { id: 'temps_reel',     title: 'Mesures',                           icon: 'bi-activity',                  color: '#ff9f0a', active: true,  available: true,  fixed: false },
+  { id: 'traitements',    title: 'Traitements',                        icon: 'bi-shield-fill',               color: '#4ecdc4', active: true,  available: true,  fixed: false },
+  { id: 'cultures',       title: 'Cultures',                           icon: 'bi-flower1',                   color: '#a2c4c9', active: true,  available: true,  fixed: false },
+  { id: 'evenements',     title: 'Anomalies capteurs',                 icon: 'bi-exclamation-triangle-fill', color: '#ff3b30', active: true,  available: true,  fixed: false },
   // Widgets fixes — toujours actifs, toujours en fin de liste
   { id: 'mon_reseau',     title: 'Infos Réseau',                      icon: 'bi-diagram-3-fill',            color: '#5b8dd9', active: true,  available: true,  fixed: true  },
   { id: 'support',        title: 'Support',                           icon: 'bi-question-circle-fill',      color: '#30d158', active: true,  available: true,  fixed: true  },
@@ -128,6 +130,187 @@ function makeBilan(plot) {
   return { j0, j7, bilan }
 }
 
+// ─── Mesures & Cumuls — constantes partagées ─────────────────────────────────
+
+const WF_MAX    = 4  // max items per widget
+const WF_COLORS = ['#0172A4', '#ff8500', '#30d158', '#bf5af2']
+
+const TR_ALL_METRICS = {
+  pluie: 'Pluie', temperature: 'Température', humidite: 'Humidité',
+  etp: 'Évapotranspiration', rayonnement: 'Rayonnement solaire', temp_rosee: 'Temp. rosée',
+  vent: 'Vent', par: 'Ray. PAR', humectation: 'Humectation foliaire',
+  pothydr: 'Potentiel hydrique', teneur: 'Teneur en eau', temp_sol: 'Temp. sol',
+}
+
+const TR_UNITS = {
+  pluie: 'mm', temperature: '°C', humidite: '%', etp: 'mm', rayonnement: 'W/m²',
+  temp_rosee: '°C', vent: 'km/h', par: 'µmol/m²/s', humectation: '%',
+  pothydr: 'kPa', teneur: '%vol', temp_sol: '°C',
+}
+
+const TR_SENSOR_METRICS = {
+  'P+': ['pluie','temperature','humidite'], 'PT': ['pluie','temperature'],
+  'P': ['pluie'], 'SMV': ['pluie','temperature','humidite'], 'TH': ['temperature','humidite'],
+  'W': ['vent'], 'PYRANO': ['rayonnement'], 'PAR': ['par'], 'LWS': ['humectation'],
+  'CHP-15/30': ['pothydr','temp_sol'], 'CHP-30/60': ['pothydr','temp_sol'],
+  'CHP-60/90': ['pothydr','temp_sol'], 'CAPA-30-3': ['teneur','temp_sol'],
+  'CAPA-60-6': ['teneur','temp_sol'], 'T_MINI': ['temp_sol'], 'EC': ['teneur','temp_sol'],
+}
+
+// ─── Mesures ──────────────────────────────────────────────────────────────────
+
+const MSR_PERIODS = [
+  { id: '365d', label: '365 derniers jours' },
+  { id: '30d',  label: '30 derniers jours' },
+  { id: '7d',   label: '7 derniers jours' },
+  { id: 'hier', label: 'Hier' },
+  { id: '1d',   label: "Aujourd'hui" },
+]
+
+function msrStepOpts(period) {
+  if (period === '1d' || period === 'hier')
+    return [{ id: 'raw', label: 'Mesures brutes' }, { id: '1h', label: 'Heure' }, { id: '1d', label: 'Jour' }]
+  if (period === '7d')
+    return [{ id: '1h', label: 'Heure' }, { id: '1d', label: 'Jour' }]
+  return [{ id: '1d', label: 'Jour' }, { id: '1w', label: 'Semaine' }, { id: '1mo', label: 'Mois' }]
+}
+
+function msrGetMetrics(subjectKey, sensors) {
+  const ALWAYS = ['etp', 'rayonnement', 'temp_rosee']
+  if (!subjectKey) return []
+  if (subjectKey.startsWith('p-')) {
+    const set = new Set(ALWAYS)
+    sensors.filter(s => s.parcelId === +subjectKey.slice(2))
+      .forEach(s => (TR_SENSOR_METRICS[s.model] || []).forEach(m => set.add(m)))
+    return [...set].filter(id => id in TR_ALL_METRICS)
+  }
+  const s = sensors.find(x => x.id === +subjectKey.slice(2))
+  return s ? (TR_SENSOR_METRICS[s.model] || []) : []
+}
+
+function msrXLabels(period, step) {
+  if (period === '1d' || period === 'hier') return ['0h', '6h', '12h', '18h', '24h']
+  if (step === '1h')  return ['J-7','J-5','J-3','J-1','Auj.']
+  if (step === '1d')  return period === '365d' ? ['Jan','Avr','Jul','Oct','Déc']
+                           : period === '30d'  ? ['J-30','J-22','J-14','J-7','Auj.']
+                           : ['J-7','J-5','J-3','J-1','Auj.']
+  if (step === '1w')  return period === '365d' ? ['S-52','S-38','S-26','S-13','Auj.'] : ['S-4','S-3','S-2','S-1','Auj.']
+  if (step === '1mo') return period === '365d' ? ['Jan','Avr','Jul','Oct','Déc'] : ['M-4','M-3','M-2','M-1','Auj.']
+  return []
+}
+
+let mesuresList = []
+
+let cumulsList = []
+
+// Apply persisted state
+;(() => {
+  const s = _loadDash()
+  if (s.catalog) {
+    const order = s.catalog.map(c => c.id)
+    CATALOG.sort((a, b) => {
+      const ai = order.indexOf(a.id), bi = order.indexOf(b.id)
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi)
+    })
+    s.catalog.forEach(c => { const w = CATALOG.find(x => x.id === c.id); if (w) w.active = c.active })
+  }
+  if (s.mesuresList) mesuresList = s.mesuresList
+  if (s.cumulsList)  cumulsList  = s.cumulsList
+})()
+
+function trMockSeries(subjectKey, metricId, count) {
+  const seed = [...(subjectKey + metricId)].reduce((s, c) => s + c.charCodeAt(0), 1)
+  const r    = i => (Math.sin(seed * 0.07 + i * 0.5) + Math.sin(seed * 0.03 + i * 1.3)) / 2 + 0.5
+  const cfg  = {
+    pluie:       { base: 0, amp: 18, sparse: true }, temperature: { base: 10, amp: 14 },
+    humidite:    { base: 50, amp: 38 },              etp:         { base: 1, amp: 4 },
+    rayonnement: { base: 100, amp: 550 },            temp_rosee:  { base: 4, amp: 9 },
+    vent:        { base: 4, amp: 22 },               par:         { base: 100, amp: 1400 },
+    humectation: { base: 0, amp: 100, sparse: true }, pothydr:    { base: 20, amp: 130 },
+    teneur:      { base: 18, amp: 18 },              temp_sol:    { base: 7, amp: 9 },
+  }[metricId] || { base: 40, amp: 40 }
+  return Array.from({ length: count }, (_, i) =>
+    (cfg.sparse && r(i * 3.7) > 0.28) ? 0 : Math.max(0, cfg.base + cfg.amp * r(i * 0.28 + 1.2))
+  )
+}
+
+function msrCardHtml(m, idx) {
+  const count = { '1d': 24, 'hier': 24, '7d': 42, '30d': 60, '365d': 90 }[m.period] || 42
+  const data  = trMockSeries(m.subjectKey, m.metricId, count)
+  const W = 270, H = 60, PL = 26, PB = 12
+  const yMax = Math.max(...data, 1)
+  const pts  = data.map((v, i) =>
+    `${PL + Math.round(i / (count - 1) * W)},${H - PB - Math.round(v / yMax * (H - PB - 4))}`
+  ).join(' ')
+  let grid = ''
+  for (let i = 0; i <= 2; i++) {
+    const y = Math.round(i / 2 * (H - PB - 4) + 4)
+    grid += `<line x1="${PL}" y1="${y}" x2="${PL+W}" y2="${y}" stroke="#E8E6E0" stroke-width=".5"/>`
+    grid += `<text x="${PL-3}" y="${y+3}" text-anchor="end" font-size="7" fill="#B0AEA8">${+(yMax*(1-i/2)).toFixed(yMax<5?1:0)}</text>`
+  }
+  const xlbls  = msrXLabels(m.period, m.step)
+  const xTicks = xlbls.map((lbl, i) =>
+    `<text x="${PL + Math.round(i/(xlbls.length-1)*W)}" y="${H+2}" text-anchor="middle" font-size="7" fill="#B0AEA8">${lbl}</text>`
+  ).join('')
+  const serialData = JSON.stringify(data.map(v => +v.toFixed(2)))
+  return `
+    <div class="m-wf-card">
+      <div class="m-wf-card-hd">
+        <div>
+          <div class="m-wf-card-title" style="color:${m.color}">${m.metricLabel} <span style="font-weight:400;color:#636366">· ${m.subjectLabel}</span></div>
+          <div class="m-wf-card-sub">${m.periodLabel} · ${m.stepLabel}</div>
+        </div>
+        <button class="m-wf-del" data-widget="temps_reel" data-idx="${idx}" type="button">×</button>
+      </div>
+      <div class="m-tr-chart-wrap" data-unit="${m.unit}" data-series='${serialData}' style="position:relative;margin-top:4px">
+        <svg viewBox="0 0 ${PL+W} ${H+6}" style="width:100%;display:block;overflow:visible">
+          ${grid}
+          <polyline points="${pts}" fill="none" stroke="${m.color}" stroke-width="1.5" stroke-linejoin="round"/>
+          <line class="m-tr-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#333" stroke-width=".7" stroke-dasharray="3,2" opacity="0"/>
+          ${xTicks}
+        </svg>
+        <div class="m-tr-tooltip" style="display:none;position:absolute;top:2px;pointer-events:none;background:rgba(28,28,30,.85);color:#fff;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;white-space:nowrap">—</div>
+      </div>
+    </div>`
+}
+
+function buildMesures(plots, sensors) {
+  const atMax = mesuresList.length >= WF_MAX
+  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
+  const sensorOpts = sensors.filter(s => s.parcelId).map(s => {
+    const p = plots.find(x => x.id === s.parcelId)
+    return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
+  }).join('')
+  const defSteps = msrStepOpts('7d')
+  const listHtml = mesuresList.length
+    ? mesuresList.map(msrCardHtml).join('')
+    : `<div class="m-wf-empty">Aucune mesure enregistrée</div>`
+  return `
+    <div class="m-list-section-header">Nouvelle mesure</div>
+    <div class="m-wf-form${atMax ? ' m-wf-disabled' : ''}">
+      <select class="m-wf-sel" id="msr-subject" ${atMax ? 'disabled' : ''}>
+        <option value="">— Parcelle ou capteur —</option>
+        <optgroup label="Parcelles">${plotOpts}</optgroup>
+        ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
+      </select>
+      <select class="m-wf-sel" id="msr-metric" disabled>
+        <option value="">— Métrique —</option>
+      </select>
+      <div class="m-wf-row">
+        <select class="m-wf-sel" id="msr-period" ${atMax ? 'disabled' : ''}>
+          ${MSR_PERIODS.map(p => `<option value="${p.id}"${p.id==='7d'?' selected':''}>${p.label}</option>`).join('')}
+        </select>
+        <select class="m-wf-sel" id="msr-step" ${atMax ? 'disabled' : ''}>
+          ${defSteps.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
+        </select>
+      </div>
+      <button class="m-wf-create-btn" id="msr-create" disabled>Créer la mesure</button>
+      ${atMax ? `<div class="m-wf-max-msg">Quantité maximale atteinte. Supprimez une mesure pour en ajouter une nouvelle.</div>` : ''}
+    </div>
+    <div class="m-list-section-header" style="margin-top:16px">Mesures enregistrées</div>
+    <div id="msr-list">${listHtml}</div>`
+}
+
 // ─── Widget HTML builders ─────────────────────────────────────────────────────
 const BH_PAGE = 8
 
@@ -141,7 +324,8 @@ function buildBilanHydrique(plots, expanded = false) {
   if (!plots.length) {
     return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucune parcelle</p></div>`
   }
-  const visible = expanded ? plots : plots.slice(0, BH_PAGE)
+  const sorted  = [...plots].sort((a, b) => makeBilan(b).bilan - makeBilan(a).bilan)
+  const visible = expanded ? sorted : sorted.slice(0, BH_PAGE)
   const rows = visible.map(p => {
     const { j0, j7, bilan } = makeBilan(p)
     const planif = makePlanif7j(p)
@@ -152,27 +336,30 @@ function buildBilanHydrique(plots, expanded = false) {
       <div class="m-bh-td m-bh-td--reco">${bilan > 0 ? bilan : '—'}</div>
       <div class="m-bh-td m-bh-td--planif">${planif > 0 ? planif : '—'}</div>`
   }).join('')
-  const more = !expanded && plots.length > BH_PAGE
+  const more = !expanded && sorted.length > BH_PAGE
     ? `<button class="m-bh-expand" id="bh-expand">Afficher les ${plots.length - BH_PAGE} autres parcelles <i class="bi bi-chevron-down"></i></button>` : ''
   return `
     <div class="m-bh-table">
+      <div class="m-bh-gh"></div>
+      <div class="m-bh-gh" style="grid-column:span 2">Niveau RFU</div>
+      <div class="m-bh-gh" style="grid-column:span 2">Irrigations J+7</div>
       <div class="m-bh-th m-bh-unit-lbl">mm</div>
       <div class="m-bh-th">J0</div>
       <div class="m-bh-th">J+7</div>
-      <div class="m-bh-th">Reco 7j</div>
-      <div class="m-bh-th">Planif. 7j</div>
+      <div class="m-bh-th">Reco.</div>
+      <div class="m-bh-th">Planif.</div>
       ${rows}
     </div>
     ${more}
     <div class="m-bh-actions">
-      <button class="m-bh-action m-bh-action--cal" id="bh-btn-calendar">
-        <i class="bi bi-calendar3"></i> Voir le calendrier des irrigations
-      </button>
       <button class="m-bh-action" id="bh-btn-irrigation">
         <i class="bi bi-droplet-fill"></i> Saisir une irrigation
       </button>
       <button class="m-bh-action m-bh-action--sec" id="bh-btn-strategie">
-        <i class="bi bi-arrow-repeat"></i> Saisir une stratégie d'irrigation
+        <i class="bi bi-arrow-repeat"></i> Saisir une saison d'irrigation
+      </button>
+      <button class="m-bh-action m-bh-action--cal" id="bh-btn-calendar">
+        <i class="bi bi-calendar3"></i> Voir les irrigations
       </button>
     </div>`
 }
@@ -224,24 +411,60 @@ function buildPrevisions(plots, sensors, forecast) {
 }
 
 const CUMULS_METRICS = [
-  { id: 'pluie', label: 'Cumul de pluie',          unit: 'mm',  base: 45,  amp: 80,   needsModels: ['P+','PT','P','SMV'] },
-  { id: 'dj',    label: 'Degrés-jours',             unit: 'DJ',  base: 120, amp: 300,  needsModels: ['P+','PT','SMV','TH'] },
-  { id: 'dh',    label: 'Degrés-heures',            unit: 'Dh',  base: 800, amp: 2000, needsModels: ['P+','PT','SMV','TH'] },
-  { id: 'hf',    label: 'Heures de froid',          unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
-  { id: 'etp',   label: 'Évapotranspiration',       unit: 'mm',  base: 20,  amp: 60,   needsModels: null }, // always
-  { id: 'humec', label: 'Humectation foliaire',     unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
+  { id: 'pluie', label: 'Cumul de pluie',        unit: 'mm',  base: 45,  amp: 80,   needsModels: ['P+','PT','P','SMV'] },
+  { id: 'dj',    label: 'Degrés-jours',           unit: 'DJ',  base: 120, amp: 300,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'hf',    label: 'Heures de froid',        unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'etp',   label: 'Évapotranspiration',     unit: 'mm',  base: 20,  amp: 60,   needsModels: ['P+','PT','SMV'] },
+  { id: 'rayo',  label: 'Rayonnement solaire',    unit: 'MJ',  base: 8,   amp: 20,   needsModels: ['PYRANO'] },
+  { id: 'humec', label: 'Humectation foliaire',   unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
 ]
+
+// Set of all sensor models that qualify for at least one cumul
+const CUMUL_QUALIFYING_MODELS = new Set(
+  CUMULS_METRICS.flatMap(m => m.needsModels || [])
+)
 
 function getAvailableMetrics(subjectVal) {
   if (!subjectVal) return CUMULS_METRICS
-  if (subjectVal.startsWith('s-')) return CUMULS_METRICS // all metrics for sensors
-  const plotId = +subjectVal.slice(2)
-  const linkedModels = new Set(
-    allSensors.filter(s => s.parcelId === plotId).map(s => s.model)
-  )
-  return CUMULS_METRICS.filter(m =>
-    m.needsModels === null || m.needsModels.some(mod => linkedModels.has(mod))
-  )
+  if (subjectVal.startsWith('s-')) {
+    const sensor = allSensors.find(s => s.id === +subjectVal.slice(2))
+    if (!sensor) return CUMULS_METRICS
+    return CUMULS_METRICS.filter(m => m.needsModels === null || m.needsModels.includes(sensor.model))
+  }
+  const linkedModels = new Set(allSensors.filter(s => s.parcelId === +subjectVal.slice(2)).map(s => s.model))
+  return CUMULS_METRICS.filter(m => m.needsModels === null || m.needsModels.some(mod => linkedModels.has(mod)))
+}
+
+const CUMUL_ICONS = {
+  pluie: { icon: 'bi-droplet-fill',    color: '#45b7d1' },
+  dj:    { icon: 'bi-thermometer-sun', color: '#ff9f0a' },
+  hf:    { icon: 'bi-thermometer-low', color: '#5ac8fa' },
+  etp:   { icon: 'bi-moisture',        color: '#30d158' },
+  rayo:  { icon: 'bi-sun-fill',        color: '#f5c842' },
+  humec: { icon: 'bi-droplet-half',    color: '#bf5af2' },
+}
+
+function renderCumulCards() {
+  if (!cumulsList.length) {
+    return `<div style="text-align:center;padding:16px;font-size:13px;color:#8e8e93">Aucun cumul enregistré</div>`
+  }
+  return cumulsList.map((c, idx) => {
+    const from = new Date(c.fromDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+    return `<div class="m-cumuls-saved-card" style="position:relative">
+      <button class="m-cumuls-del" data-cidx="${idx}" type="button" title="Supprimer">×</button>
+      <div class="m-cumuls-saved-row1">
+        <span class="m-cumuls-saved-metric"><i class="bi ${c.icon}" style="color:${c.color}"></i> ${c.metricLabel}</span>
+        <span class="m-cumuls-saved-val">${c.value} <span class="m-cumuls-saved-unit">${c.unit}</span></span>
+      </div>
+      <div class="m-cumuls-saved-row2">${c.subjectLabel}</div>
+      <div class="m-cumuls-saved-row3">depuis le ${from}${
+        c.thresholds
+          ? c.metricId === 'hf' ? ` · seuil < ${c.thresholds.cold}°C`
+          : c.metricId === 'dj' ? ` · ${c.thresholds.low}–${c.thresholds.high}°C`
+          : '' : ''
+      }</div>
+    </div>`
+  }).join('')
 }
 
 function computeCumul(subjectVal, fromDate, metricId) {
@@ -252,53 +475,175 @@ function computeCumul(subjectVal, fromDate, metricId) {
   return +(m.base + (seed % (m.amp * 10)) / 10).toFixed(1)
 }
 
-const DEFAULT_CUMULS = [
-  { metric: 'Pluie',          icon: 'bi-droplet-fill',    color: '#45b7d1', subject: 'La Petite Lande', value: '87.4', unit: 'mm', since: '1 jan 2026', params: '' },
-  { metric: 'Heures de froid', icon: 'bi-thermometer-low', color: '#5ac8fa', subject: 'La Croix',        value: '312',  unit: 'h',  since: '1 jan 2026', params: '< 7.2°C' },
-]
-
 function buildCumuls(plots, sensors) {
-  const today7 = new Date(); today7.setDate(today7.getDate() - 7)
-  const defaultFrom = today7.toISOString().split('T')[0]
-  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
-  const sensorOpts = sensors.filter(s => s.parcelId).map(s => `<option value="s-${s.id}">${s.serial} (${s.model})</option>`).join('')
+  const atMax      = cumulsList.length >= WF_MAX
+  const defaultFrom = `${new Date().getFullYear()}-01-01`
+
+  const qualSensors = sensors.filter(s => s.parcelId && CUMUL_QUALIFYING_MODELS.has(s.model))
+  const qualPlotIds = new Set(qualSensors.map(s => s.parcelId))
+  const qualPlots   = plots.filter(p => qualPlotIds.has(p.id))
+
+  const plotOpts   = qualPlots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
+  const sensorOpts = qualSensors.map(s => {
+    const p = plots.find(x => x.id === s.parcelId)
+    return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
+  }).join('')
+
+  const listHtml = cumulsList.length
+    ? renderCumulCards()
+    : `<div class="m-wf-empty">Aucun cumul enregistré</div>`
+
   return `
     <div class="m-list-section-header">Nouveau cumul</div>
-    <div class="m-cumuls-form">
-      <select class="m-cumuls-select" id="cumuls-subject">
-        <option value="">Choisir une parcelle ou un capteur…</option>
+    <div class="m-wf-form${atMax ? ' m-wf-disabled' : ''}">
+      <select class="m-wf-sel" id="cumuls-subject" ${atMax ? 'disabled' : ''}>
+        <option value="">— Parcelle ou capteur —</option>
         <optgroup label="Parcelles">${plotOpts}</optgroup>
         ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
       </select>
-      <div class="m-cumuls-row2">
-        <div class="m-cumuls-field">
-          <span class="m-cumuls-label">Depuis le</span>
-          <input type="date" class="m-cumuls-date" id="cumuls-from" value="${defaultFrom}">
-        </div>
-        <div class="m-cumuls-field">
-          <span class="m-cumuls-label">Métrique</span>
-          <select class="m-cumuls-select m-cumuls-select--sm" id="cumuls-metric">
-            ${CUMULS_METRICS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}
-          </select>
+      <select class="m-wf-sel" id="cumuls-metric" disabled>
+        <option value="">— Métrique —</option>
+      </select>
+      <div id="cumuls-thresholds"></div>
+      <div class="m-wf-row">
+        <div class="m-wf-field">
+          <span class="m-wf-label">Depuis le</span>
+          <input type="date" class="m-wf-date" id="cumuls-from" value="${defaultFrom}" ${atMax ? 'disabled' : ''}>
         </div>
       </div>
-      <div class="m-cumuls-result" id="cumuls-result">
-        <span class="m-cumuls-val" id="cumuls-val">—</span>
-        <span class="m-cumuls-unit" id="cumuls-unit">Sélectionnez un sujet</span>
-      </div>
+      <div id="cumuls-date-err" class="m-wf-err" style="display:none">Période supérieure à 365 jours. Choisissez une date plus récente.</div>
+      <button class="m-wf-create-btn" id="cumuls-create" disabled>Créer le cumul</button>
+      ${atMax ? `<div class="m-wf-max-msg">Quantité maximale atteinte. Supprimez un cumul pour en ajouter un nouveau.</div>` : ''}
     </div>
     <div class="m-list-section-header" style="margin-top:16px">Cumuls enregistrés</div>
-    <div class="m-cumuls-saved">
-      ${DEFAULT_CUMULS.map(c => `
-        <div class="m-cumuls-saved-card">
-          <div class="m-cumuls-saved-row1">
-            <span class="m-cumuls-saved-metric"><i class="bi ${c.icon}" style="color:${c.color}"></i> ${c.metric}</span>
-            <span class="m-cumuls-saved-val">${c.value} <span class="m-cumuls-saved-unit">${c.unit}</span></span>
-          </div>
-          <div class="m-cumuls-saved-row2">${c.subject}</div>
-          <div class="m-cumuls-saved-row3">depuis le ${c.since}${c.params ? ' · ' + c.params : ''}</div>
-        </div>`).join('')}
+    <div id="cumuls-saved-list">${listHtml}</div>`
+}
+
+// ─── Traitements phytosanitaires ─────────────────────────────────────────────
+
+const CROP_PRODUCTS = {
+  'Blé tendre':        ['Prosaro', 'Aviator Xpro', 'Input Xpro'],
+  'Maïs':              ['Mercantor Gold', 'Callisto', 'Milagro'],
+  'Orge':              ['Comet Pro', 'Siltra Xpro', 'Variano Xpro'],
+  'Colza':             ['Karate Zeon', 'Plenum', 'Caryx'],
+  'Prairie permanente':['Duplosan KV', 'Starane Premium', '—'],
+  'Tournesol':         ['Adengo', 'Merlin Flexx', 'Pulsar Plus'],
+  'Betterave':         ['Betanal Expert', 'Debut', 'Safari'],
+}
+
+function plotTreatmentData(plot) {
+  const s    = plot.id
+  const now  = new Date()
+  const products = CROP_PRODUCTS[plot.crop] || ['—']
+  const product  = products[s % products.length]
+  const daysAgo  = (s * 3 + 3) % 23 + 3
+  let daysAhead, winHour
+  if (s % 5 === 3) { daysAhead = 0; winHour = (now.getHours() + 2 + (s % 3) * 3) % 24 }
+  else             { daysAhead = (s * 2 + 1) % 6 + 1; winHour = 6 + (s % 5) * 2 }
+  const winDur  = 2 + (s % 3)
+  const winDate = new Date(now); winDate.setDate(winDate.getDate() + daysAhead)
+  const winDateStr = daysAhead === 0 ? "Aujourd'hui"
+    : winDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+  const minutesFromNow = daysAhead * 1440 + winHour * 60 - (now.getHours() * 60 + now.getMinutes())
+  const isUrgent = minutesFromNow >= 0 && minutesFromNow <= 600
+  return { product, winDateStr, winHour, winDur, isUrgent }
+}
+
+function buildTraitements(plots) {
+  const myPlots = plots.filter(p => p.crop)
+  if (!myPlots.length) return `<div class="m-widget-empty">Aucune parcelle avec culture renseignée</div>`
+  return `<div class="m-w-list">${myPlots.map(p => {
+    const d = plotTreatmentData(p)
+    const urgColor = d.isUrgent ? '#ff9f0a' : '#1c1c1e'
+    const urgIcon  = d.isUrgent ? '<i class="bi bi-alarm-fill" style="color:#ff9f0a"></i> ' : ''
+    return `<div class="m-w-row">
+      <div class="m-w-row-main">
+        <div class="m-w-row-name">${p.name}</div>
+        <div class="m-w-row-sub">${p.crop}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:12px;font-weight:600;color:${urgColor}">${urgIcon}${d.winDateStr} · ${d.winHour}h</div>
+        <div style="font-size:11px;color:#8e8e93">${d.winDur}h de traitement</div>
+      </div>
     </div>`
+  }).join('')}</div>`
+}
+
+// ─── Capteurs avec événements ─────────────────────────────────────────────────
+
+const SENSOR_EVENT_CFG = {
+  'capteur couché':         { icon: 'bi-arrow-down-circle-fill', color: '#ff9f0a' },
+  'émissions interrompues': { icon: 'bi-wifi-off',               color: '#ff3b30' },
+  'capteur déplacé':        { icon: 'bi-geo-alt-fill',            color: '#ff9f0a' },
+  'cuillère bloquée':       { icon: 'bi-x-octagon-fill',          color: '#ff3b30' },
+}
+
+function buildEvenements(plots, sensors) {
+  const withEvents = sensors.filter(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
+  if (!withEvents.length) return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucun événement en cours</p></div>`
+  return `<div class="m-w-list">${withEvents.map(s => {
+    const parcel  = plots.find(p => p.id === s.parcelId)
+    const evList  = Array.isArray(s.event) ? s.event : [s.event]
+    const badges  = evList.map(ev => {
+      const cfg = SENSOR_EVENT_CFG[ev] || { icon: 'bi-exclamation-circle-fill', color: '#ff9f0a' }
+      return `<span class="m-ev-badge" style="color:${cfg.color}"><i class="bi ${cfg.icon}"></i> ${ev}</span>`
+    }).join('')
+    return `<div class="m-w-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+        <div class="m-w-row-name">${s.model} — ${s.serial}</div>
+        <div style="font-size:11px;color:#8e8e93">${parcel?.ville || parcel?.name || '—'}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
+    </div>`
+  }).join('')}</div>`
+}
+
+// ─── Stades phénologiques ─────────────────────────────────────────────────────
+
+const PHENOLOGY_M = {
+  'Blé tendre':  { varieties: ['Bermude','Chevignon','Oregrain'],    stages: ['Tallage (BBCH 25)','SLAG (BBCH 29-30)','Montaison (BBCH 32)','Gonflement (BBCH 45)'], nextStages: ['SLAG','Montaison','Gonflement','Épiaison'] },
+  'Maïs':        { varieties: ['DKC4795','Farrandole','Ambition'],   stages: ['Levée (BBCH 09)','6 feuilles (BBCH 16)','10 feuilles (BBCH 18)','Floraison mâle (BBCH 65)'], nextStages: ['6 feuilles','10 feuilles','Floraison mâle','Nouaison'] },
+  'Orge':        { varieties: ['Irina','KWS Cassia','Etincel'],      stages: ['Tallage (BBCH 25)','SLAG (BBCH 29-30)','Montaison (BBCH 33)','Gonflement (BBCH 45)'], nextStages: ['SLAG','Montaison','Gonflement','Épiaison'] },
+  'Colza':       { varieties: ['Avatar','DK Expower','Atlavista'],   stages: ['Boutons floraux (BBCH 51)','Début floraison (BBCH 60)','Pleine floraison (BBCH 65)','Nouaison (BBCH 70)'], nextStages: ['Début floraison','Pleine floraison','Nouaison','Siliques vertes'] },
+  'Tournesol':   { varieties: ['Heliasol','LG 5474','Heliosol'],     stages: ['Levée (BBCH 09)','4 feuilles (BBCH 14)','Bouton floral (BBCH 51)','Floraison (BBCH 65)'], nextStages: ['4 feuilles','Bouton floral','Floraison','Maturité'] },
+  'Betterave sucrière': { varieties: ['Alegria','Belinda','Cosima'], stages: ['Levée (BBCH 09)','4 feuilles (BBCH 14)','Fermeture rang (BBCH 29)','Grossissement (BBCH 40)'], nextStages: ['4 feuilles','Fermeture rang','Grossissement','Maturité'] },
+  'Pomme de terre': { varieties: ['Bintje','Charlotte','Agria'],     stages: ['Levée (BBCH 09)','Développement tiges (BBCH 30)','Floraison (BBCH 60)','Sénescence (BBCH 90)'], nextStages: ['Développement tiges','Floraison','Sénescence','Récolte'] },
+}
+const PHENOLOGY_DEFAULT_M = { varieties: ['—'], stages: ['Végétation active'], nextStages: ['Prochain stade'] }
+const NEXT_STAGE_CROPS_M = new Set(['Blé tendre','Blé dur','Maïs','Maïs ensilage','Pomme de terre','Carotte','Tournesol','Pommier','Colza','Betterave sucrière'])
+
+function plotPhenologyDataM(plot) {
+  const s  = plot.id
+  const ph = PHENOLOGY_M[plot.crop] || PHENOLOGY_DEFAULT_M
+  const idx = s % ph.stages.length
+  const daysToNext = (s * 2 + 5) % 18 + 4
+  const nextDate   = new Date('2026-04-18'); nextDate.setDate(nextDate.getDate() + daysToNext)
+  const nextDateStr = nextDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return { stage: ph.stages[idx], nextStage: ph.nextStages[idx], variety: ph.varieties[s % ph.varieties.length], nextDateStr, daysToNext }
+}
+
+function buildCultures(plots) {
+  const myPlots = plots.filter(p => p.crop)
+  if (!myPlots.length) return `<div class="m-widget-empty">Aucune parcelle avec culture renseignée</div>`
+  return `<div class="m-w-list">${myPlots.map(p => {
+    const hasPheno = !!PHENOLOGY_M[p.crop]
+    const d        = hasPheno ? plotPhenologyDataM(p) : null
+    const showNext = hasPheno && NEXT_STAGE_CROPS_M.has(p.crop)
+    const variety  = hasPheno && d.variety !== '—' ? ` · ${d.variety}` : ''
+    return `<div class="m-w-row">
+      <div class="m-w-row-main">
+        <div class="m-w-row-name">${p.name}</div>
+        <div class="m-w-row-sub">${p.crop}${variety}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;max-width:48%">
+        ${hasPheno
+          ? `<div style="font-size:12px;font-weight:600;color:#1c1c1e;line-height:1.3">${d.stage.split(' (BBCH')[0]}</div>
+             ${showNext ? `<div style="font-size:11px;color:#636366">↗ ${d.nextStage} · ${d.nextDateStr}</div>` : ''}`
+          : `<div style="font-size:12px;color:#b0aead;font-style:italic">Stade non renseigné</div>`
+        }
+      </div>
+    </div>`
+  }).join('')}</div>`
 }
 
 function buildMonReseau() {
@@ -457,7 +802,18 @@ export function initDashboardScreen(screenEl, role) {
   const exploitSensors = allSensors.filter(s => plotIds.has(s.parcelId))
   let forecast = makeForecast()
 
-  const collapsedWidgets = new Set()
+  const _saved = _loadDash()
+  const ALWAYS_OPEN = new Set(['mon_reseau', 'support'])
+  const collapsedWidgets = new Set(_saved.collapsed ?? CATALOG.map(w => w.id).filter(id => !ALWAYS_OPEN.has(id)))
+
+  function persist() {
+    _saveDash({
+      catalog:  CATALOG.map(w => ({ id: w.id, active: w.active })),
+      collapsed: [...collapsedWidgets],
+      mesuresList,
+      cumulsList,
+    })
+  }
 
   function widgetCard(w, bodyHtml) {
     const menu = w.fixed ? '' :
@@ -482,13 +838,18 @@ export function initDashboardScreen(screenEl, role) {
     const custom = CATALOG.filter(w => w.active && !w.fixed)
     const fixed  = CATALOG.filter(w => w.active && w.fixed)
     content.innerHTML = `
+      <button class="m-add-widget-btn" id="dash-add-widget-btn" style="margin-top:16px;margin-bottom:12px"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
       ${[...custom, ...fixed].map(w => {
         let body = ''
         if (w.id === 'bilan_hydrique') body = buildBilanHydrique(exploitPlots, false)
-        else if (w.id === 'previsions') body = buildPrevisions(exploitPlots, exploitSensors, forecast)
-        else if (w.id === 'cumuls')     body = buildCumuls(exploitPlots, exploitSensors)
-        else if (w.id === 'mon_reseau') body = buildMonReseau()
-        else if (w.id === 'support')    body = buildSupport()
+        else if (w.id === 'previsions')  body = buildPrevisions(exploitPlots, exploitSensors, forecast)
+        else if (w.id === 'cumuls')      body = buildCumuls(exploitPlots, exploitSensors)
+        else if (w.id === 'temps_reel')  body = buildMesures(exploitPlots, exploitSensors)
+        else if (w.id === 'traitements') body = buildTraitements(exploitPlots)
+        else if (w.id === 'evenements')  body = buildEvenements(exploitPlots, exploitSensors)
+        else if (w.id === 'cultures')    body = buildCultures(exploitPlots)
+        else if (w.id === 'mon_reseau')  body = buildMonReseau()
+        else if (w.id === 'support')     body = buildSupport()
         return widgetCard(w, body)
       }).join('')}
       <div style="height:24px"></div>`
@@ -507,7 +868,7 @@ export function initDashboardScreen(screenEl, role) {
           <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Prévisions</span></button>
           <div style="width:32px"></div>
         </div>
-        <div class="m-detail-row2" style="justify-content:space-between;align-items:center;padding:4px 16px 0">
+        <div class="m-detail-row2" style="justify-content:space-between;align-items:center;padding:4px 16px 10px">
           <button class="m-day-nav" id="prev-day" ${idx === 0 ? 'disabled' : ''}>‹</button>
           <div style="display:flex;align-items:center;gap:6px"><i class="bi ${d.icon}" style="color:${d.color};font-size:22px"></i><span class="m-d-name">${title}</span></div>
           <button class="m-day-nav" id="next-day" ${idx >= forecast.length-1 ? 'disabled' : ''}>›</button>
@@ -563,7 +924,8 @@ export function initDashboardScreen(screenEl, role) {
   }
 
   function bindEvents() {
-    screenEl.querySelector('.m-navbar-action')?.addEventListener('click', showCatalog)
+    screenEl.querySelector('.m-navbar-action')?.addEventListener('click', showAddPage)
+    content.querySelector('#dash-add-widget-btn')?.addEventListener('click', showCatalog)
 
     // Widget collapse
     content.querySelectorAll('.m-widget-hd--toggle').forEach(hd => {
@@ -572,67 +934,214 @@ export function initDashboardScreen(screenEl, role) {
         const widgetId = hd.dataset.collapse
         if (collapsedWidgets.has(widgetId)) collapsedWidgets.delete(widgetId)
         else collapsedWidgets.add(widgetId)
-        render()
+        persist(); render()
       })
     })
 
     content.querySelector('#bh-expand')?.addEventListener('click', () => {
       const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
-      if (bd) bd.innerHTML = buildBilanHydrique(exploitPlots, true)
-    })
-
-    // Bilan hydrique — lien vers détail parcelle
-    content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
-        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, []))
-      })
-    })
-
-    // Bilan hydrique — boutons irrigation
-    content.querySelector('#bh-btn-calendar')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openCalendar(exploitPlots, ''))
-    })
-    content.querySelector('#bh-btn-irrigation')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationSaisie(exploitPlots, showToast))
-    })
-    content.querySelector('#bh-btn-strategie')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
-    })
-
-    // Cumuls — filter metrics then recalculate
-    const metricSel = content.querySelector('#cumuls-metric')
-    const updateMetrics = () => {
-      if (!metricSel) return
-      const subj = content.querySelector('#cumuls-subject')?.value
-      const available = getAvailableMetrics(subj)
-      const cur = metricSel.value
-      metricSel.innerHTML = available.map(m =>
-        `<option value="${m.id}"${m.id === cur && available.find(x => x.id === cur) ? ' selected' : ''}>${m.label}</option>`
-      ).join('')
-    }
-    const updateCumul = () => {
-      const subj   = content.querySelector('#cumuls-subject')?.value
-      const from   = content.querySelector('#cumuls-from')?.value
-      const metric = content.querySelector('#cumuls-metric')?.value
-      const valEl  = content.querySelector('#cumuls-val')
-      const unitEl = content.querySelector('#cumuls-unit')
-      if (!valEl || !unitEl) return
-      const v = computeCumul(subj, from, metric)
-      const m = CUMULS_METRICS.find(x => x.id === metric)
-      if (v !== null && subj) {
-        valEl.textContent = v
-        unitEl.textContent = m?.unit || ''
-      } else {
-        valEl.textContent = '—'
-        unitEl.textContent = 'Sélectionnez un sujet'
+      if (bd) {
+        bd.innerHTML = buildBilanHydrique(exploitPlots, true)
+        bindBhButtons()
+        bindBhPlotLinks()
       }
+    })
+
+    function bindBhPlotLinks() {
+      content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
+          if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, []))
+        })
+      })
     }
-    content.querySelector('#cumuls-subject')?.addEventListener('change', () => { updateMetrics(); updateCumul() })
-    content.querySelector('#cumuls-from')?.addEventListener('change', updateCumul)
-    content.querySelector('#cumuls-metric')?.addEventListener('change', updateCumul)
+    function bindBhButtons() {
+      content.querySelector('#bh-btn-calendar')?.addEventListener('click', () => {
+        import('./irrigation.js').then(m => m.openCalendar(exploitPlots, ''))
+      })
+      content.querySelector('#bh-btn-irrigation')?.addEventListener('click', () => {
+        import('./irrigation.js').then(m => m.openIrrigationSaisie(exploitPlots, showToast))
+      })
+      content.querySelector('#bh-btn-strategie')?.addEventListener('click', () => {
+        import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
+      })
+    }
+    bindBhPlotLinks()
+    bindBhButtons()
+
+    // ── Cumuls ────────────────────────────────────────────────────────────────
+    function rebuildCumulsWidget() {
+      const bd = content.querySelector('[data-widget="cumuls"] .m-widget-bd')
+      if (bd) { bd.innerHTML = buildCumuls(exploitPlots, exploitSensors); bindCumulsEvents() }
+    }
+    function bindCumulsEvents() {
+      const updateThresholds = () => {
+        const metric = content.querySelector('#cumuls-metric')?.value
+        const thEl   = content.querySelector('#cumuls-thresholds')
+        if (!thEl) return
+        if (metric === 'hf') {
+          thEl.innerHTML = `
+            <div class="m-wf-field">
+              <span class="m-wf-label">Seuil de froid (°C)</span>
+              <input type="number" class="m-wf-date" id="cumuls-th-cold" value="7.2" step="0.1" min="-20" max="20">
+            </div>`
+        } else if (metric === 'dj') {
+          thEl.innerHTML = `
+            <div class="m-wf-row">
+              <div class="m-wf-field">
+                <span class="m-wf-label">Seuil bas (°C)</span>
+                <input type="number" class="m-wf-date" id="cumuls-th-low" value="0" step="1" min="-20" max="50">
+              </div>
+              <div class="m-wf-field">
+                <span class="m-wf-label">Seuil haut (°C)</span>
+                <input type="number" class="m-wf-date" id="cumuls-th-high" value="18" step="1" min="0" max="50">
+              </div>
+            </div>`
+        } else {
+          thEl.innerHTML = ''
+        }
+      }
+      const updateMetrics = () => {
+        const sel  = content.querySelector('#cumuls-metric')
+        const subj = content.querySelector('#cumuls-subject')?.value
+        if (!sel) return
+        const avail = getAvailableMetrics(subj)
+        sel.innerHTML = `<option value="">— Métrique —</option>` +
+          avail.map(m => `<option value="${m.id}">${m.label}</option>`).join('')
+        sel.disabled = !subj || !avail.length
+        updateThresholds()
+        checkCumulCreate()
+      }
+      const checkCumulCreate = () => {
+        const btn    = content.querySelector('#cumuls-create')
+        const errEl  = content.querySelector('#cumuls-date-err')
+        const subj   = content.querySelector('#cumuls-subject')?.value
+        const from   = content.querySelector('#cumuls-from')?.value
+        const metric = content.querySelector('#cumuls-metric')?.value
+        const tooOld = from ? (Date.now() - new Date(from)) / 86400000 > 365 : false
+        if (errEl) errEl.style.display = tooOld ? '' : 'none'
+        if (btn) btn.disabled = !subj || !from || !metric || tooOld
+      }
+      content.querySelector('#cumuls-subject')?.addEventListener('change', () => { updateMetrics(); checkCumulCreate() })
+      content.querySelector('#cumuls-from')?.addEventListener('change', checkCumulCreate)
+      content.querySelector('#cumuls-metric')?.addEventListener('change', () => { updateThresholds(); checkCumulCreate() })
+      content.querySelector('#cumuls-create')?.addEventListener('click', () => {
+        const subjSel = content.querySelector('#cumuls-subject')
+        const subj    = subjSel?.value
+        const from    = content.querySelector('#cumuls-from')?.value
+        const metric  = content.querySelector('#cumuls-metric')?.value
+        if (!subj || !from || !metric) return
+        const m   = CUMULS_METRICS.find(x => x.id === metric)
+        const cfg = CUMUL_ICONS[metric] || { icon: 'bi-bar-chart-fill', color: '#636366' }
+        const thresholds = metric === 'hf'
+          ? { cold: +(content.querySelector('#cumuls-th-cold')?.value ?? 7.2) }
+          : metric === 'dj'
+          ? { low: +(content.querySelector('#cumuls-th-low')?.value ?? 0), high: +(content.querySelector('#cumuls-th-high')?.value ?? 18) }
+          : null
+        cumulsList.push({
+          metricId: metric, metricLabel: m?.label || metric, unit: m?.unit || '',
+          icon: cfg.icon, color: cfg.color,
+          subjectKey: subj, subjectLabel: (subjSel.options[subjSel.selectedIndex]?.text || subj).trim(),
+          fromDate: from, value: String(computeCumul(subj, from, metric) ?? '—'),
+          thresholds,
+        })
+        persist(); rebuildCumulsWidget()
+      })
+      content.querySelectorAll('.m-cumuls-del').forEach(btn => {
+        btn.addEventListener('click', () => {
+          cumulsList.splice(+btn.dataset.cidx, 1)
+          persist(); rebuildCumulsWidget()
+        })
+      })
+    }
+    bindCumulsEvents()
 
     content.querySelector('#open-chat-btn')?.addEventListener('click', showChatSheet)
+
+    // ── Mesures ───────────────────────────────────────────────────────────────
+    function bindChartTooltips() {
+      content.querySelectorAll('.m-tr-chart-wrap').forEach(wrap => {
+        const cursor = wrap.querySelector('.m-tr-cursor')
+        const tip    = wrap.querySelector('.m-tr-tooltip')
+        if (!tip) return
+        const data  = JSON.parse(wrap.dataset.series || '[]')
+        const unit  = wrap.dataset.unit || ''
+        const count = data.length
+        const PL = 26, W = 270
+        wrap.addEventListener('pointermove', e => {
+          const rect = wrap.getBoundingClientRect()
+          const frac = Math.max(0, Math.min(((e.clientX - rect.left) * (PL + W) / rect.width - PL) / W, 1))
+          const val  = data[Math.round(frac * (count - 1))] ?? null
+          if (cursor) { const x = PL + Math.round(frac * W); cursor.setAttribute('x1', x); cursor.setAttribute('x2', x); cursor.setAttribute('opacity', '1') }
+          tip.style.display = ''
+          tip.style.left    = `${Math.max(0, Math.min(e.clientX - rect.left - 24, rect.width - 60))}px`
+          tip.textContent   = val !== null ? `${(+val).toFixed(1)} ${unit}` : '—'
+        })
+        wrap.addEventListener('pointerleave', () => { tip.style.display = 'none'; cursor?.setAttribute('opacity', '0') })
+      })
+    }
+    function rebuildMesuresWidget() {
+      const bd = content.querySelector('[data-widget="temps_reel"] .m-widget-bd')
+      if (bd) { bd.innerHTML = buildMesures(exploitPlots, exploitSensors); bindMesuresEvents() }
+    }
+    function bindMesuresEvents() {
+      const checkMsrCreate = () => {
+        const btn = content.querySelector('#msr-create')
+        if (btn) btn.disabled = !content.querySelector('#msr-subject')?.value
+                             || !content.querySelector('#msr-metric')?.value
+                             || mesuresList.length >= WF_MAX
+      }
+      const updateMsrMetrics = () => {
+        const sel  = content.querySelector('#msr-metric')
+        const subj = content.querySelector('#msr-subject')?.value
+        if (!sel) return
+        const avail = msrGetMetrics(subj, exploitSensors)
+        sel.innerHTML = `<option value="">— Métrique —</option>` +
+          avail.map(id => `<option value="${id}">${TR_ALL_METRICS[id]}</option>`).join('')
+        sel.disabled = !subj || !avail.length
+        checkMsrCreate()
+      }
+      const updateMsrSteps = () => {
+        const sel   = content.querySelector('#msr-step')
+        const period = content.querySelector('#msr-period')?.value || '7d'
+        if (!sel) return
+        sel.innerHTML = msrStepOpts(period).map(s => `<option value="${s.id}">${s.label}</option>`).join('')
+        checkMsrCreate()
+      }
+      content.querySelector('#msr-subject')?.addEventListener('change', () => { updateMsrMetrics(); checkMsrCreate() })
+      content.querySelector('#msr-period')?.addEventListener('change', () => { updateMsrSteps(); checkMsrCreate() })
+      content.querySelector('#msr-metric')?.addEventListener('change', checkMsrCreate)
+      content.querySelector('#msr-step')?.addEventListener('change', checkMsrCreate)
+      content.querySelector('#msr-create')?.addEventListener('click', () => {
+        const subjSel   = content.querySelector('#msr-subject')
+        const metricSel = content.querySelector('#msr-metric')
+        const periodSel = content.querySelector('#msr-period')
+        const stepSel   = content.querySelector('#msr-step')
+        const subj = subjSel?.value, metric = metricSel?.value
+        const period = periodSel?.value, step = stepSel?.value
+        if (!subj || !metric || !period || !step) return
+        mesuresList.push({
+          subjectKey:   subj,
+          subjectLabel: (subjSel.options[subjSel.selectedIndex]?.text || subj).trim(),
+          metricId:     metric,
+          metricLabel:  TR_ALL_METRICS[metric] || metric,
+          unit:         TR_UNITS[metric] || '',
+          period,
+          periodLabel:  (periodSel.options[periodSel.selectedIndex]?.text || period).trim(),
+          step,
+          stepLabel:    (stepSel.options[stepSel.selectedIndex]?.text || step).trim(),
+          color:        WF_COLORS[mesuresList.length % WF_COLORS.length],
+        })
+        persist(); rebuildMesuresWidget()
+      })
+      content.querySelectorAll('.m-wf-del[data-widget="temps_reel"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          mesuresList.splice(+btn.dataset.idx, 1); persist(); rebuildMesuresWidget()
+        })
+      })
+      bindChartTooltips()
+    }
+    bindMesuresEvents()
 
     content.querySelectorAll('.m-prev-card').forEach(card => {
       card.addEventListener('click', () => {
@@ -668,7 +1177,7 @@ export function initDashboardScreen(screenEl, role) {
         body.querySelector('#menu-remove').addEventListener('click', () => {
           w.active = false
           sheet.classList.remove('m-sheet-overlay--show')
-          setTimeout(() => { sheet.remove(); render() }, 280)
+          setTimeout(() => { sheet.remove(); persist(); render() }, 280)
           showToast('Widget retiré')
         })
       })
@@ -699,12 +1208,98 @@ export function initDashboardScreen(screenEl, role) {
           const i = +btn.dataset.i, j = i + +btn.dataset.dir
           const ai = CATALOG.indexOf(list2[i]), aj = CATALOG.indexOf(list2[j])
           ;[CATALOG[ai], CATALOG[aj]] = [CATALOG[aj], CATALOG[ai]]
-          refresh(); render()
+          persist(); refresh(); render()
         })
       })
     }
     refresh()
     showSheet({ title: 'Réorganiser les widgets', body, doneLabel: 'Fermer', onDone: () => {} })
+  }
+
+  function showAddPage() {
+    const isAdmin = role === 'admin'
+    const layer = pushDetail(`
+      <div class="m-detail-header">
+        <div class="m-detail-topbar">
+          <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Retour</span></button>
+          <span style="font-size:17px;font-weight:600">Ajouter</span>
+          <div style="width:44px"></div>
+        </div>
+      </div>
+      <div class="m-detail-tabs" style="display:none"></div>
+      <div id="detail-content" class="m-detail-content" style="top:52px">
+        <div style="padding:20px 16px">
+          <div class="m-add-section-label">Mon exploitation</div>
+          <div class="m-add-grid">
+            <button class="m-add-item" data-action="parcelle">
+              <div class="m-add-icon"><i class="bi bi-geo-alt-fill"></i></div>
+              <span>Parcelle</span>
+            </button>
+            <button class="m-add-item" data-action="capteur">
+              <div class="m-add-icon"><i class="bi bi-broadcast"></i></div>
+              <span>Capteur</span>
+            </button>
+            <button class="m-add-item" data-action="station">
+              <div class="m-add-icon"><i class="bi bi-cloud-sun-fill"></i></div>
+              <span>Station météo virtuelle</span>
+            </button>
+            <button class="m-add-item" data-action="membre">
+              <div class="m-add-icon"><i class="bi bi-person-plus-fill"></i></div>
+              <span>Membre</span>
+            </button>
+            <button class="m-add-item" data-action="irrigation">
+              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-droplet-fill"></i></div>
+              <span>Irrigation</span>
+            </button>
+            <button class="m-add-item" data-action="strategie-irrigation">
+              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div>
+              <span>Saison d'irr.</span>
+            </button>
+            <button class="m-add-item" data-action="calendrier">
+              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-calendar3"></i></div>
+              <span>Voir les irrigations</span>
+            </button>
+          </div>
+          ${isAdmin ? `
+          <div class="m-add-section-label" style="margin-top:20px">Mon réseau</div>
+          <div class="m-add-grid">
+            <button class="m-add-item" data-action="adherent">
+              <div class="m-add-icon"><i class="bi bi-building"></i></div>
+              <span>Adhérent</span>
+            </button>
+          </div>` : ''}
+          <div class="m-add-section-label" style="margin-top:20px">Mon compte</div>
+          <div class="m-add-grid">
+            <button class="m-add-item" data-action="alerte">
+              <div class="m-add-icon"><i class="bi bi-bell-fill"></i></div>
+              <span>Alerte</span>
+            </button>
+            <button class="m-add-item" data-action="export">
+              <div class="m-add-icon"><i class="bi bi-download"></i></div>
+              <span>Export de données</span>
+            </button>
+          </div>
+        </div>
+      </div>`)
+
+    layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+    layer.querySelectorAll('.m-add-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action
+        if (action === 'irrigation') {
+          popDetail()
+          import('./irrigation.js').then(m => m.openIrrigationSaisie(exploitPlots, showToast))
+        } else if (action === 'strategie-irrigation') {
+          popDetail()
+          import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
+        } else if (action === 'calendrier') {
+          popDetail()
+          import('./irrigation.js').then(m => m.openCalendar(exploitPlots, ''))
+        } else {
+          showToast('Fonctionnalité à venir')
+        }
+      })
+    })
   }
 
   function showCatalog() {
@@ -724,7 +1319,7 @@ export function initDashboardScreen(screenEl, role) {
       body.querySelectorAll('[data-cid]').forEach(btn => {
         btn.addEventListener('click', () => {
           const w = CATALOG.find(x => x.id === btn.dataset.cid); if (!w) return
-          w.active = !w.active; refresh(); render()
+          w.active = !w.active; persist(); refresh(); render()
         })
       })
     }

@@ -6015,3 +6015,19 @@ tr.row-selected td {
 }
 
 
+
+/* ── Widget catalog (parcelle detail) ──────────────────────────────────────── */
+.wcat-list { display: flex; flex-direction: column; margin-top: 4px; }
+.wcat-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-radius: 6px; gap: 12px;
+  border-bottom: .5px solid var(--bdr);
+  font-size: 13px; color: var(--txt);
+}
+.wcat-item:last-child { border-bottom: none; }
+.wcat-add-btn {
+  flex-shrink: 0; background: none; border: 1px solid var(--pri);
+  color: var(--pri); border-radius: 6px; padding: 3px 10px;
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.wcat-add-btn:hover { background: var(--pri); color: #fff; }

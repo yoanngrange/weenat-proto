@@ -1,5 +1,6 @@
 // Mobile prototype entry point
 // Data shared with web context — same source of truth
+import { stackDepth, hasUnsavedChanges } from './nav.js'
 import { plots }   from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { orgs }    from '../data/orgs.js'
@@ -45,9 +46,38 @@ function navigateTo(tab) {
 }
 
 // Bottom nav clicks
+function showAbandonConfirm(onConfirm) {
+  document.getElementById('abandon-modal')?.remove()
+  const modal = document.createElement('div')
+  modal.id = 'abandon-modal'
+  modal.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:flex-end'
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%">
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">Quitter la saisie ?</div>
+      <div style="font-size:14px;color:#636366;margin-bottom:20px">Les modifications en cours seront perdues.</div>
+      <button id="abandon-ok" style="width:100%;padding:14px;background:#ff3b30;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;margin-bottom:8px;cursor:pointer">Quitter sans enregistrer</button>
+      <button id="abandon-cancel" style="width:100%;padding:14px;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:12px;font-size:15px;font-family:inherit;cursor:pointer">Annuler</button>
+    </div>`
+  document.getElementById('phone-screen').appendChild(modal)
+  modal.querySelector('#abandon-cancel').addEventListener('click', () => modal.remove())
+  modal.querySelector('#abandon-ok').addEventListener('click', () => { modal.remove(); onConfirm() })
+}
+
 document.getElementById('bottom-nav').addEventListener('click', e => {
   const btn = e.target.closest('.nav-item')
-  if (btn) navigateTo(btn.dataset.tab)
+  if (!btn) return
+  const tab = btn.dataset.tab
+  if (stackDepth() > 0 && hasUnsavedChanges()) {
+    showAbandonConfirm(() => {
+      window.dispatchEvent(new CustomEvent('m-tab-change', { detail: tab }))
+      navigateTo(tab)
+    })
+  } else if (stackDepth() > 0) {
+    window.dispatchEvent(new CustomEvent('m-tab-change', { detail: tab }))
+    navigateTo(tab)
+  } else {
+    navigateTo(tab)
+  }
 })
 
 // ─── Swipe gesture (mouse drag simulation) ───────────────────────────────────

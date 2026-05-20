@@ -221,6 +221,46 @@ function getDisplayCount() {
   return Math.max(2, Math.min(200, Math.floor(total / step)))
 }
 
+// ─── Widget catalog ───────────────────────────────────────────────────────────
+
+const WIDGET_CATALOG_WEB = [
+  { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
+  { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
+  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire'] },
+  { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
+  { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
+  { title: 'Irrigation', items: ['Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+]
+
+function openWebWidgetCatalog() {
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:520px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Ajouter un widget</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      ${WIDGET_CATALOG_WEB.map(sec => `
+        <div class="add-modal-section">
+          <div class="add-modal-section-label">${sec.title}</div>
+          <div class="wcat-list">
+            ${sec.items.map(item => `
+              <div class="wcat-item">
+                <span>${item}</span>
+                <button class="wcat-add-btn" type="button"><i class="bi bi-plus-circle"></i> Ajouter</button>
+              </div>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>`
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.querySelectorAll('.wcat-add-btn').forEach(btn => {
+    btn.addEventListener('click', () => { modal.remove(); alert('Widget bientôt disponible') })
+  })
+  document.body.appendChild(modal)
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -244,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCompareControl()
   initTabs()
   initDashGrid()
+  document.getElementById('parcel-add-widget-btn')?.addEventListener('click', openWebWidgetCatalog)
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
 
   const _sidebar = document.getElementById('sidebar')

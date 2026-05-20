@@ -1,4 +1,36 @@
-import { pushDetail, popDetail } from '../nav.js'
+import { pushDetail, popDetail, clearDirty } from '../nav.js'
+
+function initFakeScrollbars(container) {
+  container.querySelectorAll('.irr-zone').forEach(zone => {
+    const inner = zone.querySelector('.irr-zone-inner')
+    if (!inner) return
+    if (!zone.querySelector('.irr-fake-track')) {
+      const track = document.createElement('div')
+      track.className = 'irr-fake-track'
+      zone.appendChild(track)
+    }
+    let thumb = zone.querySelector('.irr-fake-thumb')
+    if (!thumb) {
+      thumb = document.createElement('div')
+      thumb.className = 'irr-fake-thumb'
+      zone.appendChild(thumb)
+    }
+    const update = () => {
+      const { scrollTop, scrollHeight, clientHeight } = inner
+      if (scrollHeight <= clientHeight) { thumb.style.opacity = '0'; return }
+      const thumbH = Math.max(28, (clientHeight / scrollHeight) * clientHeight)
+      const maxT   = scrollHeight - clientHeight
+      const top    = maxT > 0 ? (scrollTop / maxT) * (clientHeight - thumbH) : 0
+      thumb.style.height    = `${thumbH}px`
+      thumb.style.top       = `${top}px`
+      thumb.style.opacity   = '1'
+    }
+    if (inner._fakeScrollHandler) inner.removeEventListener('scroll', inner._fakeScrollHandler)
+    inner._fakeScrollHandler = update
+    inner.addEventListener('scroll', update)
+    setTimeout(update, 30)
+  })
+}
 
 function flexLayer(layer) {
   layer.style.display       = 'flex'
@@ -14,6 +46,47 @@ const TODAY = new Date().toISOString().split('T')[0]
 function fmtDate(iso) {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+function fmtDateFull(iso) {
+  const mNames = ['jan.','fév.','mar.','avr.','mai','jun.','jul.','aoû.','sep.','oct.','nov.','déc.']
+  const [y, m, d] = iso.split('-')
+  return `${parseInt(d)} ${mNames[parseInt(m) - 1]} ${y}`
+}
+
+function makeSubjectLabel(selectedIds, plots, preselect, groups = []) {
+  if (preselect && preselect.ids.length > 1) {
+    return { text: preselect.label, count: preselect.ids.length }
+  }
+  const n = selectedIds.size
+  if (n === 1) {
+    const p = plots.find(p => p.id === [...selectedIds][0])
+    return { text: p?.name ?? 'Parcelle', count: null }
+  }
+  const matchedGroup = groups.find(g => g.ids.length === n && g.ids.every(id => selectedIds.has(id)))
+  if (matchedGroup) return { text: matchedGroup.label, count: matchedGroup.ids.length }
+  return { text: `${n} parcelles`, count: null }
+}
+
+function buildParcelSections(selectedIds, plots, preselect, groups) {
+  if (preselect) {
+    const names = preselect.ids.map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
+    return [{ title: `Groupe "${preselect.label}"`, names }]
+  }
+  const remaining = new Set(selectedIds)
+  const sections  = []
+  for (const g of groups) {
+    if (g.ids.length >= 2 && g.ids.every(id => selectedIds.has(id))) {
+      const names = g.ids.map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
+      sections.push({ title: `Groupe "${g.label}"`, names })
+      g.ids.forEach(id => remaining.delete(id))
+    }
+  }
+  if (remaining.size > 0) {
+    const names = [...remaining].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
+    sections.push({ title: sections.length > 0 ? 'Autres parcelles' : null, names })
+  }
+  return sections
 }
 
 function fmtDateShort(iso) {
@@ -95,10 +168,10 @@ function plotInfo(p) {
 
 // ─── Saisie d'une irrigation ──────────────────────────────────────────────────
 
-export function openIrrigationSaisie(plots, showToast) {
-  let selectedIds = new Set()
+export function openIrrigationSaisie(plots, showToast, preselect = null) {
+  let selectedIds = new Set(preselect?.ids ?? [])
   let dateVal     = TODAY
-  let qtyVal      = 25
+  let qtyVal      = 10
 
   const groups = buildGroups(plots)
 
@@ -135,9 +208,15 @@ export function openIrrigationSaisie(plots, showToast) {
     const sum = layer.querySelector('.irr-summary')
     const btn = layer.querySelector('.irr-save-btn')
     if (!sum || !btn) return
-    sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''} · ${qtyVal} mm`
-    btn.disabled    = n === 0
-    btn.textContent = n === 0 ? 'Enregistrer' : `Enregistrer · ${n} parcelle${n > 1 ? 's' : ''}`
+    if (preselect) {
+      sum.textContent = ''
+      btn.disabled    = false
+      btn.textContent = 'Enregistrer'
+    } else {
+      sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''} · ${qtyVal} mm`
+      btn.disabled    = n === 0
+      btn.textContent = 'Enregistrer'
+    }
   }
 
   function bindZones(layer) {
@@ -160,7 +239,32 @@ export function openIrrigationSaisie(plots, showToast) {
         bindZones(layer); renderBottomBar(layer)
       })
     })
+    initFakeScrollbars(layer)
   }
+
+  const preselectParts  = preselect ? preselect.label.split(' · ') : []
+  const preselectCrop   = preselectParts[0] || ''
+  const preselectIrrTy  = preselectParts[1] || ''
+  const preselectPlots  = preselect ? plots.filter(p => preselect.ids.includes(p.id)) : []
+
+  const selectionZone = preselect
+    ? `<div style="padding:14px 14px;overflow-y:auto">
+         <div style="font-size:16px;font-weight:700;color:#1c1c1e">${preselectCrop}</div>
+         ${preselectIrrTy ? `<div style="font-size:13px;color:#636366;margin-top:2px">${preselectIrrTy}</div>` : ''}
+         <div style="font-size:12px;color:#8e8e93;margin-top:6px;margin-bottom:8px">${preselectPlots.length} parcelle${preselectPlots.length > 1 ? 's' : ''}</div>
+         ${preselectPlots.map(p => `<div style="font-size:13px;color:#1c1c1e;padding:2px 0">· ${p.name}</div>`).join('')}
+       </div>`
+    : `<div class="irr-two-zones" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px">
+         ${groups.length ? `
+         <div class="irr-zone">
+           <div class="irr-zone-hd">Groupes suggérés</div>
+           <div class="irr-zone-inner" id="groups-inner">${groupsHTML()}</div>
+         </div>` : ''}
+         <div class="irr-zone">
+           <div class="irr-zone-hd">Toutes les parcelles</div>
+           <div class="irr-zone-inner" id="plots-inner">${plotsHTML()}</div>
+         </div>
+       </div>`
 
   const layer = flexLayer(pushDetail(`
     <div class="irr-detail-header">
@@ -184,24 +288,18 @@ export function openIrrigationSaisie(plots, showToast) {
         </div>
       </div>
     </div>
-    <div class="irr-scroll-body irr-two-zones">
-      ${groups.length ? `
-      <div class="irr-zone">
-        <div class="irr-zone-hd">✦ Groupes suggérés</div>
-        <div class="irr-zone-inner" id="groups-inner">${groupsHTML()}</div>
-      </div>` : ''}
-      <div class="irr-zone">
-        <div class="irr-zone-hd">Toutes les parcelles</div>
-        <div class="irr-zone-inner" id="plots-inner">${plotsHTML()}</div>
-      </div>
+    <div class="irr-scroll-body" style="${preselect ? 'overflow-y:auto' : 'overflow-y:hidden;display:flex;flex-direction:column'}">
+      ${selectionZone}
     </div>
     <div class="irr-bottom-bar">
       <div class="irr-summary"></div>
-      <button class="irr-save-btn" disabled>Enregistrer</button>
+      <button class="irr-save-btn" ${preselect ? '' : 'disabled'}>Enregistrer</button>
     </div>
   `))
 
-  bindZones(layer)
+  layer.dataset.dirty = 'true'
+  if (!preselect) bindZones(layer)
+  else initFakeScrollbars(layer)
   renderBottomBar(layer)
 
   layer.querySelector('#irr-back').addEventListener('click', popDetail)
@@ -214,24 +312,32 @@ export function openIrrigationSaisie(plots, showToast) {
   })
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
-    const n      = selectedIds.size
-    const isFut  = dateVal > TODAY
-    const status = isFut ? 'Planifiée' : 'Réalisée'
+    const isFut       = dateVal > TODAY
+    const subj        = makeSubjectLabel(selectedIds, plots, preselect, groups)
+    const irLabel     = subj.text
+    const calFilter   = subj.count ? subj.text : selectedIds.size === 1 ? String([...selectedIds][0]) : ''
+    const parcelSections = buildParcelSections(selectedIds, plots, preselect, groups)
+    const totalParcels   = parcelSections.reduce((s, sec) => s + sec.names.length, 0)
+    IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: irLabel, fromStrategy: false })
+    clearDirty()
     openConfirmation({
-      title: 'Irrigation enregistrée',
-      sub: `${n} parcelle${n > 1 ? 's' : ''} · ${qtyVal} mm · ${fmtDateShort(dateVal)}`,
-      status, isFut, plots, calFilter: [...selectedIds][0] ?? '',
+      title: totalParcels > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
+      params: [
+        { label: 'Date',     value: fmtDateFull(dateVal) },
+        { label: 'Quantité', value: `${qtyVal} mm` },
+      ],
+      parcelSections, isFut, plots, calFilter, addedCount: 1, stackDepth: 1,
     })
   })
 }
 
 // ─── Stratégie d'irrigation ───────────────────────────────────────────────────
 
-export function openIrrigationStrategie(plots, showToast) {
-  let selectedIds = new Set()
+export function openIrrigationStrategie(plots, showToast, preselect = null) {
+  let selectedIds = new Set(preselect?.ids ?? [])
   let debut = TODAY
   let fin   = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
-  let qty   = 25
+  let qty   = 10
   let freq  = 7
 
   const groups = buildGroups(plots)
@@ -315,9 +421,13 @@ export function openIrrigationStrategie(plots, showToast) {
         </div>
       </div>
       <div class="irr-preview-box" id="strat-preview">${preview}</div>
-      <div class="irr-section-lbl">Parcelles</div>
-      ${groups.length ? `<div class="irr-group-hint">✦ Groupes suggérés</div>${groupsHTML}<div class="irr-divider"></div>` : ''}
-      ${plotsHTML}
+      ${preselect
+        ? `<div class="irr-presel-banner"><i class="bi bi-geo-alt-fill" style="color:#185FA5;flex-shrink:0"></i>
+             <span>${preselect.label} <span style="color:#9E9D98;font-weight:400">· ${preselect.ids.length} parcelle${preselect.ids.length > 1 ? 's' : ''}</span></span>
+           </div>`
+        : `<div class="irr-section-lbl">Parcelles</div>
+           ${groups.length ? `<div class="irr-group-hint">Groupes suggérés</div>${groupsHTML}<div class="irr-divider"></div>` : ''}
+           ${plotsHTML}`}
       <div class="irr-bottom-spacer"></div>
     `
   }
@@ -330,9 +440,7 @@ export function openIrrigationStrategie(plots, showToast) {
     if (!btn || !sum) return
     btn.disabled = n === 0 || occs.length === 0
     sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''} · ${occs.length} occurrences`
-    btn.textContent = occs.length > 0
-      ? `Voir l'aperçu (${occs.length}) →`
-      : "Voir l'aperçu →"
+    btn.textContent = "Voir l'aperçu →"
   }
 
   function bindForm(layer) {
@@ -378,7 +486,7 @@ export function openIrrigationStrategie(plots, showToast) {
     <div class="irr-detail-header">
       <div class="irr-header-row">
         <button class="irr-back" id="strat-back"><i class="bi bi-chevron-left"></i> Annuler</button>
-        <span class="irr-header-title">Stratégie d'irrigation</span>
+        <span class="irr-header-title">Saison d'irrigation</span>
         <div style="width:60px"></div>
       </div>
     </div>
@@ -389,6 +497,7 @@ export function openIrrigationStrategie(plots, showToast) {
     </div>
   `))
 
+  layer.dataset.dirty = 'true'
   bindForm(layer)
   updateBottomBar(layer)
 
@@ -396,34 +505,44 @@ export function openIrrigationStrategie(plots, showToast) {
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
     const occs = computeOccs()
-    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast)
+    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect)
   })
 }
 
 // ─── Aperçu stratégie ─────────────────────────────────────────────────────────
 
-function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast) {
-  const months = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
-  const n      = selectedIds.size
+function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect) {
+  const n = selectedIds.size
 
-  const first5 = occs.slice(0, 5)
-  const rest   = occs.length - 5
+  const MAX_VISIBLE = 5
+  const rest = occs.length - MAX_VISIBLE
 
-  const occItems = first5.map((d, i) => {
+  function makeOccRow(d) {
     const isFuture = d.toISOString().slice(0, 10) >= TODAY
-    const col = isFuture ? '#185FA5' : '#C05000'
-    const bg  = isFuture ? '#E6F1FB' : '#FEF0E6'
-    const lbl = isFuture ? 'Planifiée' : 'Réalisée'
+    const col = isFuture ? '#FFB705' : '#FF8500'
+    const iso = d.toISOString().slice(0, 10)
     return `<div class="irr-occ-row">
-      <div class="irr-occ-date" style="background:${bg};color:${col}">
-        <span style="font-size:14px;font-weight:600">${d.getDate()}</span>
-        <span style="font-size:9px">${months[d.getMonth()]}</span>
-      </div>
-      <span class="irr-occ-label">Irrigation n°${i + 1}</span>
-      <span class="irr-occ-badge" style="background:${bg};color:${col}">${lbl}</span>
-      <span class="irr-occ-qty">${qty} mm</span>
+      <span style="flex:1;font-size:13px;color:#1c1c1e">${fmtDateFull(iso)}</span>
+      <span style="font-size:13px;font-weight:700;color:${col}">${qty} mm</span>
     </div>`
-  }).join('')
+  }
+
+  const pastOccs   = occs.filter(d => d.toISOString().slice(0, 10) <  TODAY)
+  const futureOccs = occs.filter(d => d.toISOString().slice(0, 10) >= TODAY)
+  const visibleFut = futureOccs.slice(0, MAX_VISIBLE)
+  const restFut    = futureOccs.slice(MAX_VISIBLE)
+
+  const pastSection = pastOccs.length ? `
+    <div class="irr-section-lbl" style="margin-top:0;margin-bottom:4px">Irrigations effectuées</div>
+    ${pastOccs.map(makeOccRow).join('')}` : ''
+
+  const futureSection = futureOccs.length ? `
+    <div class="irr-section-lbl" style="margin-top:${pastOccs.length ? '12px' : '0'};margin-bottom:4px">Irrigations planifiées</div>
+    ${visibleFut.map(makeOccRow).join('')}
+    ${restFut.length ? `
+      <div id="apercu-rest" style="display:none">${restFut.map(makeOccRow).join('')}</div>
+      <button class="irr-more-label" id="apercu-show-more">... et ${restFut.length} irrigation${restFut.length > 1 ? 's' : ''} de plus</button>
+    ` : ''}` : ''
 
   const layer = flexLayer(pushDetail(`
     <div class="irr-detail-header">
@@ -444,36 +563,49 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
           <div class="irr-apercu-sub">${n} parcelle${n > 1 ? 's' : ''} · ${qty} mm/irrig.</div>
         </div>
       </div>
-      <div class="irr-section-lbl">Premières occurrences</div>
-      ${occItems}
-      ${rest > 0 ? `<div class="irr-more-label">... et ${rest} occurrence${rest > 1 ? 's' : ''} de plus</div>` : ''}
+      <div class="irr-apercu-list">
+        ${pastSection}
+        ${futureSection}
+        ${!pastOccs.length && !futureOccs.length ? '<div style="font-size:13px;color:#8e8e93;text-align:center;padding:8px 0">Aucune irrigation</div>' : ''}
+      </div>
       <div class="irr-bottom-spacer"></div>
     </div>
     <div class="irr-bottom-bar">
       <div class="irr-summary"></div>
-      <button class="irr-save-btn" id="apercu-confirm">Confirmer la stratégie</button>
+      <button class="irr-save-btn" id="apercu-confirm">Confirmer la saison</button>
     </div>
   `))
 
+  layer.dataset.dirty = 'true'
   layer.querySelector('#apercu-back').addEventListener('click', popDetail)
 
+  layer.querySelector('#apercu-show-more')?.addEventListener('click', e => {
+    layer.querySelector('#apercu-rest').style.display = ''
+    e.target.remove()
+  })
+
   layer.querySelector('#apercu-confirm').addEventListener('click', () => {
-    const enrouleurPlots = [...selectedIds]
-      .map(id => plots.find(p => p.id === id))
-      .filter(p => p?.irrigation === 'Enrouleur')
-
-    const doConfirm = () => openConfirmation({
-      title: 'Stratégie enregistrée',
-      sub: `${n} parcelle${n > 1 ? 's' : ''} · ${qty} mm · tous les ${freq} j · ${occs.length} irrigations générées`,
-      status: 'Planifiée', isFut: true, plots,
-      calFilter: [...selectedIds][0] ?? '',
+    const localGroups = buildGroups(plots)
+    const subj        = makeSubjectLabel(selectedIds, plots, preselect, localGroups)
+    const irLabel     = subj.text
+    const calFilter   = subj.count ? subj.text : selectedIds.size === 1 ? String([...selectedIds][0]) : ''
+    const parcelSections = buildParcelSections(selectedIds, plots, preselect, localGroups)
+    occs.forEach(d => {
+      const iso = d.toISOString().slice(0, 10)
+      IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: irLabel, fromStrategy: true })
     })
-
-    if (enrouleurPlots.length >= 2) {
-      openTourDEau(enrouleurPlots, freq, doConfirm)
-    } else {
-      doConfirm()
-    }
+    clearDirty()
+    openConfirmation({
+      title: 'Saison enregistrée',
+      params: [
+        { label: 'Début',                value: fmtDateFull(debut) },
+        { label: 'Fin',                  value: fmtDateFull(fin) },
+        { label: 'Quantité',             value: `${qty} mm/irrig.` },
+        { label: 'Fréquence',            value: `tous les ${freq} jours` },
+        { label: 'Irrigations générées', value: `${occs.length}` },
+      ],
+      parcelSections, isFut: true, plots, calFilter, addedCount: occs.length, stackDepth: 2,
+    })
   })
 }
 
@@ -563,15 +695,47 @@ function openTourDEau(enrPlots, freq, onConfirm) {
 
 // ─── Confirmation ─────────────────────────────────────────────────────────────
 
-function openConfirmation({ title, sub, status, isFut, plots, calFilter }) {
-  const statusColor = isFut ? '#185FA5' : '#3B6D11'
-  const statusBg    = isFut ? '#E6F1FB' : '#EAF3DE'
+function openConfirmation({ title, params, parcelSections = [], isFut, plots, calFilter, addedCount = 0, stackDepth = 3 }) {
+  const paramsHtml = (params || []).map(p => `
+    <div class="irr-confirm-param">
+      <span class="irr-confirm-param-lbl">${p.label}</span>
+      <span class="irr-confirm-param-val">${p.value}</span>
+    </div>`).join('')
+
+  const SHOW_MAX  = 3
+  const allItems  = parcelSections.flatMap(sec => sec.names.map(n => ({ title: sec.title, name: n })))
+  const visible   = allItems.slice(0, SHOW_MAX)
+  const extra     = allItems.slice(SHOW_MAX)
+
+  function renderItems(items) {
+    const grouped = []
+    let cur = null
+    for (const item of items) {
+      if (!cur || cur.title !== item.title) { cur = { title: item.title, names: [] }; grouped.push(cur) }
+      cur.names.push(item.name)
+    }
+    return grouped.map(g => `
+      ${g.title ? `<div class="irr-confirm-sec-hd">${g.title}</div>` : ''}
+      ${g.names.map(n => `<div class="irr-confirm-parcel">· ${n}</div>`).join('')}
+    `).join('')
+  }
+
+  const parcelsHtml = allItems.length === 0 ? '' : `
+    <div style="width:100%;max-width:280px;margin:0 auto 4px;font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;text-align:left">Parcelles</div>
+    <div class="irr-confirm-parcels">
+      ${renderItems(visible)}
+      ${extra.length ? `
+        <details class="irr-confirm-more">
+          <summary>${extra.length} parcelle${extra.length > 1 ? 's' : ''} de plus</summary>
+          ${renderItems(extra)}
+        </details>` : ''}
+    </div>`
 
   const layer = flexLayer(pushDetail(`
     <div class="irr-detail-header">
       <div class="irr-header-row">
         <div style="width:60px"></div>
-        <span class="irr-header-title">${title.includes('ratégie') ? 'Stratégie' : 'Enregistrée'}</span>
+        <span class="irr-header-title">${title.includes('aison') ? 'Saison' : title.includes('rrigations') ? 'Enregistrées' : 'Enregistrée'}</span>
         <div style="width:60px"></div>
       </div>
     </div>
@@ -580,9 +744,23 @@ function openConfirmation({ title, sub, status, isFut, plots, calFilter }) {
         <div class="irr-confirm-icon">✓</div>
       </div>
       <div class="irr-confirm-title">${title}</div>
-      <div class="irr-confirm-sub">${sub}</div>
-      <span class="irr-confirm-badge" style="background:${statusBg};color:${statusColor}">${status}</span>
+      <div class="irr-confirm-params">${paramsHtml}</div>
+      ${parcelsHtml}
       <div class="irr-confirm-options">
+        <div class="irr-confirm-opt" id="conf-edit">
+          <div class="irr-confirm-opt-icon" style="background:#F5F4F0">✎</div>
+          <div>
+            <div class="irr-confirm-opt-title">Modifier</div>
+            <div class="irr-confirm-opt-sub">Corriger une erreur de saisie</div>
+          </div>
+        </div>
+        <div class="irr-confirm-opt irr-confirm-opt--primary" id="conf-calendar">
+          <div class="irr-confirm-opt-icon" style="background:#E6F1FB">📅</div>
+          <div>
+            <div class="irr-confirm-opt-title">Voir les irrigations</div>
+            <div class="irr-confirm-opt-sub">Irrigations effectuées et planifiées</div>
+          </div>
+        </div>
         <div class="irr-confirm-opt" id="conf-back">
           <div class="irr-confirm-opt-icon" style="background:#F5F4F0">↩</div>
           <div>
@@ -590,20 +768,17 @@ function openConfirmation({ title, sub, status, isFut, plots, calFilter }) {
             <div class="irr-confirm-opt-sub">Continuer la navigation</div>
           </div>
         </div>
-        <div class="irr-confirm-opt irr-confirm-opt--primary" id="conf-calendar">
-          <div class="irr-confirm-opt-icon" style="background:#E6F1FB">📅</div>
-          <div>
-            <div class="irr-confirm-opt-title">Voir le calendrier</div>
-            <div class="irr-confirm-opt-sub">Historique &amp; irrigations planifiées</div>
-          </div>
-        </div>
       </div>
     </div>
   `))
 
+  layer.querySelector('#conf-edit').addEventListener('click', () => {
+    if (addedCount > 0) IRRIG_SEASON.splice(IRRIG_SEASON.length - addedCount, addedCount)
+    popDetail()
+  })
+
   layer.querySelector('#conf-back').addEventListener('click', () => {
-    // Pop until back to dashboard (pop all pushed layers)
-    popDetail(); popDetail(); popDetail()
+    for (let i = 0; i <= stackDepth; i++) popDetail()
   })
 
   layer.querySelector('#conf-calendar').addEventListener('click', () => {
@@ -614,19 +789,19 @@ function openConfirmation({ title, sub, status, isFut, plots, calFilter }) {
 // ─── Calendrier ───────────────────────────────────────────────────────────────
 
 const IRRIG_SEASON = [
-  { iso: '2026-04-21', mm: 18, real: true,  label: 'Maïs · Pivot' },
-  { iso: '2026-04-28', mm: 22, real: true,  label: 'Maïs · Aspersion' },
-  { iso: '2026-05-04', mm: 20, real: true,  label: 'Maïs · Pivot' },
-  { iso: '2026-05-07', mm: 25, real: true,  label: 'Maïs · Pivot' },
-  { iso: '2026-05-11', mm: 30, real: true,  label: 'Maïs · Pivot' },
-  { iso: '2026-05-13', mm: 22, real: false, label: 'Maïs · Aspersion' },
-  { iso: '2026-05-18', mm: 30, real: false, label: 'Maïs · Pivot' },
-  { iso: '2026-05-21', mm: 25, real: false, label: 'Maïs · Pivot' },
-  { iso: '2026-05-24', mm: 18, real: false, label: 'Maïs · Aspersion' },
-  { iso: '2026-05-28', mm: 30, real: false, label: 'Maïs · Pivot' },
-  { iso: '2026-06-04', mm: 25, real: false, label: 'Maïs · Pivot' },
-  { iso: '2026-06-11', mm: 30, real: false, label: 'Maïs · Pivot' },
-  { iso: '2026-06-18', mm: 25, real: false, label: 'Maïs · Aspersion' },
+  { iso: '2026-04-21', mm: 18, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-04-28', mm: 22, real: true,  label: 'Maïs · Aspersion', fromStrategy: true },
+  { iso: '2026-05-04', mm: 20, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-05-07', mm: 25, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-05-11', mm: 30, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-05-13', mm: 22, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
+  { iso: '2026-05-18', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-05-21', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-05-24', mm: 18, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
+  { iso: '2026-05-28', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-06-04', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-06-11', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
+  { iso: '2026-06-18', mm: 25, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
 ]
 
 const RAIN_DATA = [
@@ -645,10 +820,26 @@ export function openCalendar(plots, initialFilter) {
   let calYear    = 2026
   let selectedDay = null
 
+  function resolveFilter(filter, grps, plts) {
+    if (!filter) return null
+    const g = grps.find(g => g.label === filter)
+    if (g) return { ids: g.ids, label: g.label }
+    const p = plts.find(p => String(p.id) === String(filter))
+    if (p) return { ids: [p.id], label: p.name }
+    return null
+  }
+
   function getIrrig() {
-    if (!calFilter) return IRRIG_SEASON
+    if (!calFilter || calFilter === 'all') return IRRIG_SEASON
+    // Groupe auto-détecté — label exact
     const g = groups.find(g => g.label === calFilter)
-    if (g) return IRRIG_SEASON.filter(i => g.ids.some(id => plots.find(p => p.id === id)?.crop === i.label.split(' · ')[0]))
+    if (g) return IRRIG_SEASON.filter(i => i.label === g.label)
+    // Parcelle individuelle — label = nom de la parcelle, ou groupe contenant cette parcelle
+    const p = plots.find(p => String(p.id) === String(calFilter))
+    if (p) {
+      const groupLabels = new Set(groups.filter(grp => grp.ids.includes(p.id)).map(grp => grp.label))
+      return IRRIG_SEASON.filter(i => i.label === p.name || groupLabels.has(i.label))
+    }
     return IRRIG_SEASON
   }
 
@@ -659,14 +850,14 @@ export function openCalendar(plots, initialFilter) {
     const tP = planned.reduce((s, i) => s + i.mm, 0)
     return `<div class="irr-cumuls-bar">
       <div class="irr-cumul-block">
-        <div class="irr-cumul-lbl">Réalisées</div>
-        <div class="irr-cumul-val" style="color:#C05000">${tR} mm</div>
+        <div class="irr-cumul-lbl">Effectuées</div>
+        <div class="irr-cumul-val" style="color:#FF8500">${tR} mm</div>
         <div class="irr-cumul-count">${real.length} irrigation${real.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="irr-cumul-sep"></div>
       <div class="irr-cumul-block">
         <div class="irr-cumul-lbl">Planifiées</div>
-        <div class="irr-cumul-val" style="color:#185FA5">${tP} mm</div>
+        <div class="irr-cumul-val" style="color:#FFB705">${tP} mm</div>
         <div class="irr-cumul-count">${planned.length} irrigation${planned.length !== 1 ? 's' : ''}</div>
       </div>
       <div class="irr-cumul-sep"></div>
@@ -675,6 +866,59 @@ export function openCalendar(plots, initialFilter) {
         <div class="irr-cumul-val">${tR + tP} mm</div>
         <div class="irr-cumul-count">${real.length + planned.length} irrigations</div>
       </div>
+    </div>`
+  }
+
+  function renderTimeline(irrig) {
+    if (irrig.length < 2) return ''
+    const sorted = [...irrig].sort((a, b) => a.iso < b.iso ? -1 : 1)
+    for (let i = 1; i < sorted.length; i++) {
+      if ((new Date(sorted[i].iso) - new Date(sorted[i-1].iso)) / 86400000 < 1) return ''
+    }
+
+    const MNAMES  = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+    const first   = new Date(sorted[0].iso)
+    const last    = new Date(sorted[sorted.length - 1].iso)
+    const totalMs = Math.max(last - first, 1)
+    const SVG_W   = 300
+    const BAR_Y   = 26, BAR_H = 5, DOT_R = 5
+    const DOT_CY  = BAR_Y - DOT_R - 4
+    const MLBL_Y  = DOT_CY - DOT_R - 3
+    const DATE_Y  = BAR_Y + BAR_H + 13
+    const SVG_H   = DATE_Y + 2
+
+    const xOf = d => Math.round((d - first) / totalMs * SVG_W)
+    const fmtD = iso => { const [, m, d] = iso.split('-'); return `${parseInt(d)}/${parseInt(m)}` }
+
+    const ticks = []
+    const cur = new Date(first.getFullYear(), first.getMonth() + 1, 1)
+    while (cur <= last) { ticks.push(new Date(cur)); cur.setMonth(cur.getMonth() + 1) }
+
+    const tickLines = ticks.map(t =>
+      `<line x1="${xOf(t)}" y1="${BAR_Y - 6}" x2="${xOf(t)}" y2="${BAR_Y + BAR_H + 6}" stroke="#C0BEB8" stroke-width="1"/>`
+    ).join('')
+
+    const bounds = [first, ...ticks, last]
+    const monthLabels = bounds.slice(0, -1).map((b, i) => {
+      const x1 = xOf(b), x2 = xOf(bounds[i + 1])
+      if (x2 - x1 < 16) return ''
+      return `<text x="${Math.round((x1 + x2) / 2)}" y="${MLBL_Y}" font-size="8" fill="#B0AEA8" text-anchor="middle">${MNAMES[b.getMonth()]}</text>`
+    }).join('')
+
+    const dots = sorted.map(ir => {
+      const col = ir.real ? '#FF8500' : '#FFB705'
+      return `<circle cx="${xOf(new Date(ir.iso))}" cy="${DOT_CY}" r="${DOT_R}" fill="${col}" stroke="#fff" stroke-width="1.5"/>`
+    }).join('')
+
+    return `<div style="padding:4px 0 8px">
+      <svg width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}" style="width:100%;display:block">
+        ${monthLabels}
+        <rect x="0" y="${BAR_Y}" width="${SVG_W}" height="${BAR_H}" rx="${BAR_H/2}" fill="#E0DED8"/>
+        ${tickLines}
+        ${dots}
+        <text x="1" y="${DATE_Y}" font-size="9" fill="#B0AEA8">${fmtD(sorted[0].iso)}</text>
+        <text x="${SVG_W - 1}" y="${DATE_Y}" font-size="9" fill="#B0AEA8" text-anchor="end">${fmtD(sorted[sorted.length-1].iso)}</text>
+      </svg>
     </div>`
   }
 
@@ -885,7 +1129,8 @@ export function openCalendar(plots, initialFilter) {
 
   function openEditStratSheet(label, layer) {
     const bodyEl = document.createElement('div')
-    let showStopConfirm = false
+    let showStopConfirm   = false
+    let showDeleteConfirm = false
 
     function renderBody() {
       bodyEl.innerHTML = `
@@ -899,8 +1144,15 @@ export function openCalendar(plots, initialFilter) {
         <div class="irr-strat-opt irr-strat-opt--danger" id="strat-stop">
           <div class="irr-strat-opt-icon" style="background:#FDECEC">✕</div>
           <div>
-            <div class="irr-strat-opt-title" style="color:#8B1A1A">Arrêter la stratégie</div>
+            <div class="irr-strat-opt-title" style="color:#8B1A1A">Arrêter la saison</div>
             <div class="irr-strat-opt-sub" style="color:#C05050">Supprime toutes les irrigations futures planifiées</div>
+          </div>
+        </div>
+        <div class="irr-strat-opt irr-strat-opt--danger" id="strat-delete">
+          <div class="irr-strat-opt-icon" style="background:#FDECEC">🗑</div>
+          <div>
+            <div class="irr-strat-opt-title" style="color:#8B1A1A">Supprimer la saison</div>
+            <div class="irr-strat-opt-sub" style="color:#C05050">Supprime toutes les irrigations, effectuées et planifiées</div>
           </div>
         </div>
         ${showStopConfirm ? `
@@ -910,29 +1162,50 @@ export function openCalendar(plots, initialFilter) {
             <button class="irr-scope-btn" id="stop-cancel">Annuler</button>
             <button class="irr-scope-btn irr-scope-btn--danger" id="stop-confirm">Confirmer</button>
           </div>
+        </div>` : ''}
+        ${showDeleteConfirm ? `
+        <div class="irr-stop-confirm">
+          <div style="font-size:12px;font-weight:600;color:#7A3A00;margin-bottom:8px">Supprimer toutes les irrigations de cette saison ?</div>
+          <div style="display:flex;gap:8px">
+            <button class="irr-scope-btn" id="delete-cancel">Annuler</button>
+            <button class="irr-scope-btn irr-scope-btn--danger" id="delete-confirm">Supprimer tout</button>
+          </div>
         </div>` : ''}`
 
       bodyEl.querySelector('#strat-modify')?.addEventListener('click', () => {
         document.querySelector('.irr-sheet-overlay')?.remove()
-        openIrrigationStrategie(plots, () => renderContent(layer))
+        const preselect = resolveFilter(label, groups, plots)
+        openIrrigationStrategie(plots, () => renderContent(layer), preselect)
       })
       bodyEl.querySelector('#strat-stop')?.addEventListener('click', () => {
-        showStopConfirm = true; renderBody()
+        showStopConfirm = true; showDeleteConfirm = false; renderBody()
+      })
+      bodyEl.querySelector('#strat-delete')?.addEventListener('click', () => {
+        showDeleteConfirm = true; showStopConfirm = false; renderBody()
       })
       bodyEl.querySelector('#stop-cancel')?.addEventListener('click', () => {
         showStopConfirm = false; renderBody()
       })
       bodyEl.querySelector('#stop-confirm')?.addEventListener('click', () => {
-        const before = IRRIG_SEASON.length
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
           ...IRRIG_SEASON.filter(i => !(i.label === label && !i.real))
         )
         document.querySelector('.irr-sheet-overlay')?.remove()
         renderContent(layer)
       })
+      bodyEl.querySelector('#delete-cancel')?.addEventListener('click', () => {
+        showDeleteConfirm = false; renderBody()
+      })
+      bodyEl.querySelector('#delete-confirm')?.addEventListener('click', () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => i.label !== label)
+        )
+        document.querySelector('.irr-sheet-overlay')?.remove()
+        renderContent(layer)
+      })
     }
     renderBody()
-    showIrrigSheet({ title: 'Gérer la stratégie', body: bodyEl, saveLabel: 'Fermer', onSave: () => {} })
+    showIrrigSheet({ title: 'Gérer la saison', body: bodyEl, saveLabel: 'Fermer', onSave: () => {} })
   }
 
   function renderList(irrig, layer) {
@@ -943,7 +1216,7 @@ export function openCalendar(plots, initialFilter) {
 
     const stratBtnHTML = label
       ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la stratégie ↗</button>
+           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la saison ↗</button>
          </div>` : ''
 
     function item(ir, idx) {
@@ -967,41 +1240,39 @@ export function openCalendar(plots, initialFilter) {
     }
 
     return stratBtnHTML + `
-      ${real.length    ? `<div class="irr-list-section">Réalisées</div>${real.map(item).join('')}`    : ''}
+      ${real.length    ? `<div class="irr-list-section">Effectuées</div>${real.map(item).join('')}`    : ''}
       ${planned.length ? `<div class="irr-list-section">Planifiées</div>${planned.map(item).join('')}` : ''}
     `
   }
 
-  function renderFullList(irrig, layer) {
+  function renderFullList(irrig) {
     if (!irrig.length) return `<div style="text-align:center;padding:32px;font-size:13px;color:#9E9D98">Aucune irrigation enregistrée</div>`
 
     const future = [...irrig].filter(i => !i.real).sort((a, b) => a.iso < b.iso ? -1 : 1)
     const past   = [...irrig].filter(i =>  i.real).sort((a, b) => a.iso > b.iso ? -1 : 1)
 
     function item(ir) {
-      const [, m, d] = ir.iso.split('-').map(Number)
-      const col  = ir.real ? '#C05000' : '#185FA5'
-      const bg   = ir.real ? '#FEF0E6' : '#E6F1FB'
+      const col  = ir.real ? '#FF8500' : '#FFB705'
       const iidx = IRRIG_SEASON.indexOf(ir)
       return `<div class="irr-list-item">
-        <div class="irr-list-stripe" style="background:${col}"></div>
-        <div class="irr-list-date" style="background:${bg};color:${col}">
-          <span style="font-size:15px;font-weight:700">${d}</span>
-          <span style="font-size:9px">${MONTHS_SHORT[m-1]}</span>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div class="irr-list-label">${ir.label}</div>
-          <div class="irr-list-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div>
-        </div>
-        <div class="irr-list-mm" style="background:${bg};color:${col}">${ir.mm} mm</div>
+        <span style="flex:1;font-size:13px;color:#1c1c1e">${fmtDateFull(ir.iso)}</span>
+        <span style="font-size:13px;font-weight:700;color:${col};white-space:nowrap;margin-right:4px">${ir.mm} mm</span>
         <button class="irr-edit-btn" data-iidx="${iidx}" title="Modifier">✎</button>
         <button class="irr-del-btn"  data-iidx="${iidx}" title="Supprimer">🗑</button>
       </div>`
     }
 
     return `
-      ${future.length ? `<div class="irr-list-section">À venir</div>${future.map(item).join('')}` : ''}
-      ${past.length   ? `<div class="irr-list-section">Réalisées</div>${past.map(item).join('')}`   : ''}
+      ${past.length ? `
+        <details class="irr-section-details" data-section="effectuees">
+          <summary class="irr-section-summary">Effectuées <span class="irr-section-count">${past.length}</span></summary>
+          ${past.map(item).join('')}
+        </details>` : ''}
+      ${future.length ? `
+        <details class="irr-section-details" data-section="planifiees" open>
+          <summary class="irr-section-summary">Planifiées <span class="irr-section-count">${future.length}</span></summary>
+          ${future.map(item).join('')}
+        </details>` : ''}
     `
   }
 
@@ -1013,23 +1284,65 @@ export function openCalendar(plots, initialFilter) {
       return
     }
 
-    const irrig      = getIrrig()
-    const hasStrategy = irrig.some(i => !i.real)
-    const actionBar  = hasStrategy
+    // Preserve open/closed state of collapsible sections across re-renders
+    const openSections = {}
+    body.querySelectorAll('details[data-section]').forEach(d => {
+      openSections[d.dataset.section] = d.open
+    })
+
+    if (calFilter === 'all') {
+      // Vue "Toutes les parcelles" : une section par label
+      const byLabel = {}
+      for (const ir of IRRIG_SEASON) {
+        if (!byLabel[ir.label]) byLabel[ir.label] = []
+        byLabel[ir.label].push(ir)
+      }
+      const labels = Object.keys(byLabel)
+      if (!labels.length) {
+        body.innerHTML = `<div style="text-align:center;padding:32px;font-size:13px;color:#9E9D98">Aucune irrigation enregistrée</div>`
+        return
+      }
+      body.innerHTML = labels.map(label => {
+        const irrig    = byLabel[label]
+        const hasStrat = irrig.some(i => i.fromStrategy)
+        return `<div style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:#1c1c1e;margin-bottom:6px">${label}</div>
+          ${renderCumuls(irrig)}
+          ${renderTimeline(irrig)}
+          ${hasStrat ? `<div style="display:flex;justify-content:flex-end;margin-top:4px">
+            <button class="irr-cal-strat-btn" data-strat-label="${label}">Modifier la saison ↗</button>
+          </div>` : ''}
+        </div>`
+      }).join('')
+      body.querySelectorAll('[data-strat-label]').forEach(btn => {
+        btn.addEventListener('click', () => openEditStratSheet(btn.dataset.stratLabel, layer))
+      })
+      return
+    }
+
+    const irrig       = getIrrig()
+    const hasStrategy = irrig.some(i => i.fromStrategy)
+    const actionBar   = hasStrategy
       ? `<div style="display:flex;justify-content:flex-end;margin-bottom:4px">
-           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la stratégie ↗</button>
+           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la saison ↗</button>
          </div>`
       : `<div class="irr-cal-add-bar">
            <button class="irr-cal-add-btn" id="cal-add-irrig"><i class="bi bi-droplet-fill"></i> Ajouter une irrigation</button>
-           <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="cal-add-strat"><i class="bi bi-arrow-repeat"></i> Ajouter une stratégie</button>
+           <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="cal-add-strat"><i class="bi bi-arrow-repeat"></i> Ajouter une saison d'irrigation</button>
          </div>`
 
     body.innerHTML = `
       ${renderCumuls(irrig)}
+      ${renderTimeline(irrig)}
       ${actionBar}
-      ${renderGraph(irrig)}
-      ${renderFullList(irrig, layer)}
+      ${renderFullList(irrig)}
     `
+
+    // Restore section open/closed state
+    body.querySelectorAll('details[data-section]').forEach(d => {
+      const s = d.dataset.section
+      if (s in openSections) d.open = openSections[s]
+    })
 
     body.querySelectorAll('.irr-edit-btn').forEach(btn => {
       btn.addEventListener('click', e => {
@@ -1049,10 +1362,10 @@ export function openCalendar(plots, initialFilter) {
       openEditStratSheet(calFilter, layer)
     })
     body.querySelector('#cal-add-irrig')?.addEventListener('click', () => {
-      openIrrigationSaisie(plots, () => renderContent(layer))
+      openIrrigationSaisie(plots, () => renderContent(layer), resolveFilter(calFilter, groups, plots))
     })
     body.querySelector('#cal-add-strat')?.addEventListener('click', () => {
-      openIrrigationStrategie(plots, () => renderContent(layer))
+      openIrrigationStrategie(plots, () => renderContent(layer), resolveFilter(calFilter, groups, plots))
     })
   }
 
@@ -1063,12 +1376,14 @@ export function openCalendar(plots, initialFilter) {
     <div class="irr-detail-header">
       <div class="irr-header-row">
         <button class="irr-back" id="cal-back"><i class="bi bi-chevron-left"></i> Retour</button>
-        <span class="irr-header-title">Calendrier</span>
+        <span class="irr-header-title">Irrigations</span>
         <div style="width:60px"></div>
       </div>
-      <div style="padding:8px 14px 10px">
+      <div style="padding:4px 14px 10px">
+        <div style="font-size:11px;font-weight:700;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Parcelle ou groupe</div>
         <select class="irr-cal-select" id="cal-filter-sel">
-          <option value="" disabled ${!calFilter ? 'selected' : ''}>— Sélectionner une parcelle ou un groupe —</option>
+          <option value="" disabled ${!calFilter ? 'selected' : ''}>— Sélectionner —</option>
+          <option value="all"${calFilter === 'all' ? ' selected' : ''}>Toutes les parcelles</option>
           ${groups.length ? `<optgroup label="Groupes auto-détectés">${groupOpts}</optgroup>` : ''}
           <optgroup label="Parcelles">${plotOpts}</optgroup>
         </select>

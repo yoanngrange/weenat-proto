@@ -152,8 +152,12 @@ function openAddModal() {
           </button>
           <button class="add-item-btn" data-action="strategie-irrigation">
             <i class="bi bi-arrow-repeat"></i>
-            <span>Stratégie d'irr.</span>
+            <span>Saison d'irr.</span>
             <span class="add-item-tip" data-tip="Récurrence sur toute une saison, sur une ou plusieurs parcelles">i</span>
+          </button>
+          <button class="add-item-btn" data-action="voir-irrigations">
+            <i class="bi bi-calendar3"></i>
+            <span>Voir les irrigations</span>
           </button>
         </div>
       </div>

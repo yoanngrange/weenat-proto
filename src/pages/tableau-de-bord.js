@@ -158,12 +158,12 @@ function renderParcelTable(isAdherent) {
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
       <td>${p.texture || '<span class="tdb-missing">—</span>'}</td>
-      ${irrigCell}
       <td class="tdb-num">${d.teneurEau} mm</td>
       <td class="tdb-num">${d.pluie7j} mm</td>
       <td class="tdb-num">${d.etp7j} mm</td>
       <td class="tdb-num ${d.teneurEauJ7 < 0 ? 'tdb-irrig-needed' : ''}">${d.teneurEauJ7} mm</td>
       <td class="tdb-num ${d.balance >= 0 ? 'tdb-irrig-ok' : 'tdb-irrig-needed'}">${d.balance >= 0 ? '0 mm' : '<i class="bi bi-droplet-fill"></i> +' + Math.abs(d.balance) + ' mm'}</td>
+      ${irrigCell}
     </tr>`
   }).join('')
 
@@ -171,12 +171,12 @@ function renderParcelTable(isAdherent) {
     { label: 'Parcelle',         tip: 'Nom de la parcelle' },
     { label: 'Culture',          tip: 'Culture actuellement en place sur la parcelle' },
     { label: 'Texture de sol',   tip: 'Texture du sol renseignée pour la parcelle' },
-    { label: 'Irr. planifiées',  tip: 'Irrigations planifiées sur les 7 prochains jours', num: true },
     { label: 'Rés. J0',         tip: "Niveau estimé du réservoir hydrique aujourd'hui (mm)", num: true },
     { label: '+ Pluie J+7',     tip: 'Cumul de pluie prévu sur les 7 prochains jours (mm)', num: true },
     { label: '− ETR J+7',       tip: 'Évapotranspiration réelle prévue sur 7 jours (mm)', num: true },
     { label: 'Rés. J+7',        tip: 'Niveau estimé du réservoir hydrique dans 7 jours (mm)', num: true },
     { label: '= Irr. J+7',      tip: 'Volume d\'irrigation nécessaire sur les 7 prochains jours', num: true },
+    { label: 'Irr. planifiées',  tip: 'Irrigations planifiées sur les 7 prochains jours', num: true },
   ]
   const headerRow = headers.map(h =>
     `<th${h.num ? ' class="tdb-num"' : ''}>${h.label}${thInfo(h.tip)}</th>`
