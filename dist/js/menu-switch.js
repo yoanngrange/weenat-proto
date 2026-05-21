@@ -145,6 +145,20 @@ function openAddModal() {
             <i class="bi bi-person-plus-fill"></i>
             <span>Membre</span>
           </button>
+          <button class="add-item-btn" data-action="irrigation">
+            <i class="bi bi-droplet-fill"></i>
+            <span>Irrigation</span>
+            <span class="add-item-tip" data-tip="Une irrigation ponctuelle sur une ou plusieurs parcelles">i</span>
+          </button>
+          <button class="add-item-btn" data-action="strategie-irrigation">
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Saison d'irr.</span>
+            <span class="add-item-tip" data-tip="Récurrence sur toute une saison, sur une ou plusieurs parcelles">i</span>
+          </button>
+          <button class="add-item-btn" data-action="voir-irrigations">
+            <i class="bi bi-calendar3"></i>
+            <span>Voir les irrigations</span>
+          </button>
         </div>
       </div>
 
@@ -181,11 +195,15 @@ function openAddModal() {
   });
   modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove());
 
-  // Action buttons (stub — log for prototype)
+  // Action buttons
   modal.querySelectorAll('.add-item-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      console.log('[add]', btn.dataset.action);
+      const action = btn.dataset.action;
       modal.remove();
+      if (action === 'irrigation')         { window.WebIrrig?.openSaisie(); return; }
+      if (action === 'strategie-irrigation'){ window.WebIrrig?.openSaison(); return; }
+      if (action === 'voir-irrigations')    { window.WebIrrig?.openVoirIrrigations(); return; }
+      console.log('[add]', action);
     });
   });
 

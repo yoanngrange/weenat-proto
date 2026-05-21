@@ -195,11 +195,15 @@ function openAddModal() {
   });
   modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove());
 
-  // Action buttons (stub — log for prototype)
+  // Action buttons
   modal.querySelectorAll('.add-item-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      console.log('[add]', btn.dataset.action);
+      const action = btn.dataset.action;
       modal.remove();
+      if (action === 'irrigation')         { window.WebIrrig?.openSaisie(); return; }
+      if (action === 'strategie-irrigation'){ window.WebIrrig?.openSaison(); return; }
+      if (action === 'voir-irrigations')    { window.WebIrrig?.openVoirIrrigations(); return; }
+      console.log('[add]', action);
     });
   });
 

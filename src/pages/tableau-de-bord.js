@@ -15,7 +15,20 @@ document.addEventListener('DOMContentLoaded', () => {
   renderSensorEvents()
   setupCollapsible()
   setupWidgetMenus()
+  setupIrrigButtons()
 })
+
+function setupIrrigButtons() {
+  document.getElementById('tdb-strategy-btn')?.addEventListener('click', () => {
+    window.WebIrrig?.openSaison()
+  })
+  document.getElementById('tdb-parcels')?.addEventListener('click', e => {
+    const btn = e.target.closest('.tdb-saisir-btn[data-plot-id]')
+    if (!btn) return
+    const p = plots.find(p => p.id === +btn.dataset.plotId)
+    if (p) window.WebIrrig?.openSaisie({ ids: [p.id], label: p.name })
+  })
+}
 
 function setupCollapsible() {
   document.querySelectorAll('.tdb-section-hd[data-toggle]').forEach(hd => {
@@ -153,7 +166,7 @@ function renderParcelTable(isAdherent) {
     const irrig = plotIrrigationData(p)
     const irrigCell = irrig.planned
       ? `<td class="tdb-num">${irrig.mm} mm <span class="tdb-irrig-days">J+${irrig.daysAhead}</span></td>`
-      : `<td class="tdb-num"><button class="tdb-saisir-btn">Saisir</button></td>`
+      : `<td class="tdb-num"><button class="tdb-saisir-btn" data-plot-id="${p.id}">Saisir</button></td>`
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>

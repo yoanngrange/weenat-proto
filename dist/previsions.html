@@ -2,16 +2,16 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-B-u6VpP8.svg" />
+    <link rel="icon" type="image/svg+xml" href="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Prévisions - Weenat Proto</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-    <script type="module" crossorigin src="/weenat-proto/assets/previsions-DKZLgWj9.js"></script>
+    <script type="module" crossorigin src="/weenat-proto/assets/previsions-CHS8QDor.js"></script>
     <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
-    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-kiLnwOqV.js">
-    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-BNMTTq_e.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-BEtOZiNT.js">
+    <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-DDe0aa9W.js">
     <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
-    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-D-SW6c6U.css">
+    <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-BjaGIrE0.css">
   </head>
   <body>
     <div id="app">
@@ -84,7 +84,11 @@
           <div id="hourly-section" style="padding:0 20px 32px">
             <div id="hourly-header">
               <div>
-                <div id="hourly-day-label" style="font-weight:700;font-size:15px"></div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <button id="prev-day-btn" class="day-nav-btn" title="Jour précédent"><i class="bi bi-chevron-left"></i></button>
+                  <div id="hourly-day-label" style="font-weight:700;font-size:15px"></div>
+                  <button id="next-day-btn" class="day-nav-btn" title="Jour suivant"><i class="bi bi-chevron-right"></i></button>
+                </div>
                 <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
                   <span style="font-size:12px;color:var(--txt2)">Prévisions heure par heure</span>
                   <span class="badge" style="background:#1a1a2e;color:#fff;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700;letter-spacing:.05em">AROME</span>

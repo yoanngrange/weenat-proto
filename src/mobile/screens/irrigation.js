@@ -1,4 +1,5 @@
 import { pushDetail, popDetail, clearDirty } from '../nav.js'
+import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../../data/irrigations.js'
 
 function initFakeScrollbars(container) {
   container.querySelectorAll('.irr-zone').forEach(zone => {
@@ -100,19 +101,6 @@ function dateHint(iso) {
   return iso < TODAY
     ? `<span class="irr-pill irr-pill--past">Passée · Réalisée</span>`
     : `<span class="irr-pill irr-pill--future">Future · Planifiée</span>`
-}
-
-function buildGroups(plots) {
-  const m = {}
-  for (const p of plots) {
-    const crop = p.crop
-    const irr  = p.irrigation && p.irrigation !== "Pas d'irrigation" ? p.irrigation : null
-    if (!crop && !irr) continue
-    const key = [crop, irr].filter(Boolean).join(' · ')
-    if (!m[key]) m[key] = { label: key, ids: [] }
-    m[key].ids.push(p.id)
-  }
-  return Object.values(m).filter(g => g.ids.length >= 2)
 }
 
 function checkIcon(on, partial) {
@@ -319,6 +307,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null) {
     const parcelSections = buildParcelSections(selectedIds, plots, preselect, groups)
     const totalParcels   = parcelSections.reduce((s, sec) => s + sec.names.length, 0)
     IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: irLabel, fromStrategy: false })
+    saveIrrig()
     clearDirty()
     openConfirmation({
       title: totalParcels > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
@@ -594,6 +583,7 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
       const iso = d.toISOString().slice(0, 10)
       IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: irLabel, fromStrategy: true })
     })
+    saveIrrig()
     clearDirty()
     openConfirmation({
       title: 'Saison enregistrée',
@@ -787,28 +777,6 @@ function openConfirmation({ title, params, parcelSections = [], isFut, plots, ca
 }
 
 // ─── Calendrier ───────────────────────────────────────────────────────────────
-
-const IRRIG_SEASON = [
-  { iso: '2026-04-21', mm: 18, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-04-28', mm: 22, real: true,  label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-04', mm: 20, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-07', mm: 25, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-11', mm: 30, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-13', mm: 22, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-18', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-21', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-24', mm: 18, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-28', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-04', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-11', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-18', mm: 25, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
-]
-
-const RAIN_DATA = [
-  { iso: '2026-04-25', mm: 12 }, { iso: '2026-05-03', mm: 8 },
-  { iso: '2026-05-10', mm: 15 }, { iso: '2026-05-17', mm: 5 },
-  { iso: '2026-05-26', mm: 10 }, { iso: '2026-06-02', mm: 6 },
-]
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const MONTHS_SHORT = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
@@ -1117,11 +1085,13 @@ export function openCalendar(plots, initialFilter) {
           IRRIG_SEASON.filter(i => i.label === ir.label)
             .forEach(i => { i.mm = editMm })
         }
+        saveIrrig()
         renderContent(layer)
       },
       onDelete: () => {
         const idx = IRRIG_SEASON.indexOf(ir)
         if (idx > -1) IRRIG_SEASON.splice(idx, 1)
+        saveIrrig()
         renderContent(layer)
       },
     })
@@ -1190,6 +1160,7 @@ export function openCalendar(plots, initialFilter) {
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
           ...IRRIG_SEASON.filter(i => !(i.label === label && !i.real))
         )
+        saveIrrig()
         document.querySelector('.irr-sheet-overlay')?.remove()
         renderContent(layer)
       })
@@ -1200,6 +1171,7 @@ export function openCalendar(plots, initialFilter) {
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
           ...IRRIG_SEASON.filter(i => i.label !== label)
         )
+        saveIrrig()
         document.querySelector('.irr-sheet-overlay')?.remove()
         renderContent(layer)
       })
@@ -1355,7 +1327,7 @@ export function openCalendar(plots, initialFilter) {
       btn.addEventListener('click', e => {
         e.stopPropagation()
         const idx = +btn.dataset.iidx
-        if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); renderContent(layer) }
+        if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); saveIrrig(); renderContent(layer) }
       })
     })
     body.querySelector('#open-strat-edit')?.addEventListener('click', () => {
