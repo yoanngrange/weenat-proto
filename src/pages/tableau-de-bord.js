@@ -114,7 +114,7 @@ function renderForecastTable() {
         <td class="tdb-num tdb-fc-cell">${f.etr} mm</td>`
     }).join('')
     return `<tr>
-      <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
+      <td><a href="previsions.html?plot=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '—'}</td>
       ${dayCells}
     </tr>`
@@ -174,7 +174,7 @@ function renderParcelTable(isAdherent) {
       ? `<td class="tdb-num">${irrig.mm} mm <span class="tdb-irrig-days">J+${irrig.daysAhead}</span></td>`
       : `<td class="tdb-num"><button class="tdb-saisir-btn" data-plot-id="${p.id}">Saisir</button></td>`
     return `<tr>
-      <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
+      <td><a href="irrigation.html?plot=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
       <td>${p.texture || '<span class="tdb-missing">—</span>'}</td>
       <td class="tdb-num">${d.teneurEau} mm</td>
@@ -380,7 +380,7 @@ function renderPhenologyTable() {
       ? `${d.nextDateStr} <span class="tdb-next-stage-delta">(dans ${d.daysToNext} j)</span> — <span class="tdb-next-stage-name">${d.nextStage}</span>`
       : '—'
     return `<tr>
-      <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
+      <td><a href="parcelle-detail.html?id=${p.id}&tab=donnees" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '—'}</td>
       <td>${d.variety}</td>
       <td><select class="tdb-stage-sel ${isKeyStage(d.stage) ? 'tdb-stage-key' : ''}">${stageOpts}</select></td>

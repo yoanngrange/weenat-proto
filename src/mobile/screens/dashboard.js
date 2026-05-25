@@ -730,7 +730,7 @@ function buildCultures(plots) {
     ${groups}`
 }
 
-function buildMonReseau() {
+function buildMonReseau(role) {
   const nbAdherents = allPlots.map(p => p.orgId).filter((v, i, a) => a.indexOf(v) === i && v !== 100).length
   const nbCapteurs  = allSensors.length
   const nbParcelles = allPlots.length
@@ -746,7 +746,8 @@ function buildMonReseau() {
       <div class="m-reseau-row"><i class="bi bi-telephone"></i><span>${network.telephone}</span></div>
       <div class="m-reseau-row"><i class="bi bi-globe"></i><span>${network.siteWeb}</span></div>
       <div class="m-reseau-row"><i class="bi bi-geo-alt"></i><span>${network.siege.adresse}, ${network.siege.codePostal} ${network.siege.ville}</span></div>
-    </div>`
+    </div>
+    ${role === 'admin' ? `<div style="padding:10px 16px;font-size:12px;color:#8e8e93;text-align:center;border-top:.5px solid rgba(0,0,0,.08)">Infos modifiables sur la version web.</div>` : ''}`
 }
 
 function buildSupport() {
@@ -885,6 +886,22 @@ export function initDashboardScreen(screenEl, role) {
   const plotIds = new Set(exploitPlots.map(p => p.id))
   const exploitSensors = allSensors.filter(s => plotIds.has(s.parcelId))
   let forecast = makeForecast()
+  let bhSelectedOrgId = null
+
+  function getBhPlots() {
+    if (bhSelectedOrgId === null) return allPlots
+    return allPlots.filter(p => p.orgId === bhSelectedOrgId)
+  }
+
+  function orgSelectorHTML() {
+    if (role !== 'admin') return ''
+    const adherentOrgs = allOrgs.filter(o => o.id !== 100).sort((a, b) => a.name.localeCompare(b.name))
+    return `<select id="bh-org-select" style="width:100%;padding:8px 10px;border:none;border-bottom:.5px solid rgba(0,0,0,.1);background:#f9f9fb;font-size:14px;font-family:inherit;color:#1c1c1e;outline:none">
+      <option value="all">Toutes les organisations</option>
+      <option value="100">Breiz'Agri Conseil</option>
+      ${adherentOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
+    </select>`
+  }
 
   const _saved = _loadDash()
   const ALWAYS_OPEN = new Set(['mon_reseau', 'support'])
@@ -925,14 +942,14 @@ export function initDashboardScreen(screenEl, role) {
       <button class="m-add-widget-btn" id="dash-add-widget-btn" style="margin-top:16px;margin-bottom:12px"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
       ${[...custom, ...fixed].map(w => {
         let body = ''
-        if (w.id === 'bilan_hydrique') body = buildBilanHydrique(exploitPlots)
+        if (w.id === 'bilan_hydrique') body = orgSelectorHTML() + buildBilanHydrique(getBhPlots())
         else if (w.id === 'previsions')  body = buildPrevisions(exploitPlots, exploitSensors, forecast)
         else if (w.id === 'cumuls')      body = buildCumuls(exploitPlots, exploitSensors)
         else if (w.id === 'temps_reel')  body = buildMesures(exploitPlots, exploitSensors)
         else if (w.id === 'traitements') body = buildTraitements(exploitPlots)
         else if (w.id === 'evenements')  body = buildEvenements(exploitPlots, exploitSensors)
         else if (w.id === 'cultures')    body = buildCultures(exploitPlots)
-        else if (w.id === 'mon_reseau')  body = buildMonReseau()
+        else if (w.id === 'mon_reseau')  body = buildMonReseau(role)
         else if (w.id === 'support')     body = buildSupport()
         return widgetCard(w, body)
       }).join('')}
@@ -1066,16 +1083,34 @@ export function initDashboardScreen(screenEl, role) {
         const nowExpanded = btn.dataset.expanded === 'true'
         const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
         if (bd) {
-          bd.innerHTML = buildBilanHydrique(exploitPlots, !nowExpanded)
+          bd.innerHTML = orgSelectorHTML() + buildBilanHydrique(getBhPlots(), !nowExpanded)
           bindBhPlotLinks()
           bindBhButtons()
           bindBhExpand()
+          if (role === 'admin') bindBhOrgSelect()
+        }
+      })
+    }
+    function bindBhOrgSelect() {
+      const sel = content.querySelector('#bh-org-select')
+      if (!sel) return
+      sel.value = bhSelectedOrgId === null ? 'all' : String(bhSelectedOrgId)
+      sel.addEventListener('change', () => {
+        bhSelectedOrgId = sel.value === 'all' ? null : +sel.value
+        const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
+        if (bd) {
+          bd.innerHTML = orgSelectorHTML() + buildBilanHydrique(getBhPlots())
+          bindBhPlotLinks()
+          bindBhButtons()
+          bindBhExpand()
+          bindBhOrgSelect()
         }
       })
     }
     bindBhPlotLinks()
     bindBhButtons()
     bindBhExpand()
+    if (role === 'admin') bindBhOrgSelect()
 
     // ── Cumuls ────────────────────────────────────────────────────────────────
     function rebuildCumulsWidget() {
@@ -1336,55 +1371,37 @@ export function initDashboardScreen(screenEl, role) {
       </div>
       <div class="m-detail-tabs" style="display:none"></div>
       <div id="detail-content" class="m-detail-content" style="top:52px">
-        <div style="padding:20px 16px">
+        <div style="padding:12px 16px">
           <div class="m-add-section-label">Mon exploitation</div>
-          <div class="m-add-grid">
-            <button class="m-add-item" data-action="parcelle">
-              <div class="m-add-icon"><i class="bi bi-geo-alt-fill"></i></div>
-              <span>Parcelle</span>
-            </button>
-            <button class="m-add-item" data-action="capteur">
-              <div class="m-add-icon"><i class="bi bi-broadcast"></i></div>
-              <span>Capteur</span>
-            </button>
-            <button class="m-add-item" data-action="station">
-              <div class="m-add-icon"><i class="bi bi-cloud-sun-fill"></i></div>
-              <span>Station météo virtuelle</span>
-            </button>
-            <button class="m-add-item" data-action="membre">
-              <div class="m-add-icon"><i class="bi bi-person-plus-fill"></i></div>
-              <span>Membre</span>
-            </button>
-            <button class="m-add-item" data-action="irrigation">
-              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-droplet-fill"></i></div>
-              <span>Irrigation</span>
-            </button>
-            <button class="m-add-item" data-action="strategie-irrigation">
-              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div>
-              <span>Saison d'irrigation</span>
-            </button>
-            <button class="m-add-item" data-action="calendrier">
-              <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-calendar3"></i></div>
-              <span>Voir les irrigations</span>
-            </button>
+          <div class="m-add-list">
+            ${[
+              { action:'parcelle',            icon:'bi-geo-alt-fill',    label:'Parcelle' },
+              { action:'capteur',             icon:'bi-broadcast',       label:'Capteur' },
+              { action:'station',             icon:'bi-cloud-sun-fill',  label:'Station météo virtuelle' },
+              { action:'membre',              icon:'bi-person-plus-fill',label:'Membre' },
+              { action:'irrigation',          icon:'bi-droplet',         label:'Irrigation' },
+              { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
+              { action:'note',                icon:'bi-pencil-square',   label:'Note' },
+              { action:'traitement',          icon:'bi-eyedropper',      label:'Traitement' },
+            ].map(it => `
+              <button class="m-add-item" data-action="${it.action}">
+                <i class="bi ${it.icon}"></i>
+                <span>${it.label}</span>
+              </button>`).join('')}
           </div>
           ${isAdmin ? `
-          <div class="m-add-section-label" style="margin-top:20px">Mon réseau</div>
-          <div class="m-add-grid">
+          <div class="m-add-section-label" style="margin-top:16px">Mon réseau</div>
+          <div class="m-add-list">
             <button class="m-add-item" data-action="adherent">
-              <div class="m-add-icon"><i class="bi bi-building"></i></div>
+              <i class="bi bi-building"></i>
               <span>Adhérent</span>
             </button>
           </div>` : ''}
-          <div class="m-add-section-label" style="margin-top:20px">Mon compte</div>
-          <div class="m-add-grid">
+          <div class="m-add-section-label" style="margin-top:16px">Mon compte</div>
+          <div class="m-add-list">
             <button class="m-add-item" data-action="alerte">
-              <div class="m-add-icon"><i class="bi bi-bell-fill"></i></div>
+              <i class="bi bi-bell-fill"></i>
               <span>Alerte</span>
-            </button>
-            <button class="m-add-item" data-action="export">
-              <div class="m-add-icon"><i class="bi bi-download"></i></div>
-              <span>Export de données</span>
             </button>
           </div>
         </div>
@@ -1400,9 +1417,6 @@ export function initDashboardScreen(screenEl, role) {
         } else if (action === 'strategie-irrigation') {
           popDetail()
           import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
-        } else if (action === 'calendrier') {
-          popDetail()
-          import('./irrigation.js').then(m => m.openCalendar(exploitPlots, ''))
         } else {
           showToast('Fonctionnalité à venir')
         }

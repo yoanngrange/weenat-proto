@@ -1087,4 +1087,11 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLeft()
   showGlobaleView()
   window.addEventListener('irrig-updated', () => { showGlobaleView() })
+
+  const _urlParams = new URLSearchParams(window.location.search)
+  const _plotId = _urlParams.get('plot')
+  if (_plotId) {
+    const _p = plots.find(pl => pl.id === +_plotId)
+    if (_p) openDetailPanel(_p)
+  }
 })

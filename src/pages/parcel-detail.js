@@ -652,6 +652,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initPeriodControls()
   initCompareControl()
   initTabs()
+
+  const _tabParam = urlParams.get('tab')
+  if (_tabParam) {
+    document.querySelector(`.detail-tab-btn[data-pane="tab-${_tabParam}"]`)?.click()
+  }
+
   initPhenologie()
   initNotesOverlay()
   initDashGrid()
@@ -2237,71 +2243,115 @@ function renderIntegrations() {
 
 // ─── Membres ──────────────────────────────────────────────────────────────────
 
-let linkedMemberIds = null
+let linkedOrgMemberIds = null   // adhérent's own org members
+let linkedConseillerIds = null  // réseau conseillers
 
 function initLinkedMemberIds() {
-  if (linkedMemberIds !== null) return
-  const stored = getParcel(parcelId).linkedMemberIds
-  linkedMemberIds = stored ?? members.filter(m => m.parcelIds?.includes(parcelId)).map(m => m.id)
+  if (linkedOrgMemberIds !== null) return
+  const stored = getParcel(parcelId)
+  linkedOrgMemberIds  = stored.linkedOrgMemberIds  ?? members.filter(m => m.source === 'adherent' && m.parcelIds?.includes(parcelId) && m.orgIds?.includes(parcelBase.orgId)).map(m => m.id)
+  linkedConseillerIds = stored.linkedConseillerIds ?? members.filter(m => m.source === 'réseau'   && m.parcelIds?.includes(parcelId)).map(m => m.id)
+}
+
+function memberRow(m, canRemove, showRole) {
+  return `<div class="member-row">
+    <div>
+      <span class="member-name">${m.prenom} ${m.nom}</span>
+      ${showRole ? `<span class="member-role-badge">${m.role}</span>` : ''}
+    </div>
+    ${canRemove ? `<button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
+  </div>`
 }
 
 function renderPanelMembres() {
   initLinkedMemberIds()
-  const el     = document.getElementById('panel-membres')
-  const linked = members.filter(m => linkedMemberIds.includes(m.id))
   const isAdherent = document.getElementById('sidebar')?.getAttribute('data-role') === 'adherent-reseau'
-  const section = el?.closest('.panel-section')
-  if (isAdherent && linked.length === 0) {
-    if (section) section.style.display = 'none'
-    return
+
+  // ── Section "Membres liés" (org members — adhérent can manage) ───────────
+  const elOrg = document.getElementById('panel-membres')
+  const orgSection = document.getElementById('panel-membres-section')
+  const orgMembers = members.filter(m => m.source === 'adherent' && m.orgIds?.includes(parcelBase.orgId))
+  const linkedOrg  = orgMembers.filter(m => linkedOrgMemberIds.includes(m.id))
+
+  if (orgSection) {
+    orgSection.style.display = (!isAdherent && orgMembers.length === 0) ? 'none' : ''
   }
-  if (section) section.style.display = ''
+  if (elOrg) {
+    elOrg.innerHTML = linkedOrg.length
+      ? linkedOrg.map(m => memberRow(m, true, false)).join('')
+      : '<p class="panel-empty">Aucun membre associé.</p>'
 
-  const addRow = el.closest('.panel-section')?.querySelector('.panel-add-row')
-  if (addRow) addRow.style.display = isAdherent ? 'none' : ''
-
-  const CONSEILLER_ROLES = new Set(['propriétaire', 'admin', 'agent'])
-  const canRemove = m => !isAdherent || !CONSEILLER_ROLES.has(m.role)
-
-  if (!linked.length) {
-    el.innerHTML = '<p class="panel-empty">Aucun membre associé.</p>'
-  } else {
-    el.innerHTML = linked.map(m => `
-      <div class="member-row">
-        <div>
-          <span class="member-name">${m.prenom} ${m.nom}</span>
-          ${isAdherent ? '' : `<span class="member-role-badge">${m.role}</span>`}
-        </div>
-        ${canRemove(m) ? `<button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
-      </div>
-    `).join('')
-  }
-
-  if (!isAdherent) {
-    const select = document.getElementById('add-membre-select')
-    if (select) {
-      select.innerHTML = '<option value="">Ajouter un membre…</option>'
-      members.filter(m => !linkedMemberIds.includes(m.id)).forEach(m => {
-        const opt = document.createElement('option')
-        opt.value = m.id
-        opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
-        select.appendChild(opt)
-      })
-    }
-
-    el.querySelectorAll('.remove-membre-btn').forEach(btn => {
+    elOrg.querySelectorAll('.remove-membre-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        linkedMemberIds = linkedMemberIds.filter(x => x !== parseInt(btn.dataset.id))
-        patchParcel(parcelId, { linkedMemberIds })
+        linkedOrgMemberIds = linkedOrgMemberIds.filter(x => x !== parseInt(btn.dataset.id))
+        patchParcel(parcelId, { linkedOrgMemberIds })
         renderPanelMembres()
       })
     })
+  }
 
+  const addOrgRow = document.getElementById('add-membre-org-row')
+  if (addOrgRow) addOrgRow.style.display = ''
+  const orgSelect = document.getElementById('add-membre-org-select')
+  if (orgSelect) {
+    orgSelect.innerHTML = '<option value="">Associer un membre…</option>'
+    orgMembers.filter(m => !linkedOrgMemberIds.includes(m.id)).forEach(m => {
+      const opt = document.createElement('option')
+      opt.value = m.id
+      opt.textContent = `${m.prenom} ${m.nom}`
+      orgSelect.appendChild(opt)
+    })
+  }
+  document.getElementById('add-membre-org-btn').onclick = () => {
+    const id = parseInt(orgSelect?.value)
+    if (!id || linkedOrgMemberIds.includes(id)) return
+    linkedOrgMemberIds.push(id)
+    patchParcel(parcelId, { linkedOrgMemberIds })
+    renderPanelMembres()
+  }
+
+  // ── Section "Conseillers liés" (réseau — admin réseau only) ─────────────
+  const elCons = document.getElementById('panel-conseillers')
+  const consSection = document.getElementById('panel-conseillers-section')
+  const linkedCons  = members.filter(m => m.source === 'réseau' && linkedConseillerIds.includes(m.id))
+
+  if (consSection) {
+    consSection.style.display = (isAdherent && linkedCons.length === 0) ? 'none' : ''
+  }
+  if (elCons) {
+    elCons.innerHTML = linkedCons.length
+      ? linkedCons.map(m => memberRow(m, !isAdherent, true)).join('')
+      : '<p class="panel-empty">Aucun conseiller associé.</p>'
+
+    if (!isAdherent) {
+      elCons.querySelectorAll('.remove-membre-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          linkedConseillerIds = linkedConseillerIds.filter(x => x !== parseInt(btn.dataset.id))
+          patchParcel(parcelId, { linkedConseillerIds })
+          renderPanelMembres()
+        })
+      })
+    }
+  }
+
+  const addConsRow = document.getElementById('add-conseiller-row')
+  if (addConsRow) addConsRow.style.display = isAdherent ? 'none' : ''
+  if (!isAdherent) {
+    const consSelect = document.getElementById('add-membre-select')
+    if (consSelect) {
+      consSelect.innerHTML = '<option value="">Ajouter un conseiller…</option>'
+      members.filter(m => m.source === 'réseau' && !linkedConseillerIds.includes(m.id)).forEach(m => {
+        const opt = document.createElement('option')
+        opt.value = m.id
+        opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
+        consSelect.appendChild(opt)
+      })
+    }
     document.getElementById('add-membre-btn').onclick = () => {
-      const id = parseInt(document.getElementById('add-membre-select').value)
-      if (!id || linkedMemberIds.includes(id)) return
-      linkedMemberIds.push(id)
-      patchParcel(parcelId, { linkedMemberIds })
+      const id = parseInt(consSelect?.value)
+      if (!id || linkedConseillerIds.includes(id)) return
+      linkedConseillerIds.push(id)
+      patchParcel(parcelId, { linkedConseillerIds })
       renderPanelMembres()
     }
   }

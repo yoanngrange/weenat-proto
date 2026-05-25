@@ -177,12 +177,22 @@
                     <button id="add-integ-btn" class="panel-add-btn">Ajouter</button>
                   </div>
                 </div>
-                <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
+                <div class="panel-section" id="panel-membres-section">
+                  <div class="panel-section-hd"><i class="bi bi-person-fill"></i> Membres liés</div>
                   <div class="panel-section-bd" id="panel-membres"></div>
-                  <div class="panel-add-row">
+                  <div class="panel-add-row" id="add-membre-org-row">
+                    <select id="add-membre-org-select" class="panel-add-select">
+                      <option value="">Associer un membre…</option>
+                    </select>
+                    <button id="add-membre-org-btn" class="panel-add-btn">Ajouter</button>
+                  </div>
+                </div>
+                <div class="panel-section" id="panel-conseillers-section">
+                  <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
+                  <div class="panel-section-bd" id="panel-conseillers"></div>
+                  <div class="panel-add-row" id="add-conseiller-row">
                     <select id="add-membre-select" class="panel-add-select">
-                      <option value="">Ajouter un membre…</option>
+                      <option value="">Ajouter un conseiller…</option>
                     </select>
                     <button id="add-membre-btn" class="panel-add-btn">Ajouter</button>
                   </div>

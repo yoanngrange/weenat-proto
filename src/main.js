@@ -388,7 +388,7 @@ function makeCheckboxPanel(panelId, values, stateRef, badgeId, searchable = fals
 }
 
 function populateFilterDropdowns() {
-  const cultures = [...new Set(plots.map(p => p.crop))].sort()
+  const cultures = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
   makeCheckboxPanel('panel-culture', cultures,
     { set: v => { selectedCultures = v } }, 'badge-culture', true)
 
@@ -836,7 +836,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
     filteredParcels.forEach(parcel => {
       const layer = createParcelLayer(parcel)
       layer.bindTooltip(
-        `<strong>${parcel.name}</strong><br>${getMetricTooltipValue(parcel)}<br>Culture: ${parcel.crop}<br>Superficie: ${parcel.area} ha`,
+        `<strong>${parcel.name}</strong><br>${getMetricTooltipValue(parcel)}${parcel.crop ? `<br>Culture: ${parcel.crop}` : ''}<br>Superficie: ${parcel.area} ha`,
         { sticky: true, direction: 'top', opacity: 0.95 }
       )
       layer.on('click', () => { window.location.href = `parcelle-detail.html?id=${parcel.id}` })
@@ -1963,9 +1963,9 @@ function createParcelMetricTable(parcels) {
 
     html += `<tr class="clickable-row" data-href="parcelle-detail.html?id=${parcel.id}">`
     html += `<td><a href="parcelle-detail.html?id=${parcel.id}" class="row-link">${getPlotDisplayName(parcel)}</a></td>`
-    html += `<td>${parcel.crop}</td>`
+    html += `<td>${parcel.crop || '—'}</td>`
     html += `<td class="num">${parcel.area} ha</td>`
-    html += `<td>${parcel.texture}</td>`
+    html += `<td>${parcel.texture || '—'}</td>`
     html += `<td><span class="${irrigationClass}">${irrigation}</span></td>`
     html += `<td class="num">${sensorCount > 0 ? sensorCount : '<span class="warn-text">0</span>'}</td>`
     html += `<td class="integrations-cell">${integHtml}</td>`
@@ -2023,8 +2023,8 @@ function initAdminMinimaps(container) {
 }
 
 function createParcelAdminTable(parcels) {
-  const crops = [...new Set(plots.map(p => p.crop))].sort()
-  const textures = [...new Set(plots.map(p => p.texture))].sort()
+  const crops = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
+  const textures = [...new Set(plots.map(p => p.texture).filter(Boolean))].sort()
   const irrigationTypes = ["Pas d'irrigation","Pivot","Enrouleur","Rampe","Goutte à goutte","Goutte à goutte enterré","Micro aspersion","Couverture intégrale","Gravitaire"]
 
   let html = `
@@ -2114,6 +2114,7 @@ function createParcelAdminTable(parcels) {
       <td class="num">${parcel.area}</td>
       <td>
         <select class="inline-edit" data-field="crop" data-id="${parcel.id}">
+          <option value=""${!parcel.crop ? ' selected' : ''}>—</option>
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </td>
@@ -2232,7 +2233,7 @@ function initParcelAdminTable(container) {
     bulkCropBtn.addEventListener('click', () => {
       const checked = getCheckedAdminIds(container)
       if (!checked.length) return
-      const crops = [...new Set(plots.map(p => p.crop))].sort()
+      const crops = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
       const val = prompt(`Nouvelle culture pour ${checked.length} parcelle(s) :\n${crops.join(', ')}`)
       if (val && crops.includes(val)) {
         checked.forEach(id => {

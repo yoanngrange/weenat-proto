@@ -161,13 +161,25 @@
                   <div class="panel-section-hd"><i class="bi bi-lightning"></i> Actions</div>
                   <div class="panel-section-bd" id="panel-actions"></div>
                 </div>
-                <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
+                <div class="panel-section" id="panel-membres-section">
+                  <div class="panel-section-hd"><i class="bi bi-person-fill"></i> Membres liés</div>
                   <div class="panel-section-bd" id="panel-membres"></div>
-                  <div style="padding:8px 0 0">
+                  <div style="padding:8px 0 0" id="add-membre-org-row">
+                    <div style="display:flex;gap:6px;align-items:center">
+                      <select id="add-membre-org-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
+                        <option value="">Associer un membre…</option>
+                      </select>
+                      <button id="add-membre-org-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="panel-section" id="panel-conseillers-section">
+                  <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
+                  <div class="panel-section-bd" id="panel-conseillers"></div>
+                  <div style="padding:8px 0 0" id="add-conseiller-row">
                     <div id="add-membre-row" style="display:flex;gap:6px;align-items:center">
                       <select id="add-membre-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
-                        <option value="">Ajouter un membre…</option>
+                        <option value="">Ajouter un conseiller…</option>
                       </select>
                       <button id="add-membre-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
                     </div>

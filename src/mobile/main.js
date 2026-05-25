@@ -251,9 +251,9 @@ function openMobileAddModal() {
   phone.appendChild(modal)
 }
 
-// Wire all non-param navbar + buttons
-document.querySelectorAll('.m-navbar-action:not(#param-plus-btn)').forEach(btn => {
-  btn.addEventListener('click', openMobileAddModal)
+// Wire + buttons for screens without their own handler (dashboard and alertes have their own)
+;['screen-parcelles', 'screen-capteurs'].forEach(id => {
+  document.querySelector(`#${id} .m-navbar-action`)?.addEventListener('click', openMobileAddModal)
 })
 
 // ─── Export for screens ───────────────────────────────────────────────────────

@@ -30,6 +30,14 @@ function updateDayNavButtons() {
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
   populateLocationSelect()
+
+  const _urlParams = new URLSearchParams(window.location.search)
+  const _preselect = _urlParams.get('plot')
+  if (_preselect) {
+    const sel = document.getElementById('location-select')
+    if (sel) sel.value = `parcel-${_preselect}`
+  }
+
   generateForecast()
   generateHourlySection(0)
   updateDayNavButtons()
@@ -49,7 +57,7 @@ function populateLocationSelect() {
   const select = document.getElementById('location-select')
   if (!select) return
   const pg = document.createElement('optgroup'); pg.label = 'Parcelles'
-  plots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = `${p.name} (${p.crop})`; pg.appendChild(o) })
+  plots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = p.crop ? `${p.name} (${p.crop})` : p.name; pg.appendChild(o) })
   select.appendChild(pg)
   const sg = document.createElement('optgroup'); sg.label = 'Capteurs'
   sensors.forEach(s => { const p = plots.find(x => x.id === s.parcelId); const o = document.createElement('option'); o.value = `sensor-${s.id}`; o.textContent = `${s.serial} — ${s.model}${p ? ` (${p.name})` : ''}`; sg.appendChild(o) })
