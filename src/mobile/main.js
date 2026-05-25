@@ -63,6 +63,11 @@ function showAbandonConfirm(onConfirm) {
   modal.querySelector('#abandon-ok').addEventListener('click', () => { modal.remove(); onConfirm() })
 }
 
+document.getElementById('phone-screen').addEventListener('click', e => {
+  if (!e.target.closest('.m-navbar-logo')) return
+  document.querySelector('.nav-item[data-tab="dashboard"]')?.click()
+})
+
 document.getElementById('bottom-nav').addEventListener('click', e => {
   const btn = e.target.closest('.nav-item')
   if (!btn) return
@@ -190,6 +195,71 @@ initAlertesScreen(document.getElementById('screen-alertes'), role)
 initCompteScreen(document.getElementById('param-compte'), role)
 paramControllers['param-exploitation'] = initExploitationScreen(document.getElementById('param-exploitation'), role)
 paramControllers['param-reseau']       = initReseauScreen(document.getElementById('param-reseau'), role)
+
+// ─── Mobile add modal (bouton + universel) ────────────────────────────────────
+
+function openMobileAddModal() {
+  const isAdmin = role === 'admin'
+  const phone = document.getElementById('phone-screen')
+  document.getElementById('m-add-modal')?.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'm-add-modal'
+  modal.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:flex-end'
+  modal.innerHTML = `
+    <div style="background:#f2f2f7;border-radius:16px 16px 0 0;width:100%;padding-bottom:24px;max-height:88%">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
+        <span style="font-size:17px;font-weight:700">Ajouter</span>
+        <button id="m-add-close" style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.07);border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+      </div>
+      <div style="overflow-y:auto;padding:12px 16px 0">
+        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
+          <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon exploitation</div>
+          ${[
+            { action:'parcelle',           icon:'bi-geo-alt-fill',   label:'Parcelle' },
+            { action:'capteur',            icon:'bi-broadcast',      label:'Capteur' },
+            { action:'station',            icon:'bi-cloud-sun-fill', label:'Station météo virtuelle' },
+            { action:'membre',             icon:'bi-person-plus-fill',label:'Membre' },
+            { action:'irrigation',         icon:'bi-droplet-fill',   label:'Irrigation' },
+            { action:'strategie-irrigation',icon:'bi-arrow-repeat',  label:"Saison d'irr." },
+            { action:'voir-irrigations',   icon:'bi-calendar3',      label:'Voir les irrigations' },
+            { action:'note',               icon:'bi-pencil-square',  label:'Note' },
+            { action:'traitement',         icon:'bi-eyedropper',     label:'Traitement' },
+          ].map(it => `
+            <button class="m-add-row" data-action="${it.action}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08)">
+              <i class="bi ${it.icon}" style="color:#0172A4;width:20px;text-align:center"></i>
+              <span>${it.label}</span>
+            </button>`).join('')}
+        </div>
+        ${isAdmin ? `
+        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
+          <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon réseau</div>
+          <button class="m-add-row" data-action="adherent" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08)">
+            <i class="bi bi-building" style="color:#0172A4;width:20px;text-align:center"></i>
+            <span>Adhérent</span>
+          </button>
+        </div>` : ''}
+      </div>
+    </div>`
+
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelector('#m-add-close').addEventListener('click', () => modal.remove())
+  modal.querySelectorAll('.m-add-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modal.remove()
+      // Delegate to openJournalModal if available (web context exposes it)
+      if (btn.dataset.action === 'note' || btn.dataset.action === 'traitement') {
+        window.openJournalModal?.(btn.dataset.action)
+      }
+    })
+  })
+  phone.appendChild(modal)
+}
+
+// Wire all non-param navbar + buttons
+document.querySelectorAll('.m-navbar-action:not(#param-plus-btn)').forEach(btn => {
+  btn.addEventListener('click', openMobileAddModal)
+})
 
 // ─── Export for screens ───────────────────────────────────────────────────────
 export { plots, sensors, orgs, navigateTo, activeTab }

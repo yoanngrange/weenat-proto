@@ -1,6 +1,7 @@
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
+import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
 
 const ADHERENT_ORG_ID = 1
 
@@ -16,10 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
   setupCollapsible()
   setupWidgetMenus()
   setupIrrigButtons()
+  window.addEventListener('irrig-updated', () => renderParcelTable(isAdherent))
 })
 
 function setupIrrigButtons() {
-  document.getElementById('tdb-strategy-btn')?.addEventListener('click', () => {
+  document.getElementById('tdb-strategy-btn')?.addEventListener('click', e => {
+    e.stopPropagation()
     window.WebIrrig?.openSaison()
   })
   document.getElementById('tdb-parcels')?.addEventListener('click', e => {
@@ -131,13 +134,16 @@ function renderForecastTable() {
 }
 
 function plotIrrigationData(plot) {
-  const s = plot.id
-  if (s % 3 === 0) {
-    const mm = Math.round((s * 1.7 + 8) % 30 + 5)
-    const daysAhead = (s % 4) + 1
-    return { planned: true, mm, daysAhead }
-  }
-  return { planned: false }
+  const today  = new Date().toISOString().split('T')[0]
+  const groups = buildGroups(plots.filter(p => p.orgId === ADHERENT_ORG_ID))
+  const labels = new Set([plot.name])
+  for (const g of groups) { if (g.ids.includes(plot.id)) labels.add(g.label) }
+  const upcoming = IRRIG_SEASON
+    .filter(i => !i.real && labels.has(i.label) && i.iso >= today)
+    .sort((a, b) => a.iso < b.iso ? -1 : 1)
+  if (!upcoming.length) return { planned: false }
+  const daysAhead = Math.round((new Date(upcoming[0].iso) - new Date(today)) / 86400000)
+  return { planned: true, mm: upcoming[0].mm, daysAhead }
 }
 
 function thInfo(tooltip) {

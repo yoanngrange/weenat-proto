@@ -1,5 +1,6 @@
 import { plots as allPlots }   from '../../data/plots.js'
 import { sensors as allSensors } from '../../data/sensors.js'
+import { orgs as allOrgs }       from '../../data/orgs.js'
 import { network }               from '../../data/network.js'
 import { pushDetail, popDetail } from '../nav.js'
 
@@ -365,8 +366,10 @@ function buildBilanHydrique(plots, expanded = false) {
 }
 
 function buildPrevisions(plots, sensors, forecast) {
+  const orgById = Object.fromEntries(allOrgs.map(o => [o.id, o]))
   const plotOpts = plots.map(p => {
-    const label = [p.name, p.crop, p.ville].filter(Boolean).join(' · ')
+    const commune = p.ville || orgById[p.orgId]?.ville || null
+    const label = [p.name, p.crop || null, commune].filter(Boolean).join(' · ')
     return `<option value="p-${p.id}">${label}</option>`
   }).join('')
   const sensorOpts = sensors.map(s =>
@@ -402,6 +405,7 @@ function buildPrevisions(plots, sensors, forecast) {
   const extra   = forecast.slice(3).map(makeCard).join('')
 
   return `
+    <div class="m-w-section-hd" style="margin-top:0">Lieu des prévisions</div>
     <select class="m-prev-select">${opts}</select>
     <div class="m-prev-cards">
       ${visible}
@@ -546,27 +550,35 @@ function plotTreatmentData(plot) {
     : winDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
   const minutesFromNow = daysAhead * 1440 + winHour * 60 - (now.getHours() * 60 + now.getMinutes())
   const isUrgent = minutesFromNow >= 0 && minutesFromNow <= 600
-  return { product, winDateStr, winHour, winDur, isUrgent }
+  return { product, winDateStr, winHour, winDur, isUrgent, minutesFromNow }
 }
 
 function buildTraitements(plots) {
-  const myPlots = plots.filter(p => p.crop)
-  if (!myPlots.length) return `<div class="m-widget-empty">Aucune parcelle avec culture renseignée</div>`
-  return `<div class="m-w-list">${myPlots.map(p => {
-    const d = plotTreatmentData(p)
+  const withData = plots.filter(p => p.crop).map(p => ({ p, d: plotTreatmentData(p) }))
+  const upcoming = withData
+    .filter(({ d }) => d.minutesFromNow >= 0 && d.minutesFromNow <= 2880)
+    .sort((a, b) => a.d.minutesFromNow - b.d.minutesFromNow)
+  if (!upcoming.length) return `<div class="m-widget-empty">Aucune fenêtre favorable dans les prochaines 48h</div>`
+  const visible = upcoming.slice(0, 10)
+  const rows = visible.map(({ p, d }) => {
     const urgColor = d.isUrgent ? '#ff9f0a' : '#1c1c1e'
     const urgIcon  = d.isUrgent ? '<i class="bi bi-alarm-fill" style="color:#ff9f0a"></i> ' : ''
+    const hh = String(d.winHour).padStart(2, '0')
     return `<div class="m-w-row">
       <div class="m-w-row-main">
         <div class="m-w-row-name">${p.name}</div>
         <div class="m-w-row-sub">${p.crop}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:12px;font-weight:600;color:${urgColor}">${urgIcon}${d.winDateStr} · ${d.winHour}h</div>
-        <div style="font-size:11px;color:#8e8e93">${d.winDur}h de traitement</div>
+        <div style="font-size:12px;font-weight:600;color:${urgColor}">${urgIcon}${d.winDateStr} · ${hh}:00</div>
+        <div style="font-size:11px;color:#8e8e93">fenêtre de ${d.winDur} heures</div>
       </div>
     </div>`
-  }).join('')}</div>`
+  }).join('')
+  return `<div class="m-w-list">${rows}</div>
+    <div class="m-w-see-more" data-action="weephyt">
+      <i class="bi bi-box-arrow-up-right"></i> Voir les fenêtres des autres parcelles
+    </div>`
 }
 
 // ─── Capteurs avec événements ─────────────────────────────────────────────────
@@ -588,10 +600,13 @@ function buildEvenements(plots, sensors) {
       const cfg = SENSOR_EVENT_CFG[ev] || { icon: 'bi-exclamation-circle-fill', color: '#ff9f0a' }
       return `<span class="m-ev-badge" style="color:${cfg.color}"><i class="bi ${cfg.icon}"></i> ${ev}</span>`
     }).join('')
-    return `<div class="m-w-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+    return `<div class="m-w-row m-w-row--clickable" data-sensor-id="${s.id}" style="flex-direction:column;align-items:flex-start;gap:4px">
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
         <div class="m-w-row-name">${s.model} — ${s.serial}</div>
-        <div style="font-size:11px;color:#8e8e93">${parcel?.ville || parcel?.name || '—'}</div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <span style="font-size:11px;color:#8e8e93">${parcel?.ville || parcel?.name || '—'}</span>
+          <i class="bi bi-chevron-right" style="font-size:12px;color:#C0BEB8"></i>
+        </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
     </div>`
@@ -625,25 +640,38 @@ function plotPhenologyDataM(plot) {
 function buildCultures(plots) {
   const myPlots = plots.filter(p => p.crop)
   if (!myPlots.length) return `<div class="m-widget-empty">Aucune parcelle avec culture renseignée</div>`
-  return `<div class="m-w-list">${myPlots.map(p => {
-    const hasPheno = !!PHENOLOGY_M[p.crop]
-    const d        = hasPheno ? plotPhenologyDataM(p) : null
-    const showNext = hasPheno && NEXT_STAGE_CROPS_M.has(p.crop)
-    const variety  = hasPheno && d.variety !== '—' ? ` · ${d.variety}` : ''
-    return `<div class="m-w-row">
-      <div class="m-w-row-main">
-        <div class="m-w-row-name">${p.name}</div>
-        <div class="m-w-row-sub">${p.crop}${variety}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;max-width:48%">
-        ${hasPheno
-          ? `<div style="font-size:12px;font-weight:600;color:#1c1c1e;line-height:1.3">${d.stage.split(' (BBCH')[0]}</div>
-             ${showNext ? `<div style="font-size:11px;color:#636366">↗ ${d.nextStage} · ${d.nextDateStr}</div>` : ''}`
-          : `<div style="font-size:12px;color:#b0aead;font-style:italic">Stade non renseigné</div>`
-        }
-      </div>
-    </div>`
-  }).join('')}</div>`
+  const byCrop = {}
+  for (const p of myPlots) { if (!byCrop[p.crop]) byCrop[p.crop] = []; byCrop[p.crop].push(p) }
+  const groups = Object.entries(byCrop).map(([crop, ps]) => {
+    const plotRows = ps.map(p => {
+      const hasPheno = !!PHENOLOGY_M[p.crop]
+      const d        = hasPheno ? plotPhenologyDataM(p) : null
+      const variety  = hasPheno && d.variety !== '—' ? d.variety : ''
+      const stage    = hasPheno ? d.stage.split(' (BBCH')[0] : 'Stade non renseigné'
+      return `<div class="m-w-row m-w-row--clickable" data-plot-id="${p.id}">
+        <div class="m-w-row-main">
+          <div class="m-w-row-name">${p.name}</div>
+          ${variety ? `<div class="m-w-row-sub">${variety}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <div style="font-size:12px;font-weight:600;color:#1c1c1e;text-align:right">${stage}</div>
+          <i class="bi bi-chevron-right" style="font-size:12px;color:#C0BEB8"></i>
+        </div>
+      </div>`
+    }).join('')
+    return `<details class="m-crop-group">
+      <summary class="m-crop-summary">
+        <div class="m-crop-summary-left">
+          <div class="m-crop-summary-name">${crop}</div>
+          <div class="m-crop-summary-count">${ps.length} parcelle${ps.length > 1 ? 's' : ''}</div>
+        </div>
+        <i class="bi bi-chevron-right m-crop-chevron"></i>
+      </summary>
+      <div class="m-crop-plots">${plotRows}</div>
+    </details>`
+  }).join('')
+  return `<div class="m-widget-hint">Appuyez sur une parcelle pour renseigner ou mettre à jour les stades phénologiques</div>
+    ${groups}`
 }
 
 function buildMonReseau() {
@@ -935,6 +963,23 @@ export function initDashboardScreen(screenEl, role) {
         if (collapsedWidgets.has(widgetId)) collapsedWidgets.delete(widgetId)
         else collapsedWidgets.add(widgetId)
         persist(); render()
+      })
+    })
+
+    content.querySelector('[data-action="weephyt"]')?.addEventListener('click', () => {
+      showToast('Page Weephyt — à venir')
+    })
+
+    content.querySelectorAll('[data-sensor-id]').forEach(row => {
+      row.addEventListener('click', () => {
+        const sensor = exploitSensors.find(s => s.id === +row.dataset.sensorId)
+        if (sensor) import('./sensor-detail.js').then(m => m.initSensorDetail(sensor, 'params'))
+      })
+    })
+    content.querySelectorAll('[data-widget="cultures"] [data-plot-id]').forEach(row => {
+      row.addEventListener('click', () => {
+        const plot = allPlots.find(p => p.id === +row.dataset.plotId)
+        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'params'))
       })
     })
 

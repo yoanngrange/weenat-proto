@@ -145,6 +145,43 @@ function getDisplayCount() {
   return Math.max(2, Math.min(200, Math.floor(total / step)))
 }
 
+// ─── Nav select ───────────────────────────────────────────────────────────────
+
+const SENSOR_MODEL_NAMES = {
+  'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
+  'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
+  'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde fertirrigation',
+}
+
+function initNavSelect() {
+  const titleEl = document.getElementById('breadcrumb-title')
+  if (!titleEl) return
+  const lastSpan = titleEl.querySelector('span:last-child')
+  if (!lastSpan) return
+
+  const orgSensors = sensors
+    .filter(s => s.orgId === sensor.orgId)
+    .sort((a, b) => a.serial.localeCompare(b.serial))
+
+  const wrap = document.createElement('span')
+  wrap.className = 'breadcrumb-nav-wrap'
+
+  const sel = document.createElement('select')
+  sel.className = 'breadcrumb-nav-select'
+  sel.innerHTML = orgSensors.map(s =>
+    `<option value="${s.id}"${s.id === sensorId ? ' selected' : ''}>${SENSOR_MODEL_NAMES[s.model] || s.model} · ${s.serial}</option>`
+  ).join('')
+  sel.addEventListener('change', () => {
+    window.location.href = `capteur-detail.html?id=${sel.value}`
+  })
+
+  wrap.appendChild(sel)
+  lastSpan.replaceWith(wrap)
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -157,6 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     label: 'Capteurs',
     href: 'capteurs.html',
   })
+  initNavSelect()
 
   renderLatestStrip()
   renderCharts()
@@ -1308,6 +1346,12 @@ function renderPanelMembres(parcel) {
   }
   if (section) section.style.display = ''
 
+  const addRow = el.closest('.panel-section')?.querySelector('.panel-add-row')
+  if (addRow) addRow.style.display = isAdherent ? 'none' : ''
+
+  const CONSEILLER_ROLES = new Set(['propriétaire', 'admin', 'agent'])
+  const canRemove = m => !isAdherent || !CONSEILLER_ROLES.has(m.role)
+
   if (!linked.length) {
     el.innerHTML = '<p class="panel-empty">Aucun membre associé.</p>'
   } else {
@@ -1315,40 +1359,40 @@ function renderPanelMembres(parcel) {
       <div class="member-row">
         <div>
           <span class="member-name">${m.prenom} ${m.nom}</span>
-          <span class="member-role-badge">${m.role}</span>
+          ${isAdherent ? '' : `<span class="member-role-badge">${m.role}</span>`}
         </div>
-        <button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer">
-          <i class="bi bi-x-lg"></i>
-        </button>
+        ${canRemove(m) ? `<button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
       </div>
     `).join('')
   }
 
-  const select = document.getElementById('add-membre-select')
-  if (select) {
-    select.innerHTML = '<option value="">Ajouter un membre…</option>'
-    members.filter(m => !linkedMemberIds.includes(m.id)).forEach(m => {
-      const opt = document.createElement('option')
-      opt.value = m.id
-      opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
-      select.appendChild(opt)
-    })
-  }
+  if (!isAdherent) {
+    const select = document.getElementById('add-membre-select')
+    if (select) {
+      select.innerHTML = '<option value="">Ajouter un membre…</option>'
+      members.filter(m => !linkedMemberIds.includes(m.id)).forEach(m => {
+        const opt = document.createElement('option')
+        opt.value = m.id
+        opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
+        select.appendChild(opt)
+      })
+    }
 
-  el.querySelectorAll('.remove-membre-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      linkedMemberIds = linkedMemberIds.filter(x => x !== parseInt(btn.dataset.id))
-      renderPanelMembres(parcel)
+    el.querySelectorAll('.remove-membre-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        linkedMemberIds = linkedMemberIds.filter(x => x !== parseInt(btn.dataset.id))
+        renderPanelMembres(parcel)
+      })
     })
-  })
 
-  const addBtn = document.getElementById('add-membre-btn')
-  if (addBtn) {
-    addBtn.onclick = () => {
-      const id = parseInt(document.getElementById('add-membre-select').value)
-      if (!id || linkedMemberIds.includes(id)) return
-      linkedMemberIds.push(id)
-      renderPanelMembres(parcel)
+    const addBtn = document.getElementById('add-membre-btn')
+    if (addBtn) {
+      addBtn.onclick = () => {
+        const id = parseInt(document.getElementById('add-membre-select').value)
+        if (!id || linkedMemberIds.includes(id)) return
+        linkedMemberIds.push(id)
+        renderPanelMembres(parcel)
+      }
     }
   }
 }

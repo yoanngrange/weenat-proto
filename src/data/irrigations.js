@@ -1,21 +1,31 @@
 import { plots } from './plots.js'
 
-const IRRIG_KEY = 'weenat-irrigations'
+const IRRIG_KEY = 'weenat-irrigations-v2'
 
 const DEFAULT_SEASON = [
-  { iso: '2026-04-21', mm: 18, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-04-28', mm: 22, real: true,  label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-04', mm: 20, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-07', mm: 25, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-11', mm: 30, real: true,  label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-13', mm: 22, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-18', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-21', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-05-24', mm: 18, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
-  { iso: '2026-05-28', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-04', mm: 25, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-11', mm: 30, real: false, label: 'Maïs · Pivot',     fromStrategy: true },
-  { iso: '2026-06-18', mm: 25, real: false, label: 'Maïs · Aspersion', fromStrategy: true },
+  // Maïs · Pivot
+  { iso: '2026-04-21', mm: 18, real: true,  label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-05-04', mm: 20, real: true,  label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-05-11', mm: 30, real: true,  label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-05-21', mm: 25, real: true,  label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-05-28', mm: 30, real: false, label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-06-04', mm: 25, real: false, label: 'Maïs · Pivot',                  fromStrategy: true },
+  { iso: '2026-06-11', mm: 30, real: false, label: 'Maïs · Pivot',                  fromStrategy: true },
+  // Pomme de terre · Enrouleur
+  { iso: '2026-04-30', mm: 22, real: true,  label: 'Pomme de terre · Enrouleur',     fromStrategy: true },
+  { iso: '2026-05-14', mm: 20, real: true,  label: 'Pomme de terre · Enrouleur',     fromStrategy: true },
+  { iso: '2026-05-25', mm: 18, real: false, label: 'Pomme de terre · Enrouleur',     fromStrategy: true },
+  { iso: '2026-06-06', mm: 20, real: false, label: 'Pomme de terre · Enrouleur',     fromStrategy: true },
+  // Cerisier · Goutte à goutte
+  { iso: '2026-05-08', mm: 10, real: true,  label: 'Cerisier · Goutte à goutte',     fromStrategy: true },
+  { iso: '2026-05-19', mm: 12, real: true,  label: 'Cerisier · Goutte à goutte',     fromStrategy: true },
+  { iso: '2026-05-30', mm: 10, real: false, label: 'Cerisier · Goutte à goutte',     fromStrategy: true },
+  { iso: '2026-06-13', mm: 12, real: false, label: 'Cerisier · Goutte à goutte',     fromStrategy: true },
+  // Salade · Couverture intégrale
+  { iso: '2026-05-05', mm:  8, real: true,  label: 'Salade · Couverture intégrale',  fromStrategy: true },
+  { iso: '2026-05-16', mm:  8, real: true,  label: 'Salade · Couverture intégrale',  fromStrategy: true },
+  { iso: '2026-05-27', mm:  8, real: false, label: 'Salade · Couverture intégrale',  fromStrategy: true },
+  { iso: '2026-06-07', mm:  8, real: false, label: 'Salade · Couverture intégrale',  fromStrategy: true },
 ]
 
 let _loaded = null
@@ -30,6 +40,7 @@ export const RAIN_DATA = [
 
 export function saveIrrig() {
   try { localStorage.setItem(IRRIG_KEY, JSON.stringify(IRRIG_SEASON)) } catch {}
+  window.dispatchEvent(new CustomEvent('irrig-updated'))
 }
 
 export function buildGroups(plotList) {

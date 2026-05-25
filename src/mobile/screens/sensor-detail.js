@@ -368,9 +368,9 @@ function paramsView(sensor) {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export function initSensorDetail(sensor) {
+export function initSensorDetail(sensor, initialView = 'donnees') {
   const linkedPlot = sensor.parcelId ? allPlots.find(p => p.id === sensor.parcelId) : null
-  let activeView    = 'donnees'
+  let activeView    = initialView
   let currentPeriod = '7d'
   let currentStep   = '1h'
   let isFav = false
@@ -391,8 +391,8 @@ export function initSensorDetail(sensor) {
       </div>
     </div>
     <div class="m-detail-tabs">
-      <button class="m-detail-tab active" data-view="donnees">Données</button>
-      <button class="m-detail-tab" data-view="params">Paramètres</button>
+      <button class="m-detail-tab ${initialView === 'donnees' ? 'active' : ''}" data-view="donnees">Données</button>
+      <button class="m-detail-tab ${initialView === 'params'  ? 'active' : ''}" data-view="params">Paramètres</button>
     </div>
     <div id="detail-content" class="m-detail-content"></div>`)
 
@@ -452,7 +452,8 @@ export function initSensorDetail(sensor) {
       <button class="m-sheet-option" data-a="plot"><i class="bi bi-map"></i> Parcelle</button>
       <button class="m-sheet-option" data-a="alerte"><i class="bi bi-bell"></i> Alerte</button>
       <button class="m-sheet-option" data-a="maintenance"><i class="bi bi-tools"></i> Opération de maintenance</button>
-      <button class="m-sheet-option" data-a="note"><i class="bi bi-pencil"></i> Note</button>`
+      <button class="m-sheet-option" data-a="note"><i class="bi bi-pencil"></i> Note</button>
+      <button class="m-sheet-option" data-a="traitement"><i class="bi bi-eyedropper"></i> Traitement</button>`
     const el = document.createElement('div'); el.innerHTML = body
     const sh = showSheet({ title: 'Ajouter au capteur', body: el, doneLabel: 'Fermer', onDone: () => {} })
     el.querySelectorAll('[data-a]').forEach(btn => {

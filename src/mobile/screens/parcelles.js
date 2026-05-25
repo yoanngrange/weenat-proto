@@ -113,13 +113,13 @@ export function initParcellesScreen(screenEl, role) {
 
     const listHtml = sorted.length
       ? `<div class="m-plain-list">${sorted.map(p => {
-          const city = commune(p)
+          const sub  = [p.crop, p.irrigation].filter(Boolean).join(' · ')
           const has  = hasMetric(p, metricId)
           return `
             <div class="m-plain-row m-tappable" data-plot-id="${p.id}">
               <div class="m-plain-info">
                 <span class="m-plain-name">${p.name}</span>
-                ${city ? `<span class="m-plain-city">${city}</span>` : ''}
+                ${sub ? `<span class="m-plain-city">${sub}</span>` : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px">
                 <span class="m-plain-data${has ? '' : ' m-plain-na'}">${has ? `${getVal(p.id)} ${metric.unit}` : '—'}</span>

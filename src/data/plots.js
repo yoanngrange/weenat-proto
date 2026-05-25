@@ -79,13 +79,13 @@ export const plots = [
   },
   {
     id: 4, orgId: 1, name: "Les Courtils", ville: "Guégon", lat: 48.1053, lng: -2.4739,
-    area: 4.5, crop: null, reserveHydrique: 81, degresJour: 960, texture: "Limono-argileux fin",
-    irrigation: "Pas d'irrigation", integrations: ["IRRÉ-LIS Multi-Cultures"],
+    area: 4.5, crop: "Maïs", reserveHydrique: 81, degresJour: 960, texture: "Limono-argileux fin",
+    irrigation: "Pivot", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.104397,-2.477657],[48.103118,-2.476486],[48.103047,-2.474092],[48.105214,-2.473134],[48.105108,-2.471059],[48.107772,-2.469836],[48.108128,-2.474997]]
   },
   {
     id: 5, orgId: 1, name: "La Grande Pièce", ville: "Guégon", lat: 48.1072, lng: -2.5542,
-    area: 11.2, crop: "Blé tendre", reserveHydrique: 76, degresJour: 1195, texture: "Limon fin",
+    area: 11.2, crop: "Pomme de terre", reserveHydrique: 76, degresJour: 1195, texture: "Limon fin",
     irrigation: "Enrouleur", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.105663,-2.557473],[48.104843,-2.552900],[48.109237,-2.550558],[48.108964,-2.555651]]
   },
@@ -97,8 +97,8 @@ export const plots = [
   },
   {
     id: 7, orgId: 1, name: "La Croix", ville: "La Chapelle-Caro", lat: 48.1285, lng: -2.5837,
-    area: 4.1, crop: null, reserveHydrique: 55, degresJour: 1010, texture: "Sable",
-    irrigation: null, integrations: ["IRRÉ-LIS Mono-Culture"],
+    area: 4.1, crop: "Figuier", reserveHydrique: 55, degresJour: 1010, texture: "Sable",
+    irrigation: "Gravitaire", integrations: ["IRRÉ-LIS Mono-Culture"],
     latlngs: [[48.130063,-2.587041],[48.127025,-2.585169],[48.125978,-2.583298],[48.126451,-2.582893],[48.127194,-2.583551],[48.129388,-2.578847],[48.130435,-2.583703],[48.131076,-2.585220]]
   },
   {
@@ -109,38 +109,38 @@ export const plots = [
   },
   {
     id: 9, orgId: 1, name: "Le Marais Bas", ville: "Josselin", lat: 48.1517, lng: -2.6123,
-    area: 7.5, crop: "Betterave sucrière", reserveHydrique: 90, degresJour: 1100, texture: null,
+    area: 7.5, crop: "Cerisier", reserveHydrique: 90, degresJour: 1100, texture: null,
     irrigation: "Goutte à goutte", integrations: ["DeciTrait"],
     latlngs: [[48.152435,-2.614382],[48.150411,-2.613851],[48.151102,-2.608944],[48.152689,-2.611903]]
   },
   {
     id: 10, orgId: 1, name: "La Côte", ville: "Saint-Congard", lat: 48.1599, lng: -2.5204,
-    area: 5.1, crop: "Pomme de terre", reserveHydrique: 62, degresJour: 1055, texture: "Limon sableux",
+    area: 5.1, crop: "Salade", reserveHydrique: 62, degresJour: 1055, texture: "Limon sableux",
     irrigation: "Couverture intégrale", integrations: ["Limacapt"],
     latlngs: [[48.159600,-2.523138],[48.158134,-2.522951],[48.158283,-2.520530],[48.159525,-2.518965],[48.160793,-2.518705],[48.161066,-2.518109],[48.161364,-2.518630],[48.160619,-2.520456],[48.159650,-2.521685]]
   },
   {
     id: 11, orgId: 1, name: "Le Pré du Val", ville: "Malestroit", lat: 48.0499, lng: -2.6495,
-    area: 4.8, crop: null, reserveHydrique: 74, degresJour: 1130, texture: null,
-    irrigation: null, integrations: [],
+    area: 4.8, crop: "Cerisier", reserveHydrique: 74, degresJour: 1130, texture: null,
+    irrigation: "Goutte à goutte", integrations: [],
     latlngs: [[48.051148,-2.656116],[48.048581,-2.652550],[48.046491,-2.646296],[48.049571,-2.646187],[48.053458,-2.646132]]
   },
   {
     id: 12, orgId: 1, name: "Le Bois Rond", ville: "Bignan", lat: 48.0245, lng: -2.8096,
-    area: 9.1, crop: null, reserveHydrique: 67, degresJour: 1165, texture: null,
-    irrigation: "Pas d'irrigation", integrations: [],
+    area: 9.1, crop: "Salade", reserveHydrique: 67, degresJour: 1165, texture: null,
+    irrigation: "Couverture intégrale", integrations: [],
     latlngs: [[48.027302,-2.817552],[48.026173,-2.820127],[48.023802,-2.822027],[48.022729,-2.822238],[48.020414,-2.814386],[48.020696,-2.813036],[48.021966,-2.811136],[48.021373,-2.809700],[48.021994,-2.807463],[48.022757,-2.806872],[48.022531,-2.805099],[48.022869,-2.801932],[48.023095,-2.799948],[48.024422,-2.800370],[48.024676,-2.802439],[48.026032,-2.803832],[48.028234,-2.804338],[48.031876,-2.806829],[48.032045,-2.808349],[48.025721,-2.815062]]
   },
   {
     id: 13, orgId: 1, name: "Les Haies", ville: "St-Jean-Brévelay", lat: 48.1617, lng: -2.3045,
-    area: 4.3, crop: "Pois de printemps", reserveHydrique: 79, degresJour: 930, texture: "Argile",
-    irrigation: null, integrations: [],
+    area: 4.3, crop: "Pomme de terre", reserveHydrique: 79, degresJour: 930, texture: "Argile",
+    irrigation: "Enrouleur", integrations: [],
     latlngs: [[48.165234,-2.313084],[48.162307,-2.309561],[48.160214,-2.306935],[48.158120,-2.301843],[48.158996,-2.301010],[48.160107,-2.301363],[48.160513,-2.300242],[48.161560,-2.301683],[48.163098,-2.300081],[48.163931,-2.301106],[48.164401,-2.302740],[48.162735,-2.305014],[48.163696,-2.306615],[48.166516,-2.311611]]
   },
   {
     id: 14, orgId: 1, name: "Le Clos", ville: "Sérent", lat: 48.2190, lng: -2.4655,
     area: 5.7, crop: "Tournesol", reserveHydrique: 53, degresJour: 1270, texture: "Sable limoneux",
-    irrigation: "Goutte à goutte enterré", integrations: [],
+    irrigation: "Enrouleur", integrations: [],
     latlngs: [[48.221011,-2.467585],[48.218677,-2.468331],[48.217922,-2.466477],[48.218403,-2.465885],[48.217991,-2.465087],[48.217613,-2.462923],[48.219381,-2.462151]]
   },
   {
@@ -407,3 +407,5 @@ export const plots = [
 plots.forEach(p => {
   if (!p.latlngs) p.latlngs = shapeToLatlngs(p)
 })
+
+if (typeof window !== 'undefined') window.__weenatPlots = plots

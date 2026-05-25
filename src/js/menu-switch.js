@@ -156,6 +156,14 @@ function openAddModal() {
             <span>Stratégie d'irr.</span>
             <span class="add-item-tip" data-tip="Récurrence sur toute une saison, sur une ou plusieurs parcelles">i</span>
           </button>
+          <button class="add-item-btn" data-action="note">
+            <i class="bi bi-pencil-square"></i>
+            <span>Note</span>
+          </button>
+          <button class="add-item-btn" data-action="traitement">
+            <i class="bi bi-eyedropper"></i>
+            <span>Traitement</span>
+          </button>
         </div>
       </div>
 

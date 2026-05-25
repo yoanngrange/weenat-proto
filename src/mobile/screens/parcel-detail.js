@@ -2,6 +2,8 @@ import { pushDetail, popDetail } from '../nav.js'
 import { showToast, showSheet } from '../ui.js'
 import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
+import { IRRIG_SEASON, buildGroups } from '../../data/irrigations.js'
+import { plots as allPlots }    from '../../data/plots.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
 
@@ -314,11 +316,65 @@ function bindChartTooltip(wrap) {
 }
 
 // ─── Views ────────────────────────────────────────────────────────────────────
-function widgetsView() {
+function irrigationWidget(parcel) {
+  const groups = buildGroups(allPlots.filter(p => p.orgId === parcel.orgId))
+  const labels = new Set([parcel.name])
+  groups.filter(g => g.ids.includes(parcel.id)).forEach(g => labels.add(g.label))
+  const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
+  const TODAY_M = new Date().toISOString().split('T')[0]
+  const real    = irrigs.filter(i => i.real)
+  const plan    = irrigs.filter(i => !i.real)
+  const tReal   = real.reduce((s, i) => s + i.mm, 0)
+  const tPlan   = plan.reduce((s, i) => s + i.mm, 0)
+  const next    = plan.filter(i => i.iso >= TODAY_M).sort((a, b) => a.iso < b.iso ? -1 : 1)[0]
+  const MN      = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const fmtD    = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
+  const irrType = parcel.irrigation
+
+  if (!irrigs.length) {
+    return `
+      <div class="m-placeholder-widget" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+          <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
+            <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
+          </span>
+          <button class="m-widget-menu" type="button">•••</button>
+        </div>
+        <div style="font-size:13px;color:#8e8e93">Aucune irrigation enregistrée cette saison</div>
+      </div>`
+  }
+
+  return `
+    <div class="m-placeholder-widget" style="flex-direction:column;align-items:flex-start;gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+        <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
+          <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
+          ${irrType && irrType !== "Pas d'irrigation" ? `<span style="background:rgba(1,114,164,.1);color:#0172A4;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600">${irrType}</span>` : ''}
+        </span>
+        <button class="m-widget-menu" type="button">•••</button>
+      </div>
+      <div style="display:flex;gap:20px;width:100%">
+        <div>
+          <div style="font-size:10px;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Réalisées</div>
+          <div style="font-size:22px;font-weight:700;color:#E07820;line-height:1.1">${tReal} <span style="font-size:12px;font-weight:400;color:#8e8e93">mm</span></div>
+          <div style="font-size:11px;color:#8e8e93">${real.length} irrig.</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Planifiées</div>
+          <div style="font-size:22px;font-weight:700;color:#FFB705;line-height:1.1">${tPlan} <span style="font-size:12px;font-weight:400;color:#8e8e93">mm</span></div>
+          <div style="font-size:11px;color:#8e8e93">${plan.length} irrig.</div>
+        </div>
+      </div>
+      ${next ? `<div style="font-size:12px;color:#3a3a3c"><i class="bi bi-arrow-right-circle" style="color:#0172A4"></i> Prochaine · <strong>${fmtD(next.iso)}</strong> · ${next.mm} mm</div>` : ''}
+    </div>`
+}
+
+function widgetsView(parcel) {
   const PARCEL_WIDGETS = ['Bilan hydrique', 'Stades phénologiques', 'Alertes actives', 'Données temps-réel']
   return `
     <div class="m-detail-section">
       <button class="m-add-widget-btn"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
+      ${irrigationWidget(parcel)}
       ${PARCEL_WIDGETS.map(name => `
         <div class="m-placeholder-widget">
           <span class="m-placeholder-widget-name">${name}</span>
@@ -504,9 +560,9 @@ function paramsView(parcel, org, linkedSensorIds) {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export function initParcelDetail(parcel, linkedSensorIds = []) {
+export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'widgets') {
   const org = orgs.find(o => o.id === parcel.orgId)
-  let activeView    = 'widgets'
+  let activeView    = initialView
   let currentPeriod = '7d'
   let currentStep   = '1h'
   let isFav = false
@@ -527,15 +583,15 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
       </div>
     </div>
     <div class="m-detail-tabs">
-      <button class="m-detail-tab active" data-view="widgets">Widgets</button>
-      <button class="m-detail-tab" data-view="donnees">Données</button>
-      <button class="m-detail-tab" data-view="params">Paramètres</button>
+      <button class="m-detail-tab ${initialView === 'widgets' ? 'active' : ''}" data-view="widgets">Widgets</button>
+      <button class="m-detail-tab ${initialView === 'donnees' ? 'active' : ''}" data-view="donnees">Données</button>
+      <button class="m-detail-tab ${initialView === 'params'  ? 'active' : ''}" data-view="params">Paramètres</button>
     </div>
     <div id="detail-content" class="m-detail-content"></div>`)
 
   function renderView() {
     const c = layer.querySelector('#detail-content')
-    if (activeView === 'widgets')  c.innerHTML = widgetsView()
+    if (activeView === 'widgets')  c.innerHTML = widgetsView(parcel)
     if (activeView === 'donnees')  c.innerHTML = donneesView(linkedSensorIds, currentPeriod, currentStep)
     if (activeView === 'params')   { c.innerHTML = paramsView(parcel, org, linkedSensorIds); initMinimap() }
     bindViewEvents()
@@ -591,9 +647,6 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
     })
   })
 
-  // Plus button
-  layer.querySelector('#d-plus').addEventListener('click', () => openAddPage(parcel))
-
   // Back
   layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
 
@@ -617,7 +670,8 @@ export function initParcelDetail(parcel, linkedSensorIds = []) {
       <a class="m-sheet-link" data-a="integration" style="color:#8e8e93">
         <i class="bi bi-plug"></i> Intégration <span style="font-size:11px">(version web uniquement)</span>
       </a>
-      <a class="m-sheet-link" data-a="note"><i class="bi bi-pencil"></i> Note</a>`
+      <a class="m-sheet-link" data-a="note"><i class="bi bi-pencil"></i> Note</a>
+      <a class="m-sheet-link" data-a="traitement"><i class="bi bi-eyedropper"></i> Traitement</a>`
     const el = document.createElement('div'); el.innerHTML = body
     const sh = showSheet({ title: 'Ajouter à la parcelle', body: el, doneLabel: 'Fermer', onDone: () => {} })
     el.querySelectorAll('[data-a]').forEach(btn => {

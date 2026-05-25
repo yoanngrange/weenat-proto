@@ -8,15 +8,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-DoB9iNDs.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-CHEijuCw.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-BEtOZiNT.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-BEYIGwLd.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-DDe0aa9W.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-Cx4wNzLL.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-DEd9yWse.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-DEBQjfiD.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-DzkjdUGR.js">
-  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-BjaGIrE0.css">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-cQAUTeq7.js">
+  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-Bso8GWDF.css">
 
   <body>
     <div id="app">
@@ -77,10 +78,13 @@
         </div>
         <div class="detail-tab-bar">
           <button class="detail-tab-btn active" data-pane="tab-custom">
-            <i class="bi bi-grid-1x2"></i> Vue personnalisée
+            <i class="bi bi-grid-1x2"></i> Widgets
           </button>
           <button class="detail-tab-btn" data-pane="tab-donnees">
             <i class="bi bi-graph-up"></i> Données
+          </button>
+          <button class="detail-tab-btn" data-pane="tab-journal">
+            <i class="bi bi-journal-text"></i> Journal
           </button>
         </div>
 
@@ -136,6 +140,10 @@
                 </div>
                 <div id="charts-container" class="charts-stack"></div>
               </div><!-- #tab-donnees -->
+
+              <div id="tab-journal" class="detail-tab-pane">
+                <div id="journal-container"></div>
+              </div><!-- #tab-journal -->
 
             </div>
 

@@ -5,6 +5,7 @@ import { orgs } from '../data/orgs.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getParcel, patchParcel } from '../data/store.js'
+import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
 
 const urlParams = new URLSearchParams(window.location.search)
 const parcelId  = parseInt(urlParams.get('id'))
@@ -107,7 +108,7 @@ const MODEL_NAMES = {
   'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde fertirrigation',
 }
 
-function renderWindCompositeChart(container) {
+function renderWindCompositeChart(container, source = null, emissionMins = null, cardKey = null) {
   const count   = Math.max(2, Math.min(200, Math.floor(getPeriodMinutes() / getStepMinutes())))
   const vitesse = Array.from({length: count}, () => rnd(5, 35))
   const rafales = vitesse.map(v => Math.min(v + rnd(3, 18), 80))
@@ -138,10 +139,14 @@ function renderWindCompositeChart(container) {
 
   const card = document.createElement('div')
   card.className = 'chart-card'
+  if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
+  const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
+  const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
   card.innerHTML = `
     <div class="chart-card-header">
       <span class="chart-card-name" style="color:#7bc4b0">Vent</span>
       <span class="chart-card-unit">km/h · direction</span>
+      <div class="chart-card-meta">${sourceHtml}${emHtml}</div>
     </div>
     <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
       ${yLbls}${grid}
@@ -159,7 +164,7 @@ function renderWindCompositeChart(container) {
 
 const ALL_INTEGRATIONS = [
   'Modèles Arvalis — PRÉVI-LIS / MILÉOS', 'Xarvio', 'Pixagri', 'VitiMeteo',
-  'Millésime', 'Rimpro', 'Cropwise Protector', 'IRRÉ-LIS Mono-Culture',
+  'Rimpro', 'Cropwise Protector', 'IRRÉ-LIS Mono-Culture',
   'Movida GrapeVision', 'DeciTrait',
 ]
 
@@ -223,16 +228,65 @@ function getDisplayCount() {
 
 // ─── Widget catalog ───────────────────────────────────────────────────────────
 
+// Catalog item name → widget ID
+const CATALOG_ITEM_ID = {
+  'Cumul Degrés jours': 'cumuls', 'Cumul Pluie': 'cumuls', 'Cumul Ensoleillement': 'cumuls',
+  'Cumul Evapotranspiration': 'cumuls', 'Cumul Heures froides': 'cumuls', 'Cumul Humectation foliaire': 'cumuls',
+  "Maï'zy": 'maizy', 'Suivi de culture': 'suivi-culture', 'Weephyt': 'weephyt',
+  'Decitrait': 'decitrait', 'Tavelure Pomme': 'tavelure',
+  'DPV': 'dpv', 'THI': 'thi', 'Température de rosée': 'temp-rosee',
+  'Température du sol': 'temp-sol', 'Rayonnement solaire': 'w-pyrano', 'Gel': 'gel',
+  'Prévisions à 5 jours': 'previsions-5j', 'Prévisions à 6 heures': 'previsions-6h',
+  'Prévisions du jour': 'previsions-jour', 'Prévisions de tensiométrie': 'previsions-tensio',
+  'Anémomètre': 'w-anem', "Capteur d'humectation foliaire": 'w-lws',
+  'Capteur PAR': 'w-par', 'Pyranomètre': 'w-pyrano', 'Station météo': 'w-station',
+  'Station Météo Virtuelle': 'w-station', 'Thermomètre de sol': 'w-tsol', 'Thermomètre-Hygromètre': 'w-thygro',
+  'Sonde capacitive': 'w-capa', 'Tensiomètre': 'w-tensio', 'Sonde de fertirrigation': 'w-ec',
+  'Profil capteurs': 'profil-capteurs', 'Niveau de réservoir en eau utilisable': 'niveau-reservoir',
+  'Profil de niveau de réservoir': 'profil-reservoir',
+}
+
 const WIDGET_CATALOG_WEB = [
   { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
   { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
-  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire'] },
+  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
-  { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
   { title: 'Irrigation', items: ['Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+  { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
 ]
 
 function openWebWidgetCatalog() {
+  const linked   = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  const models   = new Set(linked.map(s => s.model))
+  const crop     = (parcelState.crop || parcelBase.crop || '').toLowerCase()
+  const active   = getActiveWidgetIds()
+  const hasTH    = linked.some(s => { const ms = METRICS_BY_MODEL[s.model]||[]; return ms.some(m=>m.id==='temp') && ms.some(m=>m.id==='humidite') })
+  const hasTsol  = linked.some(s => (METRICS_BY_MODEL[s.model]||[]).some(m=>m.id==='tsol'))
+  const hasCumul = linked.some(s => (METRICS_BY_MODEL[s.model]||[]).some(m=>m.cumul))
+
+  const isVisible = item => {
+    const id = CATALOG_ITEM_ID[item]
+    if (!id) return true
+    if (item === 'Gel') return models.has('T_GEL')
+    if (item === "Maï'zy") return crop.includes('maïs') || crop.includes('mais')
+    if (item === 'Tavelure Pomme') return crop.includes('pommier')
+    if (item === 'Station météo') return models.has('P+') || models.has('PT') || models.has('P')
+    if (item === 'Station Météo Virtuelle') return models.has('SMV')
+    if (item === 'Thermomètre-Hygromètre') return models.has('TH')
+    if (item === 'Thermomètre de sol') return models.has('T_MINI') || hasTsol
+    if (item === 'Anémomètre') return models.has('W')
+    if (item === 'Pyranomètre' || item === 'Rayonnement solaire') return models.has('PYRANO')
+    if (item === "Capteur d'humectation foliaire") return models.has('LWS')
+    if (item === 'Capteur PAR') return models.has('PAR')
+    if (item === 'Sonde capacitive') return [...models].some(m=>m.startsWith('CAPA-'))
+    if (item === 'Tensiomètre') return [...models].some(m=>TENSIO_MODELS.includes(m))
+    if (item === 'Sonde de fertirrigation') return models.has('EC')
+    if (item === 'DPV' || item === 'THI' || item === 'Température de rosée') return hasTH
+    if (item === 'Température du sol') return hasTsol
+    if (item.startsWith('Cumul')) return hasCumul
+    return true
+  }
+
   const modal = document.createElement('div')
   modal.className = 'modal add-modal'
   modal.innerHTML = `
@@ -241,24 +295,288 @@ function openWebWidgetCatalog() {
         <span class="add-modal-title">Ajouter un widget</span>
         <button class="add-modal-close" aria-label="Fermer">×</button>
       </div>
-      ${WIDGET_CATALOG_WEB.map(sec => `
+      ${WIDGET_CATALOG_WEB.map(sec => {
+        const items = sec.items.filter(isVisible)
+        if (!items.length) return ''
+        return `
         <div class="add-modal-section">
           <div class="add-modal-section-label">${sec.title}</div>
           <div class="wcat-list">
-            ${sec.items.map(item => `
+            ${items.map(item => {
+              const id = CATALOG_ITEM_ID[item]
+              const already = id && active.includes(id)
+              return `
               <div class="wcat-item">
                 <span>${item}</span>
-                <button class="wcat-add-btn" type="button"><i class="bi bi-plus-circle"></i> Ajouter</button>
-              </div>`).join('')}
+                ${already
+                  ? `<span class="wcat-already"><i class="bi bi-check2"></i> Ajouté</span>`
+                  : `<button class="wcat-add-btn" type="button" data-wid="${id}"><i class="bi bi-plus-circle"></i> Ajouter</button>`}
+              </div>`
+            }).join('')}
           </div>
-        </div>`).join('')}
+        </div>`
+      }).join('')}
     </div>`
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
   modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
   modal.querySelectorAll('.wcat-add-btn').forEach(btn => {
-    btn.addEventListener('click', () => { modal.remove(); alert('Widget bientôt disponible') })
+    btn.addEventListener('click', () => {
+      const wid = btn.dataset.wid
+      if (!wid) return
+      const ids = getActiveWidgetIds()
+      if (!ids.includes(wid)) { ids.push(wid); saveWidgetIds(ids) }
+      modal.remove()
+      initDashGrid()
+    })
   })
   document.body.appendChild(modal)
+}
+
+// ─── Journal (notes & traitements) ────────────────────────────────────────────
+
+const JOURNAL_KEY = `weenat-journal-${parcelId}`
+
+const TODAY_STR = new Date().toISOString().slice(0, 10)
+
+function getJournal() {
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  // Default demo entries
+  const demo = [
+    {
+      id: 1746921600000, type: 'note',
+      date: '2026-05-11',
+      texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',
+    },
+    {
+      id: 1747353600000, type: 'traitement',
+      date: '2026-05-16',
+      texte: 'Application conforme aux conditions météo. Vent < 2 m/s.',
+      produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons',
+    },
+    {
+      id: 1747785600000, type: 'note',
+      date: '2026-05-21',
+      texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.',
+    },
+  ]
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(demo))
+  return demo
+}
+
+function saveJournal(entries) {
+  localStorage.setItem(JOURNAL_KEY, JSON.stringify(entries))
+}
+
+function renderJournalTab() {
+  const el = document.getElementById('journal-container')
+  if (!el) return
+  const entries = getJournal().sort((a, b) => b.date.localeCompare(a.date))
+
+  const fmt = d => {
+    const [y, m, j] = d.split('-')
+    return `${j}/${m}/${y}`
+  }
+
+  let html = `
+    <div class="journal-add-bar">
+      <button class="btn-secondary btn-sm" id="jrn-add-note" style="gap:6px">
+        <i class="bi bi-pencil-square"></i> Ajouter une note
+      </button>
+      <button class="btn-secondary btn-sm" id="jrn-add-traitement" style="gap:6px">
+        <i class="bi bi-eyedropper"></i> Ajouter un traitement
+      </button>
+    </div>
+  `
+
+  if (entries.length === 0) {
+    html += `<div class="journal-empty">Aucune entrée dans le journal.</div>`
+  } else {
+    entries.forEach(e => {
+      const isTraitement = e.type === 'traitement'
+      html += `
+        <div class="journal-entry" data-id="${e.id}">
+          <div class="journal-entry-hd">
+            <span class="journal-entry-date">${fmt(e.date)}</span>
+            <span class="journal-type-badge journal-type-badge--${e.type}">
+              <i class="bi bi-${isTraitement ? 'eyedropper' : 'pencil'}"></i>
+              ${isTraitement ? 'Traitement' : 'Note'}
+            </span>
+            <button class="journal-entry-delete" data-id="${e.id}" title="Supprimer">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+          ${e.texte ? `<div class="journal-entry-texte">${e.texte}</div>` : ''}
+          ${isTraitement && (e.produit || e.dose || e.cible) ? `
+            <div class="journal-entry-meta">
+              ${e.produit ? `<span><i class="bi bi-flask"></i>${e.produit}</span>` : ''}
+              ${e.dose    ? `<span><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
+              ${e.cible   ? `<span><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
+            </div>` : ''}
+          ${e.imageIds?.length ? `<div class="jrn-entry-photos" data-entry-id="${e.id}"></div>` : ''}
+        </div>
+      `
+    })
+  }
+
+  el.innerHTML = html
+
+  el.querySelector('#jrn-add-note').addEventListener('click', () => openJournalForm('note'))
+  el.querySelector('#jrn-add-traitement').addEventListener('click', () => openJournalForm('traitement'))
+
+  el.querySelectorAll('.journal-entry-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.dataset.id)
+      const entry = getJournal().find(e => e.id === id)
+      if (entry?.imageIds?.length) window.ImageStore?.remove(entry.imageIds)
+      saveJournal(getJournal().filter(e => e.id !== id))
+      renderJournalTab()
+    })
+  })
+
+  // Async-load images for entries that have imageIds
+  const IS = window.ImageStore
+  if (IS) {
+    el.querySelectorAll('.jrn-entry-photos[data-entry-id]').forEach(async photoRow => {
+      const entry = entries.find(e => String(e.id) === photoRow.dataset.entryId)
+      if (!entry?.imageIds?.length) return
+      for (const imgId of entry.imageIds) {
+        try {
+          const src = await IS.get(imgId)
+          if (!src) continue
+          const img = document.createElement('img')
+          img.className = 'jrn-entry-photo'
+          img.src = src; img.alt = ''
+          img.addEventListener('click', () => window.openLightbox?.(src))
+          photoRow.appendChild(img)
+        } catch (_) {}
+      }
+    })
+  }
+}
+
+function openJournalForm(type) {
+  const isTraitement = type === 'traitement'
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:480px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">${isTraitement ? 'Ajouter un traitement' : 'Ajouter une note'}</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="journal-form">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Date</label>
+          <input type="date" id="jrn-f-date" class="journal-form-input" value="${TODAY_STR}">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">${isTraitement ? 'Observations' : 'Texte'}</label>
+          <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="${isTraitement ? 'Conditions météo, observations…' : 'Votre note…'}"></textarea>
+        </div>
+        ${isTraitement ? `
+        <div class="journal-form-grid">
+          <div class="journal-form-row">
+            <label class="journal-form-label">Produit</label>
+            <input type="text" id="jrn-f-produit" class="journal-form-input" placeholder="Ex : Bordeaux mixture">
+          </div>
+          <div class="journal-form-row">
+            <label class="journal-form-label">Dose</label>
+            <input type="text" id="jrn-f-dose" class="journal-form-input" placeholder="Ex : 2 kg/ha">
+          </div>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Cible (maladie / ravageur)</label>
+          <input type="text" id="jrn-f-cible" class="journal-form-input" placeholder="Ex : Mildiou">
+        </div>` : ''}
+        <div class="journal-form-row">
+          <label class="journal-form-label">Photos</label>
+          <div class="jrn-img-zone">
+            <div class="jrn-img-previews" id="jrn-f-previews"></div>
+            <button type="button" class="jrn-img-add-btn" id="jrn-f-img-btn">
+              <i class="bi bi-camera"></i> Ajouter une photo
+            </button>
+            <input type="file" id="jrn-f-img-input" accept="image/jpeg,image/png,image/webp,image/avif,image/bmp" multiple style="display:none">
+            <div class="jrn-img-error" id="jrn-f-img-err"></div>
+          </div>
+        </div>
+        <button class="btn-primary btn-sm" id="jrn-f-save" style="width:100%;justify-content:center">
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  `
+
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+
+  const pendingImages = []
+  const IS = window.ImageStore
+  if (IS) {
+    IS._addThumb = IS._addThumb || window.addThumbToPreview
+    window.setupImgUpload(
+      modal.querySelector('#jrn-f-img-input'),
+      modal.querySelector('#jrn-f-img-btn'),
+      modal.querySelector('#jrn-f-previews'),
+      modal.querySelector('#jrn-f-img-err'),
+      pendingImages
+    )
+  }
+
+  modal.querySelector('#jrn-f-save').addEventListener('click', async () => {
+    const date  = modal.querySelector('#jrn-f-date').value || TODAY_STR
+    const texte = modal.querySelector('#jrn-f-texte').value.trim()
+    const entry = { id: Date.now(), type, date, texte }
+    if (isTraitement) {
+      entry.produit = modal.querySelector('#jrn-f-produit').value.trim()
+      entry.dose    = modal.querySelector('#jrn-f-dose').value.trim()
+      entry.cible   = modal.querySelector('#jrn-f-cible').value.trim()
+    }
+    if (!texte && !entry.produit && !pendingImages.length) return
+    if (IS && pendingImages.length) {
+      entry.imageIds = []
+      for (const dataURL of pendingImages) {
+        const imgId = `img_${entry.id}_${entry.imageIds.length}`
+        await IS.store(imgId, dataURL)
+        entry.imageIds.push(imgId)
+      }
+    }
+    saveJournal([entry, ...getJournal()])
+    modal.remove()
+    renderJournalTab()
+  })
+
+  document.body.appendChild(modal)
+}
+
+// ─── Nav select ───────────────────────────────────────────────────────────────
+
+function initNavSelect() {
+  const titleEl = document.getElementById('breadcrumb-title')
+  if (!titleEl) return
+  const lastSpan = titleEl.querySelector('span:last-child')
+  if (!lastSpan) return
+
+  const orgPlots = plots
+    .filter(p => p.orgId === parcelBase.orgId)
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+
+  const wrap = document.createElement('span')
+  wrap.className = 'breadcrumb-nav-wrap'
+
+  const sel = document.createElement('select')
+  sel.className = 'breadcrumb-nav-select'
+  sel.innerHTML = orgPlots.map(p =>
+    `<option value="${p.id}"${p.id === parcelId ? ' selected' : ''}>${p.name}</option>`
+  ).join('')
+  sel.addEventListener('change', () => {
+    window.location.href = `parcelle-detail.html?id=${sel.value}`
+  })
+
+  wrap.appendChild(sel)
+  lastSpan.replaceWith(wrap)
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
@@ -275,6 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
     label: 'Parcelles',
     href: 'parcelles.html',
   })
+  initNavSelect()
 
   renderCharts()
   renderPanel()
@@ -298,63 +617,106 @@ document.addEventListener('DOMContentLoaded', () => {
 let tensioViewMode = 'capteur' // 'capteur' | 'horizon'
 let compareParcelId = null
 
+const CHARTS_ORDER_KEY = `charts-order-parcel-${parcelId}`
+function loadChartOrder() { try { return JSON.parse(localStorage.getItem(CHARTS_ORDER_KEY) || 'null') } catch { return null } }
+function saveChartOrder(keys) { localStorage.setItem(CHARTS_ORDER_KEY, JSON.stringify(keys)) }
+
+function setupChartDragDrop(container) {
+  let dragging = null
+
+  container.addEventListener('dragstart', e => {
+    const card = e.target.closest('.chart-card[data-card-key]')
+    if (!card) return
+    dragging = card
+    card.classList.add('chart-dragging')
+    e.dataTransfer.effectAllowed = 'move'
+  })
+
+  container.addEventListener('dragend', () => {
+    dragging?.classList.remove('chart-dragging')
+    container.querySelectorAll('.chart-card').forEach(c => c.classList.remove('chart-drag-over'))
+    dragging = null
+    const keys = [...container.querySelectorAll('.chart-card[data-card-key]')].map(c => c.dataset.cardKey)
+    saveChartOrder(keys)
+  })
+
+  container.addEventListener('dragover', e => {
+    e.preventDefault()
+    if (!dragging) return
+    const target = e.target.closest('.chart-card[data-card-key]')
+    if (!target || target === dragging) return
+    container.querySelectorAll('.chart-card').forEach(c => c.classList.remove('chart-drag-over'))
+    target.classList.add('chart-drag-over')
+    const mid = target.getBoundingClientRect().top + target.getBoundingClientRect().height / 2
+    container.insertBefore(dragging, e.clientY < mid ? target : target.nextSibling)
+  })
+
+  container.addEventListener('drop', e => {
+    e.preventDefault()
+    container.querySelectorAll('.chart-card').forEach(c => c.classList.remove('chart-drag-over'))
+  })
+}
+
 function renderChartsContent(container, linkedSensorIds) {
   const linkedSensors = allSensors.filter(s => linkedSensorIds.includes(s.id))
   const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
   const otherSensors  = linkedSensors.filter(s => !TENSIO_MODELS.includes(s.model))
+  const stepMins = getStepMinutes()
 
-  // Non-tensio sensors: one group header + charts per sensor
+  // Collect sensor metric IDs for deduplication
+  const sensorMetricIds = new Set()
+  linkedSensors.forEach(s => (METRICS_BY_MODEL[s.model] || []).forEach(m => sensorMetricIds.add(m.id)))
+
+  // Build flat card list: {key, type, ...rest}
+  const allCards = []
+
   otherSensors.forEach(s => {
     const metrics = METRICS_BY_MODEL[s.model]
     if (!metrics) return
-
-    const groupHeader = document.createElement('div')
-    groupHeader.className = 'chart-group-header'
-    groupHeader.innerHTML = `
-      <i class="bi bi-broadcast" style="color:var(--pri)"></i>
-      <strong>${s.model}</strong>
-      <span class="chart-group-serial">${s.serial}</span>
-      ${s.event ? `<span class="detail-badge detail-badge--err"><i class="bi bi-exclamation-triangle-fill"></i> ${s.event}</span>` : ''}
-    `
-    container.appendChild(groupHeader)
+    const source = `${s.model} · ${s.serial}`
+    const emissionMins = Math.floor(5 + Math.random() * 55)
     metrics.forEach(m => {
-      if (m.isWindComposite) { renderWindCompositeChart(container); return }
-      appendChartCard(container, m)
+      if (m.isWindComposite) {
+        allCards.push({ key: `wind-${s.id}`, type: 'wind', sensor: s, source, emissionMins })
+        return
+      }
+      allCards.push({ key: `s${s.id}-${m.id}`, type: 'metric', metric: m, source, emissionMins })
     })
   })
 
-  // Tensio sensors: grouped, one chart per metric with multiple curves
   if (tensioSensors.length > 0) {
-    const tensioHeader = document.createElement('div')
-    tensioHeader.className = 'chart-group-header'
-    tensioHeader.innerHTML = `
-      <i class="bi bi-broadcast" style="color:var(--pri)"></i>
-      <strong>Tensiomètres</strong>
-      <span class="chart-group-serial">${tensioSensors.length} capteur${tensioSensors.length > 1 ? 's' : ''}</span>
-      <div class="tensio-view-toggle" style="margin-left:auto;display:flex;gap:4px">
-        <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'capteur' ? ' active' : ''}" data-mode="capteur">Par capteur</button>
-        <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'horizon' ? ' active' : ''}" data-mode="horizon">Par horizon</button>
-      </div>
-    `
-    container.appendChild(tensioHeader)
-
-    tensioHeader.querySelectorAll('.tensio-toggle-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        tensioViewMode = btn.dataset.mode
-        renderCharts()
-      })
+    const source = `Tensiomètres · ${tensioSensors.length} capteur${tensioSensors.length > 1 ? 's' : ''}`
+    const emissionMins = Math.floor(5 + Math.random() * 55)
+    ;['pothydr', 'tsol'].forEach(mId => {
+      allCards.push({ key: `tensio-${mId}`, type: 'tensio', metricId: mId, source, emissionMins, tensioSensors })
     })
-
-    appendTensioCharts(container, tensioSensors)
   }
 
-  // Always-available weather metrics last (ETP masqué si pas de temps < journalier)
-  const stepMins = getStepMinutes()
-  const alwaysHeader = document.createElement('div')
-  alwaysHeader.className = 'chart-group-header'
-  alwaysHeader.innerHTML = `<i class="bi bi-cloud-sun" style="color:var(--pri)"></i> <strong>Données météo</strong> <span class="chart-group-serial">Station de référence</span>`
-  container.appendChild(alwaysHeader)
-  ALWAYS_METRICS.filter(m => !(m.id === 'etp' && stepMins < 1440)).forEach(m => appendChartCard(container, m))
+  // ALWAYS_METRICS: skip any metric already provided by a sensor
+  ALWAYS_METRICS
+    .filter(m => !(m.id === 'etp' && stepMins < 1440))
+    .filter(m => !sensorMetricIds.has(m.id))
+    .forEach(m => allCards.push({ key: `always-${m.id}`, type: 'metric', metric: m, source: 'parcelle', emissionMins: null, unavailable: stepMins < 60 }))
+
+  // Apply saved order
+  const savedOrder = loadChartOrder()
+  if (savedOrder?.length) {
+    const idx = new Map(savedOrder.map((k, i) => [k, i]))
+    allCards.sort((a, b) => (idx.has(a.key) ? idx.get(a.key) : Infinity) - (idx.has(b.key) ? idx.get(b.key) : Infinity))
+  }
+
+  // Render cards
+  allCards.forEach(card => {
+    if (card.type === 'metric') {
+      appendChartCard(container, card.metric, card.source, card.emissionMins, card.key, card.unavailable)
+    } else if (card.type === 'wind') {
+      renderWindCompositeChart(container, card.source, card.emissionMins, card.key)
+    } else if (card.type === 'tensio') {
+      appendTensioCard(container, card.metricId, card.tensioSensors, card.source, card.emissionMins, card.key)
+    }
+  })
+
+  setupChartDragDrop(container)
 }
 
 function getParcelFlatMetrics(linkedSensorIds) {
@@ -434,67 +796,67 @@ function tensioHorizons(sensor) {
   return [{ depth: d, label: `${d} cm`, sensor }]
 }
 
-function appendTensioCharts(container, tensioSensors) {
-  const metricsToShow = ['pothydr', 'tsol']
-  const metricDefs = {
-    pothydr: { name: 'Potentiel hydrique', unit: 'kPa', baseFor: d => 20 + d * 0.8 + Math.random() * 30 },
-    tsol:    { name: 'Température du sol',          unit: '°C',  baseFor: d => 10 + Math.random() * 6 }
-  }
-
-  // Construire les "courbes" selon le mode
-  let curves
+function buildTensioCurves(tensioSensors) {
   if (tensioViewMode === 'capteur') {
-    // 1 courbe par capteur
-    curves = tensioSensors.map((s, i) => ({
-      label: s.serial,
-      color: TENSIO_COLORS[i % TENSIO_COLORS.length],
-      depth: s.depth || 30,
-      sensor: s,
-    }))
-  } else {
-    // 1 courbe par horizon unique (depth) — dédupliqué
-    const horizonMap = new Map()
-    tensioSensors.forEach(s => {
-      tensioHorizons(s).forEach(h => {
-        if (!horizonMap.has(h.depth)) horizonMap.set(h.depth, h)
-      })
-    })
-    const sorted = [...horizonMap.values()].sort((a, b) => a.depth - b.depth)
-    curves = sorted.map((h, i) => ({
-      label: h.label,
-      color: TENSIO_COLORS[i % TENSIO_COLORS.length],
-      depth: h.depth,
-      sensor: h.sensor,
+    return tensioSensors.map((s, i) => ({
+      label: s.serial, color: TENSIO_COLORS[i % TENSIO_COLORS.length], depth: s.depth || 30, sensor: s,
     }))
   }
-
-  metricsToShow.forEach(metricId => {
-    const def = metricDefs[metricId]
-    const card = document.createElement('div')
-    card.className = 'chart-card tensio-multi-card'
-    card.dataset.tensioMetric = metricId
-    card.dataset.tensioCurves = JSON.stringify(curves.map(c => ({ depth: c.depth, color: c.color })))
-
-    const legend = curves.map(c =>
-      `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2)">
-        <span style="display:inline-block;width:20px;height:2px;background:${c.color};vertical-align:middle;border-radius:1px"></span>
-        ${c.label}
-      </span>`
-    ).join('')
-
-    card.innerHTML = `
-      <div class="chart-card-header">
-        <span class="chart-card-name" style="color:${curves[0]?.color || TENSIO_COLORS[0]}">${def.name}</span>
-        <span class="chart-card-unit">${def.unit}</span>
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0 2px">${legend}</div>
-      <svg class="chart-svg tensio-svg" data-metric="${metricId}" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
-    `
-    container.appendChild(card)
-  })
+  const horizonMap = new Map()
+  tensioSensors.forEach(s => tensioHorizons(s).forEach(h => { if (!horizonMap.has(h.depth)) horizonMap.set(h.depth, h) }))
+  return [...horizonMap.values()].sort((a, b) => a.depth - b.depth).map((h, i) => ({
+    label: h.label, color: TENSIO_COLORS[i % TENSIO_COLORS.length], depth: h.depth, sensor: h.sensor,
+  }))
 }
 
-function appendChartCard(container, m) {
+function appendTensioCard(container, metricId, tensioSensors, source = null, emissionMins = null, cardKey = null) {
+  const metricDefs = {
+    pothydr: { name: 'Potentiel hydrique', unit: 'kPa' },
+    tsol:    { name: 'Température du sol', unit: '°C'  }
+  }
+  const def = metricDefs[metricId]
+  const curves = buildTensioCurves(tensioSensors)
+
+  const card = document.createElement('div')
+  card.className = 'chart-card tensio-multi-card'
+  card.dataset.tensioMetric = metricId
+  card.dataset.tensioCurves = JSON.stringify(curves.map(c => ({ depth: c.depth, color: c.color })))
+  if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
+
+  const legend = curves.map(c =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2)">
+      <span style="display:inline-block;width:20px;height:2px;background:${c.color};vertical-align:middle;border-radius:1px"></span>
+      ${c.label}
+    </span>`
+  ).join('')
+
+  const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
+  const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
+  const toggleHtml = `
+    <div class="chart-tensio-toggle">
+      <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'capteur' ? ' active' : ''}" data-mode="capteur">Par capteur</button>
+      <button class="btn-secondary btn-sm tensio-toggle-btn${tensioViewMode === 'horizon' ? ' active' : ''}" data-mode="horizon">Par horizon</button>
+    </div>`
+
+  card.innerHTML = `
+    <div class="chart-card-header">
+      <span class="chart-card-name" style="color:${curves[0]?.color || TENSIO_COLORS[0]}">${def.name}</span>
+      <span class="chart-card-unit">${def.unit}</span>
+      ${sourceHtml}${emHtml}
+    </div>
+    ${toggleHtml}
+    <div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 14px 2px">${legend}</div>
+    <svg class="chart-svg tensio-svg" data-metric="${metricId}" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+  `
+
+  card.querySelectorAll('.tensio-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => { tensioViewMode = btn.dataset.mode; renderCharts() })
+  })
+
+  container.appendChild(card)
+}
+
+function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false) {
   const base = m.base()
   const card = document.createElement('div')
   card.className = 'chart-card'
@@ -505,17 +867,25 @@ function appendChartCard(container, m) {
   card.dataset.metricId   = m.id
   card.dataset.metricName = m.name
   card.dataset.metricUnit = m.unit
+  if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
     ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label}</span><span class="chart-cumul-value">${genCumulValue(m)} ${m.cumul.unit}</span></div>`
     : ''
+  const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
+  const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
+
+  const chartContent = unavailable
+    ? `<div class="chart-unavailable">Données indisponibles pour ce pas de temps</div>`
+    : `<svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>`
 
   card.innerHTML = `
     <div class="chart-card-header">
       <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
       <span class="chart-card-unit">${m.unit}</span>
+      ${sourceHtml}${emHtml}
     </div>
-    <svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+    ${chartContent}
     ${cumulHtml}
   `
   container.appendChild(card)
@@ -1058,16 +1428,35 @@ function renderPanel() {
 
 const SOIL_TYPES  = ['Argilo-limoneux', 'Argileux', 'Limoneux', 'Sablo-limoneux', 'Sableux', 'Limon argileux', 'Limon fin', 'Argile sableux', 'Limono-argileux fin', 'Sable limoneux', 'Argile limoneuse']
 const IRRIG_TYPES = ['Goutte à goutte', 'Aspersion', 'Submersion', 'Enrouleur', 'Pivot', 'Rampe', 'Micro aspersion', 'Couverture intégrale', 'Goutte à goutte enterré', 'Gravitaire', 'Non irrigué', "Pas d'irrigation"]
+const CROP_LIST = [
+  'Abricotier', 'Ail', 'Amandier', 'Artichaut', 'Asperge', 'Aubergine', 'Avoine', 'Basilic',
+  'Betterave fourragère', 'Betterave sucrière', 'Blé dur', 'Blé tendre', 'Brocoli', 'Carotte',
+  'Cerisier', 'Chou-fleur', 'Chou pommé', 'Ciboulette', 'Citrouille', 'Clémentinier', 'Courgette',
+  'Echalote', 'Endive', 'Epinard', 'Fève', 'Figuier', 'Fraisier', 'Framboisier', 'Gesse',
+  'Giroflier', 'Haricot vert', 'Houblon', 'Kiwi', 'Lavande', 'Lentille', 'Luzerne', 'Maïs doux',
+  'Maïs grain', 'Maïs semence', 'Maïs silage', 'Melon', 'Menthe', 'Moutarde', 'Navet',
+  'Nectarinier', 'Noisetier', 'Noyer', 'Oignon', 'Olivier', 'Orge de brasserie', 'Orge de printemps',
+  'Orge d\'hiver', 'Pêcher', 'Persil', 'Pissenlit', 'Poireau', 'Pois chiche', 'Pois de conserve',
+  'Pois fourrager', 'Pois protéagineux', 'Poivron', 'Pomme de terre', 'Pommier', 'Poirier',
+  'Prunier', 'Pruneau d\'Agen', 'Radis', 'Raisin de cuve', 'Raisin de table', 'Riz', 'Romarin',
+  'Sarrasin', 'Seigle', 'Soja', 'Sorgho', 'Tabac', 'Thym', 'Tomate', 'Tournesol', 'Triticale',
+  'Vigne', 'Cardon', 'Céleri', 'Cerise', 'Châtaignier', 'Colza', 'Courge', 'Fénugrec',
+  'Groseillier', 'Lin fibre', 'Lin oléagineux', 'Mâche', 'Millet', 'Myrtille', 'Noix de cajou',
+  'Paprika', 'Patate douce', 'Pistachier', 'Poisson-Chat', 'Quinoa', 'Safran', 'Sainfoin',
+  'Scorsonère', 'Shallot', 'Topinambour', 'Trèfle', 'Vesce', 'Fétuque', 'Ray-grass', 'Prairie temporaire',
+  'Prairie permanente', 'Jachère', 'Autre',
+]
 
 function renderIdentification(org) {
   const el = document.getElementById('panel-ident')
   const p  = parcelState
-  const texture  = p.texture  || SOIL_TYPES[p.id % SOIL_TYPES.length]
+  const texture    = p.texture    || SOIL_TYPES[p.id % SOIL_TYPES.length]
   const irrigation = p.irrigation || IRRIG_TYPES[p.id % IRRIG_TYPES.length]
+  const crop       = p.crop       || CROP_LIST[0]
 
   el.innerHTML = `
-    ${editableRow('Nom',          p.name   || '—', 'name',       'text')}
-    ${editableRow('Culture',      p.crop   || '—', 'crop',       'text')}
+    ${editableRow('Nom',          p.name || '—', 'name', 'text')}
+    ${editableSelect('Culture',   crop,          'crop',       CROP_LIST)}
     ${readonlyRow('Surface',     (p.area   ? `${p.area} ha` : '—') + ' <span class="field-computed">(calculé)</span>')}
     ${editableSelect('Texture sol', texture,    'texture',    SOIL_TYPES)}
     ${editableSelect('Irrigation',  irrigation, 'irrigation', IRRIG_TYPES, 'integ-pill')}
@@ -1078,7 +1467,7 @@ function renderIdentification(org) {
     saveState({ name: v })
     updateBreadcrumb(v, { label: 'Parcelles', href: 'parcelles.html' })
   })
-  bindEditable(el, 'crop',       p.crop       || '', v => saveState({ crop: v }))
+  bindEditable(el, 'crop',       crop,                v => saveState({ crop: v }))
   bindEditable(el, 'texture',    texture,             v => saveState({ texture: v }))
   bindEditable(el, 'irrigation', irrigation,          v => saveState({ irrigation: v }))
 }
@@ -1174,6 +1563,14 @@ function getLinkedMetricIds() {
   return ids
 }
 
+function sensorMetricBadges(model) {
+  const metrics = METRICS_BY_MODEL[model] || []
+  if (!metrics.length) return ''
+  return `<div class="sensor-metric-badges">${
+    metrics.map(m => `<span class="sensor-metric-badge" style="--mc:${m.color}">${m.name}</span>`).join('')
+  }</div>`
+}
+
 function renderLinkedSensors() {
   const el     = document.getElementById('panel-sensors')
   const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
@@ -1197,6 +1594,7 @@ function renderLinkedSensors() {
         <div class="sensor-linked-info">
           <span class="sensor-linked-name">${MODEL_NAMES[s.model] || s.model}</span>
           <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
+          ${sensorMetricBadges(s.model)}
         </div>
         <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
           <i class="bi bi-x-lg"></i>
@@ -1212,7 +1610,10 @@ function renderLinkedSensors() {
         if (!byDepth[d]) byDepth[d] = []
         byDepth[d].push(s)
       })
-      html += `<div style="font-size:11px;font-weight:600;color:var(--txt2);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.04em">Kit de tensiomètres</div>`
+      html += `<div class="sensor-kit-hd">
+        <span class="sensor-kit-hd-label">Kit de tensiomètres</span>
+        ${sensorMetricBadges('CHP-15/30')}
+      </div>`
       Object.entries(byDepth).forEach(([depth, sensors]) => {
         html += `<div style="font-size:11px;color:var(--txt2);margin:4px 0 2px">— ${depth}</div>`
         html += sensors.map(s => `
@@ -1231,6 +1632,24 @@ function renderLinkedSensors() {
   }
 
   el.innerHTML = html
+
+  // Parcel-derived metrics — placed below the add form
+  const hasPyrano = linked.some(s => s.model === 'PYRANO')
+  const parcelMetrics = [
+    { name: 'Évapotranspiration (ETP)', color: '#c090e0' },
+    ...(!hasPyrano ? [{ name: 'Rayonnement solaire', color: '#f5c842' }] : []),
+    { name: 'Température de rosée', color: '#80c8e8' },
+  ]
+  const metricsExt = document.getElementById('panel-parcel-metrics-ext')
+  if (metricsExt) {
+    metricsExt.innerHTML = `
+      <div class="panel-parcel-metrics">
+        <div class="panel-parcel-metrics-title">Données spatialisées</div>
+        <div class="sensor-metric-badges">
+          ${parcelMetrics.map(m => `<span class="sensor-metric-badge" style="--mc:${m.color}">${m.name}</span>`).join('')}
+        </div>
+      </div>`
+  }
 
   // Populate the static add-sensor row (sibling of panel-section-bd)
   const addRow = document.getElementById('sensor-add-row')
@@ -1287,8 +1706,14 @@ function renderLinkedSensors() {
       }
 
       saveState({ linkedSensorIds: [...parcelState.linkedSensorIds, id] })
+      // Auto-add relevant widgets for new sensor model
+      if (sensor.model === 'T_GEL') {
+        const cur = getActiveWidgetIds()
+        if (!cur.includes('gel')) { cur.push('gel'); saveWidgetIds(cur) }
+      }
       renderLinkedSensors()
       renderCharts()
+      initDashGrid()
     })
   }
 }
@@ -1368,6 +1793,12 @@ function renderPanelMembres() {
   }
   if (section) section.style.display = ''
 
+  const addRow = el.closest('.panel-section')?.querySelector('.panel-add-row')
+  if (addRow) addRow.style.display = isAdherent ? 'none' : ''
+
+  const CONSEILLER_ROLES = new Set(['propriétaire', 'admin', 'agent'])
+  const canRemove = m => !isAdherent || !CONSEILLER_ROLES.has(m.role)
+
   if (!linked.length) {
     el.innerHTML = '<p class="panel-empty">Aucun membre associé.</p>'
   } else {
@@ -1375,41 +1806,40 @@ function renderPanelMembres() {
       <div class="member-row">
         <div>
           <span class="member-name">${m.prenom} ${m.nom}</span>
-          <span class="member-role-badge">${m.role}</span>
+          ${isAdherent ? '' : `<span class="member-role-badge">${m.role}</span>`}
         </div>
-        <button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer">
-          <i class="bi bi-x-lg"></i>
-        </button>
+        ${canRemove(m) ? `<button class="remove-membre-btn icon-btn" data-id="${m.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
       </div>
     `).join('')
   }
 
-  // Populate add select
-  const select = document.getElementById('add-membre-select')
-  if (select) {
-    select.innerHTML = '<option value="">Ajouter un membre…</option>'
-    members.filter(m => !linkedMemberIds.includes(m.id)).forEach(m => {
-      const opt = document.createElement('option')
-      opt.value = m.id
-      opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
-      select.appendChild(opt)
-    })
-  }
+  if (!isAdherent) {
+    const select = document.getElementById('add-membre-select')
+    if (select) {
+      select.innerHTML = '<option value="">Ajouter un membre…</option>'
+      members.filter(m => !linkedMemberIds.includes(m.id)).forEach(m => {
+        const opt = document.createElement('option')
+        opt.value = m.id
+        opt.textContent = `${m.prenom} ${m.nom} (${m.role})`
+        select.appendChild(opt)
+      })
+    }
 
-  el.querySelectorAll('.remove-membre-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      linkedMemberIds = linkedMemberIds.filter(x => x !== parseInt(btn.dataset.id))
+    el.querySelectorAll('.remove-membre-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        linkedMemberIds = linkedMemberIds.filter(x => x !== parseInt(btn.dataset.id))
+        patchParcel(parcelId, { linkedMemberIds })
+        renderPanelMembres()
+      })
+    })
+
+    document.getElementById('add-membre-btn').onclick = () => {
+      const id = parseInt(document.getElementById('add-membre-select').value)
+      if (!id || linkedMemberIds.includes(id)) return
+      linkedMemberIds.push(id)
       patchParcel(parcelId, { linkedMemberIds })
       renderPanelMembres()
-    })
-  })
-
-  document.getElementById('add-membre-btn').onclick = () => {
-    const id = parseInt(document.getElementById('add-membre-select').value)
-    if (!id || linkedMemberIds.includes(id)) return
-    linkedMemberIds.push(id)
-    patchParcel(parcelId, { linkedMemberIds })
-    renderPanelMembres()
+    }
   }
 }
 
@@ -1632,210 +2062,622 @@ function initTabs() {
       document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'))
       btn.classList.add('active')
       document.getElementById(btn.dataset.pane).classList.add('active')
+      if (btn.dataset.pane === 'tab-journal') renderJournalTab()
     })
   })
 }
 
-// ─── Dashboard (Vue personnalisée) ────────────────────────────────────────────
+// ─── Dashboard (Widgets) ──────────────────────────────────────────────────────
 
-const DASH_BLOCK_DEFS = [
-  { id: 'temp',         size: '1x1', title: 'Température',   icon: 'bi-thermometer-half', color: '#e07050' },
-  { id: 'pluie',        size: '1x1', title: 'Pluie (cumul)', icon: 'bi-cloud-rain-heavy', color: '#45b7d1' },
-  { id: 'humidite',     size: '1x1', title: 'Humidité',  icon: 'bi-droplet-half',     color: '#4ecdc4' },
-  { id: 'sensors',      size: '1x2', title: 'Capteurs liés', icon: 'bi-broadcast',        color: '#0172A4' },
-  { id: 'map',          size: '1x2', title: 'Localisation',  icon: 'bi-geo-alt',          color: '#6080b0' },
-  { id: 'vent',         size: '1x1', title: 'Vent',          icon: 'bi-wind',             color: '#7bc4b0' },
-  { id: 'integrations', size: '1x1', title: 'Intégrations',  icon: 'bi-plug',             color: '#2d9e5f' },
-  { id: 'bilan',        size: '3x2', title: 'Bilan hydrique',icon: 'bi-droplet',          color: '#0172A4' },
-]
+const WIDGET_DEFS = {
+  'previsions-5j':   { size:'2x2', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'weephyt':         { size:'2x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
+  'cumuls':          { size:'1x2', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#e07050', render: renderWCumuls },
+  'bilan':           { size:'3x2', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:"Voir l'irrigation", href:'#' } },
+  'gel':             { size:'2x2', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#4ecdc4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'dpv':             { size:'1x2', title:'DPV',                        icon:'bi-droplet-half',          color:'#e07050', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'thi':             { size:'1x2', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'temp-rosee':      { size:'2x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#45b7d1', render: renderWTempRosee,  footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'temp-sol':        { size:'2x1', title:'Température du sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWTempSol,    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'maizy':           { size:'2x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:"Voir Maï'zy", href:'#' } },
+  'tavelure':        { size:'2x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure },
+  'suivi-culture':   { size:'2x1', title:'Suivi de culture',           icon:'bi-flower2',               color:'#78d8a0', render: renderWPlaceholder },
+  'decitrait':       { size:'2x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder },
+  'previsions-6h':   { size:'2x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder },
+  'previsions-jour': { size:'2x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder },
+  'previsions-tensio':{ size:'2x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#5b8dd9', render: renderWPlaceholder },
+  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#e07050', render: renderWSensor('w-station') },
+  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#4ecdc4', render: renderWSensor('w-thygro') },
+  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWSensor('w-tsol') },
+  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#7bc4b0', render: renderWSensor('w-anem') },
+  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#f5c842', render: renderWSensor('w-pyrano') },
+  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#78d8a0', render: renderWSensor('w-lws') },
+  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#f0d060', render: renderWSensor('w-par') },
+  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#f0cc60', render: renderWSensor('w-capa') },
+  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#5b8dd9', render: renderWSensor('w-tensio') },
+  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#f0a030', render: renderWSensor('w-ec') },
+  'profil-capteurs': { size:'2x2', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
+  'niveau-reservoir':{ size:'2x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
+  'profil-reservoir':{ size:'2x2', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
+}
 
-const DASH_STORAGE_KEY = () => `dash-order-parcel-${parcelId}`
+const DASH_STORAGE_KEY = () => `dash-widgets-parcel-${parcelId}`
 
 let _dashMap = null
+
+function getActiveWidgetIds() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(DASH_STORAGE_KEY()))
+    if (Array.isArray(stored) && stored.length) return stored
+  } catch (_) {}
+  return computeDefaultWidgetIds()
+}
+
+function saveWidgetIds(ids) {
+  localStorage.setItem(DASH_STORAGE_KEY(), JSON.stringify(ids))
+}
+
+function computeDefaultWidgetIds() {
+  const linked  = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  const models  = new Set(linked.map(s => s.model))
+  const hasCapa   = [...models].some(m => m.startsWith('CAPA-'))
+  const hasTensio = [...models].some(m => TENSIO_MODELS.includes(m))
+  const hasCumul  = linked.some(s => (METRICS_BY_MODEL[s.model]||[]).some(m => m.cumul))
+  const ids = ['previsions-5j', 'weephyt']
+  if (hasCumul) ids.push('cumuls')
+  if (models.has('P+') || models.has('PT') || models.has('SMV') || models.has('P')) ids.push('w-station')
+  if (models.has('TH'))     ids.push('w-thygro')
+  if (models.has('T_MINI')) ids.push('w-tsol')
+  if (models.has('W'))      ids.push('w-anem')
+  if (models.has('PYRANO')) ids.push('w-pyrano')
+  if (models.has('LWS'))    ids.push('w-lws')
+  if (models.has('T_GEL'))  ids.push('gel')
+  if (models.has('PAR'))    ids.push('w-par')
+  if (hasCapa)   ids.push('w-capa')
+  if (hasTensio) ids.push('w-tensio')
+  if (models.has('EC'))     ids.push('w-ec')
+  if (hasTensio || hasCapa) ids.push('bilan')
+  return ids
+}
 
 function initDashGrid() {
   const grid = document.getElementById('dash-grid')
   if (!grid) return
 
   let order
-  try { order = JSON.parse(localStorage.getItem(DASH_STORAGE_KEY())) || null } catch { order = null }
-  if (!order) order = DASH_BLOCK_DEFS.map(b => b.id)
-
+  const ids = getActiveWidgetIds()
   grid.innerHTML = ''
-  order.forEach(id => {
-    const def = DASH_BLOCK_DEFS.find(b => b.id === id)
+  ids.forEach(id => {
+    const def = WIDGET_DEFS[id]
     if (!def) return
     const block = document.createElement('div')
     block.className = `dash-block dash-block--${def.size}`
     block.dataset.id = id
     block.draggable = true
-    block.innerHTML = `<span class="dash-drag-handle" title="Déplacer"><i class="bi bi-grip-vertical"></i></span>`
+    block.innerHTML = `
+      <div class="dash-block-hd" style="color:${def.color}">
+        <span style="display:flex;align-items:center;gap:6px"><i class="bi ${def.icon}"></i> ${def.title}</span>
+        <button class="dash-menu-btn" data-wid="${id}" title="Options" aria-label="Options">···</button>
+      </div>
+      <div class="dash-block-body" id="dblock-${id}"></div>`
     grid.appendChild(block)
+    def.render(block.querySelector(`#dblock-${id}`))
+  })
+  grid.querySelectorAll('.dash-menu-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      document.querySelector('.dash-dropdown')?.remove()
+      const dd = document.createElement('div')
+      dd.className = 'dash-dropdown'
+      dd.innerHTML = `
+        <button class="dash-dd-item" data-action="settings" data-wid="${btn.dataset.wid}">Paramétrer le widget</button>
+        <button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${btn.dataset.wid}">Retirer le widget</button>`
+      const rect = btn.getBoundingClientRect()
+      const gridRect = grid.getBoundingClientRect()
+      dd.style.top  = `${rect.bottom - gridRect.top + 4}px`
+      dd.style.right = `${gridRect.right - rect.right}px`
+      grid.style.position = 'relative'
+      grid.appendChild(dd)
+      dd.querySelector('[data-action="remove"]').addEventListener('click', () => {
+        dd.remove()
+        const cur = getActiveWidgetIds().filter(id => id !== btn.dataset.wid)
+        saveWidgetIds(cur)
+        initDashGrid()
+      })
+      dd.querySelector('[data-action="settings"]').addEventListener('click', () => dd.remove())
+      setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
+    })
   })
   attachDashDragHandlers(grid)
 }
 
-function populateDashBlocks() {
-  const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-
-  // ── Température ──
-  const tempEl = document.getElementById('dblock-temp')
-  if (tempEl) {
-    const hasTempSensor = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'temp'))
-    const tempVal = hasTempSensor ? rnd(10, 28) : null
-    tempEl.innerHTML = tempVal != null
-      ? `<div class="dash-val-big" style="color:#e07050">${tempVal}<span class="dash-val-unit"> °C</span></div>
-         <div class="dash-val-trend ${tempVal > 18 ? 'up' : 'down'}"><i class="bi bi-arrow-${tempVal > 18 ? 'up' : 'down'}-right"></i> Dernière mesure</div>
-         <div class="dash-val-sub">Aujourd'hui</div>`
-      : `<div class="dash-empty">Aucun capteur de température</div>`
-  }
-
-  // ── Pluie ──
-  const pluieEl = document.getElementById('dblock-pluie')
-  if (pluieEl) {
-    const hasPluie = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'pluie'))
-    const pluieVal = hasPluie ? rnd(0, 35) : null
-    pluieEl.innerHTML = pluieVal != null
-      ? `<div class="dash-val-big" style="color:#45b7d1">${pluieVal}<span class="dash-val-unit"> mm</span></div>
-         <div class="dash-val-sub">Cumul 7 jours</div>`
-      : `<div class="dash-empty">Aucun capteur de pluie</div>`
-  }
-
-  // ── Humidité ──
-  const humEl = document.getElementById('dblock-humidite')
-  if (humEl) {
-    const hasHum = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'humidite'))
-    const humVal = hasHum ? rnd(40, 90) : null
-    humEl.innerHTML = humVal != null
-      ? `<div class="dash-val-big" style="color:#4ecdc4">${humVal}<span class="dash-val-unit"> %</span></div>
-         <div class="dash-val-sub">Dernière mesure</div>`
-      : `<div class="dash-empty">Aucun capteur d'humidité</div>`
-  }
-
-  // ── Vent ──
-  const ventEl = document.getElementById('dblock-vent')
-  if (ventEl) {
-    const hasVent = linkedSensors.some(s => (METRICS_BY_MODEL[s.model] || []).some(m => m.id === 'vent'))
-    const ventVal = hasVent ? rnd(0, 35) : rnd(5, 20)
-    ventEl.innerHTML = `
-      <div class="dash-val-big" style="color:#7bc4b0">${ventVal}<span class="dash-val-unit"> km/h</span></div>
-      <div class="dash-val-sub">Vitesse moyenne</div>`
-  }
-
-  // ── Capteurs liés ──
-  const sensEl = document.getElementById('dblock-sensors')
-  if (sensEl) {
-    if (linkedSensors.length === 0) {
-      sensEl.innerHTML = '<div class="dash-empty">Aucun capteur lié</div>'
-    } else {
-      sensEl.innerHTML = linkedSensors.map(s => `
-        <div class="dash-sensor-row">
-          <span class="dash-sensor-dot" style="background:${s.event ? 'var(--warn)' : 'var(--ok)'}"></span>
-          <span class="dash-sensor-model">${s.model}</span>
-          <span class="dash-sensor-serial">${s.serial}</span>
-        </div>
-      `).join('')
-    }
-  }
-
-  // ── Intégrations ──
-  const integEl = document.getElementById('dblock-integrations')
-  if (integEl) {
-    const active = parcelState.integrations || []
-    integEl.innerHTML = active.length === 0
-      ? '<div class="dash-empty">Aucune intégration active</div>'
-      : active.map(name => `
-          <span class="dash-integ-pill"><i class="bi bi-plug-fill"></i> ${name}</span>
-        `).join('')
-  }
-
-  // ── Map ──
-  const mapEl = document.getElementById('dblock-map')
-  if (mapEl) {
-    mapEl.style.padding = '0 0 8px 0'
-    mapEl.innerHTML = '<div class="dash-map-inner" id="dash-map-container"></div>'
-    initDashMap()
-  }
-
-  // ── Bilan hydrique ──
-  const bilanEl = document.getElementById('dblock-bilan')
-  if (bilanEl) {
-    const pluieMm  = rndf(20, 80)
-    const etpMm    = rndf(15, 60)
-    const irrigMm  = (parcelState.irrigationEvents || []).reduce((s, e) => s + (e.mm || 0), 0)
-    const drainMm  = Math.max(0, pluieMm + irrigMm - etpMm)
-    const balMm    = pluieMm + irrigMm - etpMm - drainMm
-    const balColor = balMm >= 0 ? 'var(--ok)' : 'var(--err)'
-
-    bilanEl.innerHTML = `
-      <div style="display:flex;gap:16px;align-items:flex-start;height:100%">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1">
-          ${dashBilanCard('Pluie', pluieMm.toFixed(0), 'mm', '#45b7d1', 'bi-cloud-rain-heavy', '7 derniers jours')}
-          ${dashBilanCard('ETP', etpMm.toFixed(1), 'mm', '#c090e0', 'bi-sun', '7 derniers jours')}
-          ${dashBilanCard('Irrigation', irrigMm.toFixed(0), 'mm', '#0172A4', 'bi-droplet-fill', 'Cumulé')}
-          ${dashBilanCard('Drainage', drainMm.toFixed(0), 'mm', '#7bc4b0', 'bi-arrow-down-circle', 'Estimé')}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 140px;gap:4px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bdr)">
-          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)">Bilan net</div>
-          <div style="font-size:36px;font-weight:700;color:${balColor}">${balMm >= 0 ? '+' : ''}${balMm.toFixed(0)}</div>
-          <div style="font-size:13px;color:${balColor};font-weight:600">mm</div>
-          <div style="font-size:11px;color:var(--txt3);margin-top:4px">7 derniers jours</div>
-        </div>
-      </div>
-    `
-  }
+function getParcelIrrigations() {
+  const p = plots.find(pl => pl.id === parcelId)
+  if (!p) return []
+  const groups = buildGroups(plots.filter(pl => pl.orgId === p.orgId))
+  const labels = new Set([p.name])
+  groups.filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
+  return IRRIG_SEASON.filter(i => labels.has(i.label))
 }
 
-function dashBilanCard(label, val, unit, color, icon, sub) {
-  return `
-    <div style="background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
-      <div style="font-size:11px;color:${color};font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:4px">
-        <i class="bi ${icon}"></i> ${label}
-      </div>
-      <div style="font-size:22px;font-weight:700;color:var(--txt)">${val} <span style="font-size:12px;font-weight:400;color:var(--txt2)">${unit}</span></div>
-      <div style="font-size:10px;color:var(--txt3);margin-top:2px">${sub}</div>
+// ── Chart & gauge helpers ──────────────────────────────────────────────────────
+
+function wLineChart(series, W=380, H=90) {
+  const PL=28, PR=8, PT=6, PB=20, iW=W-PL-PR, iH=H-PT-PB
+  const allV = series.flatMap(s => s.values)
+  let minV = Math.min(...allV), maxV = Math.max(...allV)
+  if (minV === maxV) { minV -= 1; maxV += 1 }
+  const N = series[0].values.length
+  const xOf = i => (PL + (i/(N-1))*iW).toFixed(1)
+  const yOf = v => (PT + iH - ((v-minV)/(maxV-minV))*iH).toFixed(1)
+  const grid = [.25,.5,.75].map(t => {
+    const y=(PT+t*iH).toFixed(1)
+    return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(0,0,0,.06)" stroke-width="1"/>`
+  }).join('')
+  const yLbls = [minV,(minV+maxV)/2,maxV].map(v =>
+    `<text x="${PL-3}" y="${(+yOf(v)+3.5).toFixed(0)}" text-anchor="end" font-size="9" fill="var(--txt3)">${v.toFixed(0)}</text>`
+  ).join('')
+  const paths = series.map(s => {
+    const d = s.values.map((v,i) => `${i?'L':'M'}${xOf(i)},${yOf(v)}`).join('')
+    return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="1.8" stroke-linejoin="round"/>`
+  }).join('')
+  return `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${yLbls}${grid}${paths}</svg>`
+}
+
+// Semi-circle gauge: pct 0→1, zones=[{from,to,color}]
+function wGauge(pct, zones, label, valueStr) {
+  const W=160, H=100, CX=80, CY=90, R=60, SW=12
+  const arc = (p1, p2) => {
+    const a1 = Math.PI + p1*Math.PI, a2 = Math.PI + p2*Math.PI
+    const x1=(CX+R*Math.cos(a1)).toFixed(1), y1=(CY+R*Math.sin(a1)).toFixed(1)
+    const x2=(CX+R*Math.cos(a2)).toFixed(1), y2=(CY+R*Math.sin(a2)).toFixed(1)
+    return `M${x1},${y1} A${R},${R},0,${(p2-p1)>0.5?1:0},1,${x2},${y2}`
+  }
+  const trackPath = arc(0,1)
+  const fillPaths = zones.filter(z => z.from < pct).map(z =>
+    `<path d="${arc(z.from, Math.min(z.to, pct))}" fill="none" stroke="${z.color}" stroke-width="${SW}" stroke-linecap="butt"/>`
+  ).join('')
+  const na = Math.PI + pct*Math.PI
+  const nx=(CX+(R)*Math.cos(na)).toFixed(1), ny=(CY+(R)*Math.sin(na)).toFixed(1)
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <path d="${trackPath}" fill="none" stroke="var(--bdr2)" stroke-width="${SW}" stroke-linecap="butt"/>
+    ${fillPaths}
+    <circle cx="${nx}" cy="${ny}" r="5" fill="white" stroke="var(--txt3)" stroke-width="1.5"/>
+    <text x="${CX}" y="${CY-10}" text-anchor="middle" font-size="20" font-weight="700" fill="var(--txt)">${valueStr}</text>
+    <text x="${CX}" y="${CY+6}" text-anchor="middle" font-size="9" fill="var(--txt3)">${label}</text>
+  </svg>`
+}
+
+// ── Widget render functions ────────────────────────────────────────────────────
+
+let _prev5Model = 'AROME'
+
+function renderWPrev5j(el) {
+  const DN=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+  const MN=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const WI=['bi-sun','bi-cloud-sun','bi-cloud','bi-cloud-rain','bi-cloud-lightning-rain']
+  const WC=['#f5c842','#8baac8','#8090a0','#45b7d1','#c070d0']
+  const WL=['Ensoleillé','Part. nuageux','Couvert','Pluvieux','Orageux']
+  const today=new Date()
+  const p=plots.find(pl=>pl.id===parcelId)
+  const org=orgs.find(o=>o.id===p?.orgId)
+  const city=p?.ville||org?.ville||'—'
+
+  const days=Array.from({length:5},(_,i)=>{
+    const d=new Date(today); d.setDate(d.getDate()+i)
+    const wi=Math.floor(((parcelId*7+i*3)%11)/2.2)
+    const off=_prev5Model==='ICON_EU'?-1:0
+    return{
+      lbl:i===0?'Auj.':DN[d.getDay()],
+      date:`${d.getDate()} ${MN[d.getMonth()]}`,
+      tmax:rnd(17+off,34+off),tmin:rnd(4+off,15+off),
+      pluie:wi>=3?rnd(2,18):0,
+      vent:rnd(10,35),rafales:rnd(25,70),
+      wi
+    }
+  })
+
+  el.innerHTML=`
+    <div class="w-prev5-loc"><i class="bi bi-geo-alt-fill" style="color:var(--pri)"></i> ${city}</div>
+    <div class="w-prev5-models">
+      <button class="w-prev5-model-btn${_prev5Model==='AROME'?' active':''}" data-model="AROME">AROME</button>
+      <button class="w-prev5-model-btn${_prev5Model==='ICON_EU'?' active':''}" data-model="ICON_EU">ICON EU</button>
     </div>
-  `
+    <div class="w-prev5-grid">${days.map(d=>`
+      <div class="w-prev5-day">
+        <div class="w-prev5-daylbl">${d.lbl}</div>
+        <div class="w-prev5-date">${d.date}</div>
+        <i class="bi ${WI[d.wi]} w-prev5-icon" style="color:${WC[d.wi]}" title="${WL[d.wi]}"></i>
+        <div class="w-prev5-row"><i class="bi bi-droplet-fill" style="color:#45b7d1;font-size:9px"></i><span>${d.pluie>0?d.pluie+' mm':'—'}</span></div>
+        <div class="w-prev5-row w-prev5-tmax"><i class="bi bi-thermometer-high" style="font-size:9px"></i>${d.tmax}°</div>
+        <div class="w-prev5-row w-prev5-tmin"><i class="bi bi-thermometer-low" style="font-size:9px"></i>${d.tmin}°</div>
+        <div class="w-prev5-row" style="color:var(--txt3)"><i class="bi bi-wind" style="font-size:9px"></i>${d.vent}</div>
+        <div class="w-prev5-row" style="color:var(--txt3);font-size:9px"><i class="bi bi-arrow-up-right" style="font-size:9px"></i>${d.rafales}</div>
+      </div>`).join('')}</div>
+    <a href="javascript:void 0" class="w-prev5-more">Voir plus de prévisions →</a>`
+
+  el.querySelectorAll('.w-prev5-model-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{ _prev5Model=btn.dataset.model; renderWPrev5j(el) })
+  })
 }
 
-function initDashMap() {
-  const container = document.getElementById('dash-map-container')
-  if (!container || _dashMap) return
+function renderWWeephyt(el) {
+  const now=new Date()
+  const crop=parcelState.crop||parcelBase.crop||''
+  // Product families with mock 12h window data (true = window OK)
+  const families=[
+    {label:'Herbicides de contact',seed:7},
+    {label:'Fongicides',seed:3},
+    {label:'Herbicides racinaires',seed:11},
+    {label:'Herbicides systémiques',seed:5},
+  ]
+  const hours=Array.from({length:12},(_,i)=>{const d=new Date(now);d.setHours(d.getHours()+i);return d})
+  const fmtH=d=>`${String(d.getHours()).padStart(2,'0')}h`
 
-  const org = orgs.find(o => o.id === parcelBase.orgId)
-  if (!org?.lat) return
-
-  const setup = () => {
-    if (_dashMap) return
-    _dashMap = L.map(container, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false })
-
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Esri'
-    }).addTo(_dashMap)
-
-    const latlngs = parcelState.latlngs || parcelBase.latlngs
-    if (Array.isArray(latlngs) && latlngs.length >= 3) {
-      const poly = L.polygon(latlngs, {
-        color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.35
-      }).addTo(_dashMap)
-      _dashMap.fitBounds(poly.getBounds(), { padding: [8, 8] })
-    } else {
-      _dashMap.setView([org.lat, org.lng], 14)
-      L.circleMarker([org.lat, org.lng], {
-        radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
-      }).addTo(_dashMap)
-    }
+  const timeline=family=>{
+    // deterministic pseudo-random from seed
+    const ok=hours.map((_,i)=>((family.seed*17+i*5)%11)<6)
+    return hours.map((h,i)=>`
+      <div class="w-weephyt-dot-wrap" title="${fmtH(h)} — ${ok[i]?'Fenêtre OK':'Fenêtre non OK'}">
+        <div class="w-weephyt-tl-dot" style="background:${ok[i]?'#2d9e5f':'#e07050'}"></div>
+        <div class="w-weephyt-tl-lbl">${i%3===0?fmtH(h):''}</div>
+      </div>`).join('')
   }
 
-  if (container.offsetWidth > 0) {
-    setup()
-  } else {
-    const ro = new ResizeObserver(() => {
-      if (container.offsetWidth > 0) { ro.disconnect(); setup() }
+  el.innerHTML=`<div class="w-weephyt-wrap">
+    <div class="w-weephyt-tl-legend"><span style="color:#2d9e5f">● OK</span><span style="color:#e07050">● Non OK</span></div>
+    ${families.map(f=>`
+      <div class="w-weephyt-family">
+        <div class="w-weephyt-family-label">${f.label}</div>
+        <div class="w-weephyt-timeline">${timeline(f)}</div>
+      </div>`).join('')}
+    <div class="w-weephyt-src">Via <strong>Weephyt</strong> · ${crop||'—'}</div>
+  </div>`
+}
+
+function renderWCumuls(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  const met=new Set(linked.flatMap(s=>(METRICS_BY_MODEL[s.model]||[]).map(m=>m.id)))
+  const jan1=new Date(new Date().getFullYear(),0,1).toISOString().slice(0,10)
+  const CUMULS_KEY=`w-cumuls-hidden-parcel-${parcelId}`
+  let hidden
+  try{ hidden=new Set(JSON.parse(localStorage.getItem(CUMULS_KEY))||[]) }catch{ hidden=new Set() }
+
+  const allItems=[
+    {id:'etp',label:'ETP',value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
+    {id:'pluie',label:'Pluie',value:rnd(10,50),unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
+    {id:'djc',label:'DJC',value:rnd(40,180),unit:'°j',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp')},
+    {id:'hfroid',label:'Heures froides',value:rnd(5,40),unit:'h',color:'#5b8dd9',icon:'bi-snow',show:met.has('temp')},
+    {id:'humec',label:'Humectation',value:rndf(2,20).toFixed(1),unit:'h',color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
+    {id:'enso',label:'Ensoleillement',value:rndf(3,9).toFixed(1),unit:'h/j',color:'#f5c842',icon:'bi-brightness-high',show:met.has('rayonnement')},
+  ].filter(i=>i.show&&!hidden.has(i.id))
+
+  el.innerHTML=`
+    <div class="w-cumuls-date-row"><span class="w-cumuls-date-lbl">Depuis le</span><span class="w-cumuls-date-val">${jan1.split('-').reverse().join('/')}</span></div>
+    <div class="w-cumuls-list">${allItems.map(i=>`
+      <div class="w-cumul-item" data-cid="${i.id}">
+        <i class="bi ${i.icon} w-cumul-icon" style="color:${i.color}"></i>
+        <div class="w-cumul-body">
+          <div class="w-cumul-lbl">${i.label}</div>
+          <div class="w-cumul-val" style="color:${i.color}">${i.value}<span class="w-cumul-unit"> ${i.unit}</span></div>
+        </div>
+        <button class="w-cumul-del" data-cid="${i.id}" title="Retirer">×</button>
+      </div>`).join('')}
+    </div>`
+
+  el.querySelectorAll('.w-cumul-del').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation()
+      hidden.add(btn.dataset.cid)
+      localStorage.setItem(CUMULS_KEY,JSON.stringify([...hidden]))
+      renderWCumuls(el)
     })
-    ro.observe(container)
+  })
+}
+
+function renderWGel(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  if (!linked.some(s=>s.model==='T_GEL')) {el.innerHTML='<div class="dash-empty">Capteur T_GEL non lié</div>';return}
+  const N=25, base=rndf(0,5)
+  const tS=Array.from({length:N},(_,i)=>+(base+i*0.18+rndf(-0.8,0.8)).toFixed(1))
+  const tH=tS.map(v=>+(v-rndf(1,2.5)).toFixed(1))
+  const chart=wLineChart([{values:tS,color:'#e07050'},{values:tH,color:'#4ecdc4'}],380,100)
+  const tSN=tS[N-1],tHN=tH[N-1]
+  const gelColor=tHN<=0?'#e07050':tHN<=2?'#f5a030':'#2d9e5f'
+  const gelRisk=tHN<=0?'Gel probable':tHN<=2?'Risque faible':'Pas de gel'
+  const hLev=rnd(5,8),hMin=String(Math.floor(Math.random()*60)).padStart(2,'0')
+  el.innerHTML=`<div class="w-gel-wrap">
+    <div class="w-gel-legend">
+      <span style="color:#e07050"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sèche</span>
+      <span style="color:#4ecdc4"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. humide</span>
+      <span style="font-size:10px;color:var(--txt3)">12 dernières heures</span>
+    </div>
+    <div class="w-gel-chart">${chart}</div>
+    <div class="w-gel-cards">
+      <div class="w-gel-card"><span class="w-gel-card-lbl">T. sèche </span><span class="w-gel-card-val" style="color:#e07050">${tSN}°C</span></div>
+      <div class="w-gel-card"><span class="w-gel-card-lbl">T. humide </span><span class="w-gel-card-val" style="color:#4ecdc4">${tHN}°C</span></div>
+    </div>
+    <div class="w-gel-meteo">
+      <div class="w-gel-meteo-row"><i class="bi bi-sunrise" style="color:#f5c842"></i><span>Lever du soleil</span><strong>${hLev}h${hMin}</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-cloud" style="color:#8090a0"></i><span>Couverture nuageuse</span><strong>${rnd(20,80)} %</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i><span>Humidité</span><strong>${rnd(60,90)} %</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-wind" style="color:#7bc4b0"></i><span>Vent moyen</span><strong>${rnd(5,25)} km/h</strong></div>
+    </div>
+  </div>`
+}
+
+function renderWDpv(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  const hasTH=linked.some(s=>{const ms=METRICS_BY_MODEL[s.model]||[];return ms.some(m=>m.id==='temp')&&ms.some(m=>m.id==='humidite')})
+  if (!hasTH) {el.innerHTML='<div class="dash-empty">Capteur T+HR requis</div>';return}
+  const temp=rndf(18,30),hr=rnd(40,85)
+  const es=0.611*Math.exp(17.27*temp/(temp+237.3))
+  const dpv=+(es*(1-hr/100)).toFixed(2)
+  const pct=Math.min(dpv/2,1)
+  const dpvColor=dpv<0.4?'#5b8dd9':dpv<0.8?'#2d9e5f':dpv<1.2?'#f5a030':'#e07050'
+  const dpvLabel=dpv<0.4?'Transpiration faible':dpv<0.8?'Transpiration optimale':dpv<1.2?'Forte transpiration':'Stress hydrique'
+  const zones=[{from:0,to:0.2,color:'#5b8dd9'},{from:0.2,to:0.4,color:'#45b7d1'},{from:0.4,to:0.6,color:'#2d9e5f'},
+    {from:0.6,to:0.8,color:'#a0c840'},{from:0.8,to:0.9,color:'#f5a030'},{from:0.9,to:1,color:'#e07050'}]
+  const src=linked.find(s=>{const ms=METRICS_BY_MODEL[s.model]||[];return ms.some(m=>m.id==='temp')&&ms.some(m=>m.id==='humidite')})
+  el.innerHTML=`<div class="w-dpv-wrap">
+    <div class="w-dpv-gauge" style="color:${dpvColor}">${wGauge(pct,zones,dpvLabel,dpv+' kPa')}</div>
+    <div class="w-dpv-details">
+      <div class="w-dpv-row"><i class="bi bi-thermometer-half" style="color:#e07050"></i> ${temp.toFixed(1)} °C</div>
+      <div class="w-dpv-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i> ${hr} %</div>
+    </div>
+    ${src?`<div class="w-sensor-src">${MODEL_NAMES[src.model]||src.model} · ${src.serial}</div>`:''}
+  </div>`
+}
+
+function renderWThi(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  const hasTH=linked.some(s=>{const ms=METRICS_BY_MODEL[s.model]||[];return ms.some(m=>m.id==='temp')&&ms.some(m=>m.id==='humidite')})
+  if (!hasTH) {el.innerHTML='<div class="dash-empty">Capteur T+HR requis</div>';return}
+  const temp=rndf(20,35),hr=rnd(45,90)
+  const thi=+(temp-0.55*(1-hr/100)*(temp-14.5)).toFixed(0)
+  const thiColor=thi<68?'#2d9e5f':thi<72?'#f5c842':thi<79?'#f5a030':'#e07050'
+  const thiLabel=thi<68?'Confort':thi<72?'Stress léger':thi<79?'Stress modéré':'Stress sévère'
+  const DN=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'],today=new Date()
+  const fc=Array.from({length:3},(_,i)=>{const d=new Date(today);d.setDate(d.getDate()+i+1);
+    return{day:DN[d.getDay()],m:rnd(64,72),j:rnd(68,80),s:rnd(62,70)}})
+  const fc_color=v=>v<68?'#2d9e5f':v<72?'#f5c842':'#f5a030'
+  el.innerHTML=`<div class="w-thi-wrap">
+    <div class="w-thi-header">
+      <div class="w-thi-score" style="color:${thiColor}">
+        <div class="w-thi-val">${thi}</div>
+        <div class="w-thi-status">${thiLabel}</div>
+      </div>
+      <button class="w-thi-info-btn" title="Légende THI"><i class="bi bi-info-circle"></i></button>
+    </div>
+    <div class="w-thi-details">
+      <div class="w-thi-row"><i class="bi bi-thermometer-half" style="color:#e07050"></i> ${temp.toFixed(1)} °C</div>
+      <div class="w-thi-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i> ${hr} %</div>
+    </div>
+    <div class="w-thi-forecast">
+      <div class="w-thi-fc-label">Prévisions</div>
+      ${fc.map(f=>`<div class="w-thi-fc-row">
+        <span class="w-thi-fc-day">${f.day}</span>
+        <span class="w-thi-fc-val" style="color:${fc_color(f.m)}">${f.m}</span>
+        <span class="w-thi-fc-val" style="color:${fc_color(f.j)}">${f.j}</span>
+        <span class="w-thi-fc-val" style="color:${fc_color(f.s)}">${f.s}</span>
+      </div>`).join('')}
+      <div class="w-thi-fc-legend"><span>Matin</span><span>Journée</span><span>Soir</span></div>
+    </div>
+  </div>`
+
+  el.querySelector('.w-thi-info-btn').addEventListener('click',e=>{
+    e.stopPropagation()
+    const existing=el.querySelector('.w-thi-legend')
+    if (existing) { existing.remove(); return }
+    const leg=document.createElement('div')
+    leg.className='w-thi-legend'
+    leg.innerHTML=`
+      <div class="w-thi-legend-title">Échelle THI</div>
+      <div class="w-thi-legend-row" style="color:#2d9e5f"><span class="w-thi-legend-range">&lt; 68</span><span>Confort</span></div>
+      <div class="w-thi-legend-row" style="color:#f5c842"><span class="w-thi-legend-range">68 – 71</span><span>Stress léger</span></div>
+      <div class="w-thi-legend-row" style="color:#f5a030"><span class="w-thi-legend-range">72 – 78</span><span>Stress modéré</span></div>
+      <div class="w-thi-legend-row" style="color:#e07050"><span class="w-thi-legend-range">≥ 79</span><span>Stress sévère</span></div>`
+    el.querySelector('.w-thi-wrap').insertBefore(leg, el.querySelector('.w-thi-details'))
+  })
+}
+
+function renderWTempRosee(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  const hasTH=linked.some(s=>{const ms=METRICS_BY_MODEL[s.model]||[];return ms.some(m=>m.id==='temp')&&ms.some(m=>m.id==='humidite')})
+  if (!hasTH) {el.innerHTML='<div class="dash-empty">Capteur T+HR requis</div>';return}
+  const N=72,base=rndf(14,22)
+  const temp=Array.from({length:N},(_,i)=>+(base+6*Math.sin(i/24*2*Math.PI-Math.PI/2)+rndf(-0.5,0.5)).toFixed(1))
+  const hr=Array.from({length:N},(_,i)=>Math.max(30,Math.min(100,70-15*Math.sin(i/24*2*Math.PI-Math.PI/2)+rndf(-3,3))))
+  const rosee=temp.map((t,i)=>{const h=hr[i]/100,a=17.27,b=237.3;const g=Math.log(h)+a*t/(b+t);return +(b*g/(a-g)).toFixed(1)})
+  el.innerHTML=`<div class="w-temprosee-wrap">
+    ${wLineChart([{values:temp,color:'#e07050'},{values:rosee,color:'#45b7d1'}],380,100)}
+    <div class="w-temprosee-legend">
+      <span style="color:#e07050"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Température (${temp[N-1]}°C)</span>
+      <span style="color:#45b7d1"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Point de rosée (${rosee[N-1]}°C)</span>
+      <span style="font-size:10px;color:var(--txt3)">3 derniers jours</span>
+    </div>
+  </div>`
+}
+
+function renderWTempSol(el) {
+  const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+  const hasTsol=linked.some(s=>(METRICS_BY_MODEL[s.model]||[]).some(m=>m.id==='tsol'))
+  if (!hasTsol) {el.innerHTML='<div class="dash-empty">Capteur T. sol requis</div>';return}
+  const N=48,base=rndf(14,20)
+  const vals=Array.from({length:N},(_,i)=>+(base+3*Math.sin(i/24*2*Math.PI-Math.PI/2)+rndf(-0.4,0.4)).toFixed(1))
+  const optMin=15,optMax=22
+  const W=380,H=100,PL=28,PR=8,PT=6,PB=20,iW=W-PL-PR,iH=H-PT-PB
+  const allV=[...vals,optMin,optMax],minV=Math.min(...allV)-1,maxV=Math.max(...allV)+1
+  const xOf=i=>(PL+(i/(N-1))*iW).toFixed(1)
+  const yOf=v=>(PT+iH-((v-minV)/(maxV-minV))*iH).toFixed(1)
+  const yOM=+yOf(optMin),yOMx=+yOf(optMax)
+  const grid=[.25,.5,.75].map(t=>{const y=(PT+t*iH).toFixed(1);return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(0,0,0,.06)" stroke-width="1"/>`}).join('')
+  const d=vals.map((v,i)=>`${i?'L':'M'}${xOf(i)},${yOf(v)}`).join('')
+  el.innerHTML=`<div class="w-tsol-wrap">
+    <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${grid}
+      <rect x="${PL}" y="${yOMx.toFixed(1)}" width="${iW}" height="${(yOM-yOMx).toFixed(1)}" fill="rgba(45,158,95,.1)"/>
+      <line x1="${PL}" y1="${yOM.toFixed(1)}" x2="${W-PR}" y2="${yOM.toFixed(1)}" stroke="#2d9e5f" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>
+      <line x1="${PL}" y1="${yOMx.toFixed(1)}" x2="${W-PR}" y2="${yOMx.toFixed(1)}" stroke="#2d9e5f" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>
+      <path d="${d}" fill="none" stroke="#bb8fce" stroke-width="2" stroke-linejoin="round"/>
+      <text x="${PL-3}" y="${(PT+4)}" text-anchor="end" font-size="9" fill="var(--txt3)">${maxV.toFixed(0)}</text>
+      <text x="${PL-3}" y="${(PT+iH+4)}" text-anchor="end" font-size="9" fill="var(--txt3)">${minV.toFixed(0)}</text>
+    </svg>
+    <div class="w-tsol-legend">
+      <span style="color:#bb8fce"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sol · ${vals[N-1]}°C</span>
+      <span style="color:#2d9e5f;font-size:10px"><i class="bi bi-square-fill" style="opacity:.3"></i> Zone optimale ${optMin}–${optMax}°C</span>
+      <span style="font-size:10px;color:var(--txt3)">48 dernières heures</span>
+    </div>
+  </div>`
+}
+
+function renderWMaizy(el) {
+  const crop=(parcelState.crop||parcelBase.crop||'').toLowerCase()
+  if (!crop.includes('maïs')&&!crop.includes('mais')) {el.innerHTML='<div class="dash-empty">Culture Maïs requise</div>';return}
+  const VARI=[{name:'Farmflex 253',target:1320},{name:'DKC 3230',target:1380},{name:'Ronaldinio',target:1290},{name:'Banguy',target:1350}]
+  const vari=VARI[parcelId%VARI.length]
+  const djCumul=parcelBase.degresJour||rnd(600,1200)
+  const pct=Math.min(djCumul/vari.target,1)
+  const remaining=Math.max(0,vari.target-djCumul)
+  const today=new Date(),daysLeft=Math.round(remaining/10)
+  const d1=new Date(today);d1.setDate(d1.getDate()+Math.max(0,daysLeft-5))
+  const d2=new Date(today);d2.setDate(d2.getDate()+daysLeft+5)
+  const MN=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const fmtD=d=>`${d.getDate()} ${MN[d.getMonth()]}`
+  el.innerHTML=`<div class="w-maizy-wrap">
+    <div class="w-maizy-title">Récolte prévisionnelle</div>
+    <div class="w-maizy-dates">${fmtD(d1)} — ${fmtD(d2)}</div>
+    <div class="w-maizy-bar-wrap">
+      <div class="w-maizy-bar-track"><div class="w-maizy-bar-fill" style="width:${(pct*100).toFixed(1)}%"></div></div>
+      <div class="w-maizy-bar-pct">${(pct*100).toFixed(0)} %</div>
+    </div>
+    <div class="w-maizy-dj">
+      <span class="w-maizy-dj-val">${djCumul.toFixed?djCumul.toFixed(1):djCumul}</span>
+      <span class="w-maizy-dj-sep"> / ${vari.target} DJ</span>
+      <span class="w-maizy-dj-vari">${vari.name}</span>
+    </div>
+    <a class="w-maizy-link" href="#">Voir le détail <i class="bi bi-arrow-right"></i></a>
+  </div>`
+}
+
+function renderWTavelure(el) {
+  const crop=(parcelState.crop||parcelBase.crop||'').toLowerCase()
+  if (!crop.includes('pommier')&&!crop.includes('pomme')) {el.innerHTML='<div class="dash-empty">Culture Pommier requise</div>';return}
+  const today=new Date(),lastEp=new Date(today)
+  lastEp.setDate(lastEp.getDate()-rnd(2,8))
+  const MN=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const fmtD=d=>`${d.getDate()} ${MN[d.getMonth()]}`
+  const duree=rnd(8,24),dh=rnd(80,280)
+  const riskLvl=dh>200?'Élevé':dh>120?'Modéré':'Léger'
+  const riskColor=dh>200?'#e07050':dh>120?'#f5a030':'#2d9e5f'
+  el.innerHTML=`<div class="w-tav-wrap">
+    <div class="w-tav-ep">Dernier épisode · <strong>${fmtD(lastEp)}</strong></div>
+    <div class="w-tav-stats">
+      <div class="w-tav-stat"><span class="w-tav-stat-val">${duree}h</span><span class="w-tav-stat-lbl">Durée</span></div>
+      <div class="w-tav-stat"><span class="w-tav-stat-val">${dh} DH</span><span class="w-tav-stat-lbl">Degrés-heures</span></div>
+    </div>
+    <div class="w-tav-risk" style="color:${riskColor}">
+      <i class="bi bi-circle-fill" style="font-size:8px;vertical-align:middle"></i>
+      Risque d'infection estimé <strong>${riskLvl}</strong>
+    </div>
+    <a class="w-maizy-link" href="#">Afficher l'historique <i class="bi bi-arrow-right"></i></a>
+  </div>`
+}
+
+function renderWPlaceholder(el) {
+  el.innerHTML=`<div class="dash-empty" style="padding-top:20px">
+    <i class="bi bi-hourglass" style="font-size:20px;opacity:.3;display:block;margin-bottom:6px"></i>
+    Widget bientôt disponible
+  </div>`
+}
+
+function renderWSensor(type) {
+  return (el) => {
+    const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
+    const finders={
+      'w-station':s=>['P+','PT','SMV','P'].includes(s.model),
+      'w-thygro': s=>s.model==='TH',
+      'w-tsol':   s=>s.model==='T_MINI',
+      'w-anem':   s=>s.model==='W',
+      'w-pyrano': s=>s.model==='PYRANO',
+      'w-lws':    s=>s.model==='LWS',
+      'w-par':    s=>s.model==='PAR',
+      'w-capa':   s=>s.model.startsWith('CAPA-'),
+      'w-tensio': s=>TENSIO_MODELS.includes(s.model),
+      'w-ec':     s=>s.model==='EC',
+    }
+    const sensor=linked.find(finders[type]||(() => false))
+    if (!sensor) {el.innerHTML='<div class="dash-empty">Aucun capteur compatible lié</div>';return}
+    const ms=METRICS_BY_MODEL[sensor.model]||[]
+    const rowsMap={
+      'w-station':()=>{
+        const r=[]
+        if(ms.some(m=>m.id==='temp'))     r.push({label:'Température',val:rnd(10,30)+' °C',  color:'#e07050',icon:'bi-thermometer-half'})
+        if(ms.some(m=>m.id==='pluie'))    r.push({label:'Pluie 24h',   val:rnd(0,14)+' mm',   color:'#45b7d1',icon:'bi-cloud-rain-heavy'})
+        if(ms.some(m=>m.id==='humidite')) r.push({label:'Humidité',    val:rnd(40,90)+' %',   color:'#4ecdc4',icon:'bi-droplet-half'})
+        return r
+      },
+      'w-thygro':()=>[
+        {label:'Température',val:rnd(10,30)+' °C',color:'#e07050',icon:'bi-thermometer-half'},
+        {label:'Humidité',   val:rnd(40,90)+' %', color:'#4ecdc4',icon:'bi-droplet-half'},
+      ],
+      'w-tsol': ()=>[{label:'Temp. sol',      val:rnd(8,22)+' °C',       color:'#bb8fce',icon:'bi-layers'}],
+      'w-anem': ()=>[
+        {label:'Vitesse',   val:rnd(0,40)+' km/h',color:'#7bc4b0',icon:'bi-wind'},
+        {label:'Direction', val:['N','NE','E','SE','S','SO','O','NO'][rnd(0,7)],color:'#7bc4b0',icon:'bi-compass'},
+      ],
+      'w-pyrano':()=>[{label:'Rayonnement',val:rnd(100,900)+' W/m²',     color:'#f5c842',icon:'bi-sun'}],
+      'w-lws':   ()=>[{label:'Humectation', val:rndf(0,12).toFixed(1)+' h/j',color:'#78d8a0',icon:'bi-droplet'}],
+      'w-par':   ()=>[{label:'PAR',         val:rnd(100,2000)+' µmol/m²/s',color:'#f0d060',icon:'bi-brightness-high'}],
+      'w-capa':  ()=>ms.filter(m=>m.id.startsWith('vwc')).slice(0,3).map(m=>({label:m.name,val:rnd(15,45)+' %vol',color:m.color,icon:'bi-moisture'})),
+      'w-tensio':()=>[{label:'Potentiel hydrique',val:rnd(10,150)+' kPa',color:'#5b8dd9',icon:'bi-graph-down'}],
+      'w-ec':    ()=>[{label:'Conductivité',val:rndf(0.1,3).toFixed(2)+' mS/cm',color:'#f0a030',icon:'bi-plug'}],
+    }
+    const rows=(rowsMap[type]||(() => []))()
+    el.innerHTML=`
+      <div class="w-sensor-rows">${rows.map(r=>`
+        <div class="w-sensor-row">
+          <i class="bi ${r.icon}" style="color:${r.color};flex-shrink:0"></i>
+          <span class="w-sensor-val" style="color:${r.color}">${r.val}</span>
+          <span class="w-sensor-lbl">${r.label}</span>
+        </div>`).join('')}</div>
+      <div class="w-sensor-src">${MODEL_NAMES[sensor.model]||sensor.model} · ${sensor.serial}</div>`
   }
 }
+
+function renderWBilan(el) {
+  const pluieMm=rndf(20,80),etpMm=rndf(15,60)
+  const irrigMm=(parcelState.irrigationEvents||[]).reduce((s,e)=>s+(e.mm||0),0)
+  const drainMm=Math.max(0,pluieMm+irrigMm-etpMm)
+  const balMm=pluieMm+irrigMm-etpMm-drainMm
+  const balColor=balMm>=0?'var(--ok)':'var(--err)'
+  el.innerHTML=`<div style="display:flex;gap:16px;align-items:flex-start;height:100%">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1">
+      ${dashBilanCard('Pluie',pluieMm.toFixed(0),'mm','#45b7d1','bi-cloud-rain-heavy','7 derniers jours')}
+      ${dashBilanCard('ETP',etpMm.toFixed(1),'mm','#c090e0','bi-sun','7 derniers jours')}
+      ${dashBilanCard('Irrigation',irrigMm.toFixed(0),'mm','#0172A4','bi-droplet-fill','Cumulé')}
+      ${dashBilanCard('Drainage',drainMm.toFixed(0),'mm','#7bc4b0','bi-arrow-down-circle','Estimé')}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 140px;gap:4px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bdr)">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)">Bilan net</div>
+      <div style="font-size:36px;font-weight:700;color:${balColor}">${balMm>=0?'+':''}${balMm.toFixed(0)}</div>
+      <div style="font-size:13px;color:${balColor};font-weight:600">mm</div>
+      <div style="font-size:11px;color:var(--txt3);margin-top:4px">7 derniers jours</div>
+    </div>
+  </div>`
+}
+
+// legacy helper used by renderWBilan
+function dashBilanCard(label,val,unit,color,icon,sub) {
+  return `<div style="background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
+    <div style="font-size:11px;color:${color};font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:4px"><i class="bi ${icon}"></i> ${label}</div>
+    <div style="font-size:22px;font-weight:700;color:var(--txt)">${val} <span style="font-size:12px;font-weight:400;color:var(--txt2)">${unit}</span></div>
+    <div style="font-size:10px;color:var(--txt3);margin-top:2px">${sub}</div>
+  </div>`
+}
+
+// unused — kept as empty stub so any lingering references don't break
+function populateDashBlocks() {}
 
 function attachDashDragHandlers(grid) {
   let dragSrc = null
@@ -1850,8 +2692,7 @@ function attachDashDragHandlers(grid) {
       block.classList.remove('dash-drag-ghost')
       grid.querySelectorAll('.dash-block').forEach(b => b.classList.remove('dash-drag-over'))
       dragSrc = null
-      const order = [...grid.querySelectorAll('.dash-block')].map(b => b.dataset.id)
-      localStorage.setItem(DASH_STORAGE_KEY(), JSON.stringify(order))
+      saveWidgetIds([...grid.querySelectorAll('.dash-block')].map(b => b.dataset.id))
     })
     block.addEventListener('dragover', e => {
       e.preventDefault()
