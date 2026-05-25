@@ -327,7 +327,12 @@ function openJournalModal(type) {
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   const parcelOptions = allPlots.length
-    ? allPlots.map(p => `<option value="${p.id}">${p.name}</option>`).join('')
+    ? allPlots.map(p => {
+        const parts = [p.name]
+        if (p.crop) parts.push(p.crop)
+        if (p.ville) parts.push(p.ville)
+        return `<option value="${p.id}">${parts.join(' - ')}</option>`
+      }).join('')
     : '<option value="">—</option>';
 
   const modal = document.createElement('div');
