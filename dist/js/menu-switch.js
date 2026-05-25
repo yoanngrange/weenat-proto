@@ -110,7 +110,7 @@ const menuData = {
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
-      { href: 'irrigation.html', icon: 'bi-droplet-fill', text: 'Irrigation' },
+      { href: 'irrigation.html', icon: 'bi-droplet', text: 'Irrigation' },
       { href: 'integrations.html', icon: 'bi-plug', text: 'Intégrations' },
       { href: 'membres.html', icon: 'bi-people', text: 'Membres' },
       { href: 'facturation.html', icon: 'bi-receipt', text: 'Facturation' },
@@ -120,6 +120,7 @@ const menuData = {
       { href: 'parcelles-reseau.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs-reseau.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'adherents.html', icon: 'bi-person-plus', text: 'Adhérents' },
+      { href: 'irrigation.html', icon: 'bi-droplet', text: 'Irrigation' },
       { href: 'parametres-reseau.html', icon: 'bi-info-circle', text: 'Informations' }
     ]
   },
@@ -129,7 +130,7 @@ const menuData = {
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
-      { href: 'irrigation.html', icon: 'bi-droplet-fill', text: 'Irrigation' },
+      { href: 'irrigation.html', icon: 'bi-droplet', text: 'Irrigation' },
       { href: 'integrations.html', icon: 'bi-plug', text: 'Intégrations' },
       { href: 'membres.html', icon: 'bi-people', text: 'Membres' },
       { href: 'parametres.html', icon: 'bi-gear', text: 'Paramètres' }
@@ -259,12 +260,8 @@ function openAddModal() {
           </button>
           <button class="add-item-btn" data-action="strategie-irrigation">
             <i class="bi bi-arrow-repeat"></i>
-            <span>Saison d'irr.</span>
+            <span>Saison d'irrigation</span>
             <span class="add-item-tip" data-tip="Récurrence sur toute une saison, sur une ou plusieurs parcelles">i</span>
-          </button>
-          <button class="add-item-btn" data-action="voir-irrigations">
-            <i class="bi bi-calendar3"></i>
-            <span>Voir les irrigations</span>
           </button>
           <button class="add-item-btn" data-action="note">
             <i class="bi bi-pencil-square"></i>
@@ -295,10 +292,6 @@ function openAddModal() {
             <i class="bi bi-bell-fill"></i>
             <span>Alerte</span>
           </button>
-          <button class="add-item-btn" data-action="export">
-            <i class="bi bi-download"></i>
-            <span>Export de données</span>
-          </button>
         </div>
       </div>
     </div>
@@ -317,8 +310,7 @@ function openAddModal() {
       modal.remove();
       if (action === 'irrigation')         { window.WebIrrig?.openSaisie(); return; }
       if (action === 'strategie-irrigation'){ window.WebIrrig?.openSaison(); return; }
-      if (action === 'voir-irrigations')    { window.WebIrrig?.openVoirIrrigations(); return; }
-      if (action === 'note' || action === 'traitement') { openJournalModal(action); return; }
+if (action === 'note' || action === 'traitement') { openJournalModal(action); return; }
       console.log('[add]', action);
     });
   });

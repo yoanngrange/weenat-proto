@@ -388,6 +388,7 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
           <div class="m-detail-title">${sensor.serial}</div>
           <div class="m-detail-subtitle">${[MODEL_NAMES[sensor.model] || sensor.model, sensorCity].filter(Boolean).join(' · ')}</div>
         </div>
+        <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
     </div>
     <div class="m-detail-tabs">
@@ -447,6 +448,8 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
     showToast(isFav ? 'Ajouté aux favoris' : 'Retiré des favoris')
   })
 
+  layer.querySelector('#d-journal').addEventListener('click', () => openMobileSensorJournal(sensor))
+
   layer.querySelector('#d-plus').addEventListener('click', () => {
     const body = `
       <button class="m-sheet-option" data-a="plot"><i class="bi bi-map"></i> Parcelle</button>
@@ -465,4 +468,150 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
   })
 
   renderView()
+}
+
+// ─── Mobile sensor journal ────────────────────────────────────────────────────
+
+const SENSOR_JRN_KEY = id => `sensor-journal-${id}`
+
+const MAINT_TYPES_M = [
+  { id: 'installation', label: 'Installation',           icon: 'bi-box-arrow-in-down', color: '#0172A4' },
+  { id: 'batterie',     label: 'Remplacement batterie',  icon: 'bi-battery-charging',  color: '#e07820' },
+  { id: 'antenne',      label: 'Remplacement antenne',   icon: 'bi-reception-4',       color: '#5b8dd9' },
+  { id: 'bocal',        label: 'Remplacement bocal',     icon: 'bi-cup',               color: '#3a9e6a' },
+  { id: 'lacet',        label: 'Remplacement lacet',     icon: 'bi-link-45deg',        color: '#8060c0' },
+  { id: 'cuillere',     label: 'Remplacement cuillère',  icon: 'bi-moisture',          color: '#45b7d1' },
+  { id: 'nettoyage',    label: 'Nettoyage',              icon: 'bi-droplet',           color: '#4ecdc4' },
+  { id: 'verification', label: 'Vérification terrain',   icon: 'bi-check2-circle',     color: '#3a7a38' },
+  { id: 'note',         label: 'Note technique',         icon: 'bi-chat-text',         color: '#8e8e93' },
+]
+
+function getSJournal(sensorId) {
+  try { const r = localStorage.getItem(SENSOR_JRN_KEY(sensorId)); if (r) return JSON.parse(r) } catch (_) {}
+  return [
+    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', texte: '' },
+    { id: 2, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', texte: '' },
+    { id: 3, type: 'note',         date: '2023-11-02', user: 'Agriculteur',       texte: 'Capteur légèrement déplacé — redressé' },
+  ]
+}
+
+function saveSJournal(sensorId, entries) {
+  localStorage.setItem(SENSOR_JRN_KEY(sensorId), JSON.stringify(entries))
+}
+
+function openMobileSensorJournal(sensor) {
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <span style="font-size:17px;font-weight:600;flex:1;text-align:center;padding-left:44px">Journal capteur</span>
+        <button class="m-detail-back" id="sjrn-close" style="padding:0 12px;font-size:20px;font-weight:300">×</button>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div id="sjrn-content" class="m-detail-content" style="top:52px;overflow-y:auto"></div>`)
+
+  layer.querySelector('#sjrn-close').addEventListener('click', popDetail)
+
+  const typeMap = Object.fromEntries(MAINT_TYPES_M.map(t => [t.id, t]))
+
+  function renderJournal() {
+    const el = layer.querySelector('#sjrn-content')
+    const entries = getSJournal(sensor.id).slice().sort((a, b) => b.date.localeCompare(a.date))
+    const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+
+    let html = `
+      <div style="padding:12px 16px 4px">
+        <button class="btn-secondary btn-sm" id="sjrn-add-btn" style="gap:6px;width:100%;justify-content:center">
+          <i class="bi bi-plus-circle"></i> Ajouter une entrée
+        </button>
+      </div>
+    `
+
+    if (entries.length === 0) {
+      html += `<div style="padding:40px 16px;text-align:center;color:#8e8e93;font-size:14px">Aucune entrée dans le journal.</div>`
+    } else {
+      html += `<div class="m-jrn-timeline">`
+      entries.forEach((e, idx) => {
+        const t = typeMap[e.type] || { label: e.type, icon: 'bi-circle', color: '#8e8e93' }
+        const isLast = idx === entries.length - 1
+        html += `
+          <div class="m-jrn-entry" data-id="${e.id}">
+            <div class="m-jrn-aside">
+              <div class="m-jrn-dot" style="background:${t.color}18;color:${t.color};border-color:${t.color}40">
+                <i class="bi ${t.icon}"></i>
+              </div>
+              ${!isLast ? `<div class="m-jrn-line"></div>` : ''}
+            </div>
+            <div class="m-jrn-body">
+              <div class="m-jrn-hd">
+                <span class="m-jrn-date">${fmt(e.date)}</span>
+                <span style="font-size:12px;font-weight:600;color:${t.color}">${t.label}</span>
+                <button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>
+              </div>
+              ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
+              ${e.user ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${e.user}</div>` : ''}
+            </div>
+          </div>`
+      })
+      html += `</div>`
+    }
+
+    el.innerHTML = html
+    el.querySelector('#sjrn-add-btn')?.addEventListener('click', () => openSJournalForm(sensor.id, renderJournal))
+    el.querySelectorAll('.m-jrn-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id)
+        saveSJournal(sensor.id, getSJournal(sensor.id).filter(e => e.id !== id))
+        renderJournal()
+      })
+    })
+  }
+
+  renderJournal()
+}
+
+function openSJournalForm(sensorId, onSaved) {
+  const today = new Date().toISOString().slice(0, 10)
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:440px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Ajouter une entrée</span>
+        <button class="add-modal-close">×</button>
+      </div>
+      <div class="journal-form">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Type</label>
+          <select id="sjf-type" class="journal-form-input">
+            ${MAINT_TYPES_M.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Date</label>
+          <input type="date" id="sjf-date" class="journal-form-input" value="${today}">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Intervenant</label>
+          <input type="text" id="sjf-user" class="journal-form-input" value="Jean Dupont">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Note</label>
+          <textarea id="sjf-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
+        </div>
+        <button class="btn-primary btn-sm" id="sjf-save" style="width:100%;justify-content:center;margin-top:4px">Enregistrer</button>
+      </div>
+    </div>`
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelector('#sjf-save').addEventListener('click', () => {
+    const type  = modal.querySelector('#sjf-type').value
+    const date  = modal.querySelector('#sjf-date').value || today
+    const user  = modal.querySelector('#sjf-user').value.trim() || 'Jean Dupont'
+    const texte = modal.querySelector('#sjf-texte').value.trim()
+    saveSJournal(sensorId, [{ id: Date.now(), type, date, user, texte }, ...getSJournal(sensorId)])
+    modal.remove()
+    onSaved()
+  })
+  document.body.appendChild(modal)
 }

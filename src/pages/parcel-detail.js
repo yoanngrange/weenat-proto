@@ -94,6 +94,9 @@ const METRICS_BY_MODEL = {
   'PYRANO': [
     { id: 'rayonnement', name: 'Rayonnement', unit: 'W/m²', color: '#f5c842', base: () => rnd(0, 900), cumul: { label: 'Énergie', unit: 'Wh/m²' } },
   ],
+  'PAR': [
+    { id: 'par', name: 'Densité de flux de photons photosynthétiques', unit: 'µmol/m²/s', color: '#c47a00', base: () => rnd(0, 2000) },
+  ],
 }
 
 // CHP tensiometers: multiple can coexist on the same parcel — skip conflict check
@@ -127,6 +130,15 @@ function renderWindCompositeChart(container, source = null, emissionMins = null,
   const grid   = [0.25,0.5,0.75].map(t => { const y=(PT+iH-t*iH).toFixed(1); return `<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(0,0,0,.06)" stroke-width="1" stroke-dasharray="3,3"/>` }).join('')
   const yLbls  = [0,0.5,1].map(t => { const y=PT+iH-t*iH; return `<text x="${PL-4}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--txt3)">${Math.round(t*maxV)}</text>` }).join('')
 
+  // X-axis baseline + labels
+  const xBaseline = `<line x1="${PL}" y1="${PT+iH}" x2="${W-PR}" y2="${PT+iH}" stroke="var(--bdr2)" stroke-width="1"/>`
+  const labelStep = Math.max(1, Math.floor(count / 6))
+  let xLbls = ''
+  for (let i = 0; i < count; i += labelStep) {
+    const minsAgo = (count - 1 - i) / Math.max(count - 1, 1) * getPeriodMinutes()
+    xLbls += `<text x="${xOf(i).toFixed(1)}" y="${(PT+iH+14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+  }
+
   const every  = Math.max(1, Math.round(count / 25))
   const arrows = []
   for (let i = 0; i < count; i += every) {
@@ -149,7 +161,7 @@ function renderWindCompositeChart(container, source = null, emissionMins = null,
       <div class="chart-card-meta">${sourceHtml}${emHtml}</div>
     </div>
     <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      ${yLbls}${grid}
+      ${yLbls}${grid}${xBaseline}${xLbls}
       <path d="${area}" fill="#7bc4b0" opacity=".18"/>
       <path d="${curve}" fill="none" stroke="#7bc4b0" stroke-width="2" stroke-linejoin="round"/>
       ${arrows.join('')}
@@ -241,6 +253,7 @@ const CATALOG_ITEM_ID = {
   'Anémomètre': 'w-anem', "Capteur d'humectation foliaire": 'w-lws',
   'Capteur PAR': 'w-par', 'Pyranomètre': 'w-pyrano', 'Station météo': 'w-station',
   'Station Météo Virtuelle': 'w-station', 'Thermomètre de sol': 'w-tsol', 'Thermomètre-Hygromètre': 'w-thygro',
+  'Bilan hydrique': 'bilan', 'Irrigations': 'irrigations',
   'Sonde capacitive': 'w-capa', 'Tensiomètre': 'w-tensio', 'Sonde de fertirrigation': 'w-ec',
   'Profil capteurs': 'profil-capteurs', 'Niveau de réservoir en eau utilisable': 'niveau-reservoir',
   'Profil de niveau de réservoir': 'profil-reservoir',
@@ -251,7 +264,7 @@ const WIDGET_CATALOG_WEB = [
   { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
   { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
-  { title: 'Irrigation', items: ['Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+  { title: 'Irrigation', items: ['Bilan hydrique','Irrigations','Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
   { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
 ]
 
@@ -278,6 +291,8 @@ function openWebWidgetCatalog() {
     if (item === 'Pyranomètre' || item === 'Rayonnement solaire') return models.has('PYRANO')
     if (item === "Capteur d'humectation foliaire") return models.has('LWS')
     if (item === 'Capteur PAR') return models.has('PAR')
+    if (item === 'Bilan hydrique') return [...models].some(m=>m.startsWith('CAPA-')) || [...models].some(m=>TENSIO_MODELS.includes(m))
+    if (item === 'Irrigations') return true
     if (item === 'Sonde capacitive') return [...models].some(m=>m.startsWith('CAPA-'))
     if (item === 'Tensiomètre') return [...models].some(m=>TENSIO_MODELS.includes(m))
     if (item === 'Sonde de fertirrigation') return models.has('EC')
@@ -332,33 +347,58 @@ function openWebWidgetCatalog() {
   document.body.appendChild(modal)
 }
 
-// ─── Journal (notes & traitements) ────────────────────────────────────────────
+// ─── Journal (notes, traitements & historique) ────────────────────────────────
 
 const JOURNAL_KEY = `weenat-journal-${parcelId}`
-
 const TODAY_STR = new Date().toISOString().slice(0, 10)
+
+const NOTE_CATEGORIES = [
+  'Observation générale', 'Préparation du sol (labour)', 'Préparation du sol (strip-till)',
+  'Préparation du sol (sous-solage)', 'Fertilisation', 'Semis', 'Récolte',
+  'Stade phénologique', 'Passage de sangliers', 'Gestion de haie bocagère',
+  'Irrigation manuelle', 'Autre',
+]
+
+function autoEvents() {
+  const p = parcelBase
+  const evts = []
+  const addEvt = (date, texte, auteur = 'Système') => evts.push({ id: 'auto-' + date + texte.slice(0, 8), type: 'modification', date, texte, auteur })
+  // Creation
+  addEvt('2024-01-01', 'Création de la parcelle', 'Jean Dupont')
+  // Culture
+  if (p.crop) addEvt('2024-03-15', `Culture définie : ${p.crop}`, 'Jean Dupont')
+  // Texture
+  if (p.texture) addEvt('2024-03-15', `Texture de sol définie : ${p.texture}`, 'Jean Dupont')
+  // Irrigation type
+  if (p.irrigation) addEvt('2024-04-01', `Type d'irrigation : ${p.irrigation}`, 'Jean Dupont')
+  // Linked sensors
+  const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  linked.forEach(s => addEvt('2024-06-10', `Liaison capteur : ${MODEL_NAMES[s.model] || s.model} · ${s.serial}`, 'Sophie Martin'))
+  // Season start
+  addEvt('2026-03-01', 'Début de cycle cultural 2026', 'Jean Dupont')
+  return evts
+}
 
 function getJournal() {
   try {
     const raw = localStorage.getItem(JOURNAL_KEY)
     if (raw) return JSON.parse(raw)
   } catch (_) {}
-  // Default demo entries
   const demo = [
     {
-      id: 1746921600000, type: 'note',
-      date: '2026-05-11',
+      id: 1746921600000, type: 'note', category: 'Observation générale',
+      date: '2026-05-11', auteur: 'Jean Dupont',
       texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',
     },
     {
       id: 1747353600000, type: 'traitement',
-      date: '2026-05-16',
+      date: '2026-05-16', auteur: 'Sophie Martin',
       texte: 'Application conforme aux conditions météo. Vent < 2 m/s.',
       produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons',
     },
     {
-      id: 1747785600000, type: 'note',
-      date: '2026-05-21',
+      id: 1747785600000, type: 'note', category: 'Stade phénologique',
+      date: '2026-05-21', auteur: 'Jean Dupont',
       texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.',
     },
   ]
@@ -373,60 +413,70 @@ function saveJournal(entries) {
 function renderJournalTab() {
   const el = document.getElementById('journal-container')
   if (!el) return
-  const entries = getJournal().sort((a, b) => b.date.localeCompare(a.date))
+  const userEntries = getJournal()
+  const auto = autoEvents()
+  const all = [...userEntries, ...auto].sort((a, b) => b.date.localeCompare(a.date))
 
-  const fmt = d => {
-    const [y, m, j] = d.split('-')
-    return `${j}/${m}/${y}`
+  const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+  const CONFIG = {
+    note:         { label: 'Note',         icon: 'bi-pencil',        dotCls: 'note',         badgeCls: 'note'         },
+    traitement:   { label: 'Traitement',   icon: 'bi-eyedropper',    dotCls: 'traitement',   badgeCls: 'traitement'   },
+    modification: { label: 'Modification', icon: 'bi-pencil-square', dotCls: 'modification', badgeCls: 'modification' },
   }
 
   let html = `
     <div class="journal-add-bar">
       <button class="btn-secondary btn-sm" id="jrn-add-note" style="gap:6px">
-        <i class="bi bi-pencil-square"></i> Ajouter une note
+        <i class="bi bi-pencil-square"></i> Note
       </button>
       <button class="btn-secondary btn-sm" id="jrn-add-traitement" style="gap:6px">
-        <i class="bi bi-eyedropper"></i> Ajouter un traitement
+        <i class="bi bi-eyedropper"></i> Traitement
       </button>
     </div>
+    <div class="journal-timeline">
   `
 
-  if (entries.length === 0) {
+  if (all.length === 0) {
     html += `<div class="journal-empty">Aucune entrée dans le journal.</div>`
   } else {
-    entries.forEach(e => {
+    all.forEach(e => {
+      const c = CONFIG[e.type] || CONFIG.note
+      const isAuto = e.type === 'modification'
       const isTraitement = e.type === 'traitement'
       html += `
-        <div class="journal-entry" data-id="${e.id}">
-          <div class="journal-entry-hd">
-            <span class="journal-entry-date">${fmt(e.date)}</span>
-            <span class="journal-type-badge journal-type-badge--${e.type}">
-              <i class="bi bi-${isTraitement ? 'eyedropper' : 'pencil'}"></i>
-              ${isTraitement ? 'Traitement' : 'Note'}
-            </span>
-            <button class="journal-entry-delete" data-id="${e.id}" title="Supprimer">
-              <i class="bi bi-trash3"></i>
-            </button>
+        <div class="jrn-entry" data-id="${e.id}">
+          <div class="jrn-entry-aside">
+            <div class="jrn-dot jrn-dot--${c.dotCls}"><i class="bi ${c.icon}"></i></div>
           </div>
-          ${e.texte ? `<div class="journal-entry-texte">${e.texte}</div>` : ''}
-          ${isTraitement && (e.produit || e.dose || e.cible) ? `
-            <div class="journal-entry-meta">
-              ${e.produit ? `<span><i class="bi bi-flask"></i>${e.produit}</span>` : ''}
-              ${e.dose    ? `<span><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
-              ${e.cible   ? `<span><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
-            </div>` : ''}
-          ${e.imageIds?.length ? `<div class="jrn-entry-photos" data-entry-id="${e.id}"></div>` : ''}
+          <div class="jrn-entry-body">
+            <div class="jrn-entry-hd">
+              <span class="jrn-entry-date">${fmt(e.date)}</span>
+              <span class="journal-type-badge journal-type-badge--${c.badgeCls}">
+                ${c.label}
+              </span>
+              ${!isAuto ? `<button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>` : ''}
+            </div>
+            ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
+            ${isTraitement && (e.produit || e.dose || e.cible) ? `
+              <div class="jrn-entry-meta">
+                ${e.produit ? `<span class="jrn-entry-meta-chip"><i class="bi bi-flask"></i>${e.produit}</span>` : ''}
+                ${e.dose    ? `<span class="jrn-entry-meta-chip"><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
+                ${e.cible   ? `<span class="jrn-entry-meta-chip"><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
+              </div>` : ''}
+            ${e.imageIds?.length ? `<div class="jrn-entry-photos-row" data-entry-id="${e.id}"></div>` : ''}
+          </div>
         </div>
       `
     })
   }
 
+  html += `</div>`
   el.innerHTML = html
 
   el.querySelector('#jrn-add-note').addEventListener('click', () => openJournalForm('note'))
   el.querySelector('#jrn-add-traitement').addEventListener('click', () => openJournalForm('traitement'))
 
-  el.querySelectorAll('.journal-entry-delete').forEach(btn => {
+  el.querySelectorAll('.jrn-entry-delete').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.dataset.id)
       const entry = getJournal().find(e => e.id === id)
@@ -439,8 +489,8 @@ function renderJournalTab() {
   // Async-load images for entries that have imageIds
   const IS = window.ImageStore
   if (IS) {
-    el.querySelectorAll('.jrn-entry-photos[data-entry-id]').forEach(async photoRow => {
-      const entry = entries.find(e => String(e.id) === photoRow.dataset.entryId)
+    el.querySelectorAll('.jrn-entry-photos-row[data-entry-id]').forEach(async photoRow => {
+      const entry = userEntries.find(e => String(e.id) === photoRow.dataset.entryId)
       if (!entry?.imageIds?.length) return
       for (const imgId of entry.imageIds) {
         try {
@@ -528,7 +578,7 @@ function openJournalForm(type) {
   modal.querySelector('#jrn-f-save').addEventListener('click', async () => {
     const date  = modal.querySelector('#jrn-f-date').value || TODAY_STR
     const texte = modal.querySelector('#jrn-f-texte').value.trim()
-    const entry = { id: Date.now(), type, date, texte }
+    const entry = { id: Date.now(), type, date, texte, auteur: 'Jean Dupont' }
     if (isTraitement) {
       entry.produit = modal.querySelector('#jrn-f-produit').value.trim()
       entry.dose    = modal.querySelector('#jrn-f-dose').value.trim()
@@ -602,6 +652,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPeriodControls()
   initCompareControl()
   initTabs()
+  initPhenologie()
+  initNotesOverlay()
   initDashGrid()
   document.getElementById('parcel-add-widget-btn')?.addEventListener('click', openWebWidgetCatalog)
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
@@ -1053,6 +1105,8 @@ function drawAllCharts() {
       drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
     }
   })
+  renderPhenoOverlay()
+  renderNotesOverlay()
 }
 
 // curves: [{ depth, color }] — déjà calculé par appendTensioCharts selon le mode
@@ -1096,11 +1150,12 @@ function drawTensioMultiChart(svg, curves, count, step) {
     out += `<path d="${path}" fill="none" stroke="${curves[ci].color}" stroke-width="2" stroke-linecap="round" clip-path="url(#${clipId})"/>`
   })
 
-  // X labels
+  // X-axis baseline + labels
+  out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
   const labelStep = Math.max(1, Math.floor(count / 6))
   for (let i = 0; i < count; i += labelStep) {
     const minsAgo = (count - 1 - i) * step
-    out += `<text x="${xOf(i).toFixed(1)}" y="${(H - 6).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
   }
 
   svg.innerHTML = out
@@ -1156,13 +1211,16 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
     out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${label}</text>`
   }
 
-  // ── Vertical grid lines (limited, aligned to X labels) ──
+  // ── X-axis baseline ──
+  out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
+
+  // ── Vertical grid lines + X labels ──
   const labelStep = Math.max(1, Math.floor(count / 6))
   for (let i = 0; i < count; i += labelStep) {
     const x = xOf(i).toFixed(1)
     const agoMins = (count - i) * stepMins
     out += `<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="3,3"/>`
-    out += `<text x="${x}" y="${H - 6}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(agoMins)}</text>`
+    out += `<text x="${x}" y="${PAD.t + innerH + 14}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(agoMins)}</text>`
   }
 
   if (chartType === 'bar') {
@@ -1343,6 +1401,395 @@ function applyCustomDates() {
     customTo   = new Date(to + 'T23:59:59')
     if (customFrom < customTo) renderCharts()
   }
+}
+
+// ─── Phenological stages ──────────────────────────────────────────────────────
+
+const PHENO_STAGES_BY_CROP = {
+  'Blé tendre': [
+    { name: 'Semis',       date: '2025-10-20', bbch: 'BBCH 00', desc: 'Semis en sol réchauffé. Profondeur optimale 3–4 cm.' },
+    { name: 'Levée',       date: '2025-11-05', bbch: 'BBCH 09', desc: 'Apparition de la première feuille au-dessus du sol.' },
+    { name: 'Tallage',     date: '2026-02-15', bbch: 'BBCH 21', desc: '1er talle apparu. Période sensible au froid.' },
+    { name: 'Épi 1 cm',    date: '2026-04-20', bbch: 'BBCH 30', desc: 'Montaison. Début de la différenciation de l\'épi.' },
+    { name: 'Épiaison',    date: '2026-05-20', bbch: 'BBCH 55', desc: 'La moitié de l\'épiaison est atteinte. Risque maximal de fusariose.' },
+    { name: 'Floraison',   date: '2026-05-28', bbch: 'BBCH 65', desc: 'Pleine floraison. Fenêtre critique pour la qualité du grain.' },
+    { name: 'Maturité',    date: '2026-07-10', bbch: 'BBCH 89', desc: 'Grain dur, teneur en eau ≤ 15 %. Récolte possible.' },
+  ],
+  'Maïs': [
+    { name: 'Semis',       date: '2026-04-25', bbch: 'BBCH 00', desc: 'Sol > 10 °C à 5 cm. Fenêtre de semis idéale.' },
+    { name: 'Levée',       date: '2026-05-10', bbch: 'BBCH 09', desc: 'Coleoptile visible. 10 jours après semis en conditions normales.' },
+    { name: '4 feuilles',  date: '2026-05-28', bbch: 'BBCH 14', desc: 'V4. Intervention herbicide possible.' },
+    { name: '6 feuilles',  date: '2026-06-12', bbch: 'BBCH 16', desc: 'V6. Stade critique pour la nutrition azotée.' },
+    { name: 'Floraison ♂', date: '2026-07-15', bbch: 'BBCH 65', desc: 'VT. Émission du pollen. Forte demande en eau (≥ 8 mm/j).' },
+    { name: 'Soie',        date: '2026-07-18', bbch: 'BBCH 67', desc: 'R1. Fécondation. Sensibilité maximale au stress hydrique.' },
+    { name: 'Maturité',    date: '2026-09-20', bbch: 'BBCH 89', desc: 'Point noir visible. Récolte selon teneur en eau.' },
+  ],
+  'Colza': [
+    { name: 'Semis',       date: '2025-08-25', bbch: 'BBCH 00', desc: 'Sol humide, T° < 25 °C. Objectif : 30 plants/m².' },
+    { name: 'Levée',       date: '2025-09-05', bbch: 'BBCH 09', desc: 'Cotylédon visible. Période à risque limaces.' },
+    { name: 'Rosette',     date: '2025-11-15', bbch: 'BBCH 18', desc: '8 feuilles étalées. Bon état pour entrer en hiver.' },
+    { name: 'Reprise',     date: '2026-02-20', bbch: 'BBCH 30', desc: 'Allongement de l\'hypocotyle. Fin de la période de vernalisation.' },
+    { name: 'Bouton floral',date:'2026-03-25', bbch: 'BBCH 51', desc: 'Inflorescence visible. Risque sclérotinia à surveiller.' },
+    { name: 'Floraison',   date: '2026-04-10', bbch: 'BBCH 65', desc: 'Pleine floraison. Pollinisation entomophile. Éviter les traitements.' },
+    { name: 'Siliques',    date: '2026-05-05', bbch: 'BBCH 75', desc: 'Siliques de 2 cm. Fin de floraison, début de remplissage.' },
+    { name: 'Maturité',    date: '2026-07-05', bbch: 'BBCH 89', desc: 'Siliques brunes, graines noires. Seuil récolte < 9 % eau.' },
+  ],
+  'Tournesol': [
+    { name: 'Semis',       date: '2026-04-20', bbch: 'BBCH 00', desc: 'Sol > 8 °C à 5 cm. Profondeur 4–5 cm.' },
+    { name: 'Levée',       date: '2026-05-05', bbch: 'BBCH 09', desc: 'Cotylédon hors sol. Période sensible aux oiseaux.' },
+    { name: '4 feuilles',  date: '2026-05-25', bbch: 'BBCH 14', desc: 'V4. Interventions herbicides possibles.' },
+    { name: 'Bouton floral',date:'2026-06-25', bbch: 'BBCH 51', desc: 'E2. Bouton visible. Fin du développement végétatif.' },
+    { name: 'Floraison',   date: '2026-07-10', bbch: 'BBCH 65', desc: 'R5.1. Fleurs ligulées ouvertes. Stress hydrique critique.' },
+    { name: 'Maturité',    date: '2026-09-05', bbch: 'BBCH 89', desc: 'Capitule brun, dos jaune. Teneur en eau 9–12 %.' },
+  ],
+  'Vigne': [
+    { name: 'Débourrement', date: '2026-04-05', bbch: 'BBCH 05', desc: 'Bourgeon en coton. Risque gel augmente fortement.' },
+    { name: 'Sortie feuilles', date: '2026-04-20', bbch: 'BBCH 11', desc: '1ère feuille étalée. Début des traitements prophylactiques.' },
+    { name: 'Floraison',   date: '2026-06-10', bbch: 'BBCH 65', desc: 'Anthèse. Niveau de risque mildiou et oïdium maximal.' },
+    { name: 'Nouaison',    date: '2026-06-25', bbch: 'BBCH 71', desc: 'Baies visibles. Consolidation du rendement.' },
+    { name: 'Véraison',    date: '2026-08-05', bbch: 'BBCH 81', desc: 'Changement de couleur. Arrêt des traitements phytos recommandé.' },
+    { name: 'Récolte',     date: '2026-09-15', bbch: 'BBCH 89', desc: 'Maturité technologique. Date selon profil variétal.' },
+  ],
+  'Sorgho': [
+    { name: 'Semis',       date: '2026-05-10', bbch: 'BBCH 00', desc: 'Sol > 12 °C à 5 cm.' },
+    { name: 'Levée',       date: '2026-05-25', bbch: 'BBCH 09', desc: 'Coleoptile visible.' },
+    { name: 'Montaison',   date: '2026-07-01', bbch: 'BBCH 30', desc: 'Début de la montaison. Forte demande azotée.' },
+    { name: 'Floraison',   date: '2026-07-25', bbch: 'BBCH 65', desc: 'Sensibilité maximale au stress hydrique.' },
+    { name: 'Maturité',    date: '2026-09-15', bbch: 'BBCH 89', desc: 'Teneur en eau < 25 %. Récolte adaptée.' },
+  ],
+  'Orge de printemps': [
+    { name: 'Semis',         date: '2026-03-15', bbch: 'BBCH 00', desc: 'Semis dès que sol ressuyé, T° > 5 °C.' },
+    { name: 'Levée',         date: '2026-04-01', bbch: 'BBCH 09', desc: 'Coleoptile visible. Période sensible aux limaces.' },
+    { name: 'Tallage',       date: '2026-04-20', bbch: 'BBCH 21', desc: 'Premier talle. Couverture du sol progressive.' },
+    { name: 'Montaison',     date: '2026-05-10', bbch: 'BBCH 30', desc: 'Allongement du premier entre-nœud.' },
+    { name: 'Épiaison',      date: '2026-06-05', bbch: 'BBCH 55', desc: 'Moitié de l\'épiaison atteinte.' },
+    { name: 'Floraison',     date: '2026-06-15', bbch: 'BBCH 65', desc: 'Anthèse. Risque fusariose à surveiller.' },
+    { name: 'Grain pâteux',  date: '2026-07-05', bbch: 'BBCH 83', desc: 'Grain à consistance pâteuse. Maturation avancée.' },
+    { name: 'Récolte',       date: '2026-08-05', bbch: 'BBCH 89', desc: 'Grain dur, teneur en eau ≤ 15 %.' },
+  ],
+  'Orge': [
+    { name: 'Semis',         date: '2025-10-20', bbch: 'BBCH 00', desc: 'Semis en sol réchauffé, profondeur 3–4 cm.' },
+    { name: 'Levée',         date: '2025-11-04', bbch: 'BBCH 09', desc: 'Coleoptile visible. Surveillance limaces.' },
+    { name: 'Tallage',       date: '2026-02-08', bbch: 'BBCH 21', desc: 'Reprise de végétation. Premier talle.' },
+    { name: 'Montaison',     date: '2026-04-02', bbch: 'BBCH 30', desc: 'Allongement du premier entre-nœud.' },
+    { name: 'Épiaison',      date: '2026-05-07', bbch: 'BBCH 55', desc: 'Moitié de l\'épiaison atteinte.' },
+    { name: 'Floraison',     date: '2026-05-18', bbch: 'BBCH 65', desc: 'Anthèse. Risque fusariose à surveiller.' },
+    { name: 'Grain pâteux',  date: '2026-06-05', bbch: 'BBCH 83', desc: 'Grain à consistance pâteuse. Maturation avancée.' },
+    { name: 'Récolte',       date: '2026-07-01', bbch: 'BBCH 89', desc: 'Grain dur, teneur en eau ≤ 15 %.' },
+  ],
+  'Pomme de terre': [
+    { name: 'Plantation',    date: '2026-04-02', bbch: 'BBCH 00', desc: 'Tubercules-semences à 10 cm, espacement 30–35 cm.' },
+    { name: 'Levée',         date: '2026-04-26', bbch: 'BBCH 09', desc: 'Tiges émergées. Risque gel résiduel.' },
+    { name: 'Croissance',    date: '2026-05-15', bbch: 'BBCH 31', desc: 'Fermeture du rang. Première application fongicide.' },
+    { name: 'Tuberisation',  date: '2026-06-05', bbch: 'BBCH 71', desc: 'Initiation des tubercules. Demande en eau maximale.' },
+    { name: 'Grossissement', date: '2026-07-01', bbch: 'BBCH 81', desc: 'Grossissement actif. Irrigation critique.' },
+    { name: 'Maturité',      date: '2026-08-15', bbch: 'BBCH 89', desc: 'Fanes sèches, peau des tubercules fixée. Récolte.' },
+  ],
+  'Cerisier': [
+    { name: 'Dormance',        date: '2025-12-15', bbch: 'BBCH 00', desc: 'Repos végétatif. Besoin en froid accumulé.' },
+    { name: 'Bourgeons',       date: '2026-02-20', bbch: 'BBCH 03', desc: 'Gonflement des bourgeons. Chilling satisfait.' },
+    { name: 'Débourrement',    date: '2026-03-18', bbch: 'BBCH 07', desc: 'Pointe verte visible. Risque gel fort (T° critique −2 °C).' },
+    { name: 'Floraison',       date: '2026-04-08', bbch: 'BBCH 65', desc: 'Pleine floraison. Pollinisation croisée nécessaire.' },
+    { name: 'Nouaison',        date: '2026-04-28', bbch: 'BBCH 71', desc: 'Petits fruits noués. Chute physiologique normale.' },
+    { name: 'Fructification',  date: '2026-05-12', bbch: 'BBCH 81', desc: 'Grossissement actif des cerises. Irrigation si déficit.' },
+    { name: 'Récolte',         date: '2026-06-18', bbch: 'BBCH 89', desc: 'Cerises à maturité. Récolte échelonnée selon variété.' },
+  ],
+  'Poire': [
+    { name: 'Débourrement',    date: '2026-03-28', bbch: 'BBCH 07', desc: 'Pointe verte. Vigilance gel (T° critique −2 °C).' },
+    { name: 'Floraison',       date: '2026-04-15', bbch: 'BBCH 65', desc: 'Pleine floraison. Pollinisation entomophile.' },
+    { name: 'Nouaison',        date: '2026-05-05', bbch: 'BBCH 71', desc: 'Petits fruits noués. Éclaircissage si nécessaire.' },
+    { name: 'Croissance',      date: '2026-06-15', bbch: 'BBCH 78', desc: 'Grossissement actif. Besoins en eau importants.' },
+    { name: 'Véraison',        date: '2026-08-10', bbch: 'BBCH 84', desc: 'Changement de couleur. Arrêt des traitements phytos.' },
+    { name: 'Récolte',         date: '2026-09-10', bbch: 'BBCH 89', desc: 'Récolte selon indice de maturité (pénétromètre, amidon).' },
+  ],
+  'Pomme': [
+    { name: 'Débourrement',    date: '2026-04-01', bbch: 'BBCH 07', desc: 'Pointe verte. Risque gel résiduel.' },
+    { name: 'Floraison',       date: '2026-04-25', bbch: 'BBCH 65', desc: 'Pleine floraison. Risque tavelure maximal.' },
+    { name: 'Nouaison',        date: '2026-05-15', bbch: 'BBCH 71', desc: 'Petits fruits visibles. Éclaircissage possible.' },
+    { name: 'Croissance',      date: '2026-06-10', bbch: 'BBCH 78', desc: 'Grossissement actif. Surveillance carpocapse.' },
+    { name: 'Véraison',        date: '2026-08-15', bbch: 'BBCH 84', desc: 'Coloration des fruits. Maturation avancée.' },
+    { name: 'Récolte',         date: '2026-09-20', bbch: 'BBCH 89', desc: 'Récolte selon variété et indice de maturité.' },
+  ],
+  'Salade': [
+    { name: 'Plantation',      date: '2026-04-15', bbch: 'BBCH 00', desc: 'Repiquage des plants. Sol meuble et frais.' },
+    { name: 'Reprise',         date: '2026-04-25', bbch: 'BBCH 09', desc: 'Reprise végétative. Irrigation de démarrage.' },
+    { name: 'Croissance',      date: '2026-05-10', bbch: 'BBCH 31', desc: 'Développement foliaire actif. Apport azoté.' },
+    { name: 'Pommaison',       date: '2026-05-22', bbch: 'BBCH 41', desc: 'Formation de la pomme. Réduire l\'irrigation.' },
+    { name: 'Récolte',         date: '2026-05-30', bbch: 'BBCH 89', desc: 'Pomme ferme, feuilles extérieures vertes. Récolte.' },
+  ],
+  'Laitue': [
+    { name: 'Plantation',      date: '2026-04-15', bbch: 'BBCH 00', desc: 'Repiquage des plants. Sol meuble et frais.' },
+    { name: 'Reprise',         date: '2026-04-25', bbch: 'BBCH 09', desc: 'Reprise végétative. Irrigation de démarrage.' },
+    { name: 'Croissance',      date: '2026-05-10', bbch: 'BBCH 31', desc: 'Développement foliaire actif. Apport azoté.' },
+    { name: 'Pommaison',       date: '2026-05-22', bbch: 'BBCH 41', desc: 'Formation de la pomme. Réduire l\'irrigation.' },
+    { name: 'Récolte',         date: '2026-05-30', bbch: 'BBCH 89', desc: 'Pomme ferme, feuilles extérieures vertes. Récolte.' },
+  ],
+  'Betterave': [
+    { name: 'Semis',           date: '2026-03-20', bbch: 'BBCH 00', desc: 'Semis en sol réchauffé (T° > 5 °C) et ressuyé.' },
+    { name: 'Levée',           date: '2026-04-08', bbch: 'BBCH 09', desc: 'Cotylédons hors sol. Période à risque limaces.' },
+    { name: '4 feuilles',      date: '2026-05-01', bbch: 'BBCH 14', desc: 'Couverture partielle du sol. Interventions herbicides.' },
+    { name: 'Fermeture rang',  date: '2026-06-15', bbch: 'BBCH 37', desc: 'Canopée fermée. Forte demande en eau et azote.' },
+    { name: 'Grossissement',   date: '2026-08-01', bbch: 'BBCH 40', desc: 'Grossissement actif de la racine. Accumulation de sucres.' },
+    { name: 'Récolte',         date: '2026-10-20', bbch: 'BBCH 89', desc: 'Teneur en sucre optimale. Arrachage selon planning usine.' },
+  ],
+}
+
+const PHENO_FALLBACK = [
+  { name: 'Semis',     date: '2026-04-01', bbch: 'BBCH 00', desc: 'Semis.' },
+  { name: 'Levée',     date: '2026-04-20', bbch: 'BBCH 09', desc: 'Levée des plantules.' },
+  { name: 'Floraison', date: '2026-06-15', bbch: 'BBCH 65', desc: 'Floraison.' },
+  { name: 'Récolte',   date: '2026-08-20', bbch: 'BBCH 89', desc: 'Maturité physiologique.' },
+]
+
+function getPhenoStages(crop) {
+  if (!crop) return []
+  const c = crop.toLowerCase()
+  for (const key of Object.keys(PHENO_STAGES_BY_CROP)) {
+    if (c.startsWith(key.toLowerCase())) return PHENO_STAGES_BY_CROP[key]
+  }
+  return PHENO_FALLBACK
+}
+
+function initPhenologie() {
+  const toggle = document.getElementById('toggle-phenologie')
+  if (!toggle) return
+  toggle.addEventListener('change', () => {
+    renderPhenoOverlay()
+  })
+}
+
+function renderPhenoOverlay() {
+  document.querySelectorAll('.pheno-overlay').forEach(el => el.remove())
+
+  const toggle = document.getElementById('toggle-phenologie')
+  if (!toggle?.checked) return
+
+  const crop = parcelState.crop || parcelBase.crop
+  const stages = getPhenoStages(crop)
+  if (!stages.length) return
+
+  const now = Date.now()
+  const periodMs = getPeriodMinutes() * 60000
+  const windowStart = now - periodMs
+
+  const W = 600, PAD_L = 46, PAD_R = 10, PAD_T = 14, PAD_B = 28
+  const innerW = W - PAD_L - PAD_R
+  const lineTop = PAD_T + 4        // y=18
+  const lineBot = 180 - PAD_B      // y=152
+
+  const stagesInRange = stages.filter(s => {
+    const d = new Date(s.date).getTime()
+    return d >= windowStart && d <= now
+  })
+  if (!stagesInRange.length) return
+
+  document.querySelectorAll('.chart-card').forEach(card => {
+    const svg = card.querySelector('.chart-svg, .tensio-svg')
+    if (!svg) return
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.setAttribute('class', 'pheno-overlay')
+
+    stagesInRange.forEach(s => {
+      const d = new Date(s.date).getTime()
+      const frac = (d - windowStart) / periodMs
+      const x = PAD_L + frac * innerW
+
+      // 1px dashed green line
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+      line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1))
+      line.setAttribute('y1', lineTop); line.setAttribute('y2', lineBot)
+      line.setAttribute('stroke', '#3a9e6a')
+      line.setAttribute('stroke-width', '1')
+      line.setAttribute('stroke-dasharray', '4,3')
+      g.appendChild(line)
+
+      // Vertical text (rotated 90°) to the right of the line
+      const maxLen = 14
+      const truncName = s.name.length > maxLen ? s.name.slice(0, maxLen - 1) + '…' : s.name
+      const tx = (x + 3).toFixed(1)
+      const ty = (lineTop + 2).toFixed(1)
+      const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+      txt.setAttribute('x', tx)
+      txt.setAttribute('y', ty)
+      txt.setAttribute('transform', `rotate(90, ${tx}, ${ty})`)
+      txt.setAttribute('text-anchor', 'start')
+      txt.setAttribute('font-size', '9')
+      txt.setAttribute('font-family', 'var(--font)')
+      txt.setAttribute('fill', '#3a9e6a')
+      txt.style.cursor = 'pointer'
+      txt.textContent = truncName
+      g.appendChild(txt)
+
+      // Invisible hit band on the line for tooltip
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      hit.setAttribute('x', (x - 8).toFixed(1))
+      hit.setAttribute('y', lineTop.toString())
+      hit.setAttribute('width', '16')
+      hit.setAttribute('height', (lineBot - lineTop).toString())
+      hit.setAttribute('fill', 'transparent')
+      hit.style.cursor = 'pointer'
+      hit.addEventListener('click', ev => showPhenoDetail(s, ev))
+      g.appendChild(hit)
+    })
+
+    svg.appendChild(g)
+  })
+}
+
+let _phenoPopover = null
+function showPhenoDetail(stage, ev) {
+  if (_phenoPopover) { _phenoPopover.remove(); _phenoPopover = null }
+
+  const pop = document.createElement('div')
+  pop.className = 'pheno-popover'
+  const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+  pop.innerHTML = `
+    <div class="pheno-pop-hd">
+      <span class="pheno-pop-badge">${stage.bbch}</span>
+      <span class="pheno-pop-name">${stage.name}</span>
+      <button class="pheno-pop-close">×</button>
+    </div>
+    <div class="pheno-pop-date">${fmt(stage.date)}</div>
+  `
+  pop.querySelector('.pheno-pop-close').addEventListener('click', () => { pop.remove(); _phenoPopover = null })
+
+  const cx = ev.clientX, cy = ev.clientY
+  pop.style.position = 'fixed'
+  pop.style.top = (cy - 8) + 'px'
+  pop.style.left = (cx + 12) + 'px'
+
+  document.body.appendChild(pop)
+  _phenoPopover = pop
+
+  setTimeout(() => {
+    const pw = pop.offsetWidth, ph = pop.offsetHeight
+    let top = cy - 8, left = cx + 12
+    if (left + pw > window.innerWidth - 8) left = cx - pw - 12
+    if (top + ph > window.innerHeight - 8) top = cy - ph
+    pop.style.top = Math.max(8, top) + 'px'
+    pop.style.left = Math.max(8, left) + 'px'
+  }, 0)
+
+  document.addEventListener('click', function handler(e) {
+    if (!pop.contains(e.target)) { pop.remove(); _phenoPopover = null; document.removeEventListener('click', handler) }
+  }, { capture: true })
+}
+
+// ─── Notes & traitements overlay ─────────────────────────────────────────────
+
+function initNotesOverlay() {
+  const toggle = document.getElementById('toggle-notes')
+  if (!toggle) return
+  toggle.addEventListener('change', renderNotesOverlay)
+}
+
+function renderNotesOverlay() {
+  document.querySelectorAll('.notes-overlay').forEach(el => el.remove())
+  hideNoteTooltip()
+
+  const toggle = document.getElementById('toggle-notes')
+  if (!toggle?.checked) return
+
+  const entries = getJournal().filter(e => e.type === 'note' || e.type === 'traitement')
+  if (!entries.length) return
+
+  const now        = Date.now()
+  const periodMs   = getPeriodMinutes() * 60000
+  const windowStart = now - periodMs
+
+  const W = 600, PAD_L = 46, PAD_R = 10, PAD_B = 28
+  const innerW  = W - PAD_L - PAD_R
+  const axisY   = 180 - PAD_B   // bottom of the chart area = 152
+
+  const inRange = entries.filter(e => {
+    const d = new Date(e.date + 'T12:00:00').getTime()
+    return d >= windowStart && d <= now
+  })
+  if (!inRange.length) return
+
+  document.querySelectorAll('.chart-card').forEach(card => {
+    const svg = card.querySelector('.chart-svg, .tensio-svg')
+    if (!svg) return
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    g.setAttribute('class', 'notes-overlay')
+
+    inRange.forEach(e => {
+      const d     = new Date(e.date + 'T12:00:00').getTime()
+      const frac  = (d - windowStart) / periodMs
+      const x     = PAD_L + frac * innerW
+      const isT   = e.type === 'traitement'
+      const color = isT ? '#78c860' : '#60a8e0'
+      const cy    = axisY + 9
+
+      // Diamond on X-axis
+      const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+      const r = 5
+      diamond.setAttribute('points', `${x.toFixed(1)},${(cy - r).toFixed(1)} ${(x + r).toFixed(1)},${cy.toFixed(1)} ${x.toFixed(1)},${(cy + r).toFixed(1)} ${(x - r).toFixed(1)},${cy.toFixed(1)}`)
+      diamond.setAttribute('fill', color)
+      diamond.setAttribute('stroke', '#fff')
+      diamond.setAttribute('stroke-width', '1.5')
+      g.appendChild(diamond)
+
+      // Transparent hit area for tooltip
+      const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+      hit.setAttribute('x', (x - 9).toFixed(1))
+      hit.setAttribute('y', (axisY).toFixed(1))
+      hit.setAttribute('width', '18')
+      hit.setAttribute('height', '18')
+      hit.setAttribute('fill', 'transparent')
+      hit.style.cursor = 'default'
+      hit.addEventListener('mouseenter', ev => showNoteTooltip(e, ev))
+      hit.addEventListener('mouseleave', hideNoteTooltip)
+      g.appendChild(hit)
+    })
+
+    svg.appendChild(g)
+  })
+}
+
+let _noteTip = null
+
+function showNoteTooltip(entry, ev) {
+  if (!_noteTip) {
+    _noteTip = document.createElement('div')
+    _noteTip.className = 'note-tip'
+    document.body.appendChild(_noteTip)
+  }
+  const isT  = entry.type === 'traitement'
+  const fmt  = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+  let html = `<div class="note-tip-header">
+    <span class="note-tip-badge note-tip-badge--${isT ? 'trait' : 'note'}">
+      <i class="bi ${isT ? 'bi-eyedropper' : 'bi-pencil'}"></i> ${isT ? 'Traitement' : 'Note'}
+    </span>
+    <span class="note-tip-date">${fmt(entry.date)}</span>
+  </div>`
+  if (entry.texte) html += `<div class="note-tip-texte">${entry.texte}</div>`
+  if (isT && (entry.produit || entry.dose || entry.cible)) {
+    html += `<div class="note-tip-detail">`
+    if (entry.produit) html += `<span><i class="bi bi-flask"></i> ${entry.produit}</span>`
+    if (entry.dose)    html += `<span><i class="bi bi-droplet"></i> ${entry.dose}</span>`
+    if (entry.cible)   html += `<span><i class="bi bi-bullseye"></i> ${entry.cible}</span>`
+    html += `</div>`
+  }
+  _noteTip.innerHTML = html
+  _noteTip.style.display = 'block'
+
+  const x = ev.clientX + 14
+  const y = ev.clientY - 10
+  _noteTip.style.left = x + 'px'
+  _noteTip.style.top  = y + 'px'
+
+  // Clamp to viewport
+  requestAnimationFrame(() => {
+    const w = _noteTip.offsetWidth
+    if (x + w > window.innerWidth - 8) _noteTip.style.left = (ev.clientX - w - 10) + 'px'
+  })
+}
+
+function hideNoteTooltip() {
+  if (_noteTip) _noteTip.style.display = 'none'
 }
 
 // ─── Compare control ──────────────────────────────────────────────────────────
@@ -1581,7 +2028,24 @@ function renderLinkedSensors() {
     !parcelState.linkedSensorIds.includes(s.id)
   )
 
+  // Detect metric conflicts among non-tensiometer sensors
+  const nonTensio = linked.filter(s => !TENSIO_MODELS.includes(s.model))
+  const metricCount = {}
+  nonTensio.forEach(s => (METRICS_BY_MODEL[s.model] || []).forEach(m => {
+    metricCount[m.id] = (metricCount[m.id] || 0) + 1
+  }))
+  const conflictingMetricNames = Object.entries(metricCount)
+    .filter(([, n]) => n > 1)
+    .map(([id]) => Object.values(METRICS_BY_MODEL).flat().find(m => m.id === id)?.name || id)
+
   let html = ''
+  if (conflictingMetricNames.length > 0) {
+    html += `<div class="sensor-conflict-banner">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span>Conflit de métriques : <strong>${conflictingMetricNames.join(', ')}</strong> mesurée(s) par plusieurs capteurs. Les données peuvent être en doublon.</span>
+    </div>`
+  }
+
   if (linked.length === 0) {
     html += `<div class="panel-empty" style="margin-bottom:8px">Aucun capteur lié</div>`
   } else {
@@ -2073,29 +2537,30 @@ const WIDGET_DEFS = {
   'previsions-5j':   { size:'2x2', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir les prévisions', href:'previsions.html' } },
   'weephyt':         { size:'2x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
   'cumuls':          { size:'1x2', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#e07050', render: renderWCumuls },
-  'bilan':           { size:'3x2', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:"Voir l'irrigation", href:'#' } },
+  'bilan':           { size:'3x2', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'irrigations':     { size:'3x2', title:'Irrigations',               icon:'bi-moisture',              color:'#2ea0b0', render: renderWIrrigations, footer: { label:"Voir l'irrigation", href:'#' } },
   'gel':             { size:'2x2', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#4ecdc4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
   'dpv':             { size:'1x2', title:'DPV',                        icon:'bi-droplet-half',          color:'#e07050', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'thi':             { size:'1x2', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'temp-rosee':      { size:'2x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#45b7d1', render: renderWTempRosee,  footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'temp-sol':        { size:'2x1', title:'Température du sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWTempSol,    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'maizy':           { size:'2x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:"Voir Maï'zy", href:'#' } },
-  'tavelure':        { size:'2x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure },
+  'tavelure':        { size:'2x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure,           footer: { label:'Voir Tavelure', href:'#' } },
   'suivi-culture':   { size:'2x1', title:'Suivi de culture',           icon:'bi-flower2',               color:'#78d8a0', render: renderWPlaceholder },
-  'decitrait':       { size:'2x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder },
-  'previsions-6h':   { size:'2x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder },
-  'previsions-jour': { size:'2x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder },
-  'previsions-tensio':{ size:'2x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#5b8dd9', render: renderWPlaceholder },
-  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#e07050', render: renderWSensor('w-station') },
-  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#4ecdc4', render: renderWSensor('w-thygro') },
-  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWSensor('w-tsol') },
-  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#7bc4b0', render: renderWSensor('w-anem') },
-  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#f5c842', render: renderWSensor('w-pyrano') },
-  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#78d8a0', render: renderWSensor('w-lws') },
-  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#f0d060', render: renderWSensor('w-par') },
-  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#f0cc60', render: renderWSensor('w-capa') },
-  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#5b8dd9', render: renderWSensor('w-tensio') },
-  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#f0a030', render: renderWSensor('w-ec') },
+  'decitrait':       { size:'2x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder,        footer: { label:'Voir Decitrait', href:'#' } },
+  'previsions-6h':   { size:'2x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'previsions-jour': { size:'2x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'previsions-tensio':{ size:'2x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#e07050', render: renderWSensor('w-station'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#4ecdc4', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWSensor('w-tsol'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#7bc4b0', render: renderWSensor('w-anem'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#f5c842', render: renderWSensor('w-pyrano'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#78d8a0', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#c47a00', render: renderWSensor('w-par'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#f0cc60', render: renderWSensor('w-capa'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#5b8dd9', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#f0a030', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'profil-capteurs': { size:'2x2', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
   'niveau-reservoir':{ size:'2x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
   'profil-reservoir':{ size:'2x2', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
@@ -2137,6 +2602,8 @@ function computeDefaultWidgetIds() {
   if (hasTensio) ids.push('w-tensio')
   if (models.has('EC'))     ids.push('w-ec')
   if (hasTensio || hasCapa) ids.push('bilan')
+  const hasIrrig = parcelBase.irrigation && parcelBase.irrigation !== "Pas d'irrigation" && parcelBase.irrigation !== "Non irrigué"
+  if (hasIrrig) ids.push('irrigations')
   return ids
 }
 
@@ -2154,12 +2621,16 @@ function initDashGrid() {
     block.className = `dash-block dash-block--${def.size}`
     block.dataset.id = id
     block.draggable = true
+    const footerHtml = def.footer
+      ? `<div class="dash-block-ft"><a class="dash-block-ft-link" href="${def.footer.href}"${def.footer.tab ? ` data-tab="${def.footer.tab}"` : ''}>${def.footer.label} →</a></div>`
+      : ''
     block.innerHTML = `
       <div class="dash-block-hd" style="color:${def.color}">
         <span style="display:flex;align-items:center;gap:6px"><i class="bi ${def.icon}"></i> ${def.title}</span>
         <button class="dash-menu-btn" data-wid="${id}" title="Options" aria-label="Options">···</button>
       </div>
-      <div class="dash-block-body" id="dblock-${id}"></div>`
+      <div class="dash-block-body" id="dblock-${id}"></div>
+      ${footerHtml}`
     grid.appendChild(block)
     def.render(block.querySelector(`#dblock-${id}`))
   })
@@ -2188,6 +2659,13 @@ function initDashGrid() {
       setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
     })
   })
+  // Footer tab links
+  grid.querySelectorAll('.dash-block-ft-link[data-tab]').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault()
+      document.querySelector(`.detail-tab-btn[data-pane="tab-${a.dataset.tab}"]`)?.click()
+    })
+  })
   attachDashDragHandlers(grid)
 }
 
@@ -2197,6 +2675,8 @@ function getParcelIrrigations() {
   const groups = buildGroups(plots.filter(pl => pl.orgId === p.orgId))
   const labels = new Set([p.name])
   groups.filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
+  const ck = [p.crop, p.irrigation].filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+  if (ck) labels.add(ck)
   return IRRIG_SEASON.filter(i => labels.has(i.label))
 }
 
@@ -2335,42 +2815,87 @@ function renderWWeephyt(el) {
   </div>`
 }
 
+const CUMULS_STATE_KEY = () => `w-cumuls-state-${parcelId}`
+function loadCumulsState() {
+  try { return JSON.parse(localStorage.getItem(CUMULS_STATE_KEY())) || {} } catch { return {} }
+}
+function saveCumulsState(patch) {
+  const s = loadCumulsState()
+  localStorage.setItem(CUMULS_STATE_KEY(), JSON.stringify({ ...s, ...patch }))
+}
+
 function renderWCumuls(el) {
   const linked=allSensors.filter(s=>parcelState.linkedSensorIds.includes(s.id))
   const met=new Set(linked.flatMap(s=>(METRICS_BY_MODEL[s.model]||[]).map(m=>m.id)))
-  const jan1=new Date(new Date().getFullYear(),0,1).toISOString().slice(0,10)
-  const CUMULS_KEY=`w-cumuls-hidden-parcel-${parcelId}`
-  let hidden
-  try{ hidden=new Set(JSON.parse(localStorage.getItem(CUMULS_KEY))||[]) }catch{ hidden=new Set() }
+  const jan1=`${new Date().getFullYear()}-01-01`
+  const state=loadCumulsState()
+  const hidden=new Set(state.hidden||[])
+  const dates=state.dates||{}
+  const cfg=state.cfg||{}
 
   const allItems=[
-    {id:'etp',label:'ETP',value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
-    {id:'pluie',label:'Pluie',value:rnd(10,50),unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
-    {id:'djc',label:'DJC',value:rnd(40,180),unit:'°j',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp')},
-    {id:'hfroid',label:'Heures froides',value:rnd(5,40),unit:'h',color:'#5b8dd9',icon:'bi-snow',show:met.has('temp')},
-    {id:'humec',label:'Humectation',value:rndf(2,20).toFixed(1),unit:'h',color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
-    {id:'enso',label:'Ensoleillement',value:rndf(3,9).toFixed(1),unit:'h/j',color:'#f5c842',icon:'bi-brightness-high',show:met.has('rayonnement')},
+    {id:'etp',  label:'ETP',         value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
+    {id:'pluie',label:'Pluie',       value:rnd(10,50),             unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
+    {id:'djc',  label:'DJ',          value:rnd(40,180),            unit:'DJ',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp'),cfg:true,
+      cfgLabel:`${cfg.djMin??0}–${cfg.djMax??18}°C`,cfgFields:[{key:'djMin',label:'T min',def:0},{key:'djMax',label:'T max',def:18}]},
+    {id:'hfroid',label:'Heure de froid',value:rnd(5,40),          unit:'h', color:'#5b8dd9',icon:'bi-snow',show:met.has('temp'),cfg:true,
+      cfgLabel:`< ${cfg.hfSeuil??7.2}°C`,cfgFields:[{key:'hfSeuil',label:'Seuil',def:7.2}]},
+    {id:'humec',label:'Humectation', value:rndf(2,20).toFixed(1), unit:'h', color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
+    {id:'enso', label:'Ensoleillement',value:rndf(30,90).toFixed(1),unit:'h',color:'#f5c842',icon:'bi-brightness-high',show:met.has('rayonnement')},
   ].filter(i=>i.show&&!hidden.has(i.id))
 
-  el.innerHTML=`
-    <div class="w-cumuls-date-row"><span class="w-cumuls-date-lbl">Depuis le</span><span class="w-cumuls-date-val">${jan1.split('-').reverse().join('/')}</span></div>
-    <div class="w-cumuls-list">${allItems.map(i=>`
-      <div class="w-cumul-item" data-cid="${i.id}">
+  el.innerHTML=`<div class="w-cumuls-list">${allItems.map(i=>{
+    const d=dates[i.id]||jan1
+    const fmtD=d.split('-').reverse().join('/')
+    return `
+      <div class="w-cumul-item">
         <i class="bi ${i.icon} w-cumul-icon" style="color:${i.color}"></i>
         <div class="w-cumul-body">
-          <div class="w-cumul-lbl">${i.label}</div>
+          <div class="w-cumul-lbl">${i.label}${i.cfg?`<button class="w-cumul-cfg" data-cid="${i.id}" title="Paramétrer"><i class="bi bi-gear"></i></button>`:''}</div>
           <div class="w-cumul-val" style="color:${i.color}">${i.value}<span class="w-cumul-unit"> ${i.unit}</span></div>
+          <div class="w-cumul-date">Depuis le <input type="date" class="w-cumul-date-input" data-cid="${i.id}" value="${d}"></div>
         </div>
         <button class="w-cumul-del" data-cid="${i.id}" title="Retirer">×</button>
-      </div>`).join('')}
-    </div>`
+      </div>`
+  }).join('')}</div>`
 
   el.querySelectorAll('.w-cumul-del').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation()
       hidden.add(btn.dataset.cid)
-      localStorage.setItem(CUMULS_KEY,JSON.stringify([...hidden]))
+      saveCumulsState({hidden:[...hidden]})
       renderWCumuls(el)
+    })
+  })
+  el.querySelectorAll('.w-cumul-date-input').forEach(input=>{
+    input.addEventListener('change',()=>{
+      dates[input.dataset.cid]=input.value
+      saveCumulsState({dates})
+    })
+  })
+  el.querySelectorAll('.w-cumul-cfg').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation()
+      const cid=btn.dataset.cid
+      const item=allItems.find(i=>i.id===cid)
+      if(!item?.cfgFields) return
+      el.querySelector('.w-cumul-cfg-panel')?.remove()
+      const panel=document.createElement('div')
+      panel.className='w-cumul-cfg-panel'
+      panel.innerHTML=`<div class="w-cumul-cfg-title">Paramétrer ${item.label}</div>`+
+        item.cfgFields.map(f=>`
+          <label class="w-cumul-cfg-row">
+            <span>${f.label} (°C)</span>
+            <input type="number" class="w-cumul-cfg-inp" data-key="${f.key}" value="${cfg[f.key]??f.def}" step="0.1">
+          </label>`).join('')+
+        `<button class="w-cumul-cfg-ok">OK</button>`
+      btn.closest('.w-cumul-item').after(panel)
+      panel.querySelector('.w-cumul-cfg-ok').addEventListener('click',()=>{
+        panel.querySelectorAll('.w-cumul-cfg-inp').forEach(inp=>{cfg[inp.dataset.key]=parseFloat(inp.value)||0})
+        saveCumulsState({cfg})
+        panel.remove()
+        renderWCumuls(el)
+      })
     })
   })
 }
@@ -2628,7 +3153,7 @@ function renderWSensor(type) {
       ],
       'w-pyrano':()=>[{label:'Rayonnement',val:rnd(100,900)+' W/m²',     color:'#f5c842',icon:'bi-sun'}],
       'w-lws':   ()=>[{label:'Humectation', val:rndf(0,12).toFixed(1)+' h/j',color:'#78d8a0',icon:'bi-droplet'}],
-      'w-par':   ()=>[{label:'PAR',         val:rnd(100,2000)+' µmol/m²/s',color:'#f0d060',icon:'bi-brightness-high'}],
+      'w-par':   ()=>[{label:'PPFD',         val:rnd(100,2000)+' µmol/m²/s',color:'#c47a00',icon:'bi-brightness-high'}],
       'w-capa':  ()=>ms.filter(m=>m.id.startsWith('vwc')).slice(0,3).map(m=>({label:m.name,val:rnd(15,45)+' %vol',color:m.color,icon:'bi-moisture'})),
       'w-tensio':()=>[{label:'Potentiel hydrique',val:rnd(10,150)+' kPa',color:'#5b8dd9',icon:'bi-graph-down'}],
       'w-ec':    ()=>[{label:'Conductivité',val:rndf(0.1,3).toFixed(2)+' mS/cm',color:'#f0a030',icon:'bi-plug'}],
@@ -2646,34 +3171,156 @@ function renderWSensor(type) {
 }
 
 function renderWBilan(el) {
-  const pluieMm=rndf(20,80),etpMm=rndf(15,60)
-  const irrigMm=(parcelState.irrigationEvents||[]).reduce((s,e)=>s+(e.mm||0),0)
-  const drainMm=Math.max(0,pluieMm+irrigMm-etpMm)
-  const balMm=pluieMm+irrigMm-etpMm-drainMm
-  const balColor=balMm>=0?'var(--ok)':'var(--err)'
-  el.innerHTML=`<div style="display:flex;gap:16px;align-items:flex-start;height:100%">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1">
-      ${dashBilanCard('Pluie',pluieMm.toFixed(0),'mm','#45b7d1','bi-cloud-rain-heavy','7 derniers jours')}
-      ${dashBilanCard('ETP',etpMm.toFixed(1),'mm','#c090e0','bi-sun','7 derniers jours')}
-      ${dashBilanCard('Irrigation',irrigMm.toFixed(0),'mm','#0172A4','bi-droplet-fill','Cumulé')}
-      ${dashBilanCard('Drainage',drainMm.toFixed(0),'mm','#7bc4b0','bi-arrow-down-circle','Estimé')}
-    </div>
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 140px;gap:4px;padding:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bdr)">
-      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)">Bilan net</div>
-      <div style="font-size:36px;font-weight:700;color:${balColor}">${balMm>=0?'+':''}${balMm.toFixed(0)}</div>
-      <div style="font-size:13px;color:${balColor};font-weight:600">mm</div>
-      <div style="font-size:11px;color:var(--txt3);margin-top:4px">7 derniers jours</div>
-    </div>
-  </div>`
+  // Soil water balance widget: VWC / tensio state + recommended dose
+  const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  const hasCapa   = linked.some(s => s.model.startsWith('CAPA-'))
+  const hasTensio = linked.some(s => TENSIO_MODELS.includes(s.model))
+  const rhu = parcelBase.reserveHydrique || 80  // mm — total useful water reserve
+  // Simulate current reserve fill percentage (50–90 % range, seeded by parcelId)
+  const seed  = (parcelBase.id * 17 + 13) % 41
+  const rfuPct = Math.min(95, Math.max(20, 55 + seed))  // % of RFU filled
+  const rfuMm  = Math.round(rhu * rfuPct / 100)
+  // Estimated ETP next 7 days (3–5 mm/d typical)
+  const etpSum = 4 + (seed % 5) - 2  // 2–6 mm/d * 7d → 14–42 mm
+  const etpD   = Math.max(2, Math.min(6, etpSum))
+  const deficit7d = Math.round(etpD * 7 - rfuMm * 0.3)  // simplified water balance
+  const dose7d    = Math.max(0, deficit7d)
+
+  // RFU gauge color
+  const gaugeColor = rfuPct > 60 ? '#2d9e5f' : rfuPct > 35 ? '#e07820' : '#e04040'
+  const statusLabel = rfuPct > 60 ? 'Réserve suffisante' : rfuPct > 35 ? 'Réserve à surveiller' : 'Réserve critique'
+  const statusIcon  = rfuPct > 60 ? 'bi-check-circle-fill' : rfuPct > 35 ? 'bi-exclamation-circle-fill' : 'bi-x-circle-fill'
+
+  if (!hasCapa && !hasTensio) {
+    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--txt3)">
+      <i class="bi bi-droplet" style="font-size:24px"></i>
+      <div style="font-size:13px;text-align:center">Ajoutez une sonde capacitive ou un tensiomètre pour suivre l'état hydrique</div>
+    </div>`
+    return
+  }
+
+  // Horizon bars (3 depths for CAPA or 1 depth for tensio)
+  const depths = hasCapa ? [
+    { label: '10 cm', pct: Math.min(100, rfuPct + (seed % 12) - 5), color: '#f0cc60' },
+    { label: '30 cm', pct: Math.min(100, rfuPct + (seed % 8)),       color: '#c89c30' },
+    { label: '60 cm', pct: Math.min(100, rfuPct - (seed % 10) + 3),  color: '#a07010' },
+  ] : [
+    { label: 'Potentiel', pct: rfuPct, color: '#5b8dd9' },
+  ]
+
+  el.innerHTML = `
+    <div class="w-bilan-layout">
+      <div class="w-bilan-status" style="color:${gaugeColor}">
+        <i class="bi ${statusIcon}"></i> ${statusLabel}
+      </div>
+      <div class="w-bilan-gauge-wrap">
+        <div class="w-bilan-gauge-track">
+          <div class="w-bilan-gauge-fill" style="width:${rfuPct}%;background:${gaugeColor}"></div>
+        </div>
+        <div class="w-bilan-gauge-labels">
+          <span>0</span>
+          <span style="font-weight:600;color:${gaugeColor}">${rfuMm} mm / ${rhu} mm RFU (${rfuPct} %)</span>
+          <span>${rhu} mm</span>
+        </div>
+      </div>
+      <div class="w-bilan-horizons">
+        ${depths.map(d => `
+          <div class="w-bilan-hz">
+            <span class="w-bilan-hz-lbl">${d.label}</span>
+            <div class="w-bilan-hz-bar"><div style="width:${d.pct}%;background:${d.color};height:100%;border-radius:3px;transition:width .4s"></div></div>
+            <span class="w-bilan-hz-val" style="color:${d.color}">${d.pct} %</span>
+          </div>`).join('')}
+      </div>
+      <div class="w-bilan-footer">
+        <div class="w-bilan-kpi">
+          <div class="w-bilan-kpi-lbl">ETP 7 j</div>
+          <div class="w-bilan-kpi-val">${(etpD * 7).toFixed(0)} <span class="w-irrig-unit">mm</span></div>
+        </div>
+        <div class="w-bilan-kpi">
+          <div class="w-bilan-kpi-lbl">Dose conseillée</div>
+          <div class="w-bilan-kpi-val" style="color:${dose7d > 0 ? '#0172A4' : 'var(--ok)'}">
+            ${dose7d > 0 ? `${dose7d} <span class="w-irrig-unit">mm</span>` : '<i class="bi bi-check2" style="font-size:14px"></i>'}
+          </div>
+        </div>
+      </div>
+    </div>`
 }
 
-// legacy helper used by renderWBilan
-function dashBilanCard(label,val,unit,color,icon,sub) {
-  return `<div style="background:var(--bg);border:1px solid var(--bdr);border-radius:8px;padding:10px 12px">
-    <div style="font-size:11px;color:${color};font-weight:600;display:flex;align-items:center;gap:5px;margin-bottom:4px"><i class="bi ${icon}"></i> ${label}</div>
-    <div style="font-size:22px;font-weight:700;color:var(--txt)">${val} <span style="font-size:12px;font-weight:400;color:var(--txt2)">${unit}</span></div>
-    <div style="font-size:10px;color:var(--txt3);margin-top:2px">${sub}</div>
-  </div>`
+function renderWIrrigations(el) {
+  const groups = buildGroups(plots.filter(p => p.orgId === parcelBase.orgId))
+  const labels = new Set([parcelState.name || parcelBase.name])
+  groups.filter(g => g.ids.includes(parcelBase.id)).forEach(g => labels.add(g.label))
+  const ck = [parcelBase.crop || parcelState.crop, parcelBase.irrigation || parcelState.irrigation]
+    .filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+  if (ck) labels.add(ck)
+  const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
+  const TODAY_M = new Date().toISOString().split('T')[0]
+  const real    = irrigs.filter(i => i.real)
+  const plan    = irrigs.filter(i => !i.real)
+  const tReal   = real.reduce((s, i) => s + i.mm, 0)
+  const tPlan   = plan.reduce((s, i) => s + i.mm, 0)
+  const next    = plan.filter(i => i.iso >= TODAY_M).sort((a, b) => a.iso < b.iso ? -1 : 1)[0]
+  const last    = real.filter(i => i.iso <= TODAY_M).sort((a, b) => a.iso > b.iso ? -1 : 1)[0]
+  const irrType = parcelState.irrigation || parcelBase.irrigation
+  const MN      = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const fmtD    = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
+
+  // Build mini timeline: bar per month (Apr–Oct)
+  const MONTHS = [4,5,6,7,8,9,10]
+  const byMonth = {}
+  MONTHS.forEach(m => { byMonth[m] = { real: 0, plan: 0 } })
+  irrigs.forEach(i => {
+    const m = +i.iso.split('-')[1]
+    if (byMonth[m]) byMonth[m][i.real ? 'real' : 'plan'] += i.mm
+  })
+  const maxMm = Math.max(1, ...MONTHS.map(m => byMonth[m].real + byMonth[m].plan))
+  const timelineHtml = `
+    <div class="w-irrig-timeline">
+      ${MONTHS.map(m => {
+        const r = byMonth[m].real, p = byMonth[m].plan
+        const rH = Math.round((r / maxMm) * 52), pH = Math.round((p / maxMm) * 52)
+        return `<div class="w-irrig-col">
+          <div class="w-irrig-bar-wrap">
+            ${p > 0 ? `<div class="w-irrig-bar w-irrig-bar--plan" style="height:${pH}px" title="${MN[m-1]} planifié: ${p} mm"></div>` : ''}
+            ${r > 0 ? `<div class="w-irrig-bar w-irrig-bar--real" style="height:${rH}px" title="${MN[m-1]} réalisé: ${r} mm"></div>` : ''}
+          </div>
+          <div class="w-irrig-col-lbl">${MN[m-1]}</div>
+        </div>`
+      }).join('')}
+    </div>`
+
+  if (!irrigs.length) {
+    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--txt3)">
+      <i class="bi bi-droplet" style="font-size:24px"></i>
+      <div style="font-size:13px">Aucune irrigation enregistrée cette saison</div>
+    </div>`
+    return
+  }
+
+  el.innerHTML = `
+    <div class="w-irrig-layout">
+      <div class="w-irrig-kpis">
+        <div class="w-irrig-kpi">
+          <div class="w-irrig-kpi-lbl">Réalisées</div>
+          <div class="w-irrig-kpi-val" style="color:#E07820">${tReal} <span class="w-irrig-unit">mm</span></div>
+          <div class="w-irrig-kpi-sub">${real.length} apport${real.length > 1 ? 's' : ''}</div>
+        </div>
+        <div class="w-irrig-kpi">
+          <div class="w-irrig-kpi-lbl">Planifiées</div>
+          <div class="w-irrig-kpi-val" style="color:#FFB705">${tPlan} <span class="w-irrig-unit">mm</span></div>
+          <div class="w-irrig-kpi-sub">${plan.length} apport${plan.length > 1 ? 's' : ''}</div>
+        </div>
+        ${irrType && irrType !== "Pas d'irrigation" && irrType !== "Non irrigué" ? `
+        <div class="w-irrig-type-pill">
+          <i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${irrType}
+        </div>` : ''}
+      </div>
+      ${timelineHtml}
+      <div class="w-irrig-footer">
+        ${last  ? `<span><i class="bi bi-check-circle" style="color:var(--ok)"></i> Dernier : <strong>${fmtD(last.iso)}</strong> · ${last.mm} mm</span>` : ''}
+        ${next  ? `<span><i class="bi bi-arrow-right-circle" style="color:#0172A4"></i> Prochain : <strong>${fmtD(next.iso)}</strong> · ${next.mm} mm</span>` : ''}
+      </div>
+    </div>`
 }
 
 // unused — kept as empty stub so any lingering references don't break

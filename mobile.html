@@ -366,6 +366,14 @@
     }
     .m-bh-td--reco { color: #C05000; font-weight: 600; }
     .m-bh-td--planif { color: #185FA5; font-weight: 600; }
+    .m-bh-group-row {
+      grid-column: 1 / -1;
+      font-size: 11px; font-weight: 700; color: #0172A4;
+      padding: 10px 0 3px; margin-top: 2px;
+      border-top: .5px solid rgba(0,0,0,.07);
+      letter-spacing: .02em;
+    }
+    .m-bh-group-row:first-of-type { border-top: none; padding-top: 4px; }
     .m-bh-expand {
       width: 100%; padding: 12px; margin-top: 8px;
       border: 1px dashed rgba(0,0,0,.15); border-radius: 10px;
@@ -1189,6 +1197,41 @@
       flex-shrink: 0;
     }
 
+    .m-detail-journal-btn {
+      width: 30px; height: 30px;
+      background: none; color: #0172A4; border: none;
+      font-size: 19px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .m-detail-journal-btn:active { opacity: .6; }
+
+    /* Mobile journal timeline */
+    .m-jrn-timeline { padding: 8px 16px 24px; }
+    .m-jrn-entry { display: flex; gap: 12px; }
+    .m-jrn-aside { display: flex; flex-direction: column; align-items: center; width: 34px; flex-shrink: 0; }
+    .m-jrn-dot {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0; border: 1.5px solid transparent;
+    }
+    .m-jrn-line { flex: 1; width: 1.5px; background: rgba(0,0,0,.1); margin: 4px 0; min-height: 16px; }
+    .m-jrn-body { flex: 1; min-width: 0; padding-bottom: 20px; }
+    .m-jrn-hd { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+    .m-jrn-date { font-size: 12px; color: #8e8e93; font-family: ui-monospace,monospace; font-weight: 600; }
+    .m-jrn-del {
+      margin-left: auto; background: none; border: none; color: #c0c0c0;
+      font-size: 15px; padding: 2px 4px; cursor: pointer; line-height: 1; border-radius: 4px;
+    }
+    .m-jrn-del:active { color: #ff3b30; }
+    .m-jrn-texte { font-size: 14px; color: #1c1c1e; line-height: 1.5; margin-bottom: 6px; }
+    .m-jrn-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .m-jrn-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 12px; color: #3a3a3c; background: rgba(0,0,0,.05);
+      border-radius: 6px; padding: 3px 8px;
+    }
+
     .m-detail-tabs {
       display: flex;
       background: #fff;
@@ -1275,6 +1318,54 @@
       min-height: 100px;
     }
     .m-placeholder-widget-name { display: none; }
+    /* ── Mobile widget cards ── */
+    .m-widget-card {
+      background: #fff; margin: 0 16px 10px;
+      border-radius: 14px; padding: 14px 14px 10px;
+      border: 1px solid rgba(0,0,0,.07);
+      box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    .m-widget-card-hd {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .m-widget-card-title {
+      font-size: 13px; font-weight: 700;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .m-widget-footer {
+      font-size: 10px; color: #8e8e93; margin-top: 8px;
+      border-top: 1px solid rgba(0,0,0,.06); padding-top: 6px;
+    }
+    /* Cumuls widget */
+    .m-wcumuls-list { display: flex; flex-direction: column; gap: 6px; }
+    .m-wcumuls-row {
+      display: flex; align-items: center; gap: 8px; font-size: 13px;
+    }
+    .m-wcumuls-label { flex: 1; color: #3c3c43; }
+    .m-wcumuls-val { font-weight: 700; }
+    .m-wcumuls-unit { font-size: 11px; font-weight: 400; color: #8e8e93; }
+    /* Prévisions 5j widget */
+    .m-wprev5-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
+    }
+    .m-wprev5-col {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 6px 3px; border-radius: 10px; background: #f5f5f5;
+    }
+    .m-wprev5-col--today { background: rgba(1,114,164,.08); }
+    .m-wprev5-day { font-size: 10px; font-weight: 700; color: #3c3c43; text-transform: uppercase; }
+    .m-wprev5-icon { font-size: 20px; margin: 2px 0; color: #3c3c43; }
+    .m-wprev5-tmax { font-size: 13px; font-weight: 700; color: #e07050; }
+    .m-wprev5-tmin { font-size: 11px; font-weight: 500; color: #5b8dd9; }
+    .m-wprev5-rain { font-size: 10px; color: #45b7d1; font-weight: 600; }
+    .m-wprev5-rain--none { color: #c7c7cc; }
+    /* Sensor widget */
+    .m-wsensor-vals { display: flex; flex-direction: column; gap: 4px; }
+    .m-wsensor-val-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+    .m-wsensor-metric { color: #8e8e93; }
+    .m-wsensor-value { font-weight: 700; }
+
     .m-add-widget-btn {
       width: calc(100% - 32px); margin: 4px 16px 4px;
       padding: 13px; border: 1px dashed rgba(0,0,0,.15);

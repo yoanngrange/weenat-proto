@@ -173,8 +173,8 @@ export function initCapteursScreen(screenEl, role) {
       orgOpts = `
         <select class="m-filter-select" id="org-filter">
           <option value="all"${orgFilter === 'all' ? ' selected' : ''}>Tout le réseau</option>
-          <option value="mine"${orgFilter === 'mine' ? ' selected' : ''}>${myOrg?.name || 'Mon organisation'}</option>
-          <option value="network"${orgFilter === 'network' ? ' selected' : ''}>${networkOrg?.name || "Breiz'Agri Conseil"}</option>
+          <option value="network"${orgFilter === 'network' ? ' selected' : ''}>${networkOrg?.name || "Breiz'Agri Conseil"} uniquement</option>
+          <option value="mine"${orgFilter === 'mine' ? ' selected' : ''}>${myOrg?.name || 'Mon organisation'} uniquement</option>
         </select>`
     }
 

@@ -10,10 +10,10 @@ const _role = new URLSearchParams(window.location.search).get('role') === 'adher
 const WIDGET_CATALOG = [
   { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
   { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
-  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire'] },
+  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
   { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
-  { title: 'Irrigation', items: ['Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+  { title: 'Irrigation', items: ['Bilan hydrique','Irrigations','Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
 ]
 
 function openWidgetCatalog() {
@@ -64,7 +64,7 @@ function openAddPage(parcel) {
           <button class="m-add-item" data-action="station"><div class="m-add-icon"><i class="bi bi-cloud-sun-fill"></i></div><span>Station météo virtuelle</span></button>
           <button class="m-add-item" data-action="membre"><div class="m-add-icon"><i class="bi bi-person-plus-fill"></i></div><span>Membre</span></button>
           <button class="m-add-item" data-action="irrigation"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-droplet-fill"></i></div><span>Irrigation</span></button>
-          <button class="m-add-item" data-action="strategie-irrigation"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div><span>Saison d'irr.</span></button>
+          <button class="m-add-item" data-action="strategie-irrigation"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div><span>Saison d'irrigation</span></button>
           <button class="m-add-item" data-action="calendrier"><div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-calendar3"></i></div><span>Voir les irrigations</span></button>
         </div>
         ${isAdmin ? `
@@ -320,6 +320,8 @@ function irrigationWidget(parcel) {
   const groups = buildGroups(allPlots.filter(p => p.orgId === parcel.orgId))
   const labels = new Set([parcel.name])
   groups.filter(g => g.ids.includes(parcel.id)).forEach(g => labels.add(g.label))
+  const ck = [parcel.crop, parcel.irrigation].filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+  if (ck) labels.add(ck)
   const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
   const TODAY_M = new Date().toISOString().split('T')[0]
   const real    = irrigs.filter(i => i.real)
@@ -369,18 +371,157 @@ function irrigationWidget(parcel) {
     </div>`
 }
 
-function widgetsView(parcel) {
-  const PARCEL_WIDGETS = ['Bilan hydrique', 'Stades phénologiques', 'Alertes actives', 'Données temps-réel']
+function widgetsView(parcel, linkedSensorIds = []) {
+  const sensors = linkedSensorIds.map(id => allSensors.find(s => s.id === id)).filter(Boolean)
+  const sensorWidgets = mWidgetSensorCards(sensors)
   return `
     <div class="m-detail-section">
       <button class="m-add-widget-btn"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
       ${irrigationWidget(parcel)}
-      ${PARCEL_WIDGETS.map(name => `
-        <div class="m-placeholder-widget">
-          <span class="m-placeholder-widget-name">${name}</span>
-          <button class="m-widget-menu" type="button">•••</button>
-        </div>`).join('')}
+      ${mWidgetCumuls(parcel)}
+      ${mWidgetPrev5j()}
+      ${sensorWidgets}
     </div>`
+}
+
+// ─── Mobile widgets ───────────────────────────────────────────────────────────
+
+function mWidgetCard(title, icon, color, body) {
+  return `
+    <div class="m-widget-card">
+      <div class="m-widget-card-hd">
+        <span class="m-widget-card-title" style="color:${color}"><i class="bi ${icon}"></i> ${title}</span>
+        <button class="m-widget-menu" type="button">•••</button>
+      </div>
+      ${body}
+    </div>`
+}
+
+function mWidgetCumuls(parcel) {
+  const seed = parcel.id || 1
+  const rnd0 = (a, b) => +(a + ((seed * 9301 + 49297) % 233280) / 233280 * (b - a)).toFixed(1)
+  const pluie = rnd0(40, 180)
+  const etp   = rnd0(60, 200)
+  const djc   = Math.round(rnd0(80, 320))
+  const rayo  = Math.round(rnd0(120, 600))
+  const hfroid = Math.round(rnd0(20, 120))
+
+  const items = [
+    { label: 'Pluie',           val: pluie,  unit: 'mm',   color: '#45b7d1', icon: 'bi-cloud-rain-heavy' },
+    { label: 'ETP',             val: etp,    unit: 'mm',   color: '#c090e0', icon: 'bi-sun' },
+    { label: 'Degrés jours',    val: djc,    unit: 'DJ',   color: '#e07050', icon: 'bi-thermometer-half' },
+    { label: 'Ensoleillement',  val: rayo,   unit: 'h',    color: '#f5c842', icon: 'bi-brightness-high' },
+    { label: 'Heures de froid', val: hfroid, unit: 'h',    color: '#7bc4b0', icon: 'bi-snow' },
+  ]
+
+  const body = `
+    <div class="m-wcumuls-list">
+      ${items.map(it => `
+        <div class="m-wcumuls-row">
+          <i class="bi ${it.icon}" style="color:${it.color};width:16px;text-align:center"></i>
+          <span class="m-wcumuls-label">${it.label}</span>
+          <span class="m-wcumuls-val" style="color:${it.color}">${it.val} <span class="m-wcumuls-unit">${it.unit}</span></span>
+        </div>`).join('')}
+    </div>
+    <div class="m-widget-footer">Depuis le 1er janvier 2026</div>`
+
+  return mWidgetCard('Cumuls saison', 'bi-bar-chart-line', '#0172A4', body)
+}
+
+function mWidgetPrev5j() {
+  const DAYS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+  const ICONS = ['bi-sun', 'bi-cloud-sun', 'bi-cloud', 'bi-cloud-rain', 'bi-cloud-drizzle', 'bi-cloud-lightning', 'bi-cloud-snow']
+  const today = new Date()
+  const seed0 = today.getDate()
+
+  const days = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(today); d.setDate(today.getDate() + i)
+    const s = seed0 + i * 7
+    const tmax = Math.round(16 + ((s * 127 + 31) % 100) / 100 * 12)
+    const tmin = Math.round(tmax - 4 - ((s * 31 + 17) % 40) / 10)
+    const pluie = ((s * 41 + 13) % 100) < 35 ? Math.round(2 + (s * 13) % 18) : 0
+    const icon = ICONS[pluie > 0 ? (pluie > 8 ? 3 : 4) : ((s % 3 === 0) ? 1 : (s % 5 === 0 ? 2 : 0))]
+    return { day: DAYS[d.getDay()], tmax, tmin, pluie, icon }
+  })
+
+  const body = `
+    <div class="m-wprev5-grid">
+      ${days.map((d, i) => `
+        <div class="m-wprev5-col${i === 0 ? ' m-wprev5-col--today' : ''}">
+          <div class="m-wprev5-day">${i === 0 ? "Auj." : d.day}</div>
+          <i class="bi ${d.icon} m-wprev5-icon"></i>
+          <div class="m-wprev5-tmax">${d.tmax}°</div>
+          <div class="m-wprev5-tmin">${d.tmin}°</div>
+          ${d.pluie > 0 ? `<div class="m-wprev5-rain">${d.pluie}mm</div>` : `<div class="m-wprev5-rain m-wprev5-rain--none">—</div>`}
+        </div>`).join('')}
+    </div>
+    <div class="m-widget-footer">Source : Modèle Arome · 3 km</div>`
+
+  return mWidgetCard('Prévisions 5 jours', 'bi-cloud-sun', '#4ecdc4', body)
+}
+
+function mWidgetSensorCards(sensors) {
+  if (!sensors.length) return ''
+  const MODEL_ICON = {
+    'P+': 'bi-cloud-rain-heavy', 'PT': 'bi-cloud-rain-heavy', 'P': 'bi-cloud-rain-heavy',
+    'TH': 'bi-thermometer-half', 'SMV': 'bi-cloud-sun',
+    'W': 'bi-wind', 'PYRANO': 'bi-brightness-high', 'PAR': 'bi-brightness-alt-high',
+    'LWS': 'bi-droplet', 'T_GEL': 'bi-snow', 'T_MINI': 'bi-thermometer-half',
+    'CHP-15/30': 'bi-moisture', 'CHP-30/60': 'bi-moisture', 'CHP-60/90': 'bi-moisture',
+    'CAPA-30-3': 'bi-moisture', 'CAPA-60-6': 'bi-moisture', 'EC': 'bi-plug',
+  }
+  const MODEL_NAMES_M = {
+    'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre', 'TH': 'Thermo-hygro',
+    'SMV': 'Station météo virtuelle', 'W': 'Anémomètre', 'PYRANO': 'Pyranomètre',
+    'PAR': 'Capteur PAR', 'LWS': 'Humectation', 'T_GEL': 'Sonde gel',
+    'T_MINI': 'Thermo. sol', 'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre',
+    'CHP-60/90': 'Tensiomètre', 'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive',
+    'EC': 'Fertirrigation',
+  }
+  const MODEL_COLORS = {
+    'P+':'#45b7d1','PT':'#45b7d1','P':'#45b7d1','TH':'#e07050','SMV':'#c090e0',
+    'W':'#82b8e0','PYRANO':'#f5c842','PAR':'#a0d070','LWS':'#60a090','T_GEL':'#7bc4b0',
+    'T_MINI':'#bb8fce','CHP-15/30':'#5b8dd9','CHP-30/60':'#5b8dd9','CHP-60/90':'#5b8dd9',
+    'CAPA-30-3':'#f0c060','CAPA-60-6':'#f0c060','EC':'#f0a030',
+  }
+
+  const METRIC_IDS = {
+    'P+':['pluie','temperature','humidite'],'PT':['pluie','temperature'],'P':['pluie'],
+    'TH':['temperature','humidite'],'SMV':['pluie','temperature','humidite'],
+    'W':['vent'],'PYRANO':['rayonnement'],'PAR':['par'],'LWS':['humectation'],
+    'T_GEL':['temperature'],'T_MINI':['temp_sol'],
+    'CHP-15/30':['pothydr'],'CHP-30/60':['pothydr'],'CHP-60/90':['pothydr'],
+    'CAPA-30-3':['teneur'],'CAPA-60-6':['teneur'],'EC':['teneur'],
+  }
+
+  return sensors.slice(0, 4).map(sensor => {
+    const icon  = MODEL_ICON[sensor.model]  || 'bi-broadcast'
+    const name  = MODEL_NAMES_M[sensor.model] || sensor.model
+    const color = MODEL_COLORS[sensor.model] || '#0172A4'
+    const mIds  = METRIC_IDS[sensor.model]  || []
+    const m = CHART_METRICS[mIds[0]]
+    const primaryMetricId = mIds[0]
+
+    const body = `
+      <div style="margin-bottom:6px">
+        ${m ? svgChart(primaryMetricId, color, false, '1d') : '<div style="height:100px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px">Données indisponibles</div>'}
+      </div>
+      <div class="m-wsensor-vals">
+        ${mIds.slice(0, 3).map(mid => {
+          const cfg = CHART_METRICS[mid]; if (!cfg) return ''
+          const series = mockSeries(mid, 1)
+          const val = series[0]
+          const disp = val < 10 ? val.toFixed(1) : Math.round(val)
+          return `<div class="m-wsensor-val-row">
+            <span class="m-wsensor-metric">${cfg.label}</span>
+            <span class="m-wsensor-value" style="color:${cfg.color}">${disp} ${cfg.unit}</span>
+          </div>`
+        }).join('')}
+      </div>
+      <div class="m-widget-footer">${sensor.serial}</div>`
+
+    return mWidgetCard(name, icon, color, body)
+  }).join('')
 }
 
 function triggerCsvDownload(content, filename) {
@@ -580,6 +721,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
           <div class="m-detail-title">${parcel.name}</div>
           ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[parcel.crop, city].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
+        <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
     </div>
     <div class="m-detail-tabs">
@@ -591,7 +733,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
 
   function renderView() {
     const c = layer.querySelector('#detail-content')
-    if (activeView === 'widgets')  c.innerHTML = widgetsView(parcel)
+    if (activeView === 'widgets')  c.innerHTML = widgetsView(parcel, linkedSensorIds)
     if (activeView === 'donnees')  c.innerHTML = donneesView(linkedSensorIds, currentPeriod, currentStep)
     if (activeView === 'params')   { c.innerHTML = paramsView(parcel, org, linkedSensorIds); initMinimap() }
     bindViewEvents()
@@ -683,5 +825,182 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     })
   })
 
+  // Journal icon
+  layer.querySelector('#d-journal').addEventListener('click', () => openMobileParcelJournal(parcel))
+
   renderView()
+}
+
+// ─── Mobile parcel journal ────────────────────────────────────────────────────
+
+const M_JOURNAL_KEY = id => `parcel-journal-${id}`
+
+const M_NOTE_CATEGORIES = [
+  'Observation générale', 'Préparation du sol (labour)', 'Préparation du sol (strip-till)',
+  'Préparation du sol (sous-solage)', 'Fertilisation', 'Semis', 'Récolte',
+  'Stade phénologique', 'Passage de sangliers', 'Gestion de haie bocagère',
+  'Irrigation manuelle', 'Autre',
+]
+
+function getMJournal(parcelId) {
+  try { const r = localStorage.getItem(M_JOURNAL_KEY(parcelId)); if (r) return JSON.parse(r) } catch (_) {}
+  return [
+    { id: 1, type: 'note', category: 'Observation générale', date: '2026-05-11', auteur: 'Jean Dupont', texte: 'Quelques pucerons sur feuilles basses. À surveiller.' },
+    { id: 2, type: 'traitement', date: '2026-05-16', auteur: 'Sophie Martin', texte: 'Vent < 2 m/s, conditions conformes.', produit: 'Karate Zeon', dose: '0,1 L/ha', cible: 'Pucerons' },
+  ]
+}
+
+function saveMJournal(parcelId, entries) {
+  localStorage.setItem(M_JOURNAL_KEY(parcelId), JSON.stringify(entries))
+}
+
+function openMobileParcelJournal(parcel) {
+  const org  = orgs.find(o => o.id === parcel.orgId)
+  const city = org?.ville || ''
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Parcelle</span></button>
+        <span style="font-size:15px;font-weight:600;color:var(--txt3)">Journal</span>
+        <div style="width:44px"></div>
+      </div>
+      <div class="m-detail-identity" style="pointer-events:none">
+        <div style="width:38px"></div>
+        <div class="m-detail-title-block">
+          <div class="m-detail-title">${parcel.name}</div>
+          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[parcel.crop, city].filter(Boolean).join(' · ')}</div>` : ''}
+        </div>
+        <div style="width:38px"></div>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div id="mjrn-content" class="m-detail-content" style="top:96px;overflow-y:auto"></div>`)
+
+  layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+
+  function renderJournal() {
+    const el = layer.querySelector('#mjrn-content')
+    const entries = getMJournal(parcel.id).slice().sort((a, b) => b.date.localeCompare(a.date))
+    const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+
+    const CFG = {
+      note:       { label: 'Note',       icon: 'bi-pencil',     dotColor: '#3a7bd5', dotBg: '#eef4ff', badgeCls: 'note' },
+      traitement: { label: 'Traitement', icon: 'bi-eyedropper', dotColor: '#3a7a38', dotBg: '#f2faf0', badgeCls: 'traitement' },
+    }
+
+    let html = `
+      <div style="padding:12px 16px 4px;display:flex;gap:8px">
+        <button class="btn-secondary btn-sm" id="mjrn-add-note" style="gap:6px;flex:1;justify-content:center">
+          <i class="bi bi-pencil-square"></i> Note
+        </button>
+        <button class="btn-secondary btn-sm" id="mjrn-add-trait" style="gap:6px;flex:1;justify-content:center">
+          <i class="bi bi-eyedropper"></i> Traitement
+        </button>
+      </div>
+    `
+
+    if (entries.length === 0) {
+      html += `<div style="padding:40px 16px;text-align:center;color:#8e8e93;font-size:14px">Aucune entrée dans le journal.</div>`
+    } else {
+      html += `<div class="m-jrn-timeline">`
+      entries.forEach((e, idx) => {
+        const c = CFG[e.type] || CFG.note
+        const isTraitement = e.type === 'traitement'
+        const isLast = idx === entries.length - 1
+        html += `
+          <div class="m-jrn-entry" data-id="${e.id}">
+            <div class="m-jrn-aside">
+              <div class="m-jrn-dot" style="background:${c.dotBg};color:${c.dotColor};border-color:${c.dotColor}40">
+                <i class="bi ${c.icon}"></i>
+              </div>
+              ${!isLast ? `<div class="m-jrn-line"></div>` : ''}
+            </div>
+            <div class="m-jrn-body">
+              <div class="m-jrn-hd">
+                <span class="m-jrn-date">${fmt(e.date)}</span>
+                <span class="journal-type-badge journal-type-badge--${c.badgeCls}">${c.label}</span>
+                <button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>
+              </div>
+              ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
+              ${isTraitement && (e.produit || e.dose || e.cible) ? `
+                <div class="m-jrn-meta">
+                  ${e.produit ? `<span class="m-jrn-chip"><i class="bi bi-flask"></i>${e.produit}</span>` : ''}
+                  ${e.dose    ? `<span class="m-jrn-chip"><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
+                  ${e.cible   ? `<span class="m-jrn-chip"><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
+                </div>` : ''}
+            </div>
+          </div>`
+      })
+      html += `</div>`
+    }
+
+    el.innerHTML = html
+
+    el.querySelector('#mjrn-add-note')?.addEventListener('click', () => openMJournalForm('note', parcel.id, renderJournal))
+    el.querySelector('#mjrn-add-trait')?.addEventListener('click', () => openMJournalForm('traitement', parcel.id, renderJournal))
+    el.querySelectorAll('.m-jrn-del').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.dataset.id)
+        saveMJournal(parcel.id, getMJournal(parcel.id).filter(e => e.id !== id))
+        renderJournal()
+      })
+    })
+  }
+
+  renderJournal()
+}
+
+function openMJournalForm(type, parcelId, onSaved) {
+  const isTraitement = type === 'traitement'
+  const today = new Date().toISOString().slice(0, 10)
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:440px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">${isTraitement ? 'Ajouter un traitement' : 'Ajouter une note'}</span>
+        <button class="add-modal-close">×</button>
+      </div>
+      <div class="journal-form">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Date</label>
+          <input type="date" id="mjf-date" class="journal-form-input" value="${today}">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">${isTraitement ? 'Observations' : 'Texte'}</label>
+          <textarea id="mjf-texte" class="journal-form-textarea" placeholder="${isTraitement ? 'Conditions météo…' : 'Votre note…'}"></textarea>
+        </div>
+        ${isTraitement ? `
+        <div class="journal-form-row">
+          <label class="journal-form-label">Produit</label>
+          <input type="text" id="mjf-produit" class="journal-form-input" placeholder="Ex : Bordeaux mixture">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Dose</label>
+          <input type="text" id="mjf-dose" class="journal-form-input" placeholder="Ex : 2 kg/ha">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Cible</label>
+          <input type="text" id="mjf-cible" class="journal-form-input" placeholder="Ex : Mildiou">
+        </div>` : ''}
+        <button class="btn-primary btn-sm" id="mjf-save" style="width:100%;justify-content:center;margin-top:4px">Enregistrer</button>
+      </div>
+    </div>`
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelector('#mjf-save').addEventListener('click', () => {
+    const date  = modal.querySelector('#mjf-date').value || today
+    const texte = modal.querySelector('#mjf-texte').value.trim()
+    const entry = { id: Date.now(), type, date, texte, auteur: 'Jean Dupont' }
+    if (isTraitement) {
+      entry.produit = modal.querySelector('#mjf-produit').value.trim()
+      entry.dose    = modal.querySelector('#mjf-dose').value.trim()
+      entry.cible   = modal.querySelector('#mjf-cible').value.trim()
+    }
+    if (!texte && !entry.produit) return
+    saveMJournal(parcelId, [entry, ...getMJournal(parcelId)])
+    modal.remove()
+    onSaved()
+  })
+  document.body.appendChild(modal)
 }

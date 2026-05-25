@@ -205,44 +205,39 @@ function openMobileAddModal() {
 
   const modal = document.createElement('div')
   modal.id = 'm-add-modal'
-  modal.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:flex-end'
+  modal.style.cssText = 'position:absolute;inset:0;background:#f2f2f7;z-index:3000;display:flex;flex-direction:column'
   modal.innerHTML = `
-    <div style="background:#f2f2f7;border-radius:16px 16px 0 0;width:100%;padding-bottom:24px;max-height:88%">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
-        <span style="font-size:17px;font-weight:700">Ajouter</span>
-        <button id="m-add-close" style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.07);border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#f2f2f7;flex-shrink:0;border-bottom:.5px solid rgba(0,0,0,.1)">
+      <span style="font-size:17px;font-weight:700">Ajouter</span>
+      <button id="m-add-close" style="width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.07);border:none;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 16px">
+      <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon exploitation</div>
+        ${[
+          { action:'parcelle',            icon:'bi-geo-alt-fill',    label:'Parcelle' },
+          { action:'capteur',             icon:'bi-broadcast',       label:'Capteur' },
+          { action:'station',             icon:'bi-cloud-sun-fill',  label:'Station météo virtuelle' },
+          { action:'membre',              icon:'bi-person-plus-fill',label:'Membre' },
+          { action:'irrigation',          icon:'bi-droplet',         label:'Irrigation' },
+          { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
+          { action:'note',                icon:'bi-pencil-square',   label:'Note' },
+          { action:'traitement',          icon:'bi-eyedropper',      label:'Traitement' },
+        ].map(it => `
+          <button class="m-add-row" data-action="${it.action}" style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08);text-align:left">
+            <i class="bi ${it.icon}" style="color:#0172A4;width:22px;text-align:center;flex-shrink:0"></i>
+            <span>${it.label}</span>
+          </button>`).join('')}
       </div>
-      <div style="overflow-y:auto;padding:12px 16px 0">
-        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
-          <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon exploitation</div>
-          ${[
-            { action:'parcelle',           icon:'bi-geo-alt-fill',   label:'Parcelle' },
-            { action:'capteur',            icon:'bi-broadcast',      label:'Capteur' },
-            { action:'station',            icon:'bi-cloud-sun-fill', label:'Station météo virtuelle' },
-            { action:'membre',             icon:'bi-person-plus-fill',label:'Membre' },
-            { action:'irrigation',         icon:'bi-droplet-fill',   label:'Irrigation' },
-            { action:'strategie-irrigation',icon:'bi-arrow-repeat',  label:"Saison d'irr." },
-            { action:'voir-irrigations',   icon:'bi-calendar3',      label:'Voir les irrigations' },
-            { action:'note',               icon:'bi-pencil-square',  label:'Note' },
-            { action:'traitement',         icon:'bi-eyedropper',     label:'Traitement' },
-          ].map(it => `
-            <button class="m-add-row" data-action="${it.action}" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08)">
-              <i class="bi ${it.icon}" style="color:#0172A4;width:20px;text-align:center"></i>
-              <span>${it.label}</span>
-            </button>`).join('')}
-        </div>
-        ${isAdmin ? `
-        <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
-          <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon réseau</div>
-          <button class="m-add-row" data-action="adherent" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08)">
-            <i class="bi bi-building" style="color:#0172A4;width:20px;text-align:center"></i>
-            <span>Adhérent</span>
-          </button>
-        </div>` : ''}
-      </div>
+      ${isAdmin ? `
+      <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
+        <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon réseau</div>
+        <button class="m-add-row" data-action="adherent" style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08);text-align:left">
+          <i class="bi bi-building" style="color:#0172A4;width:22px;text-align:center;flex-shrink:0"></i>
+          <span>Adhérent</span>
+        </button>
+      </div>` : ''}
     </div>`
-
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
   modal.querySelector('#m-add-close').addEventListener('click', () => modal.remove())
   modal.querySelectorAll('.m-add-row').forEach(btn => {
     btn.addEventListener('click', () => {

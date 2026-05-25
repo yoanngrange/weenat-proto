@@ -3,6 +3,7 @@ import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs as allOrgs }       from '../../data/orgs.js'
 import { network }               from '../../data/network.js'
 import { pushDetail, popDetail } from '../nav.js'
+import { IRRIG_SEASON, buildGroups } from '../../data/irrigations.js'
 
 const ORG_ID   = { admin: 100, adherent: 1 }
 const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
@@ -235,14 +236,15 @@ function trMockSeries(subjectKey, metricId, count) {
   )
 }
 
+const MSR_BAR_METRICS = new Set(['pluie', 'etp'])
+
 function msrCardHtml(m, idx) {
   const count = { '1d': 24, 'hier': 24, '7d': 42, '30d': 60, '365d': 90 }[m.period] || 42
   const data  = trMockSeries(m.subjectKey, m.metricId, count)
   const W = 270, H = 60, PL = 26, PB = 12
   const yMax = Math.max(...data, 1)
-  const pts  = data.map((v, i) =>
-    `${PL + Math.round(i / (count - 1) * W)},${H - PB - Math.round(v / yMax * (H - PB - 4))}`
-  ).join(' ')
+  const isBar = MSR_BAR_METRICS.has(m.metricId)
+  let chartEl
   let grid = ''
   for (let i = 0; i <= 2; i++) {
     const y = Math.round(i / 2 * (H - PB - 4) + 4)
@@ -254,22 +256,40 @@ function msrCardHtml(m, idx) {
     `<text x="${PL + Math.round(i/(xlbls.length-1)*W)}" y="${H+2}" text-anchor="middle" font-size="7" fill="#B0AEA8">${lbl}</text>`
   ).join('')
   const serialData = JSON.stringify(data.map(v => +v.toFixed(2)))
+  const barColor = m.metricId === 'pluie' ? '#45b7d1' : m.color
+
+  if (isBar) {
+    const bw = Math.max(1, W / count * 0.7)
+    const bars = data.map((v, i) => {
+      const bh = Math.round(v / yMax * (H - PB - 4))
+      const bx = PL + Math.round(i / (count - 1) * W) - bw / 2
+      const by = H - PB - bh
+      return `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${barColor}" opacity=".85" rx="1"/>`
+    }).join('')
+    chartEl = `<svg viewBox="0 0 ${PL+W} ${H+6}" style="width:100%;display:block;overflow:visible">${grid}${bars}${xTicks}</svg>`
+  } else {
+    const pts  = data.map((v, i) =>
+      `${PL + Math.round(i / (count - 1) * W)},${H - PB - Math.round(v / yMax * (H - PB - 4))}`
+    ).join(' ')
+    chartEl = `<svg viewBox="0 0 ${PL+W} ${H+6}" style="width:100%;display:block;overflow:visible">
+      ${grid}
+      <polyline points="${pts}" fill="none" stroke="${m.color}" stroke-width="1.5" stroke-linejoin="round"/>
+      <line class="m-tr-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#333" stroke-width=".7" stroke-dasharray="3,2" opacity="0"/>
+      ${xTicks}
+    </svg>`
+  }
+
   return `
     <div class="m-wf-card">
       <div class="m-wf-card-hd">
         <div>
-          <div class="m-wf-card-title" style="color:${m.color}">${m.metricLabel} <span style="font-weight:400;color:#636366">· ${m.subjectLabel}</span></div>
+          <div class="m-wf-card-title" style="color:${m.metricId==='pluie'?barColor:m.color}">${m.metricLabel} <span style="font-weight:400;color:#636366">· ${m.subjectLabel}</span></div>
           <div class="m-wf-card-sub">${m.periodLabel} · ${m.stepLabel}</div>
         </div>
         <button class="m-wf-del" data-widget="temps_reel" data-idx="${idx}" type="button">×</button>
       </div>
       <div class="m-tr-chart-wrap" data-unit="${m.unit}" data-series='${serialData}' style="position:relative;margin-top:4px">
-        <svg viewBox="0 0 ${PL+W} ${H+6}" style="width:100%;display:block;overflow:visible">
-          ${grid}
-          <polyline points="${pts}" fill="none" stroke="${m.color}" stroke-width="1.5" stroke-linejoin="round"/>
-          <line class="m-tr-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#333" stroke-width=".7" stroke-dasharray="3,2" opacity="0"/>
-          ${xTicks}
-        </svg>
+        ${chartEl}
         <div class="m-tr-tooltip" style="display:none;position:absolute;top:2px;pointer-events:none;background:rgba(28,28,30,.85);color:#fff;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;white-space:nowrap">—</div>
       </div>
     </div>`
@@ -315,30 +335,66 @@ function buildMesures(plots, sensors) {
 // ─── Widget HTML builders ─────────────────────────────────────────────────────
 const BH_PAGE = 8
 
-function makePlanif7j(plot) {
-  const s = plot.id
-  if (!plot.irrigation || plot.irrigation === "Pas d'irrigation") return 0
-  return s % 3 === 0 ? Math.round((s * 1.7 + 8) % 30 + 5) : 0
+function makePlanif7j(plot, plotList) {
+  const today = new Date().toISOString().split('T')[0]
+  const end7  = new Date(); end7.setDate(end7.getDate() + 7)
+  const end7s = end7.toISOString().split('T')[0]
+  const labels = new Set([plot.name])
+  buildGroups(plotList).filter(g => g.ids.includes(plot.id)).forEach(g => labels.add(g.label))
+  return IRRIG_SEASON
+    .filter(i => !i.real && i.iso >= today && i.iso <= end7s && labels.has(i.label))
+    .reduce((s, i) => s + i.mm, 0)
 }
+
+const BH_LIMIT = 9
 
 function buildBilanHydrique(plots, expanded = false) {
   if (!plots.length) {
     return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucune parcelle</p></div>`
   }
-  const sorted  = [...plots].sort((a, b) => makeBilan(b).bilan - makeBilan(a).bilan)
-  const visible = expanded ? sorted : sorted.slice(0, BH_PAGE)
-  const rows = visible.map(p => {
+
+  const groups     = buildGroups(plots)
+  const groupedIds = new Set(groups.flatMap(g => g.ids))
+  const standalones = plots.filter(p => !groupedIds.has(p.id))
+
+  // Ordered list of all plots (groups first, then standalones)
+  const ordered = [
+    ...groups.flatMap(g => g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)),
+    ...standalones
+  ]
+  const visible    = expanded ? ordered : ordered.slice(0, BH_LIMIT)
+  const visibleIds = new Set(visible.map(p => p.id))
+  const remaining  = ordered.length - visible.length
+
+  const makeRow = p => {
     const { j0, j7, bilan } = makeBilan(p)
-    const planif = makePlanif7j(p)
+    const planif = makePlanif7j(p, plots)
     return `
       <button class="m-bh-th-n m-bh-plot-link" data-plot-id="${p.id}">${p.name}</button>
       <div class="m-bh-td">${j0}</div>
       <div class="m-bh-td">${j7}</div>
       <div class="m-bh-td m-bh-td--reco">${bilan > 0 ? bilan : '—'}</div>
       <div class="m-bh-td m-bh-td--planif">${planif > 0 ? planif : '—'}</div>`
-  }).join('')
-  const more = !expanded && sorted.length > BH_PAGE
-    ? `<button class="m-bh-expand" id="bh-expand">Afficher les ${plots.length - BH_PAGE} autres parcelles <i class="bi bi-chevron-down"></i></button>` : ''
+  }
+
+  let rows = ''
+  for (const g of groups) {
+    const gPlots = g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)
+      .filter(p => visibleIds.has(p.id))
+    if (!gPlots.length) continue
+    rows += `<div class="m-bh-group-row">⬡ ${g.label}</div>`
+    rows += gPlots.map(makeRow).join('')
+  }
+  rows += standalones.filter(p => visibleIds.has(p.id)).map(makeRow).join('')
+
+  const expandBtn = ordered.length > BH_LIMIT
+    ? `<button class="m-bh-expand" id="bh-expand" data-expanded="${expanded}">
+        ${expanded
+          ? 'Réduire <i class="bi bi-chevron-up"></i>'
+          : `Afficher les ${remaining} autres parcelles <i class="bi bi-chevron-down"></i>`}
+      </button>`
+    : ''
+
   return `
     <div class="m-bh-table">
       <div class="m-bh-gh"></div>
@@ -351,7 +407,7 @@ function buildBilanHydrique(plots, expanded = false) {
       <div class="m-bh-th">Planif.</div>
       ${rows}
     </div>
-    ${more}
+    ${expandBtn}
     <div class="m-bh-actions">
       <button class="m-bh-action" id="bh-btn-irrigation">
         <i class="bi bi-droplet-fill"></i> Saisir une irrigation
@@ -869,7 +925,7 @@ export function initDashboardScreen(screenEl, role) {
       <button class="m-add-widget-btn" id="dash-add-widget-btn" style="margin-top:16px;margin-bottom:12px"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
       ${[...custom, ...fixed].map(w => {
         let body = ''
-        if (w.id === 'bilan_hydrique') body = buildBilanHydrique(exploitPlots, false)
+        if (w.id === 'bilan_hydrique') body = buildBilanHydrique(exploitPlots)
         else if (w.id === 'previsions')  body = buildPrevisions(exploitPlots, exploitSensors, forecast)
         else if (w.id === 'cumuls')      body = buildCumuls(exploitPlots, exploitSensors)
         else if (w.id === 'temps_reel')  body = buildMesures(exploitPlots, exploitSensors)
@@ -983,14 +1039,6 @@ export function initDashboardScreen(screenEl, role) {
       })
     })
 
-    content.querySelector('#bh-expand')?.addEventListener('click', () => {
-      const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
-      if (bd) {
-        bd.innerHTML = buildBilanHydrique(exploitPlots, true)
-        bindBhButtons()
-        bindBhPlotLinks()
-      }
-    })
 
     function bindBhPlotLinks() {
       content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
@@ -1011,8 +1059,23 @@ export function initDashboardScreen(screenEl, role) {
         import('./irrigation.js').then(m => m.openIrrigationStrategie(exploitPlots, showToast))
       })
     }
+    function bindBhExpand() {
+      const btn = content.querySelector('#bh-expand')
+      if (!btn) return
+      btn.addEventListener('click', () => {
+        const nowExpanded = btn.dataset.expanded === 'true'
+        const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
+        if (bd) {
+          bd.innerHTML = buildBilanHydrique(exploitPlots, !nowExpanded)
+          bindBhPlotLinks()
+          bindBhButtons()
+          bindBhExpand()
+        }
+      })
+    }
     bindBhPlotLinks()
     bindBhButtons()
+    bindBhExpand()
 
     // ── Cumuls ────────────────────────────────────────────────────────────────
     function rebuildCumulsWidget() {
@@ -1298,7 +1361,7 @@ export function initDashboardScreen(screenEl, role) {
             </button>
             <button class="m-add-item" data-action="strategie-irrigation">
               <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-arrow-repeat"></i></div>
-              <span>Saison d'irr.</span>
+              <span>Saison d'irrigation</span>
             </button>
             <button class="m-add-item" data-action="calendrier">
               <div class="m-add-icon" style="background:#e8f4fd;color:#0172A4"><i class="bi bi-calendar3"></i></div>

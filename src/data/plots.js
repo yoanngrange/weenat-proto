@@ -74,7 +74,7 @@ export const plots = [
   {
     id: 3, orgId: 1, name: "La Petite Lande", ville: "Réguiny", lat: 48.0930, lng: -2.4674,
     area: 3.9, crop: "Orge", reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
-    irrigation: null, integrations: ["IRRÉ-LIS Mono-Culture"],
+    irrigation: "Asperseur", integrations: ["IRRÉ-LIS Mono-Culture"],
     latlngs: [[48.091107,-2.471167],[48.089614,-2.469996],[48.090574,-2.468027],[48.091426,-2.465101],[48.092813,-2.462121],[48.094447,-2.463718],[48.094660,-2.465793],[48.095229,-2.467070],[48.095122,-2.469358],[48.094092,-2.470102],[48.094056,-2.469251]]
   },
   {

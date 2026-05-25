@@ -1,12 +1,16 @@
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../data/irrigations.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
+import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 
 const ADHERENT_ORG_ID = 1
-const plots = ALL_PLOTS.filter(p => p.orgId === ADHERENT_ORG_ID)
+const IS_ADMIN = (localStorage.getItem('menuRole') || 'admin-reseau') === 'admin-reseau'
+let selectedOrgId = null  // null = toutes les orgas (vue admin par défaut)
+let plots = IS_ADMIN ? ALL_PLOTS : ALL_PLOTS.filter(p => p.orgId === ADHERENT_ORG_ID)
+
 const TODAY = new Date().toISOString().split('T')[0]
 
-let activeAction = null // 'saisie' | 'saison' | 'voir' | 'export'
+let activeAction = null // 'saisie' | 'saison' | 'export'
 let globaleExtraMonths = 0
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,7 +30,7 @@ function fmtDateShort(iso) {
   return `${parseInt(d)} ${m[parseInt(mo)-1]}`
 }
 function fmtCol(iso) {
-  const [, m, d] = iso.split('-'); return `${parseInt(d)}/${parseInt(m)}`
+  const [, m, d] = iso.split('-'); return `${d}/${m}`
 }
 
 function getGroups() { return buildGroups(plots) }
@@ -61,7 +65,6 @@ function plotIrrigLabels(p) {
 
 function showSaveConfirmModal(title, lines) {
   document.querySelector('.irr-save-confirm')?.remove()
-  showGlobaleView()
   const ov = document.createElement('div')
   ov.className = 'irr-save-confirm'
   ov.innerHTML = `
@@ -72,8 +75,36 @@ function showSaveConfirmModal(title, lines) {
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-confirm-close">Fermer</button>
     </div>`
   document.body.appendChild(ov)
-  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
-  ov.querySelector('#irr-confirm-close').addEventListener('click', () => ov.remove())
+  const close = () => { ov.remove(); showGlobaleView(true) }
+  ov.addEventListener('click', e => { if (e.target === ov) close() })
+  ov.querySelector('#irr-confirm-close').addEventListener('click', close)
+}
+
+function showConflictModal(count, scopeLabel, onOverwrite) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>Irrigations existantes</span>
+        <button class="irr-edit-close" id="irr-cf-close">×</button>
+      </div>
+      <div class="irr-edit-body" style="font-size:13px;color:var(--txt);line-height:1.5">
+        <p style="margin:0"><strong>${count} irrigation${count > 1 ? 's' : ''}</strong> déjà enregistrée${count > 1 ? 's' : ''} pour <strong>${scopeLabel}</strong>.</p>
+        <p style="margin:8px 0 0;color:var(--txt2)">Voulez-vous les écraser avec la nouvelle saisie ?</p>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-cf-cancel">Annuler</button>
+        <button class="iw-btn iw-btn--pri" id="irr-cf-overwrite">Écraser</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  const cancel = () => ov.remove()
+  ov.addEventListener('click', e => { if (e.target === ov) cancel() })
+  ov.querySelector('#irr-cf-close').addEventListener('click', cancel)
+  ov.querySelector('#irr-cf-cancel').addEventListener('click', cancel)
+  ov.querySelector('#irr-cf-overwrite').addEventListener('click', () => { ov.remove(); onOverwrite() })
 }
 
 function scopeSelectHTML(id, currentVal = '') {
@@ -213,7 +244,7 @@ function showIrrigView(scope) {
   bindDelBtns(right)
 }
 
-function showGlobaleView() {
+function showGlobaleView(resetScroll = false) {
   const right = document.getElementById('irr-right')
   const maxFuture = addDays(TODAY, 14)
 
@@ -239,8 +270,8 @@ function showGlobaleView() {
   extendedEnd.setMonth(extendedEnd.getMonth() + globaleExtraMonths)
   const rangeEnd = extendedEnd.toISOString().split('T')[0]
 
-  // Preserve scroll position if table already exists
-  const prevScroll = right.querySelector('#irr-gl-body')?.scrollLeft ?? null
+  // Preserve scroll position if table already exists (unless caller requests reset)
+  const prevScroll = resetScroll ? null : (right.querySelector('#irr-gl-body')?.scrollLeft ?? null)
 
   // Generate ALL dates in range
   const sortedDates = []
@@ -285,7 +316,7 @@ function showGlobaleView() {
         content += `<span class="irr-gl-val irr-gl-irrig" data-idxs="${idxs}" data-iso="${d}" style="color:${col};cursor:pointer">${total} mm</span>`
       }
       if (rainMm) content += `<span class="irr-gl-rain">${rainMm} mm</span>`
-      if (!content) content = `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
+      if (!total) content += `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
       return `<td class="irr-gl-td${isT ? ' irr-gl-td--today' : ''}">${content}</td>`
     }).join('')
     return `<tr data-row-plot="${p.id}"><td class="irr-gl-plot"><span class="irr-gl-plot-link" data-plot-id="${p.id}">${p.name}</span></td>${cells}</tr>`
@@ -518,11 +549,11 @@ function openGroupDetailPanel(g) {
   })
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.label === g.label && !i.real && i.iso > TODAY)))
-    saveIrrig(); openGroupDetailPanel(g); showGlobaleView()
+    saveIrrig(); openGroupDetailPanel(g); showGlobaleView(true)
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.label !== g.label))
-    saveIrrig(); openGroupDetailPanel(g); showGlobaleView()
+    saveIrrig(); openGroupDetailPanel(g); showGlobaleView(true)
   })
   panel.querySelectorAll('.irr-pr-del').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -631,19 +662,21 @@ function renderDetailPanel(p) {
       ${!irrig.length ? `<div class="irr-pr-empty" style="padding:24px"><i class="bi bi-calendar3"></i><p>Aucune irrigation</p></div>` : ''}
     </div>`
 
-  // Modifier la saison toggle
   panel.querySelector('#irr-det-strat-toggle')?.addEventListener('click', () => {
     const opts = panel.querySelector('#irr-det-strat-opts')
     opts.style.display = opts.style.display === 'none' ? '' : 'none'
   })
-  // Only manage entries attributed directly to this plot (not group-label entries)
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.label === p.name && !i.real && i.iso > TODAY)))
-    saveIrrig(); renderDetailPanel(p); showGlobaleView()
+    const labels = new Set([p.name])
+    getGroups().filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(labels.has(i.label) && !i.real && i.iso > TODAY)))
+    saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.label !== p.name))
-    saveIrrig(); renderDetailPanel(p); showGlobaleView()
+    const labels = new Set([p.name])
+    getGroups().filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !labels.has(i.label)))
+    saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
   })
 
   panel.querySelectorAll('.irr-pr-del').forEach(btn => {
@@ -770,11 +803,27 @@ function showExportView() {
 
 function renderLeft() {
   const left = document.getElementById('irr-left')
+  const adherentOrgs = [...orgs].filter(o => o.id !== 100).sort((a, b) => a.name.localeCompare(b.name))
+  const orgSelector = IS_ADMIN ? `
+    <div class="irr-lc-org-wrap">
+      <label class="irr-lc-lbl" style="margin-bottom:4px;display:block">Organisation</label>
+      <select class="irr-lc-select" id="irr-org-select">
+        <option value=""${selectedOrgId === null ? ' selected' : ''}>Toutes les organisations</option>
+        <option value="100"${selectedOrgId === 100 ? ' selected' : ''}>Breiz'Agri Conseil</option>
+        <optgroup label="Adhérents">
+          ${adherentOrgs.map(o =>
+            `<option value="${o.id}"${o.id === selectedOrgId ? ' selected' : ''}>${o.name}</option>`
+          ).join('')}
+        </optgroup>
+      </select>
+    </div>` : ''
+
   left.innerHTML = `
     <div class="irr-lc-hd">Irrigation</div>
+    ${orgSelector}
 
     <button class="irr-lc-btn${activeAction==='saisie'?' irr-lc-btn--active':''}" data-action="saisie">
-      <i class="bi bi-droplet-fill"></i><span>Saisir une irrigation</span>
+      <i class="bi bi-droplet"></i><span>Saisir une irrigation</span>
       <i class="bi bi-chevron-down irr-lc-chev"></i>
     </button>
     <div class="irr-lc-form${activeAction==='saisie'?'':' irr-lc-form--hidden'}" id="irr-form-saisie">
@@ -790,6 +839,7 @@ function renderLeft() {
         <label class="irr-lc-lbl">Quantité <span class="irr-lc-unit">(mm par parcelle)</span></label>
         <input type="number" class="irr-lc-input" id="irr-s-qty" value="10" min="1" />
       </div>
+      <div class="irr-lc-err" id="irr-s-err" style="display:none">Veuillez renseigner tous les champs requis.</div>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-s-save">Enregistrer</button>
     </div>
 
@@ -821,34 +871,55 @@ function renderLeft() {
         </div>
       </div>
       <div class="irr-lc-preview" id="irr-sa-preview">—</div>
+      <div class="irr-lc-err" id="irr-sa-err" style="display:none">Veuillez renseigner tous les champs requis.</div>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-sa-save">Enregistrer</button>
     </div>
 
-    <button class="irr-lc-btn${activeAction==='voir'?' irr-lc-btn--active':''}" data-action="voir">
-      <i class="bi bi-calendar3"></i><span>Voir les irrigations</span>
-    </button>
-
     <button class="irr-lc-btn${activeAction==='export'?' irr-lc-btn--active':''}" data-action="export">
       <i class="bi bi-download"></i><span>Exporter les irrigations</span>
+      <i class="bi bi-chevron-down irr-lc-chev"></i>
     </button>
+    <div class="irr-lc-form${activeAction==='export'?'':' irr-lc-form--hidden'}" id="irr-form-export">
+      <div class="irr-lc-field">
+        <label class="irr-lc-lbl">Périmètre</label>
+        ${scopeSelectHTML('irr-ex-scope', 'all')}
+      </div>
+      <div class="irr-lc-field">
+        <label class="irr-lc-lbl">Du</label>
+        <input type="date" class="irr-lc-input" id="irr-ex-start" value="${IRRIG_SEASON.length ? [...IRRIG_SEASON].sort((a,b)=>a.iso<b.iso?-1:1)[0].iso : TODAY}" />
+      </div>
+      <div class="irr-lc-field">
+        <label class="irr-lc-lbl">Au</label>
+        <input type="date" class="irr-lc-input" id="irr-ex-end" value="${IRRIG_SEASON.length ? [...IRRIG_SEASON].sort((a,b)=>a.iso>b.iso?-1:1)[0].iso : TODAY}" />
+      </div>
+      <div class="irr-lc-field">
+        <label class="irr-lc-lbl">Données à inclure</label>
+        <div class="irr-ef-checks">
+          <label><input type="checkbox" id="irr-ex-irrig" checked /> Irrigations</label>
+          <label><input type="checkbox" id="irr-ex-rain" checked /> Pluie</label>
+        </div>
+      </div>
+      <p class="irr-ef-hint">Une ligne par date · Valeurs en mm</p>
+      <button class="irr-pm-btn irr-pm-btn--pri" id="irr-ex-dl"><i class="bi bi-download"></i> Télécharger CSV</button>
+    </div>
   `
+
+  // Org selector
+  left.querySelector('#irr-org-select')?.addEventListener('change', e => {
+    const val = e.target.value
+    selectedOrgId = val === '' ? null : parseInt(val)
+    plots = selectedOrgId === null ? ALL_PLOTS : ALL_PLOTS.filter(p => p.orgId === selectedOrgId)
+    globaleExtraMonths = 0
+    renderLeft()
+    showGlobaleView()
+  })
 
   // Accordion toggle
   left.querySelectorAll('.irr-lc-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const action = btn.dataset.action
-      // 'voir' et 'export' n'ont pas de formulaire — pas de toggle
-      activeAction = (action === 'voir' || action === 'export')
-        ? action
-        : (activeAction === action ? null : action)
+      activeAction = activeAction === action ? null : action
       renderLeft()
-      if (action === 'voir')   showGlobaleView()
-      if (action === 'export') {
-        const page  = document.getElementById('irr-page')
-        const panel = document.getElementById('irr-detail')
-        if (page && panel) { page.classList.remove('irr-has-detail'); panel.style.display = 'none'; panel.dataset.plotId = '' }
-        showExportView()
-      }
     })
   })
 
@@ -876,22 +947,76 @@ function renderLeft() {
     left.querySelector('#irr-sa-freq')?.addEventListener('input',  updateSaisonPreview)
   }
 
+  // Export download
+  left.querySelector('#irr-ex-dl')?.addEventListener('click', () => {
+    const scopeVal = left.querySelector('#irr-ex-scope').value
+    const start    = left.querySelector('#irr-ex-start').value
+    const end      = left.querySelector('#irr-ex-end').value
+    const inclIrr  = left.querySelector('#irr-ex-irrig').checked
+    const inclRain = left.querySelector('#irr-ex-rain').checked
+    const scope    = resolveScope(scopeVal)
+    const selPlots = scope ? plots.filter(p => scope.ids.includes(p.id)) : plots
+
+    const dates = new Set()
+    if (inclIrr) for (const ir of IRRIG_SEASON) { if (ir.iso >= start && ir.iso <= end) dates.add(ir.iso) }
+    if (inclRain) for (const r of RAIN_DATA) { if (r.iso >= start && r.iso <= end) dates.add(r.iso) }
+    const sortedDates = [...dates].sort()
+
+    const rainMap = {}
+    if (inclRain) for (const r of RAIN_DATA) rainMap[r.iso] = r.mm
+
+    const header = ['Date', ...selPlots.map(p => p.name + (inclRain ? ' (irrig.)' : ''))].join(';')
+    const rows = sortedDates.map(d => {
+      const cells = selPlots.map(p => {
+        const lbls    = plotIrrigLabels(p)
+        const irrigMm = inclIrr ? IRRIG_SEASON.filter(i => i.iso === d && lbls.has(i.label)).reduce((s,i)=>s+i.mm,0) : 0
+        const rainMm  = inclRain ? (rainMap[d] ?? 0) : 0
+        const total   = irrigMm + rainMm
+        return total > 0 ? total : ''
+      })
+      return [d, ...cells].join(';')
+    })
+
+    const csv  = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = Object.assign(document.createElement('a'), { href: url, download: `irrigations_${start}_${end}.csv` })
+    document.body.appendChild(a); a.click()
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 100)
+  })
+
   // Saisie save
   left.querySelector('#irr-s-save')?.addEventListener('click', () => {
     const scopeVal = left.querySelector('#irr-s-scope').value
     const dateVal  = left.querySelector('#irr-s-date').value
-    const qtyVal   = parseInt(left.querySelector('#irr-s-qty').value) || 10
+    const qtyVal   = parseInt(left.querySelector('#irr-s-qty').value) || 0
+    const errEl    = left.querySelector('#irr-s-err')
+    if (!scopeVal || !dateVal || !qtyVal) {
+      if (errEl) errEl.style.display = ''
+      return
+    }
+    if (errEl) errEl.style.display = 'none'
     const scope    = resolveScope(scopeVal)
     const isFut    = dateVal > TODAY
-    if (!scopeVal) return
     const labels   = scope ? [scope.label] : []
-    labels.forEach(lbl => IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: lbl, fromStrategy: false }))
-    saveIrrig()
-    showSaveConfirmModal('Irrigation enregistrée', [
-      `Date : ${fmtDateFull(dateVal)}`,
-      `Quantité : ${qtyVal} mm`,
-      `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
-    ])
+    const doSaisie = () => {
+      labels.forEach(lbl => IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: lbl, fromStrategy: false }))
+      saveIrrig()
+      showSaveConfirmModal('Irrigation enregistrée', [
+        `Date : ${fmtDateFull(dateVal)}`,
+        `Quantité : ${qtyVal} mm`,
+        `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
+      ])
+    }
+    const conflicts = IRRIG_SEASON.filter(i => labels.includes(i.label))
+    if (conflicts.length) {
+      showConflictModal(conflicts.length, scope?.label ?? 'Toutes les parcelles', () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !labels.includes(i.label)))
+        doSaisie()
+      })
+      return
+    }
+    doSaisie()
   })
 
   // Saison save
@@ -901,22 +1026,38 @@ function renderLeft() {
     const fin      = left.querySelector('#irr-sa-fin').value
     const qty      = parseInt(left.querySelector('#irr-sa-qty').value) || 10
     const freq     = parseInt(left.querySelector('#irr-sa-freq').value) || 7
-    if (!scopeVal || !debut || !fin) return
-    const scope    = resolveScope(scopeVal)
-    const labels   = scope ? [scope.label] : []
-    const occs     = []
+    const errEl    = left.querySelector('#irr-sa-err')
+    if (!scopeVal || !debut || !fin) {
+      if (errEl) errEl.style.display = ''
+      return
+    }
+    if (errEl) errEl.style.display = 'none'
+    const scope  = resolveScope(scopeVal)
+    const labels = scope ? [scope.label] : []
+    const occs   = []
     let cur = new Date(debut), end = new Date(fin)
     while (cur <= end && occs.length < 200) { occs.push(new Date(cur)); cur.setDate(cur.getDate() + freq) }
-    labels.forEach(lbl => occs.forEach(d => {
-      const iso = d.toISOString().slice(0, 10)
-      IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: lbl, fromStrategy: true })
-    }))
-    saveIrrig()
-    showSaveConfirmModal('Saison enregistrée', [
-      `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
-      `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
-      `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
-    ])
+    const doSaison = () => {
+      labels.forEach(lbl => occs.forEach(d => {
+        const iso = d.toISOString().slice(0, 10)
+        IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: lbl, fromStrategy: true })
+      }))
+      saveIrrig()
+      showSaveConfirmModal('Saison enregistrée', [
+        `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
+        `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
+        `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
+      ])
+    }
+    const conflicts = IRRIG_SEASON.filter(i => labels.includes(i.label) && i.iso >= debut && i.iso <= fin)
+    if (conflicts.length) {
+      showConflictModal(conflicts.length, scope?.label ?? 'Toutes les parcelles', () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(labels.includes(i.label) && i.iso >= debut && i.iso <= fin)))
+        doSaison()
+      })
+      return
+    }
+    doSaison()
   })
 }
 

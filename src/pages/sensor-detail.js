@@ -47,7 +47,7 @@ const METRIC_DEFS = {
   tensio_180:       { name: 'Tension sol 180 cm',   unit: 'cbar',      color: '#003828', baseVal: () => rnd(10, 80)   },
   conductivite:     { name: 'Conductivité',         unit: 'mS/cm',     color: '#f0a030', baseVal: () => rndf(0.1, 3)  },
   humectation:      { name: 'Humectation foliaire',  unit: 'h',         color: '#78d8a0', baseVal: () => rnd(0, 12)    },
-  par:              { name: 'PAR',                  unit: 'µmol/m²/s', color: '#f8e840', baseVal: () => rnd(0, 2000)  },
+  par:              { name: 'Densité de flux de photons photosynthétiques', unit: 'µmol/m²/s', color: '#c47a00', baseVal: () => rnd(0, 2000)  },
   temperature_gel:  { name: 'Temp. feuille/gel',    unit: '°C',        color: '#a0d8a0', baseVal: () => rnd(-3, 12),   cumul: { label: 'Heures de gel', unit: 'h' } },
   temp_rosee:       { name: 'Température de rosée', unit: '°C',        color: '#7ec8e0', baseVal: () => rnd(4, 16)    },
   temp_seche:       { name: 'Température sèche',    unit: '°C',        color: '#e07050', baseVal: () => rnd(-5, 10)   },
@@ -203,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initPeriodControls()
   initCompareControl()
   initMiniMap()
+  initTabs()
+  renderSensorJournal()
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
 
   const _sidebar2 = document.getElementById('sidebar')
@@ -1437,4 +1439,154 @@ function initPanelToggle() {
     btn.title = collapsed ? 'Afficher le panneau' : 'Masquer le panneau'
     icon.className = collapsed ? 'bi bi-chevron-left' : 'bi bi-chevron-right'
   })
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+
+function initTabs() {
+  document.querySelectorAll('.detail-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.detail-tab-btn').forEach(b => b.classList.remove('active'))
+      document.querySelectorAll('.detail-tab-pane').forEach(p => p.classList.remove('active'))
+      btn.classList.add('active')
+      document.getElementById(btn.dataset.pane)?.classList.add('active')
+    })
+  })
+}
+
+// ─── Sensor journal ───────────────────────────────────────────────────────────
+
+const SENSOR_JOURNAL_KEY = `sensor-journal-${sensorId}`
+
+const MAINT_TYPES = [
+  { id: 'installation',  label: 'Installation',            icon: 'bi-box-arrow-in-down', color: '#0172A4' },
+  { id: 'batterie',      label: 'Remplacement batterie',   icon: 'bi-battery-charging',  color: '#e07820' },
+  { id: 'antenne',       label: 'Remplacement antenne',    icon: 'bi-reception-4',       color: '#5b8dd9' },
+  { id: 'bocal',         label: 'Remplacement bocal',      icon: 'bi-cup',               color: '#3a9e6a' },
+  { id: 'lacet',         label: 'Remplacement lacet',      icon: 'bi-link-45deg',        color: '#8060c0' },
+  { id: 'cuillere',      label: 'Remplacement cuillère',   icon: 'bi-moisture',          color: '#45b7d1' },
+  { id: 'nettoyage',     label: 'Nettoyage',               icon: 'bi-droplet',           color: '#4ecdc4' },
+  { id: 'verification',  label: 'Vérification terrain',    icon: 'bi-check2-circle',     color: '#3a7a38' },
+  { id: 'note',          label: 'Note technique',          icon: 'bi-chat-text',         color: '#8e8e93' },
+]
+
+function getSensorJournal() {
+  try {
+    const raw = localStorage.getItem(SENSOR_JOURNAL_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  return [
+    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', texte: '' },
+    { id: 2, type: 'nettoyage',    date: '2023-03-20', user: 'Agriculteur',       texte: 'Nettoyage pluviomètre après hiver' },
+    { id: 3, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', texte: '' },
+    { id: 4, type: 'note',         date: '2023-11-02', user: 'Agriculteur',       texte: 'Capteur légèrement déplacé après passage tracteur — redressé' },
+  ]
+}
+
+function saveSensorJournal(entries) {
+  localStorage.setItem(SENSOR_JOURNAL_KEY, JSON.stringify(entries))
+}
+
+function renderSensorJournal() {
+  const el = document.getElementById('sensor-journal-container')
+  if (!el) return
+  const entries = getSensorJournal().slice().sort((a, b) => b.date.localeCompare(a.date))
+  const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+  const typeMap = Object.fromEntries(MAINT_TYPES.map(t => [t.id, t]))
+
+  let html = `
+    <div class="journal-add-bar">
+      <button class="btn-secondary btn-sm" id="sjrn-add-btn" style="gap:6px">
+        <i class="bi bi-plus-circle"></i> Ajouter une entrée
+      </button>
+    </div>
+  `
+
+  if (entries.length === 0) {
+    html += `<div class="journal-empty">Aucune entrée dans le journal.</div>`
+  } else {
+    html += `<div class="journal-timeline">`
+    entries.forEach((e, idx) => {
+      const t = typeMap[e.type] || { label: e.type, icon: 'bi-circle', color: '#8e8e93' }
+      const isLast = idx === entries.length - 1
+      html += `
+        <div class="jrn-entry" data-id="${e.id}">
+          <div class="jrn-entry-aside">
+            <div class="jrn-dot" style="background:${t.color}18;color:${t.color};border:1.5px solid ${t.color}50">
+              <i class="bi ${t.icon}"></i>
+            </div>
+          </div>
+          <div class="jrn-entry-body">
+            <div class="jrn-entry-hd">
+              <span class="jrn-entry-date">${fmt(e.date)}</span>
+              <span style="font-size:12px;font-weight:600;color:${t.color}">${t.label}</span>
+              <button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>
+            </div>
+            ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
+            ${e.user ? `<div style="font-size:11px;color:var(--txt3);margin-top:2px">${e.user}</div>` : ''}
+          </div>
+        </div>
+      `
+    })
+    html += `</div>`
+  }
+
+  el.innerHTML = html
+
+  el.querySelector('#sjrn-add-btn')?.addEventListener('click', openSensorJournalForm)
+  el.querySelectorAll('.jrn-entry-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = parseInt(btn.dataset.id)
+      saveSensorJournal(getSensorJournal().filter(e => e.id !== id))
+      renderSensorJournal()
+    })
+  })
+}
+
+function openSensorJournalForm() {
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:440px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Ajouter une entrée maintenance</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="journal-form">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Type</label>
+          <select id="sjrn-f-type" class="journal-form-input">
+            ${MAINT_TYPES.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Date</label>
+          <input type="date" id="sjrn-f-date" class="journal-form-input" value="${new Date().toISOString().slice(0,10)}">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Intervenant</label>
+          <input type="text" id="sjrn-f-user" class="journal-form-input" value="Jean Dupont" placeholder="Nom de l'intervenant">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Note</label>
+          <textarea id="sjrn-f-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
+        </div>
+        <button class="btn-primary btn-sm" id="sjrn-f-save" style="width:100%;justify-content:center">
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  `
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelector('#sjrn-f-save').addEventListener('click', () => {
+    const type  = modal.querySelector('#sjrn-f-type').value
+    const date  = modal.querySelector('#sjrn-f-date').value || new Date().toISOString().slice(0,10)
+    const user  = modal.querySelector('#sjrn-f-user').value.trim() || 'Jean Dupont'
+    const texte = modal.querySelector('#sjrn-f-texte').value.trim()
+    saveSensorJournal([{ id: Date.now(), type, date, user, texte }, ...getSensorJournal()])
+    modal.remove()
+    renderSensorJournal()
+  })
+  document.body.appendChild(modal)
 }

@@ -26,6 +26,12 @@ const DEFAULT_SEASON = [
   { iso: '2026-05-16', mm:  8, real: true,  label: 'Salade · Couverture intégrale',  fromStrategy: true },
   { iso: '2026-05-27', mm:  8, real: false, label: 'Salade · Couverture intégrale',  fromStrategy: true },
   { iso: '2026-06-07', mm:  8, real: false, label: 'Salade · Couverture intégrale',  fromStrategy: true },
+  // Orge · Asperseur
+  { iso: '2026-04-28', mm: 15, real: true,  label: 'Orge · Asperseur',               fromStrategy: true },
+  { iso: '2026-05-12', mm: 18, real: true,  label: 'Orge · Asperseur',               fromStrategy: true },
+  { iso: '2026-05-23', mm: 20, real: true,  label: 'Orge · Asperseur',               fromStrategy: true },
+  { iso: '2026-06-02', mm: 15, real: false, label: 'Orge · Asperseur',               fromStrategy: true },
+  { iso: '2026-06-15', mm: 18, real: false, label: 'Orge · Asperseur',               fromStrategy: true },
 ]
 
 let _loaded = null
