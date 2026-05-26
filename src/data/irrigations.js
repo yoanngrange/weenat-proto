@@ -53,7 +53,7 @@ export function buildGroups(plotList) {
   const m = {}
   for (const p of plotList) {
     const crop = p.crop
-    const irr  = p.irrigation && p.irrigation !== "Pas d'irrigation" ? p.irrigation : null
+    const irr  = p.irrigation || null
     if (!crop && !irr) continue
     const key = [crop, irr].filter(Boolean).join(' · ')
     if (!m[key]) m[key] = { label: key, ids: [] }

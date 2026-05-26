@@ -4,6 +4,15 @@ import { plots } from './data/plots.js'
 import { sensors } from './data/sensors.js'
 import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
+import { applyStoredPlotPatches } from './data/store.js'
+applyStoredPlotPatches(plots)
+
+const _iconBase = import.meta.env.BASE_URL + 'icons/'
+function envIcon(env) {
+  if (env === 'serre')       return `<img src="${_iconBase}greenhouse.png" width="18" height="18" title="Serre" style="vertical-align:middle;opacity:.75">`
+  if (env === 'plein champ') return `<img src="${_iconBase}fields.png"     width="18" height="18" title="Plein champ" style="vertical-align:middle;opacity:.75">`
+  return ''
+}
 
 let currentRole = 'admin' // 'admin' or 'adherent'
 const ADHERENT_ORG_ID = 1   // Ferme du Bocage (exploitation de l'adhérent)
@@ -209,6 +218,7 @@ function initNavigation() {
       currentSection = btn.dataset.section
       updateNavigation()
       updateFiltersVisibility()
+      rebuildCultureFilter()
       updateContent()
     })
   })
@@ -228,6 +238,7 @@ function initRoleSwitcher() {
     currentRole = currentRole === 'admin' ? 'adherent' : 'admin'
     switcher.textContent = currentRole === 'admin' ? 'Admin réseau' : 'Adhérent'
     updateFiltersVisibility()
+    rebuildCultureFilter()
     updateContent()
   })
 }
@@ -387,10 +398,23 @@ function makeCheckboxPanel(panelId, values, stateRef, badgeId, searchable = fals
   bindCheckboxes()
 }
 
-function populateFilterDropdowns() {
-  const cultures = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
+function rebuildCultureFilter() {
+  let sourcePlots
+  if (currentSection === 'reseau') {
+    sourcePlots = plots
+  } else {
+    const orgId = currentRole === 'admin' ? ADMIN_ORG_ID : ADHERENT_ORG_ID
+    sourcePlots = plots.filter(p => p.orgId === orgId)
+  }
+  const cultures = [...new Set(sourcePlots.map(p => p.crop).filter(Boolean))].sort()
+  selectedCultures = []
+  updateBadge('badge-culture', 0)
   makeCheckboxPanel('panel-culture', cultures,
     { set: v => { selectedCultures = v } }, 'badge-culture', true)
+}
+
+function populateFilterDropdowns() {
+  rebuildCultureFilter()
 
   makeCheckboxPanel('panel-irrigation', null,
     { set: v => { selectedIrrigations = v } }, 'badge-irrigation')
@@ -1637,7 +1661,7 @@ function renderAdmin(filteredParcels, filteredSensors) {
     const withoutSensors = filteredParcels.length - withSensors
     const withInteg = filteredParcels.filter(p => (p.integrations || []).length > 0).length
     const uniqueCultures = new Set(filteredParcels.map(p => p.crop)).size
-    const withIrrigation = filteredParcels.filter(p => p.irrigation && p.irrigation !== "Pas d'irrigation").length
+    const withIrrigation = filteredParcels.filter(p => p.irrigation && p.irrigation !== 'Non irrigué').length
     const totalSensorsLinked = filteredParcels.reduce((s, p) => s + sensors.filter(se => se.parcelId === p.id).length, 0)
 
     container.innerHTML += `
@@ -1941,6 +1965,7 @@ function createParcelMetricTable(parcels) {
   html += '<th data-column="name">Parcelle</th>'
   html += '<th data-column="crop">Culture</th>'
   html += '<th data-column="area">Surface</th>'
+  html += '<th data-column="env" title="Environnement">Env.</th>'
   html += '<th data-column="texture">Texture</th>'
   html += '<th data-column="irrigation">Irrigation</th>'
   html += '<th data-column="sensors">Capteurs</th>'
@@ -1959,12 +1984,13 @@ function createParcelMetricTable(parcels) {
       ? integList.map(i => `<span class="tag">${i}</span>`).join(' ')
       : '<span class="tag-none">—</span>'
     const irrigation = parcel.irrigation || '—'
-    const irrigationClass = irrigation === "Pas d'irrigation" ? 'tag-none' : 'tag tag-irrigation'
+    const irrigationClass = (parcel.irrigation && parcel.irrigation !== 'Non irrigué') ? 'tag tag-irrigation' : 'tag-none'
 
     html += `<tr class="clickable-row" data-href="parcelle-detail.html?id=${parcel.id}">`
     html += `<td><a href="parcelle-detail.html?id=${parcel.id}" class="row-link">${getPlotDisplayName(parcel)}</a></td>`
     html += `<td>${parcel.crop || '—'}</td>`
     html += `<td class="num">${parcel.area} ha</td>`
+    html += `<td style="text-align:center">${envIcon(parcel.env)}</td>`
     html += `<td>${parcel.texture || '—'}</td>`
     html += `<td><span class="${irrigationClass}">${irrigation}</span></td>`
     html += `<td class="num">${sensorCount > 0 ? sensorCount : '<span class="warn-text">0</span>'}</td>`
@@ -2025,7 +2051,7 @@ function initAdminMinimaps(container) {
 function createParcelAdminTable(parcels) {
   const crops = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
   const textures = [...new Set(plots.map(p => p.texture).filter(Boolean))].sort()
-  const irrigationTypes = ["Pas d'irrigation","Pivot","Enrouleur","Rampe","Goutte à goutte","Goutte à goutte enterré","Micro aspersion","Couverture intégrale","Gravitaire"]
+  const irrigationTypes = ["Non irrigué","Pivot","Enrouleur","Rampe","Goutte à goutte","Goutte à goutte enterré","Micro aspersion","Couverture intégrale","Gravitaire"]
 
   let html = `
     <div id="bulk-bar" class="bulk-bar hidden">
@@ -2054,6 +2080,7 @@ function createParcelAdminTable(parcels) {
   html += '<th class="col-minimap">Contour</th>'
   html += '<th data-column="area">Surface (ha)</th>'
   html += '<th data-column="crop">Culture</th>'
+  html += '<th data-column="env" title="Environnement">Env.</th>'
   html += '<th data-column="texture">Texture de Sol</th>'
   html += '<th data-column="irrigation">Type d\'irrigation</th>'
   html += '<th data-column="sensors">Capteurs</th>'
@@ -2118,6 +2145,7 @@ function createParcelAdminTable(parcels) {
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </td>
+      <td style="text-align:center">${envIcon(parcel.env)}</td>
       <td>
         <select class="inline-edit" data-field="texture" data-id="${parcel.id}">
           ${textures.map(t => `<option value="${t}"${t === parcel.texture ? ' selected' : ''}>${t}</option>`).join('')}
@@ -2125,7 +2153,8 @@ function createParcelAdminTable(parcels) {
       </td>
       <td>
         <select class="inline-edit" data-field="irrigation" data-id="${parcel.id}">
-          ${irrigationTypes.map(v => `<option value="${v}"${v === (parcel.irrigation || "Pas d'irrigation") ? ' selected' : ''}>${v}</option>`).join('')}
+          <option value=""${!parcel.irrigation ? ' selected' : ''}>—</option>
+          ${irrigationTypes.map(v => `<option value="${v}"${v === parcel.irrigation ? ' selected' : ''}>${v}</option>`).join('')}
         </select>
       </td>
       <td class="admin-links-cell">${sensorsHtml}</td>
@@ -2272,7 +2301,7 @@ function initParcelAdminTable(container) {
   container.querySelector('#bulk-env-btn')?.addEventListener('click', () => {
     const checked = getCheckedAdminIds(container)
     if (!checked.length) return
-    const options = ["Pas d'irrigation", "Pivot", "Enrouleur", "Rampe", "Goutte à goutte", "Goutte à goutte enterré", "Micro aspersion", "Couverture intégrale", "Gravitaire"]
+    const options = ["Non irrigué", "Pivot", "Enrouleur", "Rampe", "Goutte à goutte", "Goutte à goutte enterré", "Micro aspersion", "Couverture intégrale", "Gravitaire"]
     const val = prompt(`Type d'irrigation pour ${checked.length} parcelle(s) :\n${options.join(', ')}`)
     if (val && options.includes(val)) {
       checked.forEach(id => {

@@ -1,8 +1,10 @@
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../data/irrigations.js'
+import { patchParcel, applyStoredPlotPatches } from '../data/store.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
 
 const TODAY = new Date().toISOString().split('T')[0]
 const ADHERENT_ORG_ID = 1
+applyStoredPlotPatches(ALL_PLOTS)
 const plots = ALL_PLOTS.filter(p => p.orgId === ADHERENT_ORG_ID)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,12 +28,12 @@ function checkIcon(on, partial) {
 }
 
 function plotInfoHtml(p) {
-  const crop = p.crop
-  const irr  = p.irrigation && p.irrigation !== "Pas d'irrigation" ? p.irrigation : null
-  if (crop && irr)  return `<span class="iw-plot-info">${crop} · ${irr}</span>`
-  if (crop)         return `<span class="iw-plot-info">${crop}</span>`
-  if (irr)          return `<span class="iw-plot-info">${irr}</span>`
-  return `<span class="iw-plot-info iw-plot-info--miss">type d'irrigation non renseigné</span>`
+  const crop    = p.crop
+  const irr     = p.irrigation || null
+  const texture = p.texture || null
+  const parts   = [crop, irr, texture].filter(Boolean)
+  if (!parts.length) return `<span class="iw-plot-info iw-plot-info--miss">type d'irrigation non renseigné</span>`
+  return `<span class="iw-plot-info">${parts.join(' · ')}</span>`
 }
 
 function decomposeSaveLabels(selectedIds, groups) {
@@ -249,6 +251,51 @@ function showWebToast(msg) {
   }, 3000)
 }
 
+// ─── Ask irrigation type if missing ──────────────────────────────────────────
+
+const IRRIG_TYPES_LIST = ['Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Goutte à goutte enterré', 'Micro aspersion', 'Couverture intégrale', 'Gravitaire', 'Aspersion']
+
+function askIrrigTypeIfNeeded(ids, callback) {
+  const missing = plots.filter(p => ids.has(p.id) && (!p.irrigation || p.irrigation === 'Non irrigué'))
+  if (!missing.length) { callback(); return }
+
+  const { ov, close } = createOverlay()
+  ov.innerHTML = `
+    <div class="iw-modal" style="max-width:400px;width:95%">
+      <div class="iw-modal-hd">
+        <span class="iw-modal-title">Type d'irrigation non renseigné</span>
+        <button class="iw-modal-close" id="iw-ask-close">×</button>
+      </div>
+      <div class="iw-modal-body">
+        <p style="font-size:13px;color:#636366;margin:0 0 14px">
+          ${missing.length === 1
+            ? `<strong>${missing[0].name}</strong> n'a pas de type d'irrigation renseigné.`
+            : `${missing.length} parcelles n'ont pas de type d'irrigation renseigné.`}
+        </p>
+        <div class="iw-field">
+          <label class="iw-label">Type d'irrigation</label>
+          <select class="iw-input" id="iw-ask-type">
+            <option value="">— Choisir un type —</option>
+            ${IRRIG_TYPES_LIST.map(t => `<option value="${t}">${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="iw-modal-ft">
+        <button class="iw-btn iw-btn--sec" id="iw-ask-skip">Passer</button>
+        <button class="iw-btn iw-btn--pri" id="iw-ask-confirm">Confirmer</button>
+      </div>
+    </div>`
+
+  const confirm = () => {
+    const val = ov.querySelector('#iw-ask-type').value
+    if (val) missing.forEach(p => { p.irrigation = val; patchParcel(p.id, { irrigation: val }) })
+    close(); callback()
+  }
+  ov.querySelector('#iw-ask-close').addEventListener('click', () => { close(); callback() })
+  ov.querySelector('#iw-ask-skip').addEventListener('click', () => { close(); callback() })
+  ov.querySelector('#iw-ask-confirm').addEventListener('click', confirm)
+}
+
 // ─── Base overlay factory ─────────────────────────────────────────────────────
 
 function createOverlay() {
@@ -412,25 +459,27 @@ function openSaisie(preselect = null) {
   if (!preselect) bindSelectionCards(ov, groups, selectedIds, updateSave)
 
   ov.querySelector('#iw-save').addEventListener('click', () => {
-    const ids    = preselect ? new Set(preselect.ids) : selectedIds
-    const isFut  = dateVal > TODAY
-    const labels = preselect
-      ? [preselect.label]
-      : decomposeSaveLabels(ids, groups)
-    labels.forEach(label => {
-      IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label, fromStrategy: false })
-    })
-    saveIrrig()
-    close()
-    openWebConfirmation({
-      title: labels.length > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
-      params: [
-        { label: 'Date',     value: fmtDateFull(dateVal) },
-        { label: 'Quantité', value: `${qtyVal} mm` },
-      ],
-      labels,
-      addedCount: labels.length,
-      filterLabel: labels.length === 1 ? labels[0] : null,
+    const ids = preselect ? new Set(preselect.ids) : selectedIds
+    askIrrigTypeIfNeeded(ids, () => {
+      const isFut  = dateVal > TODAY
+      const labels = preselect
+        ? [preselect.label]
+        : decomposeSaveLabels(ids, groups)
+      labels.forEach(label => {
+        IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label, fromStrategy: false })
+      })
+      saveIrrig()
+      close()
+      openWebConfirmation({
+        title: labels.length > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
+        params: [
+          { label: 'Date',     value: fmtDateFull(dateVal) },
+          { label: 'Quantité', value: `${qtyVal} mm` },
+        ],
+        labels,
+        addedCount: labels.length,
+        filterLabel: labels.length === 1 ? labels[0] : null,
+      })
     })
   })
 }
@@ -605,31 +654,33 @@ function openSaison(preselect = null) {
   ov.querySelector('#iw-back-btn').addEventListener('click', () => { step = 'form'; render() })
   ov.querySelector('#iw-next-btn').addEventListener('click', () => { step = 'apercu'; render() })
   ov.querySelector('#iw-conf-btn').addEventListener('click', () => {
-    const occs   = computeOccs()
-    const ids    = preselect ? new Set(preselect.ids) : selectedIds
-    const labels = preselect
-      ? [preselect.label]
-      : decomposeSaveLabels(ids, groups)
-    occs.forEach(d => {
-      const iso = d.toISOString().slice(0, 10)
-      labels.forEach(label => {
-        IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label, fromStrategy: true })
+    const occs = computeOccs()
+    const ids  = preselect ? new Set(preselect.ids) : selectedIds
+    askIrrigTypeIfNeeded(ids, () => {
+      const labels = preselect
+        ? [preselect.label]
+        : decomposeSaveLabels(ids, groups)
+      occs.forEach(d => {
+        const iso = d.toISOString().slice(0, 10)
+        labels.forEach(label => {
+          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label, fromStrategy: true })
+        })
       })
-    })
-    saveIrrig()
-    close()
-    openWebConfirmation({
-      title: 'Saison enregistrée',
-      params: [
-        { label: 'Début',                value: fmtDateFull(occs[0]?.toISOString().slice(0,10) ?? '') },
-        { label: 'Fin',                  value: fmtDateFull(occs[occs.length-1]?.toISOString().slice(0,10) ?? '') },
-        { label: 'Quantité',             value: `${qty} mm/irrig.` },
-        { label: 'Fréquence',            value: `tous les ${freq} jours` },
-        { label: 'Irrigations générées', value: `${occs.length * labels.length}` },
-      ],
-      labels,
-      addedCount: occs.length * labels.length,
-      filterLabel: labels.length === 1 ? labels[0] : null,
+      saveIrrig()
+      close()
+      openWebConfirmation({
+        title: 'Saison enregistrée',
+        params: [
+          { label: 'Début',                value: fmtDateFull(occs[0]?.toISOString().slice(0,10) ?? '') },
+          { label: 'Fin',                  value: fmtDateFull(occs[occs.length-1]?.toISOString().slice(0,10) ?? '') },
+          { label: 'Quantité',             value: `${qty} mm/irrig.` },
+          { label: 'Fréquence',            value: `tous les ${freq} jours` },
+          { label: 'Irrigations générées', value: `${occs.length * labels.length}` },
+        ],
+        labels,
+        addedCount: occs.length * labels.length,
+        filterLabel: labels.length === 1 ? labels[0] : null,
+      })
     })
   })
 

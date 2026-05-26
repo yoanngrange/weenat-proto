@@ -2,6 +2,8 @@
 // Data shared with web context — same source of truth
 import { stackDepth, hasUnsavedChanges } from './nav.js'
 import { plots }   from '../data/plots.js'
+import { applyStoredPlotPatches } from '../data/store.js'
+applyStoredPlotPatches(plots)
 import { sensors } from '../data/sensors.js'
 import { orgs }    from '../data/orgs.js'
 import { initCompteScreen }       from './screens/compte.js'

@@ -320,7 +320,7 @@ function irrigationWidget(parcel) {
   const groups = buildGroups(allPlots.filter(p => p.orgId === parcel.orgId))
   const labels = new Set([parcel.name])
   groups.filter(g => g.ids.includes(parcel.id)).forEach(g => labels.add(g.label))
-  const ck = [parcel.crop, parcel.irrigation].filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+  const ck = [parcel.crop, parcel.irrigation].filter(Boolean).join(' · ')
   if (ck) labels.add(ck)
   const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
   const TODAY_M = new Date().toISOString().split('T')[0]
@@ -351,7 +351,8 @@ function irrigationWidget(parcel) {
       <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
         <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
           <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
-          ${irrType && irrType !== "Pas d'irrigation" ? `<span style="background:rgba(1,114,164,.1);color:#0172A4;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600">${irrType}</span>` : ''}
+          ${irrType ? `<span style="background:rgba(1,114,164,.1);color:#0172A4;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600">${irrType}</span>` : ''}
+          ${parcel.texture ? `<span style="background:#f0f0f0;color:#636366;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:500">${parcel.texture}</span>` : ''}
         </span>
         <button class="m-widget-menu" type="button">•••</button>
       </div>
@@ -584,7 +585,7 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h') {
 
 function paramsView(parcel, org, linkedSensorIds) {
   const cropOptions = ['Blé tendre', 'Maïs', 'Orge', 'Colza', 'Prairie', 'Tournesol', 'Betterave', 'Pomme', 'Légumes', 'Vigne']
-  const irrigOptions = ["Pas d'irrigation", 'Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Aspersion']
+  const irrigOptions = ['Non irrigué', 'Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Aspersion']
   const textureOpts  = ['Limon', 'Limon argileux', 'Limon fin', 'Argile', 'Argile limoneuse', 'Sable limoneux']
   const envOptions   = ['Plein champ', 'Sous abri', 'Serre', 'Arboriculture', 'Maraîchage', 'Vignoble']
 
@@ -642,7 +643,7 @@ function paramsView(parcel, org, linkedSensorIds) {
       <div class="m-list">
         <div class="m-list-row" data-action="edit-env">
           <span class="m-list-row-label">Environnement</span>
-          <span class="m-list-row-value">Plein champ</span>
+          <span class="m-list-row-value">${parcel.env || '—'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
         <div class="m-list-row" data-action="edit-irrigation">

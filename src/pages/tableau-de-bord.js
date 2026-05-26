@@ -2,6 +2,15 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
+import { applyStoredPlotPatches } from '../data/store.js'
+applyStoredPlotPatches(plots)
+
+const _iconBase = import.meta.env.BASE_URL + 'icons/'
+function envIcon(env) {
+  if (env === 'serre')       return `<img src="${_iconBase}greenhouse.png" width="16" height="16" title="Serre" style="vertical-align:middle;opacity:.75">`
+  if (env === 'plein champ') return `<img src="${_iconBase}fields.png"     width="16" height="16" title="Plein champ" style="vertical-align:middle;opacity:.75">`
+  return ''
+}
 
 const ADHERENT_ORG_ID = 1
 
@@ -176,6 +185,8 @@ function renderParcelTable(isAdherent) {
     return `<tr>
       <td><a href="irrigation.html?plot=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
+      <td>${p.irrigation || '<span class="tdb-missing">—</span>'}</td>
+      <td style="text-align:center">${envIcon(p.env)}</td>
       <td>${p.texture || '<span class="tdb-missing">—</span>'}</td>
       <td class="tdb-num">${d.teneurEau} mm</td>
       <td class="tdb-num">${d.pluie7j} mm</td>
@@ -189,6 +200,8 @@ function renderParcelTable(isAdherent) {
   const headers = [
     { label: 'Parcelle',         tip: 'Nom de la parcelle' },
     { label: 'Culture',          tip: 'Culture actuellement en place sur la parcelle' },
+    { label: 'Type d\'irrigation', tip: 'Type de système d\'irrigation de la parcelle' },
+    { label: 'Env.',             tip: 'Environnement de la parcelle (plein champ, serre)' },
     { label: 'Texture de sol',   tip: 'Texture du sol renseignée pour la parcelle' },
     { label: 'Rés. J0',         tip: "Niveau estimé du réservoir hydrique aujourd'hui (mm)", num: true },
     { label: '+ Pluie J+7',     tip: 'Cumul de pluie prévu sur les 7 prochains jours (mm)', num: true },

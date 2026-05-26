@@ -1,5 +1,6 @@
 import { pushDetail, popDetail, clearDirty } from '../nav.js'
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../../data/irrigations.js'
+import { patchParcel } from '../../data/store.js'
 
 function initFakeScrollbars(container) {
   container.querySelectorAll('.irr-zone').forEach(zone => {
@@ -207,15 +208,53 @@ function showIrrigSheet({ title, body, onSave, onDelete, saveLabel = 'Enregistre
   return overlay
 }
 
+// ─── Ask irrigation type if missing ──────────────────────────────────────────
+
+const IRRIG_TYPES_LIST = ['Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Goutte à goutte enterré', 'Micro aspersion', 'Couverture intégrale', 'Gravitaire', 'Aspersion']
+
+function askIrrigTypeIfNeeded(ids, plots, callback) {
+  const missing = plots.filter(p => ids.has(p.id) && (!p.irrigation || p.irrigation === 'Non irrigué'))
+  if (!missing.length) { callback(); return }
+
+  const bodyEl = document.createElement('div')
+  bodyEl.innerHTML = `
+    <p style="font-size:13px;color:#636366;margin:0 0 12px">
+      ${missing.length === 1
+        ? `<strong>${missing[0].name}</strong> n'a pas de type d'irrigation renseigné.`
+        : `${missing.length} parcelles n'ont pas de type d'irrigation renseigné.`}
+    </p>
+    <select id="irr-type-ask" style="width:100%;padding:12px;border-radius:10px;border:1px solid #E0DED8;font-size:15px;font-family:inherit;background:#fff;color:#1c1c1e">
+      <option value="">— Choisir un type —</option>
+      ${IRRIG_TYPES_LIST.map(t => `<option value="${t}">${t}</option>`).join('')}
+    </select>`
+
+  const sheet = showIrrigSheet({
+    title: "Type d'irrigation",
+    body: bodyEl,
+    saveLabel: 'Confirmer',
+    onDelete: () => callback(),
+    onSave: () => {
+      const val = bodyEl.querySelector('#irr-type-ask').value
+      if (val) missing.forEach(p => { p.irrigation = val; patchParcel(p.id, { irrigation: val }) })
+      callback()
+    }
+  })
+  const delBtn = sheet.querySelector('#iss-del')
+  if (delBtn) {
+    delBtn.textContent = 'Passer'
+    delBtn.style.cssText += ';background:#F5F4F0;border-color:#E0DED8;color:#636366'
+  }
+}
+
 // ─── Shared plot info helper ──────────────────────────────────────────────────
 
 function plotInfo(p) {
-  const crop = p.crop
-  const irr  = p.irrigation && p.irrigation !== "Pas d'irrigation" ? p.irrigation : null
-  if (crop && irr)  return `<span class="irr-plot-info">${crop} · ${irr}</span>`
-  if (crop)         return `<span class="irr-plot-info">${crop} · <em>type d'irrigation non renseigné</em></span>`
-  if (irr)          return `<span class="irr-plot-info"><em>Culture non renseignée</em> · ${irr}</span>`
-  return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
+  const crop    = p.crop
+  const irr     = p.irrigation || null
+  const texture = p.texture || null
+  const parts   = [crop, irr || '<em>type irrigation non renseigné</em>', texture].filter(Boolean)
+  if (!crop && !irr) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
+  return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
 }
 
 // ─── Saisie d'une irrigation ──────────────────────────────────────────────────
@@ -326,26 +365,28 @@ export function openIrrigationSaisie(plots, showToast, preselect = null) {
   })
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
-    const isFut  = dateVal > TODAY
-    const ids    = preselect ? new Set(preselect.ids) : selectedIds
-    const labels = preselect
-      ? [preselect.label]
-      : decomposeSaveLabels(ids, groups, plots)
-    labels.forEach(lbl => {
-      IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: lbl, fromStrategy: false })
-    })
-    saveIrrig()
-    const calFilter      = labels.length === 1 ? labels[0] : 'all'
-    const parcelSections = buildParcelSections(ids, plots, preselect, groups)
-    const totalParcels   = parcelSections.reduce((s, sec) => s + sec.names.length, 0)
-    clearDirty()
-    openConfirmation({
-      title: totalParcels > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
-      params: [
-        { label: 'Date',     value: fmtDateFull(dateVal) },
-        { label: 'Quantité', value: `${qtyVal} mm` },
-      ],
-      parcelSections, isFut, plots, calFilter, addedCount: labels.length, stackDepth: 1,
+    const ids = preselect ? new Set(preselect.ids) : selectedIds
+    askIrrigTypeIfNeeded(ids, plots, () => {
+      const isFut  = dateVal > TODAY
+      const labels = preselect
+        ? [preselect.label]
+        : decomposeSaveLabels(ids, groups, plots)
+      labels.forEach(lbl => {
+        IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: lbl, fromStrategy: false })
+      })
+      saveIrrig()
+      const calFilter      = labels.length === 1 ? labels[0] : 'all'
+      const parcelSections = buildParcelSections(ids, plots, preselect, groups)
+      const totalParcels   = parcelSections.reduce((s, sec) => s + sec.names.length, 0)
+      clearDirty()
+      openConfirmation({
+        title: totalParcels > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
+        params: [
+          { label: 'Date',     value: fmtDateFull(dateVal) },
+          { label: 'Quantité', value: `${qtyVal} mm` },
+        ],
+        parcelSections, isFut, plots, calFilter, addedCount: labels.length, stackDepth: 1,
+      })
     })
   })
 }
@@ -374,12 +415,12 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
   }
 
   function plotInfo(p) {
-    const crop = p.crop
-    const irr  = p.irrigation && p.irrigation !== "Pas d'irrigation" ? p.irrigation : null
-    if (crop && irr)  return `<span class="irr-plot-info">${crop} · ${irr}</span>`
-    if (crop)         return `<span class="irr-plot-info">${crop}</span>`
-    if (irr)          return `<span class="irr-plot-info">${irr}</span>`
-    return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
+    const crop    = p.crop
+    const irr     = p.irrigation || null
+    const texture = p.texture || null
+    const parts   = [crop, irr, texture].filter(Boolean)
+    if (!parts.length) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
+    return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
   }
 
   function renderForm() {
@@ -576,36 +617,38 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
   })
 
   layer.querySelector('#apercu-confirm').addEventListener('click', () => {
-    const localGroups    = buildGroups(plots)
-    const ids            = preselect ? new Set(preselect.ids) : selectedIds
-    const labels         = preselect
-      ? [preselect.label]
-      : decomposeSaveLabels(ids, localGroups, plots)
-    const calFilter      = labels.length === 1 ? labels[0] : 'all'
-    const parcelSections = buildParcelSections(ids, plots, preselect, localGroups)
-    if (replaceLabel) {
-      IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
-        ...IRRIG_SEASON.filter(i => !(labels.includes(i.label) && i.fromStrategy && !i.real))
-      )
-    }
-    occs.forEach(d => {
-      const iso = d.toISOString().slice(0, 10)
-      labels.forEach(lbl => {
-        IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: lbl, fromStrategy: true })
+    const localGroups = buildGroups(plots)
+    const ids         = preselect ? new Set(preselect.ids) : selectedIds
+    askIrrigTypeIfNeeded(ids, plots, () => {
+      const labels         = preselect
+        ? [preselect.label]
+        : decomposeSaveLabels(ids, localGroups, plots)
+      const calFilter      = labels.length === 1 ? labels[0] : 'all'
+      const parcelSections = buildParcelSections(ids, plots, preselect, localGroups)
+      if (replaceLabel) {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(labels.includes(i.label) && i.fromStrategy && !i.real))
+        )
+      }
+      occs.forEach(d => {
+        const iso = d.toISOString().slice(0, 10)
+        labels.forEach(lbl => {
+          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: lbl, fromStrategy: true })
+        })
       })
-    })
-    saveIrrig()
-    clearDirty()
-    openConfirmation({
-      title: 'Saison enregistrée',
-      params: [
-        { label: 'Début',                value: fmtDateFull(debut) },
-        { label: 'Fin',                  value: fmtDateFull(fin) },
-        { label: 'Quantité',             value: `${qty} mm/irrig.` },
-        { label: 'Fréquence',            value: `tous les ${freq} jours` },
-        { label: 'Irrigations générées', value: `${occs.length * labels.length}` },
-      ],
-      parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * labels.length, stackDepth: 2,
+      saveIrrig()
+      clearDirty()
+      openConfirmation({
+        title: 'Saison enregistrée',
+        params: [
+          { label: 'Début',                value: fmtDateFull(debut) },
+          { label: 'Fin',                  value: fmtDateFull(fin) },
+          { label: 'Quantité',             value: `${qty} mm/irrig.` },
+          { label: 'Fréquence',            value: `tous les ${freq} jours` },
+          { label: 'Irrigations générées', value: `${occs.length * labels.length}` },
+        ],
+        parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * labels.length, stackDepth: 2,
+      })
     })
   })
 }

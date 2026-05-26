@@ -26,6 +26,19 @@ export function patchParcel(id, patch) {
   save(store)
 }
 
+// Fields that can be user-edited and must stay in sync across all pages
+const PLOT_PATCH_FIELDS = ['name', 'crop', 'irrigation', 'texture', 'env', 'orgId', 'area', 'integrations']
+
+// Apply localStorage overrides to the in-memory plots array — call once at page init
+export function applyStoredPlotPatches(plotsArray) {
+  const store = load()
+  plotsArray.forEach(p => {
+    const stored = store[`parcel_${p.id}`]
+    if (!stored) return
+    PLOT_PATCH_FIELDS.forEach(f => { if (stored[f] !== undefined) p[f] = stored[f] })
+  })
+}
+
 // ─── Sensor ───────────────────────────────────────────────────────────────────
 
 export function getStoredSensor(id) {

@@ -203,6 +203,7 @@ function initState() {
 
 function saveState(patch) {
   Object.assign(parcelState, patch)
+  Object.assign(parcelBase, patch)
   patchParcel(parcelId, patch)
 }
 
@@ -1880,7 +1881,7 @@ function renderPanel() {
 // ─── Identification (editable) ────────────────────────────────────────────────
 
 const SOIL_TYPES  = ['Argilo-limoneux', 'Argileux', 'Limoneux', 'Sablo-limoneux', 'Sableux', 'Limon argileux', 'Limon fin', 'Argile sableux', 'Limono-argileux fin', 'Sable limoneux', 'Argile limoneuse']
-const IRRIG_TYPES = ['Goutte à goutte', 'Aspersion', 'Submersion', 'Enrouleur', 'Pivot', 'Rampe', 'Micro aspersion', 'Couverture intégrale', 'Goutte à goutte enterré', 'Gravitaire', 'Non irrigué', "Pas d'irrigation"]
+const IRRIG_TYPES = ['Goutte à goutte', 'Aspersion', 'Submersion', 'Enrouleur', 'Pivot', 'Rampe', 'Micro aspersion', 'Couverture intégrale', 'Goutte à goutte enterré', 'Gravitaire', 'Non irrigué']
 const CROP_LIST = [
   'Abricotier', 'Ail', 'Amandier', 'Artichaut', 'Asperge', 'Aubergine', 'Avoine', 'Basilic',
   'Betterave fourragère', 'Betterave sucrière', 'Blé dur', 'Blé tendre', 'Brocoli', 'Carotte',
@@ -2652,7 +2653,7 @@ function computeDefaultWidgetIds() {
   if (hasTensio) ids.push('w-tensio')
   if (models.has('EC'))     ids.push('w-ec')
   if (hasTensio || hasCapa) ids.push('bilan')
-  const hasIrrig = parcelBase.irrigation && parcelBase.irrigation !== "Pas d'irrigation" && parcelBase.irrigation !== "Non irrigué"
+  const hasIrrig = !!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué'
   if (hasIrrig) ids.push('irrigations')
   return ids
 }
@@ -2725,7 +2726,7 @@ function getParcelIrrigations() {
   const groups = buildGroups(plots.filter(pl => pl.orgId === p.orgId))
   const labels = new Set([p.name])
   groups.filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
-  const ck = [p.crop, p.irrigation].filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+  const ck = [p.crop, p.irrigation].filter(Boolean).join(' · ')
   if (ck) labels.add(ck)
   return IRRIG_SEASON.filter(i => labels.has(i.label))
 }
@@ -3301,7 +3302,7 @@ function renderWIrrigations(el) {
   const labels = new Set([parcelState.name || parcelBase.name])
   groups.filter(g => g.ids.includes(parcelBase.id)).forEach(g => labels.add(g.label))
   const ck = [parcelBase.crop || parcelState.crop, parcelBase.irrigation || parcelState.irrigation]
-    .filter(v => v && v !== "Pas d'irrigation" && v !== "Non irrigué").join(' · ')
+    .filter(Boolean).join(' · ')
   if (ck) labels.add(ck)
   const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
   const TODAY_M = new Date().toISOString().split('T')[0]
@@ -3360,7 +3361,7 @@ function renderWIrrigations(el) {
           <div class="w-irrig-kpi-val" style="color:#FFB705">${tPlan} <span class="w-irrig-unit">mm</span></div>
           <div class="w-irrig-kpi-sub">${plan.length} apport${plan.length > 1 ? 's' : ''}</div>
         </div>
-        ${irrType && irrType !== "Pas d'irrigation" && irrType !== "Non irrigué" ? `
+        ${irrType ? `
         <div class="w-irrig-type-pill">
           <i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${irrType}
         </div>` : ''}
