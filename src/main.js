@@ -13,6 +13,10 @@ function envIcon(env) {
   if (env === 'plein champ') return `<img src="${_iconBase}fields.png"     width="18" height="18" title="Plein champ" style="vertical-align:middle;opacity:.75">`
   return ''
 }
+function textureDisplay(parcel) {
+  if (parcel.substrate) return 'Substrat : ' + parcel.substrate
+  return parcel.texture || '—'
+}
 
 let currentRole = 'admin' // 'admin' or 'adherent'
 const ADHERENT_ORG_ID = 1   // Ferme du Bocage (exploitation de l'adhérent)
@@ -1991,7 +1995,7 @@ function createParcelMetricTable(parcels) {
     html += `<td>${parcel.crop || '—'}</td>`
     html += `<td class="num">${parcel.area} ha</td>`
     html += `<td style="text-align:center">${envIcon(parcel.env)}</td>`
-    html += `<td>${parcel.texture || '—'}</td>`
+    html += `<td>${textureDisplay(parcel)}</td>`
     html += `<td><span class="${irrigationClass}">${irrigation}</span></td>`
     html += `<td class="num">${sensorCount > 0 ? sensorCount : '<span class="warn-text">0</span>'}</td>`
     html += `<td class="integrations-cell">${integHtml}</td>`

@@ -11,7 +11,7 @@ const TYPE_COLORS = {
   fertilisation: 'var(--ok)'
 }
 
-const ADHERENT_ACTIVE_IDS = new Set(['irre-lis-mono', 'cropwise-protector', 'abelio'])
+const ADHERENT_ACTIVE_IDS = new Set(['irre-lis-multi', 'irre-lis-mono', 'decitrait', 'limacapt'])
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -36,14 +36,24 @@ function renderIntegrationStats(adherentMode = false) {
   })
 
   if (adherentMode) {
+    const adherentPlots = plots.filter(p => p.orgId === 1)
+    const adherentTotal = adherentPlots.length
+    const adherentCounts = {}
+    integrations.forEach(integ => {
+      adherentCounts[integ.id] = adherentPlots.filter(p =>
+        (p.integrations || []).includes(integ.name)
+      ).length
+    })
     const activeIntegrations = integrations.filter(i => ADHERENT_ACTIVE_IDS.has(i.id))
+    const maxCount = Math.max(...activeIntegrations.map(i => adherentCounts[i.id]), 1)
     const top5Rows = activeIntegrations.map((i, idx) => `
       <div class="integ-top5-row">
         <span class="integ-top5-rank">${idx + 1}</span>
         <span class="integ-top5-name">${i.name}</span>
         <div class="integ-top5-bar">
-          <div style="width:${Math.round((1 - idx * 0.2) * 100)}%;background:${TYPE_COLORS[i.type] || 'var(--pri)'};height:100%;border-radius:3px"></div>
+          <div style="width:${Math.round(adherentCounts[i.id] / maxCount * 100)}%;background:${TYPE_COLORS[i.type] || 'var(--pri)'};height:100%;border-radius:3px"></div>
         </div>
+        <span class="integ-top5-ratio">${adherentCounts[i.id]} / ${adherentTotal}</span>
       </div>
     `).join('')
     container.innerHTML = `
@@ -58,7 +68,7 @@ function renderIntegrationStats(adherentMode = false) {
         </div>
       </div>
     `
-    container._plotCounts = plotCounts
+    container._plotCounts = adherentCounts
     return
   }
 
@@ -89,10 +99,10 @@ function renderIntegrationStats(adherentMode = false) {
           <div class="integ-top5-row">
             <span class="integ-top5-rank">${idx + 1}</span>
             <span class="integ-top5-name">${i.name}</span>
-            <span class="integ-top5-count">${plotCounts[i.id]}</span>
             <div class="integ-top5-bar">
               <div style="width:${Math.round(plotCounts[i.id] / maxCount * 100)}%;background:${TYPE_COLORS[i.type] || 'var(--pri)'};height:100%;border-radius:3px"></div>
             </div>
+            <span class="integ-top5-ratio">${plotCounts[i.id]} / ${plots.length}</span>
           </div>
         `).join('') : '<div style="color:var(--txt3);font-size:13px;padding:12px 0">Aucune parcelle avec intégration active.</div>'}
       </div>

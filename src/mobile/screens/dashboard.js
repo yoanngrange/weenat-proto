@@ -889,6 +889,7 @@ export function initDashboardScreen(screenEl, role) {
   let bhSelectedOrgId = null
 
   function getBhPlots() {
+    if (role !== 'admin') return exploitPlots
     if (bhSelectedOrgId === null) return allPlots
     return allPlots.filter(p => p.orgId === bhSelectedOrgId)
   }

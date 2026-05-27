@@ -251,7 +251,7 @@ function askIrrigTypeIfNeeded(ids, plots, callback) {
 function plotInfo(p) {
   const crop    = p.crop
   const irr     = p.irrigation || null
-  const texture = p.texture || null
+  const texture = p.substrate ? 'substrat : ' + p.substrate : (p.texture || null)
   const parts   = [crop, irr || '<em>type irrigation non renseigné</em>', texture].filter(Boolean)
   if (!crop && !irr) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
   return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
@@ -417,7 +417,7 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
   function plotInfo(p) {
     const crop    = p.crop
     const irr     = p.irrigation || null
-    const texture = p.texture || null
+    const texture = p.substrate ? 'substrat : ' + p.substrate : (p.texture || null)
     const parts   = [crop, irr, texture].filter(Boolean)
     if (!parts.length) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
     return `<span class="irr-plot-info">${parts.join(' · ')}</span>`

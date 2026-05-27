@@ -25,9 +25,9 @@ function initParamMap() {
 
 const PROFESSIONS = [
   'Arboriculture', 'Viticulture', 'Maraîchage', 'Grandes cultures', 'Polyculture-Élevage',
-  'Pépiniériste', 'Floriculture', 'Trufficulture',
+  'Pépiniériste', 'Floriculture', 'Trufficulture', 'Compostage',
   'Organismes publics / semi-publics', 'Coopérative', 'Négoce', 'Concessionnaire',
-  'Semencier', 'Laboratoire / Institut / Recherche', 'Autre'
+  'Semencier', 'Laboratoire / Institut / Recherche', 'Collectivité territoriale', 'Syndicat', 'Autre'
 ]
 
 const SUBSCRIPTION_PLANS = [
@@ -51,9 +51,26 @@ const SUBSCRIPTION_PLANS = [
 // Current org — depends on role
 const isAdmin = (localStorage.getItem('menuRole') || 'admin-reseau') === 'admin-reseau'
 const adminOrg = orgs.find(o => o.id === 100) || {}
+
+function parseAdresse(str) {
+  const cpMatch = (str || '').match(/(\d{5})/)
+  if (cpMatch) {
+    const idx = str.indexOf(cpMatch[0])
+    return { rue: str.slice(0, idx).trim().replace(/,\s*$/, ''), cp: cpMatch[0], ville: str.slice(idx + 5).trim().replace(/^,?\s*/, '') }
+  }
+  return { rue: str || '', cp: '', ville: '' }
+}
+
 const org = isAdmin
   ? { ...adminOrg, name: network.nom, siret: network.siret, adresse: network.siege.adresse, codePostal: network.siege.codePostal, ville: network.siege.ville, pays: network.siege.pays }
-  : orgs.find(o => o.id === 1) || { name: 'Ferme du Bocage', ville: 'Rennes', lat: 48.1, lng: -1.7 }
+  : (() => {
+      const raw = orgs.find(o => o.id === 1) || { name: 'Ferme du Bocage', ville: 'Rennes', lat: 48.1, lng: -1.7 }
+      if (!raw.codePostal && raw.adresse) {
+        const { rue, cp, ville } = parseAdresse(raw.adresse)
+        return { ...raw, adresse: rue, codePostal: cp, ville: ville || raw.ville }
+      }
+      return raw
+    })()
 const owners = members.filter(m => m.role === 'propriétaire' || m.role === 'admin')
 
 function renderForm() {

@@ -3,6 +3,7 @@ import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
 import { applyStoredPlotPatches } from '../data/store.js'
+import { orgs } from '../data/orgs.js'
 applyStoredPlotPatches(plots)
 
 const _iconBase = import.meta.env.BASE_URL + 'icons/'
@@ -10,6 +11,10 @@ function envIcon(env) {
   if (env === 'serre')       return `<img src="${_iconBase}greenhouse.png" width="16" height="16" title="Serre" style="vertical-align:middle;opacity:.75">`
   if (env === 'plein champ') return `<img src="${_iconBase}fields.png"     width="16" height="16" title="Plein champ" style="vertical-align:middle;opacity:.75">`
   return ''
+}
+function textureDisplay(parcel) {
+  if (parcel.substrate) return 'substrat : ' + parcel.substrate
+  return parcel.texture || '—'
 }
 
 const ADHERENT_ORG_ID = 1
@@ -170,13 +175,30 @@ function plotAgroData(plot) {
   return { pluie7j, etp7j, teneurEau, drainage7j, balance, teneurEauJ7 }
 }
 
-function renderParcelTable(isAdherent) {
+function renderParcelTable(isAdherent, selectedOrgId = null) {
   const container = document.getElementById('tdb-parcels')
   if (!container) return
 
-  const myPlots = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
+  let visiblePlots
+  if (isAdherent) {
+    visiblePlots = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
+  } else if (selectedOrgId) {
+    visiblePlots = plots.filter(p => p.orgId === selectedOrgId)
+  } else {
+    visiblePlots = plots
+  }
 
-  const rows = myPlots.map(p => {
+  const orgFilter = isAdherent ? '' : (() => {
+    const adherentOrgs = orgs.filter(o => o.id !== 100).sort((a, b) => a.name.localeCompare(b.name))
+    return `<div style="padding:8px 12px 0">
+      <select id="tdb-org-filter" style="padding:5px 8px;border:1px solid var(--bdr);border-radius:6px;font-size:13px;background:var(--bg2);color:var(--txt1)">
+        <option value="">Toutes les organisations (${plots.length})</option>
+        ${adherentOrgs.map(o => `<option value="${o.id}"${selectedOrgId === o.id ? ' selected' : ''}>${o.name}</option>`).join('')}
+      </select>
+    </div>`
+  })()
+
+  const rows = visiblePlots.map(p => {
     const d = plotAgroData(p)
     const irrig = plotIrrigationData(p)
     const irrigCell = irrig.planned
@@ -187,7 +209,7 @@ function renderParcelTable(isAdherent) {
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
       <td>${p.irrigation || '<span class="tdb-missing">—</span>'}</td>
       <td style="text-align:center">${envIcon(p.env)}</td>
-      <td>${p.texture || '<span class="tdb-missing">—</span>'}</td>
+      <td>${p.substrate ? 'substrat : ' + p.substrate : (p.texture || '<span class="tdb-missing">—</span>')}</td>
       <td class="tdb-num">${d.teneurEau} mm</td>
       <td class="tdb-num">${d.pluie7j} mm</td>
       <td class="tdb-num">${d.etp7j} mm</td>
@@ -215,11 +237,17 @@ function renderParcelTable(isAdherent) {
   ).join('')
 
   container.innerHTML = `
+    ${orgFilter}
     <table class="tdb-parcels-table">
       <thead><tr>${headerRow}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="tdb-parcels-formula">Déficit = pluies + irrigations − ETR − drainage</div>`
+
+  container.querySelector('#tdb-org-filter')?.addEventListener('change', e => {
+    const val = e.target.value
+    renderParcelTable(isAdherent, val ? +val : null)
+  })
 }
 
 // ─── Treatment table ──────────────────────────────────────────────────────────

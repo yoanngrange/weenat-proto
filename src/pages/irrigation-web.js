@@ -30,7 +30,7 @@ function checkIcon(on, partial) {
 function plotInfoHtml(p) {
   const crop    = p.crop
   const irr     = p.irrigation || null
-  const texture = p.texture || null
+  const texture = p.substrate ? 'Substrat : ' + p.substrate : (p.texture || null)
   const parts   = [crop, irr, texture].filter(Boolean)
   if (!parts.length) return `<span class="iw-plot-info iw-plot-info--miss">type d'irrigation non renseigné</span>`
   return `<span class="iw-plot-info">${parts.join(' · ')}</span>`

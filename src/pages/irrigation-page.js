@@ -483,16 +483,9 @@ function highlightTableRow(plotId, groupLabel) {
   if (groupLabel) right.querySelector(`[data-row-group="${CSS.escape(groupLabel)}"]`)?.classList.add('irr-gl-row--active')
 }
 
-function openGroupDetailPanel(g) {
-  const page  = document.getElementById('irr-page')
+function renderGroupDetailPanel(g) {
   const panel = document.getElementById('irr-detail')
-  if (!page || !panel) return
-  if (panel.dataset.plotId === `group:${g.label}` && page.classList.contains('irr-has-detail')) {
-    page.classList.remove('irr-has-detail'); panel.style.display = 'none'; panel.dataset.plotId = ''; return
-  }
-  panel.dataset.plotId = `group:${g.label}`
-  panel.style.display = ''; page.classList.add('irr-has-detail')
-  highlightTableRow(null, g.label)
+  if (!panel) return
 
   const irrig    = IRRIG_SEASON.filter(i => i.label === g.label)
   const hasStrat = irrig.some(i => i.fromStrategy)
@@ -549,22 +542,35 @@ function openGroupDetailPanel(g) {
   })
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.label === g.label && !i.real && i.iso > TODAY)))
-    saveIrrig(); openGroupDetailPanel(g); showGlobaleView(true)
+    saveIrrig(); renderGroupDetailPanel(g); showGlobaleView(true)
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.label !== g.label))
-    saveIrrig(); openGroupDetailPanel(g); showGlobaleView(true)
+    saveIrrig(); renderGroupDetailPanel(g); showGlobaleView(true)
   })
   panel.querySelectorAll('.irr-pr-del').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = +btn.dataset.idx
-      if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); saveIrrig(); openGroupDetailPanel(g) }
+      if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); saveIrrig(); renderGroupDetailPanel(g) }
     })
   })
   panel.querySelector('#irr-det-close').addEventListener('click', () => {
     document.getElementById('irr-page')?.classList.remove('irr-has-detail')
     panel.style.display = 'none'; panel.dataset.plotId = ''
   })
+}
+
+function openGroupDetailPanel(g) {
+  const page  = document.getElementById('irr-page')
+  const panel = document.getElementById('irr-detail')
+  if (!page || !panel) return
+  if (panel.dataset.plotId === `group:${g.label}` && page.classList.contains('irr-has-detail')) {
+    page.classList.remove('irr-has-detail'); panel.style.display = 'none'; panel.dataset.plotId = ''; return
+  }
+  panel.dataset.plotId = `group:${g.label}`
+  panel.style.display = ''; page.classList.add('irr-has-detail')
+  highlightTableRow(null, g.label)
+  renderGroupDetailPanel(g)
 }
 
 function openDetailPanel(p) {
@@ -1086,7 +1092,20 @@ document.addEventListener('DOMContentLoaded', () => {
   setupDataTip()
   renderLeft()
   showGlobaleView()
-  window.addEventListener('irrig-updated', () => { showGlobaleView() })
+  window.addEventListener('irrig-updated', () => {
+    showGlobaleView()
+    const panel = document.getElementById('irr-detail')
+    const plotId = panel?.dataset.plotId
+    if (!plotId) return
+    if (plotId.startsWith('group:')) {
+      const label = plotId.slice(6)
+      const g = getGroups().find(g => g.label === label)
+      if (g) renderGroupDetailPanel(g)
+    } else {
+      const p = plots.find(pl => String(pl.id) === plotId)
+      if (p) renderDetailPanel(p)
+    }
+  })
 
   const _urlParams = new URLSearchParams(window.location.search)
   const _plotId = _urlParams.get('plot')

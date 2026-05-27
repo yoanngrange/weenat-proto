@@ -352,7 +352,7 @@ function irrigationWidget(parcel) {
         <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
           <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
           ${irrType ? `<span style="background:rgba(1,114,164,.1);color:#0172A4;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600">${irrType}</span>` : ''}
-          ${parcel.texture ? `<span style="background:#f0f0f0;color:#636366;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:500">${parcel.texture}</span>` : ''}
+          ${(parcel.substrate || parcel.texture) ? `<span style="background:#f0f0f0;color:#636366;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:500">${parcel.substrate ? 'substrat : ' + parcel.substrate : parcel.texture}</span>` : ''}
         </span>
         <button class="m-widget-menu" type="button">•••</button>
       </div>
@@ -653,7 +653,7 @@ function paramsView(parcel, org, linkedSensorIds) {
         </div>
         <div class="m-list-row m-list-row--last" data-action="edit-texture">
           <span class="m-list-row-label">Texture de sol</span>
-          <span class="m-list-row-value">${parcel.texture || '—'}</span>
+          <span class="m-list-row-value">${parcel.substrate ? 'Substrat : ' + parcel.substrate : (parcel.texture || '—')}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
       </div>
