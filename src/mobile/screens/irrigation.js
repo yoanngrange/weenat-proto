@@ -1,6 +1,7 @@
 import { pushDetail, popDetail, clearDirty } from '../nav.js'
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../../data/irrigations.js'
 import { patchParcel } from '../../data/store.js'
+import { IRRIG_TYPES } from '../../data/constants.js'
 
 function initFakeScrollbars(container) {
   container.querySelectorAll('.irr-zone').forEach(zone => {
@@ -34,7 +35,7 @@ function initFakeScrollbars(container) {
   })
 }
 
-function flexLayer(layer) {
+export function flexLayer(layer) {
   layer.style.display       = 'flex'
   layer.style.flexDirection = 'column'
   layer.style.overflowY     = 'hidden'
@@ -104,7 +105,7 @@ function dateHint(iso) {
     : `<span class="irr-pill irr-pill--future">Future · Planifiée</span>`
 }
 
-function checkIcon(on, partial) {
+export function checkIcon(on, partial) {
   if (on)      return `<div class="irr-chk irr-chk--on"></div>`
   if (partial) return `<div class="irr-chk irr-chk--partial">−</div>`
   return `<div class="irr-chk"></div>`
@@ -137,7 +138,7 @@ function decomposeSaveLabels(selectedIds, groups, plots) {
 
 // ─── Selection list builder ───────────────────────────────────────────────────
 
-function buildSelectionHTML(groups, plots, selectedIds) {
+export function buildSelectionHTML(groups, plots, selectedIds) {
   const standalones = plots.filter(p => !groups.some(g => g.ids.includes(p.id)))
 
   const groupSections = groups.map(g => {
@@ -210,8 +211,6 @@ function showIrrigSheet({ title, body, onSave, onDelete, saveLabel = 'Enregistre
 
 // ─── Ask irrigation type if missing ──────────────────────────────────────────
 
-const IRRIG_TYPES_LIST = ['Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Goutte à goutte enterré', 'Micro aspersion', 'Couverture intégrale', 'Gravitaire', 'Aspersion']
-
 function askIrrigTypeIfNeeded(ids, plots, callback) {
   const missing = plots.filter(p => ids.has(p.id) && (!p.irrigation || p.irrigation === 'Non irrigué'))
   if (!missing.length) { callback(); return }
@@ -225,7 +224,7 @@ function askIrrigTypeIfNeeded(ids, plots, callback) {
     </p>
     <select id="irr-type-ask" style="width:100%;padding:12px;border-radius:10px;border:1px solid #E0DED8;font-size:15px;font-family:inherit;background:#fff;color:#1c1c1e">
       <option value="">— Choisir un type —</option>
-      ${IRRIG_TYPES_LIST.map(t => `<option value="${t}">${t}</option>`).join('')}
+      ${IRRIG_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
     </select>`
 
   const sheet = showIrrigSheet({
@@ -251,7 +250,7 @@ function askIrrigTypeIfNeeded(ids, plots, callback) {
 function plotInfo(p) {
   const crop    = p.crop
   const irr     = p.irrigation || null
-  const texture = p.substrate ? 'substrat : ' + p.substrate : (p.texture || null)
+  const texture = p.substrate ? 'Substrat : ' + p.substrate : (p.texture || null)
   const parts   = [crop, irr || '<em>type irrigation non renseigné</em>', texture].filter(Boolean)
   if (!crop && !irr) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
   return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
@@ -417,7 +416,7 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
   function plotInfo(p) {
     const crop    = p.crop
     const irr     = p.irrigation || null
-    const texture = p.substrate ? 'substrat : ' + p.substrate : (p.texture || null)
+    const texture = p.substrate ? 'Substrat : ' + p.substrate : (p.texture || null)
     const parts   = [crop, irr, texture].filter(Boolean)
     if (!parts.length) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
     return `<span class="irr-plot-info">${parts.join(' · ')}</span>`

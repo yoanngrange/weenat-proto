@@ -1,6 +1,7 @@
 import { pushDetail, popDetail } from '../nav.js'
 import { showToast, showSheet } from '../ui.js'
 import { plots as allPlots }   from '../../data/plots.js'
+import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs }                from '../../data/orgs.js'
 
 // ─── Model metadata (iso web) ─────────────────────────────────────────────────
@@ -23,36 +24,36 @@ const MODEL_BRANDS = {
 }
 
 const MODEL_METRICS_MAP = {
-  'P+':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
-               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
-  'PT':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
-               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  }],
-  'P':        [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' }],
-  'SMV':      [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
-               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
-  'TH':       [{ id: 'temp',        label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#4ecdc4', cumul: false }],
-  'T_MINI':   [{ id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'T_GEL':    [{ id: 'tseche',      label: 'Température sèche',    unit: '°C',   color: '#e07050', cumul: false },
-               { id: 'thumide',     label: 'Température humide',   unit: '°C',   color: '#80c8e8', cumul: false }],
-  'W':        [{ id: 'vent',        label: 'Vent',                 unit: 'km/h',       color: '#82b8e0', cumul: false }],
-  'PYRANO':   [{ id: 'rayonnement', label: 'Rayonnement solaire', unit: 'W/m²',       color: '#f5c842', cumul: false, cumulsType: 'rayo'  }],
-  'PAR':      [{ id: 'par',        label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#a0d070', cumul: false }],
-  'LWS':      [{ id: 'humectation', label: 'Humectation foliaire', unit: '%',          color: '#60a090', cumul: false, cumulsType: 'hws'   }],
-  'CHP-15/30':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#5b8dd9', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'CHP-30/60':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#5b8dd9', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'CHP-60/90':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#5b8dd9', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'CAPA-30-3':[{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#f0c060', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'CAPA-60-6':[{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#f0c060', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
-  'EC':       [{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#f0c060', cumul: false },
-               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#bb8fce', cumul: false }],
+  'P+':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#2E75B6', cumul: true,  cumulsType: 'pluie' },
+               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#FBAF05', cumul: false, cumulsType: 'temp'  },
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#5B12A4', cumul: false }],
+  'PT':       [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#2E75B6', cumul: true,  cumulsType: 'pluie' },
+               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#FBAF05', cumul: false, cumulsType: 'temp'  }],
+  'P':        [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#2E75B6', cumul: true,  cumulsType: 'pluie' }],
+  'SMV':      [{ id: 'pluie',       label: 'Pluie',               unit: 'mm',   color: '#2E75B6', cumul: true,  cumulsType: 'pluie' },
+               { id: 'temp',        label: 'Température',          unit: '°C',   color: '#FBAF05', cumul: false, cumulsType: 'temp'  },
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#5B12A4', cumul: false }],
+  'TH':       [{ id: 'temp',        label: 'Température',          unit: '°C',   color: '#FBAF05', cumul: false, cumulsType: 'temp'  },
+               { id: 'humidite',    label: 'Humidité',         unit: '%',    color: '#5B12A4', cumul: false }],
+  'T_MINI':   [{ id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'T_GEL':    [{ id: 'tseche',      label: 'Température sèche',    unit: '°C',   color: '#23B19B', cumul: false },
+               { id: 'thumide',     label: 'Température humide',   unit: '°C',   color: '#5E88EC', cumul: false }],
+  'W':        [{ id: 'vent',        label: 'Vent',                 unit: 'km/h',       color: '#616161', cumul: false }],
+  'PYRANO':   [{ id: 'rayonnement', label: 'Rayonnement solaire', unit: 'W/m²',       color: '#CBCB0B', cumul: false, cumulsType: 'rayo'  }],
+  'PAR':      [{ id: 'par',        label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#4CBB17', cumul: false }],
+  'LWS':      [{ id: 'humectation', label: 'Humectation foliaire', unit: '%',          color: '#00887E', cumul: false, cumulsType: 'hws'   }],
+  'CHP-15/30':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#A6C157', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'CHP-30/60':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#A6C157', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'CHP-60/90':[{ id: 'pothydr',     label: 'Potentiel hydrique',   unit: 'kPa',  color: '#A6C157', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'CAPA-30-3':[{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#ED9A2C', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'CAPA-60-6':[{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#ED9A2C', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
+  'EC':       [{ id: 'teneur',      label: 'Teneur en eau',        unit: '%vol', color: '#ED9A2C', cumul: false },
+               { id: 'temp_sol',    label: 'Température sol',      unit: '°C',   color: '#795548', cumul: false }],
 }
 
 // ─── Chart helpers ────────────────────────────────────────────────────────────
@@ -250,37 +251,65 @@ function donneesView(sensor, period = '7d', step = '1h') {
       </div>`
   }).join('')
 
+  const today = new Date().toISOString().slice(0, 10)
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   return `
-    <div class="m-period-bar">
-      <select class="m-period-sel">
-        <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
-        <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
-        <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
-        <option value="hier"${period==='hier'?' selected':''}>Hier</option>
-        <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
-        <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
-      </select>
-      <select class="m-step-sel">
-        <option value="1h"${step==='1h'?' selected':''}>Horaire</option>
-        <option value="1d"${step==='1d'?' selected':''}>Journalier</option>
-        <option value="1w"${step==='1w'?' selected':''}>Hebdo</option>
-      </select>
-      <button class="m-export-btn" title="Exporter CSV"><i class="bi bi-download"></i></button>
+    <div class="m-period-bar" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;gap:8px">
+        <select class="m-period-sel" style="flex:1;min-width:0">
+          <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
+          <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
+          <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
+          <option value="hier"${period==='hier'?' selected':''}>Hier</option>
+          <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
+          <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
+        </select>
+        <select class="m-step-sel" style="flex:1;min-width:0">
+          <option value="1h"${step==='1h'?' selected':''}>Horaire</option>
+          <option value="1d"${step==='1d'?' selected':''}>Journalier</option>
+          <option value="1w"${step==='1w'?' selected':''}>Hebdo</option>
+        </select>
+      </div>
+      ${period === 'custom' ? `
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <label style="font-size:12px;color:#8e8e93;white-space:nowrap">Du</label>
+        <input type="date" class="m-custom-from" value="${weekAgo}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+        <label style="font-size:12px;color:#8e8e93;white-space:nowrap">au</label>
+        <input type="date" class="m-custom-to" value="${today}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+      </div>` : ''}
     </div>
     <div class="m-detail-section">${cards}</div>`
 }
 
 function paramsView(sensor) {
-  const linkedPlot = sensor.parcelId ? allPlots.find(p => p.id === sensor.parcelId) : null
-  const org = linkedPlot ? orgs.find(o => o.id === linkedPlot.orgId) : null
+  const linkedPlots = (sensor.parcelIds || []).map(id => allPlots.find(p => p.id === id)).filter(Boolean)
+  const primaryPlot = linkedPlots[0] || null
+  const org = primaryPlot ? orgs.find(o => o.id === primaryPlot.orgId) : null
   const signal = sensor.networkQuality || 0
   const signalColor = signal > 70 ? '#30d158' : signal > 40 ? '#ff9f0a' : '#ff3b30'
-  const events = sensor.event ? [sensor.event] : []
+  const events = sensor.event ? (Array.isArray(sensor.event) ? sensor.event : [sensor.event]) : []
+
+  const linkedPlotRows = linkedPlots.map((plot, i) => {
+    const isLast = i === linkedPlots.length - 1
+    return `<div class="m-list-row${isLast && linkedPlots.length > 0 ? '' : ''}" data-unlink-plot="${plot.id}">
+      <span class="m-list-row-label">${plot.name}</span>
+      ${plot.crop ? `<span class="m-list-row-value">${plot.crop}</span>` : ''}
+      <button data-unlink-plot-btn="${plot.id}" style="background:none;border:none;padding:4px 6px;cursor:pointer;color:#ff3b30;font-size:13px;line-height:1;flex-shrink:0" title="Délier">
+        <i class="bi bi-x-circle"></i>
+      </button>
+    </div>`
+  }).join('')
 
   return `
     <div class="m-detail-section">
       <div class="m-list-section-header">Identification</div>
       <div class="m-list">
+        <div class="m-list-row">
+          <span class="m-list-row-label">Nom du capteur</span>
+          <input type="text" id="sensor-name-input" class="m-inline-input" placeholder="${sensor.serial}"
+            value="${(()=>{try{return JSON.parse(localStorage.getItem('weenat-sensor-names'))||{}}catch{return{}}})()?.[sensor.id]||''}"
+            style="flex:1;min-width:0;margin-left:10px;border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:5px 10px;font-size:14px;font-family:inherit;color:#1c1c1e;background:#f5f5f7;outline:none;user-select:text;-webkit-user-select:text">
+        </div>
         <div class="m-list-row">
           <span class="m-list-row-label">Marque</span>
           <span class="m-list-row-value">${MODEL_BRANDS[sensor.model] || 'Weenat'}</span>
@@ -297,28 +326,27 @@ function paramsView(sensor) {
           <span class="m-list-row-label">Réseau télécom</span>
           <span class="m-list-row-value">${sensor.telecom || '—'}</span>
         </div>
-        <div class="m-list-row m-list-row--last" data-action="edit-exploitation">
+        <div class="m-list-row m-list-row--last">
           <span class="m-list-row-label">Exploitation</span>
           <span class="m-list-row-value">${org?.name || '—'}</span>
-          <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
       </div>
 
-      <div class="m-list-section-header">Localisation</div>
+      <div class="m-list-section-header">Géolocalisation</div>
       <div class="m-list">
-        ${linkedPlot ? `<div id="sensor-minimap" class="m-minimap-container"></div>` : ''}
+        ${primaryPlot ? `<div id="sensor-minimap" class="m-minimap-container"></div>` : ''}
         <div class="m-list-row">
           <span class="m-list-row-label">Commune</span>
           <span class="m-list-row-value">${org?.ville || '—'}</span>
         </div>
         <div class="m-list-row m-list-row--last">
-          <a class="m-itinerary-link" href="geo:${linkedPlot?.lat||0},${linkedPlot?.lng||0}?q=${linkedPlot?.lat||0},${linkedPlot?.lng||0}" target="_blank">
+          <a class="m-itinerary-link" href="geo:${primaryPlot?.lat||0},${primaryPlot?.lng||0}?q=${primaryPlot?.lat||0},${primaryPlot?.lng||0}" target="_blank">
             <i class="bi bi-signpost-2"></i> Obtenir l'itinéraire
           </a>
         </div>
       </div>
 
-      <div class="m-list-section-header">État</div>
+      <div class="m-list-section-header">Anomalies</div>
       <div class="m-list">
         ${events.length
           ? events.map(e => `<div class="m-list-row"><i class="bi bi-exclamation-triangle-fill" style="color:#ff3b30"></i><span class="m-list-row-label" style="color:#ff3b30">${e}</span></div>`).join('')
@@ -328,7 +356,7 @@ function paramsView(sensor) {
           <span class="m-list-row-value" style="color:${signalColor};font-weight:600">${signal}%</span>
         </div>
         <div class="m-list-row m-list-row--last">
-          <span class="m-list-row-label">Émissions (7j)</span>
+          <span class="m-list-row-label">Émissions (moy. 7 j)</span>
           <span class="m-list-row-value">${sensor.messages7d ?? '—'} msg</span>
         </div>
       </div>
@@ -341,11 +369,9 @@ function paramsView(sensor) {
         </div>
       </div>
 
-      <div class="m-list-section-header">Liens</div>
-      <div class="m-list">
-        ${linkedPlot
-          ? `<div class="m-list-row"><span class="m-list-row-label">Parcelle</span><span class="m-list-row-value">${linkedPlot.name}</span><i class="bi bi-chevron-right m-list-chevron"></i></div>`
-          : ''}
+      <div class="m-list-section-header">Parcelles liées</div>
+      <div class="m-list" id="linked-plots-list">
+        ${linkedPlotRows}
         <div class="m-list-row m-list-row--last" data-action="add-plot" style="color:#007aff">
           <i class="bi bi-plus-circle" style="font-size:15px"></i>
           <span class="m-list-row-label" style="color:#007aff">Lier une parcelle</span>
@@ -368,8 +394,9 @@ function paramsView(sensor) {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export function initSensorDetail(sensor, initialView = 'donnees') {
-  const linkedPlot = sensor.parcelId ? allPlots.find(p => p.id === sensor.parcelId) : null
+export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin') {
+  if (!sensor.parcelIds) sensor.parcelIds = []
+  const linkedPlot = sensor.parcelIds.length ? allPlots.find(p => sensor.parcelIds.includes(p.id)) : null
   let activeView    = initialView
   let currentPeriod = '7d'
   let currentStep   = '1h'
@@ -386,7 +413,7 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${sensor.serial}</div>
-          <div class="m-detail-subtitle">${[MODEL_NAMES[sensor.model] || sensor.model, sensorCity].filter(Boolean).join(' · ')}</div>
+          <div class="m-detail-subtitle">${[MODEL_NAMES[sensor.model] ? `${MODEL_NAMES[sensor.model]} · ${sensor.model}` : sensor.model, sensorCity].filter(Boolean).join(' · ')}</div>
         </div>
         <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
@@ -405,13 +432,15 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
   }
 
   function initMinimap() {
-    const L = window.L; if (!L || !linkedPlot) return
+    const L = window.L
+    const primaryPlot = sensor.parcelIds.length ? allPlots.find(p => sensor.parcelIds.includes(p.id)) : null
+    if (!L || !primaryPlot) return
     setTimeout(() => {
       const el = layer.querySelector('#sensor-minimap'); if (!el) return
       const map = L.map(el, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false })
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map)
-      map.setView([linkedPlot.lat, linkedPlot.lng], 15)
-      L.circleMarker([linkedPlot.lat, linkedPlot.lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#5b8dd9', fillOpacity: 0.9 }).addTo(map)
+      map.setView([primaryPlot.lat, primaryPlot.lng], 15)
+      L.circleMarker([primaryPlot.lat, primaryPlot.lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#5b8dd9', fillOpacity: 0.9 }).addTo(map)
     }, 50)
   }
 
@@ -422,10 +451,39 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
     layer.querySelector('.m-step-sel')?.addEventListener('change', e => {
       currentStep = e.target.value; renderView()
     })
-    layer.querySelector('.m-export-btn')?.addEventListener('click', () => exportCsvSensor(sensor, currentPeriod))
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
-      row.addEventListener('click', () => showToast('Fonctionnalité à venir'))
+      row.addEventListener('click', () => {
+        const action = row.dataset.action
+        if (action === 'add-maintenance') {
+          openMobileSensorJournal(sensor, { openForm: true })
+        } else if (action === 'add-plot') {
+          openPlotPicker(sensor, role, renderView)
+        } else {
+          showToast('Fonctionnalité à venir')
+        }
+      })
+    })
+    layer.querySelectorAll('[data-unlink-plot-btn]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const plotId = +btn.dataset.unlinkPlotBtn
+        sensor.parcelIds = sensor.parcelIds.filter(id => id !== plotId)
+        const plot = allPlots.find(p => p.id === plotId)
+        showToast(`Délié de ${plot?.name || 'la parcelle'}`)
+        renderView()
+      })
+    })
+    layer.querySelector('#sensor-name-input')?.addEventListener('change', e => {
+      const name = e.target.value.trim()
+      try {
+        const names = JSON.parse(localStorage.getItem('weenat-sensor-names')) || {}
+        if (name) names[sensor.id] = name; else delete names[sensor.id]
+        localStorage.setItem('weenat-sensor-names', JSON.stringify(names))
+      } catch {}
+      const titleEl = layer.querySelector('.m-detail-title')
+      if (titleEl) titleEl.textContent = name || sensor.serial
+      window.dispatchEvent(new CustomEvent('weenat-sensor-renamed'))
     })
   }
 
@@ -450,22 +508,7 @@ export function initSensorDetail(sensor, initialView = 'donnees') {
 
   layer.querySelector('#d-journal').addEventListener('click', () => openMobileSensorJournal(sensor))
 
-  layer.querySelector('#d-plus').addEventListener('click', () => {
-    const body = `
-      <button class="m-sheet-option" data-a="plot"><i class="bi bi-map"></i> Parcelle</button>
-      <button class="m-sheet-option" data-a="alerte"><i class="bi bi-bell"></i> Alerte</button>
-      <button class="m-sheet-option" data-a="maintenance"><i class="bi bi-tools"></i> Opération de maintenance</button>
-      <button class="m-sheet-option" data-a="note"><i class="bi bi-pencil"></i> Note</button>
-      <button class="m-sheet-option" data-a="traitement"><i class="bi bi-eyedropper"></i> Traitement</button>`
-    const el = document.createElement('div'); el.innerHTML = body
-    const sh = showSheet({ title: 'Ajouter au capteur', body: el, doneLabel: 'Fermer', onDone: () => {} })
-    el.querySelectorAll('[data-a]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        sh.classList.remove('m-sheet-overlay--show')
-        setTimeout(() => { sh.remove(); showToast('Fonctionnalité à venir') }, 280)
-      })
-    })
-  })
+  layer.querySelector('#d-plus').addEventListener('click', () => window.showMobileAddPage?.())
 
   renderView()
 }
@@ -499,7 +542,134 @@ function saveSJournal(sensorId, entries) {
   localStorage.setItem(SENSOR_JRN_KEY(sensorId), JSON.stringify(entries))
 }
 
-function openMobileSensorJournal(sensor) {
+function openPlotPicker(sensor, role, onChanged) {
+  const myOrgId = role === 'adherent' ? 1 : null
+  const plots = myOrgId ? allPlots.filter(p => p.orgId === myOrgId) : allPlots.filter(p => p.orgId !== 100)
+  const myMetrics = new Set((MODEL_METRICS_MAP[sensor.model] || []).map(m => m.id))
+
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div style="padding:4px 0 10px">
+      <div style="position:relative">
+        <i class="bi bi-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#8e8e93;font-size:14px;pointer-events:none"></i>
+        <input type="search" id="plot-search" placeholder="Rechercher une parcelle…" autocomplete="off"
+          style="width:100%;box-sizing:border-box;padding:9px 12px 9px 32px;border:1px solid rgba(0,0,0,.15);border-radius:10px;font-size:14px;font-family:inherit;background:#f5f5f7;-webkit-appearance:none;outline:none">
+      </div>
+    </div>
+    <div id="plot-list" style="max-height:50vh;overflow-y:auto;margin:0 -16px"></div>`
+
+  function renderList(query = '') {
+    const q = query.toLowerCase()
+    const filtered = q
+      ? plots.filter(p => p.name.toLowerCase().includes(q) || (p.crop || '').toLowerCase().includes(q))
+      : plots
+    const listEl = body.querySelector('#plot-list')
+    if (!filtered.length) {
+      listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;color:#8e8e93;font-size:14px">Aucune parcelle trouvée</div>`
+      return
+    }
+    listEl.innerHTML = ''
+    filtered.forEach((plot, i) => {
+      const linked = sensor.parcelIds.includes(plot.id)
+      const isLast = i === filtered.length - 1
+      const row = document.createElement('div')
+      row.style.cssText = `display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;${isLast ? '' : 'border-bottom:1px solid rgba(0,0,0,.07);'}`
+      row.innerHTML = `
+        <span style="flex:1;min-width:0">
+          <span style="font-size:15px;font-weight:500;color:${linked ? '#1c1c1e' : '#1c1c1e'}">${plot.name}</span>
+          ${plot.crop ? `<span style="font-size:12px;color:#8e8e93;margin-left:6px">${plot.crop}</span>` : ''}
+        </span>
+        ${linked
+          ? '<i class="bi bi-check-circle-fill" style="color:#30d158;font-size:20px;flex-shrink:0"></i>'
+          : '<i class="bi bi-circle" style="color:#c7c7cc;font-size:20px;flex-shrink:0"></i>'}`
+
+      row.addEventListener('click', () => {
+        if (linked) {
+          // Délier
+          sensor.parcelIds = sensor.parcelIds.filter(id => id !== plot.id)
+          showToast(`Délié de ${plot.name}`)
+          renderList(query)
+          onChanged()
+        } else {
+          // Lier — vérifier conflit
+          const conflicting = allSensors.find(s =>
+            s.id !== sensor.id && s.parcelIds.includes(plot.id) &&
+            (MODEL_METRICS_MAP[s.model] || []).some(m => myMetrics.has(m.id))
+          )
+          if (conflicting) {
+            sheet.classList.remove('m-sheet-overlay--show')
+            setTimeout(() => {
+              sheet.remove()
+              openConflictSheet(sensor, plot, conflicting, onChanged)
+            }, 280)
+          } else {
+            sensor.parcelIds = [...sensor.parcelIds, plot.id]
+            showToast(`Lié à ${plot.name}`)
+            renderList(query)
+            onChanged()
+          }
+        }
+      })
+      listEl.appendChild(row)
+    })
+  }
+
+  renderList()
+  const sheet = showSheet({ title: 'Parcelles liées', body, doneLabel: 'Fermer', onDone: () => { onChanged() } })
+  body.querySelector('#plot-search').addEventListener('input', e => renderList(e.target.value))
+}
+
+function openConflictSheet(sensor, plot, conflicting, onLinked) {
+  const conflictingMetrics = (MODEL_METRICS_MAP[conflicting.model] || [])
+    .filter(m => (MODEL_METRICS_MAP[sensor.model] || []).some(n => n.id === m.id))
+    .map(m => m.label).join(', ')
+
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0 14px;font-size:13px;color:#636366;line-height:1.5">
+      <i class="bi bi-exclamation-triangle-fill" style="color:#ff9f0a;font-size:17px;flex-shrink:0;margin-top:1px"></i>
+      <span>La parcelle <strong style="color:#1c1c1e">${plot.name}</strong> a déjà un capteur mesurant <strong style="color:#1c1c1e">${conflictingMetrics}</strong>. Quel capteur conserver ?</span>
+    </div>
+
+    <div style="border-radius:12px;overflow:hidden;border:.5px solid rgba(0,0,0,.12)">
+      <div class="m-sheet-option" id="keep-existing" style="gap:12px;border-bottom:.5px solid rgba(0,0,0,.1)">
+        <div style="width:36px;height:36px;border-radius:50%;background:#f2f2f7;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-broadcast" style="color:#636366;font-size:15px"></i>
+        </div>
+        <div style="flex:1;min-width:0;text-align:left">
+          <div style="font-size:15px;font-weight:600;color:#1c1c1e">${conflicting.model} · <span style="font-family:monospace;font-weight:400">${conflicting.serial}</span></div>
+          <div style="font-size:12px;color:#8e8e93;margin-top:2px">Conserver ce capteur</div>
+        </div>
+        <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:13px;flex-shrink:0"></i>
+      </div>
+      <div class="m-sheet-option" id="keep-new" style="gap:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#e8f3ff;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="bi bi-broadcast" style="color:#0172A4;font-size:15px"></i>
+        </div>
+        <div style="flex:1;min-width:0;text-align:left">
+          <div style="font-size:15px;font-weight:600;color:#0172A4">${sensor.model} · <span style="font-family:monospace;font-weight:400">${sensor.serial}</span></div>
+          <div style="font-size:12px;color:#0172A4;opacity:.75;margin-top:2px">Utiliser ce capteur à la place</div>
+        </div>
+        <i class="bi bi-chevron-right" style="color:#0172A4;font-size:13px;flex-shrink:0"></i>
+      </div>
+    </div>
+    <div style="height:6px"></div>`
+
+  const sheet = showSheet({ title: 'Conflit de métrique', body, doneLabel: 'Annuler', onDone: () => {} })
+
+  body.querySelector('#keep-existing').addEventListener('click', () => {
+    sheet.classList.remove('m-sheet-overlay--show')
+    setTimeout(() => { sheet.remove(); showToast('Liaison annulée') }, 280)
+  })
+  body.querySelector('#keep-new').addEventListener('click', () => {
+    conflicting.parcelIds = conflicting.parcelIds.filter(id => id !== plot.id)
+    sensor.parcelIds = [...sensor.parcelIds, plot.id]
+    sheet.classList.remove('m-sheet-overlay--show')
+    setTimeout(() => { sheet.remove(); showToast(`Lié à ${plot.name}`); onLinked() }, 280)
+  })
+}
+
+function openMobileSensorJournal(sensor, opts = {}) {
   const layer = pushDetail(`
     <div class="m-detail-header">
       <div class="m-detail-topbar">
@@ -516,13 +686,16 @@ function openMobileSensorJournal(sensor) {
 
   function renderJournal() {
     const el = layer.querySelector('#sjrn-content')
-    const entries = getSJournal(sensor.id).slice().sort((a, b) => b.date.localeCompare(a.date))
+    const dashNotes = (() => { try { return JSON.parse(localStorage.getItem('weenat-m-notes')) || [] } catch { return [] } })()
+      .filter(n => n.linkedType === 'sensor' && n.linkedId === sensor.id)
+      .map((n, i) => ({ id: `dash-${i}`, type: 'note', date: n.date, texte: n.text, user: n.auteur, _fromDashboard: true }))
+    const entries = [...getSJournal(sensor.id), ...dashNotes].sort((a, b) => b.date.localeCompare(a.date))
     const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
 
     let html = `
-      <div style="padding:12px 16px 4px">
-        <button class="btn-secondary btn-sm" id="sjrn-add-btn" style="gap:6px;width:100%;justify-content:center">
-          <i class="bi bi-plus-circle"></i> Ajouter une entrée
+      <div style="padding:12px 16px 8px">
+        <button class="btn-primary" id="sjrn-add-btn" style="width:100%;justify-content:center;gap:8px;font-size:15px;padding:11px 16px;border-radius:10px">
+          <i class="bi bi-plus-circle-fill"></i> Ajouter une opération de maintenance
         </button>
       </div>
     `
@@ -534,6 +707,7 @@ function openMobileSensorJournal(sensor) {
       entries.forEach((e, idx) => {
         const t = typeMap[e.type] || { label: e.type, icon: 'bi-circle', color: '#8e8e93' }
         const isLast = idx === entries.length - 1
+        const fromDash = !!e._fromDashboard
         html += `
           <div class="m-jrn-entry" data-id="${e.id}">
             <div class="m-jrn-aside">
@@ -546,7 +720,9 @@ function openMobileSensorJournal(sensor) {
               <div class="m-jrn-hd">
                 <span class="m-jrn-date">${fmt(e.date)}</span>
                 <span style="font-size:12px;font-weight:600;color:${t.color}">${t.label}</span>
-                <button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>
+                ${fromDash
+                  ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
+                  : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
               ${e.user ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${e.user}</div>` : ''}
@@ -568,50 +744,45 @@ function openMobileSensorJournal(sensor) {
   }
 
   renderJournal()
+  if (opts.openForm) openSJournalForm(sensor.id, renderJournal)
 }
 
 function openSJournalForm(sensorId, onSaved) {
   const today = new Date().toISOString().slice(0, 10)
-  const modal = document.createElement('div')
-  modal.className = 'modal add-modal'
-  modal.innerHTML = `
-    <div class="add-modal-content" style="max-width:440px">
-      <div class="add-modal-header">
-        <span class="add-modal-title">Ajouter une entrée</span>
-        <button class="add-modal-close">×</button>
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div class="m-sheet-input-group" style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Type</div>
+        <select class="m-sheet-input" id="sjf-type">
+          ${MAINT_TYPES_M.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+        </select>
       </div>
-      <div class="journal-form">
-        <div class="journal-form-row">
-          <label class="journal-form-label">Type</label>
-          <select id="sjf-type" class="journal-form-input">
-            ${MAINT_TYPES_M.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
-          </select>
-        </div>
-        <div class="journal-form-row">
-          <label class="journal-form-label">Date</label>
-          <input type="date" id="sjf-date" class="journal-form-input" value="${today}">
-        </div>
-        <div class="journal-form-row">
-          <label class="journal-form-label">Intervenant</label>
-          <input type="text" id="sjf-user" class="journal-form-input" value="Jean Dupont">
-        </div>
-        <div class="journal-form-row">
-          <label class="journal-form-label">Note</label>
-          <textarea id="sjf-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
-        </div>
-        <button class="btn-primary btn-sm" id="sjf-save" style="width:100%;justify-content:center;margin-top:4px">Enregistrer</button>
+      <div>
+        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Date</div>
+        <input type="date" class="m-sheet-input" id="sjf-date" value="${today}">
+      </div>
+      <div>
+        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Intervenant</div>
+        <input type="text" class="m-sheet-input" id="sjf-user" value="Jean Dupont">
+      </div>
+      <div>
+        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Note</div>
+        <textarea class="m-sheet-input" id="sjf-texte" placeholder="Observations éventuelles…" style="resize:none;min-height:72px"></textarea>
       </div>
     </div>`
-  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
-  modal.querySelector('#sjf-save').addEventListener('click', () => {
-    const type  = modal.querySelector('#sjf-type').value
-    const date  = modal.querySelector('#sjf-date').value || today
-    const user  = modal.querySelector('#sjf-user').value.trim() || 'Jean Dupont'
-    const texte = modal.querySelector('#sjf-texte').value.trim()
-    saveSJournal(sensorId, [{ id: Date.now(), type, date, user, texte }, ...getSJournal(sensorId)])
-    modal.remove()
-    onSaved()
+  showSheet({
+    title: 'Opération de maintenance',
+    body,
+    doneLabel: 'Enregistrer',
+    onDone: () => {
+      const type  = body.querySelector('#sjf-type').value
+      const date  = body.querySelector('#sjf-date').value || today
+      const user  = body.querySelector('#sjf-user').value.trim() || 'Jean Dupont'
+      const texte = body.querySelector('#sjf-texte').value.trim()
+      saveSJournal(sensorId, [{ id: Date.now(), type, date, user, texte }, ...getSJournal(sensorId)])
+      onSaved()
+    }
   })
-  document.body.appendChild(modal)
+  setTimeout(() => body.querySelector('#sjf-texte')?.focus(), 350)
 }

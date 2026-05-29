@@ -13,45 +13,45 @@ const sensor    = sensors.find(s => s.id === sensorId)
 // ─── Metric definitions ───────────────────────────────────────────────────────
 
 const METRIC_DEFS = {
-  pluie:            { name: 'Pluie',               unit: 'mm',        color: '#45b7d1', baseVal: () => rnd(0, 8),     cumul: { label: 'Cumul pluie',       unit: 'mm'   }, isCumul: true },
-  temperature:      { name: 'Température',          unit: '°C',        color: '#e07050', baseVal: () => rnd(10, 28),   cumul: { label: 'Degrés-jours (DJC)', unit: '°j'  } },
-  humidite_air:     { name: 'Humidité',         unit: '%',         color: '#4ecdc4', baseVal: () => rnd(40, 90)   },
-  dpv:              { name: 'DPV',                  unit: 'kPa',       color: '#a8d8b0', baseVal: () => rndf(0.1, 2.5) },
-  vent_vitesse:            { name: 'Vent – vitesse',            unit: 'km/h', color: '#7bc4b0', baseVal: () => rnd(0, 40)   },
-  vent_rafales:            { name: 'Vent – rafales',            unit: 'km/h', color: '#5aa490', baseVal: () => rnd(5, 60)   },
-  vent_direction:          { name: 'Vent – direction',          unit: '°',    color: '#3a8070', baseVal: () => rnd(0, 360)  },
-  vent_direction_rafales:  { name: 'Vent – direction rafales',  unit: '°',    color: '#1a6050', baseVal: () => rnd(0, 360)  },
-  rayonnement:      { name: 'Rayonnement',          unit: 'W/m²',      color: '#f5c842', baseVal: () => rnd(0, 900),   cumul: { label: 'Énergie', unit: 'Wh/m²' } },
-  etp:              { name: 'ETP',                  unit: 'mm/j',      color: '#c090e0', baseVal: () => rndf(0.5, 5),  cumul: { label: 'Cumul ETP', unit: 'mm' } },
-  temperature_min:  { name: 'Température min',      unit: '°C',        color: '#90b0e0', baseVal: () => rnd(-2, 15),   cumul: { label: 'Heures de froid', unit: 'h' } },
-  humidite_sol_10:  { name: 'Teneur en eau du sol 10 cm',      unit: '%vol',      color: '#f0cc60', baseVal: () => rnd(15, 45)   },
-  humidite_sol_20:  { name: 'Teneur en eau du sol 20 cm',      unit: '%vol',      color: '#dab448', baseVal: () => rnd(15, 45)   },
-  humidite_sol_30:  { name: 'Teneur en eau du sol 30 cm',      unit: '%vol',      color: '#c09830', baseVal: () => rnd(15, 45)   },
-  humidite_sol_40:  { name: 'Teneur en eau du sol 40 cm',      unit: '%vol',      color: '#a87c18', baseVal: () => rnd(17, 43)   },
-  humidite_sol_50:  { name: 'Teneur en eau du sol 50 cm',      unit: '%vol',      color: '#906200', baseVal: () => rnd(18, 42)   },
-  humidite_sol_60:  { name: 'Teneur en eau du sol 60 cm',      unit: '%vol',      color: '#784800', baseVal: () => rnd(18, 42)   },
-  humidite_sol_90:  { name: 'Teneur en eau du sol 90 cm',      unit: '%vol',      color: '#603000', baseVal: () => rnd(20, 40)   },
-  temp_sol:         { name: 'Température du sol',            unit: '°C',        color: '#bb8fce', baseVal: () => rnd(8, 22)    },
+  pluie:            { name: 'Pluie',               unit: 'mm',        color: '#2E75B6', baseVal: () => rnd(0, 8),     cumul: { label: 'Cumul pluie',       unit: 'mm'   }, isCumul: true },
+  temperature:      { name: 'Température',          unit: '°C',        color: '#FBAF05', baseVal: () => rnd(10, 28),   cumul: { label: 'Degrés-jours (DJC)', unit: '°j'  } },
+  humidite_air:     { name: 'Humidité',         unit: '%',         color: '#5B12A4', baseVal: () => rnd(40, 90)   },
+  dpv:              { name: 'DPV',                  unit: 'kPa',       color: '#5E88EC', baseVal: () => rndf(0.1, 2.5) },
+  vent_vitesse:            { name: 'Vent – vitesse',            unit: 'km/h', color: '#616161', baseVal: () => rnd(0, 40)   },
+  vent_rafales:            { name: 'Vent – rafales',            unit: 'km/h', color: '#525252', baseVal: () => rnd(5, 60)   },
+  vent_direction:          { name: 'Vent – direction',          unit: '°',    color: '#424242', baseVal: () => rnd(0, 360)  },
+  vent_direction_rafales:  { name: 'Vent – direction rafales',  unit: '°',    color: '#343232', baseVal: () => rnd(0, 360)  },
+  rayonnement:      { name: 'Rayonnement',          unit: 'W/m²',      color: '#CBCB0B', baseVal: () => rnd(0, 900),   cumul: { label: 'Énergie', unit: 'Wh/m²' } },
+  etp:              { name: 'ETP',                  unit: 'mm/j',      color: '#7DBDD7', baseVal: () => rndf(0.5, 5),  cumul: { label: 'Cumul ETP', unit: 'mm' } },
+  temperature_min:  { name: 'Température min',      unit: '°C',        color: '#FEE7B4', baseVal: () => rnd(-2, 15),   cumul: { label: 'Heures de froid', unit: 'h' } },
+  humidite_sol_10:  { name: 'Teneur en eau du sol 10 cm',      unit: '%vol',      color: '#105200', baseVal: () => rnd(15, 45)   },
+  humidite_sol_20:  { name: 'Teneur en eau du sol 20 cm',      unit: '%vol',      color: '#8C5E82', baseVal: () => rnd(15, 45)   },
+  humidite_sol_30:  { name: 'Teneur en eau du sol 30 cm',      unit: '%vol',      color: '#46DA82', baseVal: () => rnd(15, 45)   },
+  humidite_sol_40:  { name: 'Teneur en eau du sol 40 cm',      unit: '%vol',      color: '#949494', baseVal: () => rnd(17, 43)   },
+  humidite_sol_50:  { name: 'Teneur en eau du sol 50 cm',      unit: '%vol',      color: '#870021', baseVal: () => rnd(18, 42)   },
+  humidite_sol_60:  { name: 'Teneur en eau du sol 60 cm',      unit: '%vol',      color: '#F608C2', baseVal: () => rnd(18, 42)   },
+  humidite_sol_90:  { name: 'Teneur en eau du sol 90 cm',      unit: '%vol',      color: '#B14C19', baseVal: () => rnd(20, 40)   },
+  temp_sol:         { name: 'Température du sol',            unit: '°C',        color: '#795548', baseVal: () => rnd(8, 22)    },
   potentiel_hydrique: {
-    name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9',
+    name: 'Potentiel hydrique', unit: 'kPa', color: '#A6C157',
     baseVal: () => {
       const month = new Date().getMonth()
       return Math.round(10 + (0.5 - 0.5 * Math.cos(2 * Math.PI * month / 12)) * 140)
     }
   },
-  tensio_30:        { name: 'Tension sol 30 cm',    unit: 'cbar',      color: '#98d8c8', baseVal: () => rnd(10, 80)   },
-  tensio_60:        { name: 'Tension sol 60 cm',    unit: 'cbar',      color: '#78b8a8', baseVal: () => rnd(10, 80)   },
-  tensio_90:        { name: 'Tension sol 90 cm',    unit: 'cbar',      color: '#589888', baseVal: () => rnd(10, 80)   },
-  tensio_120:       { name: 'Tension sol 120 cm',   unit: 'cbar',      color: '#387868', baseVal: () => rnd(10, 80)   },
-  tensio_150:       { name: 'Tension sol 150 cm',   unit: 'cbar',      color: '#185848', baseVal: () => rnd(10, 80)   },
-  tensio_180:       { name: 'Tension sol 180 cm',   unit: 'cbar',      color: '#003828', baseVal: () => rnd(10, 80)   },
-  conductivite:     { name: 'Conductivité',         unit: 'mS/cm',     color: '#f0a030', baseVal: () => rndf(0.1, 3)  },
-  humectation:      { name: 'Humectation foliaire',  unit: 'h',         color: '#78d8a0', baseVal: () => rnd(0, 12)    },
-  par:              { name: 'Densité de flux de photons photosynthétiques', unit: 'µmol/m²/s', color: '#c47a00', baseVal: () => rnd(0, 2000)  },
-  temperature_gel:  { name: 'Temp. feuille/gel',    unit: '°C',        color: '#a0d8a0', baseVal: () => rnd(-3, 12),   cumul: { label: 'Heures de gel', unit: 'h' } },
-  temp_rosee:       { name: 'Température de rosée', unit: '°C',        color: '#7ec8e0', baseVal: () => rnd(4, 16)    },
-  temp_seche:       { name: 'Température sèche',    unit: '°C',        color: '#e07050', baseVal: () => rnd(-5, 10)   },
-  temp_humide:      { name: 'Température humide',   unit: '°C',        color: '#60b8d0', baseVal: () => rnd(-7, 8)    },
+  tensio_30:        { name: 'Tension sol 30 cm',    unit: 'cbar',      color: '#46DA82', baseVal: () => rnd(10, 80)   },
+  tensio_60:        { name: 'Tension sol 60 cm',    unit: 'cbar',      color: '#F608C2', baseVal: () => rnd(10, 80)   },
+  tensio_90:        { name: 'Tension sol 90 cm',    unit: 'cbar',      color: '#B14C19', baseVal: () => rnd(10, 80)   },
+  tensio_120:       { name: 'Tension sol 120 cm',   unit: 'cbar',      color: '#7D9537', baseVal: () => rnd(10, 80)   },
+  tensio_150:       { name: 'Tension sol 150 cm',   unit: 'cbar',      color: '#5C7020', baseVal: () => rnd(10, 80)   },
+  tensio_180:       { name: 'Tension sol 180 cm',   unit: 'cbar',      color: '#3C4E10', baseVal: () => rnd(10, 80)   },
+  conductivite:     { name: 'Conductivité',         unit: 'mS/cm',     color: '#2BCDDE', baseVal: () => rndf(0.1, 3)  },
+  humectation:      { name: 'Humectation foliaire',  unit: 'h',         color: '#00887E', baseVal: () => rnd(0, 12)    },
+  par:              { name: 'Densité de flux de photons photosynthétiques', unit: 'µmol/m²/s', color: '#4CBB17', baseVal: () => rnd(0, 2000)  },
+  temperature_gel:  { name: 'Temp. feuille/gel',    unit: '°C',        color: '#FEE7B4', baseVal: () => rnd(-3, 12),   cumul: { label: 'Heures de gel', unit: 'h' } },
+  temp_rosee:       { name: 'Température de rosée', unit: '°C',        color: '#72B0D8', baseVal: () => rnd(4, 16)    },
+  temp_seche:       { name: 'Température sèche',    unit: '°C',        color: '#23B19B', baseVal: () => rnd(-5, 10)   },
+  temp_humide:      { name: 'Température humide',   unit: '°C',        color: '#5E88EC', baseVal: () => rnd(-7, 8)    },
 }
 
 const METRICS_BY_MODEL = {
@@ -75,27 +75,27 @@ const METRICS_BY_MODEL = {
 
 // Virtual metric keys for multi-horizon charts
 const VIRTUAL_METRICS = {
-  '_capa_vwc':       { name: 'Humidité sol par horizon',        unit: '%vol', color: '#4e9fd4', isVirtual: true },
-  '_capa_temp':      { name: 'Température du sol par horizon',  unit: '°C',   color: '#bb8fce', isVirtual: true },
-  '_lws_intensite':  { name: "Intensité d'humectation",         unit: 'mV',   color: '#78d8a0', isVirtual: true },
-  '_lws_duree':      { name: "Durée d'humectation",             unit: 'h',    color: '#45c090', isVirtual: true },
-  '_vent':           { name: 'Vent',                            unit: 'km/h', color: '#7bc4b0', isVirtual: true },
+  '_capa_vwc':       { name: 'Humidité sol par horizon',        unit: '%vol', color: '#ED9A2C', isVirtual: true },
+  '_capa_temp':      { name: 'Température du sol par horizon',  unit: '°C',   color: '#795548', isVirtual: true },
+  '_lws_intensite':  { name: "Intensité d'humectation",         unit: 'mV',   color: '#00887E', isVirtual: true },
+  '_lws_duree':      { name: "Durée d'humectation",             unit: 'h',    color: '#003D39', isVirtual: true },
+  '_vent':           { name: 'Vent',                            unit: 'km/h', color: '#616161', isVirtual: true },
 }
 
 // CAPA horizon definitions per model
 const CAPA_HORIZONS = {
   'CAPA-30-3': [
-    { id: 'humidite_sol_10', label: '10 cm', color: '#f0cc60' },
-    { id: 'humidite_sol_20', label: '20 cm', color: '#c89c30' },
-    { id: 'humidite_sol_30', label: '30 cm', color: '#a07010' },
+    { id: 'humidite_sol_10', label: '10 cm', color: '#105200' },
+    { id: 'humidite_sol_20', label: '20 cm', color: '#8C5E82' },
+    { id: 'humidite_sol_30', label: '30 cm', color: '#46DA82' },
   ],
   'CAPA-60-6': [
-    { id: 'humidite_sol_10', label: '10 cm', color: '#f0d070' },
-    { id: 'humidite_sol_20', label: '20 cm', color: '#d8b050' },
-    { id: 'humidite_sol_30', label: '30 cm', color: '#c09030' },
-    { id: 'humidite_sol_40', label: '40 cm', color: '#a87010' },
-    { id: 'humidite_sol_50', label: '50 cm', color: '#905200' },
-    { id: 'humidite_sol_60', label: '60 cm', color: '#783400' },
+    { id: 'humidite_sol_10', label: '10 cm', color: '#105200' },
+    { id: 'humidite_sol_20', label: '20 cm', color: '#8C5E82' },
+    { id: 'humidite_sol_30', label: '30 cm', color: '#46DA82' },
+    { id: 'humidite_sol_40', label: '40 cm', color: '#949494' },
+    { id: 'humidite_sol_50', label: '50 cm', color: '#870021' },
+    { id: 'humidite_sol_60', label: '60 cm', color: '#F608C2' },
   ],
 }
 

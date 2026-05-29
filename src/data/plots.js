@@ -72,8 +72,8 @@ export const plots = [
   },
   {
     id: 3, orgId: 1, name: "La Petite Lande", ville: "Réguiny", lat: 48.0930, lng: -2.4674,
-    area: 3.9, reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
-    irrigation: "Asperseur", integrations: ["IRRÉ-LIS Mono-Culture"],
+    area: 3.9, crop: "Fraise", reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
+    irrigation: "Micro aspersion", integrations: ["IRRÉ-LIS Mono-Culture"],
     latlngs: [[48.091107,-2.471167],[48.089614,-2.469996],[48.090574,-2.468027],[48.091426,-2.465101],[48.092813,-2.462121],[48.094447,-2.463718],[48.094660,-2.465793],[48.095229,-2.467070],[48.095122,-2.469358],[48.094092,-2.470102],[48.094056,-2.469251]]
   },
   {
@@ -105,7 +105,7 @@ export const plots = [
   },
   {
     id: 9, env: "serre", orgId: 1, name: "Le Marais Bas", ville: "Josselin", lat: 48.1517, lng: -2.6123,
-    area: 7.5, crop: "Cerisier", reserveHydrique: 90, degresJour: 1100, texture: null, integrations: ["DeciTrait"],
+    area: 7.5, crop: "Cerisier", reserveHydrique: 90, degresJour: 1100, texture: null, irrigation: "Goutte à goutte", integrations: ["DeciTrait"],
     latlngs: [[48.152435,-2.614382],[48.150411,-2.613851],[48.151102,-2.608944],[48.152689,-2.611903]]
   },
   {
@@ -365,19 +365,19 @@ export const plots = [
   { id: 224, env: "plein champ", orgId: 29, name: "La Haie Verte",      lat: 48.497, lng: -2.016, area: 7.9,  crop: "Maïs",         reserveHydrique: 73, degresJour: 1210, texture: "Limon argileux",   irrigation: "Enrouleur",        integrations: [], shape: { type: "rectangle", width: 205, height: 147 } },
   { id: 225, env: "plein champ", orgId: 30, name: "Le Moulin",          lat: 48.860, lng: -1.582, area: 8.8,      reserveHydrique: 71, degresJour: 1130, texture: "Limon fin", integrations: [], shape: { type: "rectangle", width: 216, height: 155 } },
   { id: 226, env: "plein champ", orgId: 30, name: "Les Terres Froides", lat: 48.824, lng: -1.621, area: 5.4,  crop: "Prairie bio",  reserveHydrique: 77, degresJour: 1010, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 170, height: 122 } },
-  { id: 227, orgId: 31, name: "Le Verger",          lat: 49.088, lng: 0.498,  area: 4.1,  crop: "Pomme",        reserveHydrique: 60, degresJour: 1220, texture: "Limon",             irrigation: "Aspersion",        integrations: [], shape: { type: "rectangle", width: 148, height: 106 } },
+  { id: 227, orgId: 31, name: "Le Verger",          lat: 49.088, lng: 0.498,  area: 4.1,  crop: "Pomme",        reserveHydrique: 60, degresJour: 1220, texture: "Limon",             irrigation: "Micro aspersion",        integrations: [], shape: { type: "rectangle", width: 148, height: 106 } },
   { id: 228, orgId: 31, name: "La Butte",           lat: 49.052, lng: 0.462,  area: 6.2,  crop: "Poire",        reserveHydrique: 58, degresJour: 1190, texture: "Argile limoneuse",  irrigation: "Goutte à goutte",  integrations: [], shape: { type: "rectangle", width: 182, height: 130 } },
   { id: 229, orgId: 32, name: "Les Saulniers",      lat: 48.042, lng: -2.348, area: 7.6,  crop: "Blé tendre",   reserveHydrique: 69, degresJour: 1140, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 201, height: 144 } },
   { id: 230, env: "plein champ", orgId: 32, name: "Le Val",             lat: 48.005, lng: -2.386, area: 5.0,  crop: "Maïs",         reserveHydrique: 74, degresJour: 1200, texture: "Limon fin",            integrations: [], shape: { type: "rectangle", width: 163, height: 116 } },
   { id: 231, orgId: 33, name: "La Laiterie",        lat: 49.280, lng: -0.608, area: 9.4,  crop: "Prairie",      reserveHydrique: 84, degresJour: 1020, texture: "Limon", integrations: [], shape: { type: "rectangle", width: 222, height: 159 } },
   { id: 232, orgId: 33, name: "Le Grand Pré",       lat: 49.244, lng: -0.648, area: 6.8,  crop: "Blé tendre",   reserveHydrique: 67, degresJour: 1150, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 190, height: 136 } },
   { id: 233, env: "plein champ", orgId: 34, name: "La Falaise",         lat: 49.759, lng: 0.284,  area: 5.7,  crop: "Lin",          reserveHydrique: 62, degresJour: 1100, texture: "Limon fin", integrations: [], shape: { type: "rectangle", width: 175, height: 125 } },
-  { id: 234, orgId: 34, name: "Les Dunes",          lat: 49.721, lng: 0.249,  area: 7.3,  crop: "Betterave",    reserveHydrique: 58, degresJour: 1080, texture: "Sable limoneux",   irrigation: "Aspersion",        integrations: [], shape: { type: "rectangle", width: 197, height: 141 } },
+  { id: 234, orgId: 34, name: "Les Dunes",          lat: 49.721, lng: 0.249,  area: 7.3,  crop: "Betterave",    reserveHydrique: 58, degresJour: 1080, texture: "Sable limoneux",   irrigation: "Micro aspersion",        integrations: [], shape: { type: "rectangle", width: 197, height: 141 } },
   { id: 235, substrate: "laine de roche", env: "serre", orgId: 35, name: "Les Marais",         lat: 48.099, lng: -1.671, area: 3.4,  crop: "Légumes",      reserveHydrique: 88, degresJour: 1280, texture: "Sable limoneux",  integrations: [], shape: { type: "rectangle", width: 135, height: 97  } },
-  { id: 236, env: "plein champ", orgId: 35, name: "La Plaine Sud",      lat: 48.062, lng: -1.709, area: 4.7,  crop: "Tomate",       reserveHydrique: 82, degresJour: 1300, texture: "Sable limoneux",   irrigation: "Aspersion",        integrations: [], shape: { type: "rectangle", width: 158, height: 113 } },
+  { id: 236, env: "plein champ", orgId: 35, name: "La Plaine Sud",      lat: 48.062, lng: -1.709, area: 4.7,  crop: "Tomate",       reserveHydrique: 82, degresJour: 1300, texture: "Sable limoneux",   irrigation: "Micro aspersion",        integrations: [], shape: { type: "rectangle", width: 158, height: 113 } },
   { id: 237, orgId: 36, name: "Le Bocage",          lat: 48.972, lng: -0.141, area: 8.0,  crop: "Prairie",      reserveHydrique: 76, degresJour: 1060, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 206, height: 148 } },
   { id: 238, env: "plein champ", irrigation: "Non irrigué", orgId: 36, name: "Les Pâtures",        lat: 48.936, lng: -0.178, area: 5.5,  crop: "Orge",         reserveHydrique: 65, degresJour: 1120, texture: "Limon", integrations: [], shape: { type: "rectangle", width: 171, height: 123 } },
-  { id: 239, env: "plein champ", orgId: 37, name: "Le Verger d'Or",     lat: 48.756, lng: 0.232,  area: 4.6,  crop: "Pomme",        reserveHydrique: 61, degresJour: 1200, texture: "Argile limoneuse",  irrigation: "Aspersion",        integrations: [], shape: { type: "rectangle", width: 156, height: 112 } },
+  { id: 239, env: "plein champ", orgId: 37, name: "Le Verger d'Or",     lat: 48.756, lng: 0.232,  area: 4.6,  crop: "Pomme",        reserveHydrique: 61, degresJour: 1200, texture: "Argile limoneuse",  irrigation: "Micro aspersion",        integrations: [], shape: { type: "rectangle", width: 156, height: 112 } },
   { id: 240, orgId: 37, name: "Les Poiriers",       lat: 48.720, lng: 0.197,  area: 3.9,  crop: "Poire",        reserveHydrique: 57, degresJour: 1180, texture: "Argile limoneuse",        integrations: [], shape: { type: "rectangle", width: 144, height: 103 } },
   { id: 241, orgId: 38, name: "La Baie",            lat: 48.651, lng: -1.494, area: 9.2,      reserveHydrique: 81, degresJour: 1020, texture: "Limon", integrations: [], shape: { type: "rectangle", width: 220, height: 158 } },
   { id: 242, orgId: 38, name: "Le Mont Vert",       lat: 48.614, lng: -1.531, area: 6.1,  crop: "Blé tendre",   reserveHydrique: 66, degresJour: 1140, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 180, height: 129 } },

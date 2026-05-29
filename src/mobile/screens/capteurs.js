@@ -57,6 +57,14 @@ function modelName(model) {
   return MODEL_NAMES[model] || model
 }
 
+function getSensorName(s) {
+  try {
+    const names = JSON.parse(localStorage.getItem('weenat-sensor-names')) || {}
+    return names[s.id] || s.serial
+  } catch { return s.serial }
+}
+
+
 const METRICS = [
   { id: 'pluie',     label: 'Pluie',                 unit: 'mm',    aggs: ["Aujourd'hui", 'Hier', '7 jours', '30 jours', '1 an'], defaultAgg: '7 jours'    },
   { id: 'temp',      label: 'Température',            unit: '°C',    aggs: ['Actuel', 'Min du jour', 'Max du jour', 'Moy. 7 jours', 'Moy. 30 jours'], defaultAgg: 'Actuel' },
@@ -122,22 +130,22 @@ export function initCapteursScreen(screenEl, role) {
       if (orgFilter === 'all') return allSensors
       if (orgFilter === String(ADMIN_ORG_ID)) {
         const ids = new Set(allPlots.filter(p => p.orgId === ADMIN_ORG_ID).map(p => p.id))
-        return allSensors.filter(s => ids.has(s.parcelId))
+        return allSensors.filter(s => s.parcelIds.some(id => ids.has(id)))
       }
       const ids = new Set(allPlots.filter(p => String(p.orgId) === orgFilter).map(p => p.id))
-      return allSensors.filter(s => ids.has(s.parcelId))
+      return allSensors.filter(s => s.parcelIds.some(id => ids.has(id)))
     }
     // Adhérent
     const myIds       = new Set(allPlots.filter(p => p.orgId === ADHERENT_ORG_ID).map(p => p.id))
-    const mine        = allSensors.filter(s => myIds.has(s.parcelId))
-    const shared      = allSensors.filter(s => !myIds.has(s.parcelId) && METEO_MODELS.includes(s.model))
+    const mine        = allSensors.filter(s => s.parcelIds.some(id => myIds.has(id)))
+    const shared      = allSensors.filter(s => !s.parcelIds.some(id => myIds.has(id)) && METEO_MODELS.includes(s.model))
     if (orgFilter === 'mine')    return mine
     if (orgFilter === 'network') return shared
     return [...mine, ...shared]
   }
 
   function sensorPos(s) {
-    const p = s.parcelId ? plotById[s.parcelId] : null
+    const p = s.parcelIds.length ? plotById[s.parcelIds[0]] : null
     if (!p) return null
     // Offset déterministe par capteur (~50m max) pour simuler la position physique réelle
     const dLat = ((s.id * 7919) % 1000 - 500) / 1000000
@@ -146,8 +154,8 @@ export function initCapteursScreen(screenEl, role) {
   }
 
   function sensorCommune(s) {
-    const p = s.parcelId ? plotById[s.parcelId] : null
-    return p ? orgById[p.orgId]?.ville || null : null
+    const p = s.parcelIds.length ? plotById[s.parcelIds[0]] : null
+    return (p ? orgById[p.orgId]?.ville : null) || orgById[s.orgId]?.ville || null
   }
 
   function destroyMap() {
@@ -156,8 +164,8 @@ export function initCapteursScreen(screenEl, role) {
 
   function render() {
     destroyMap()
-    const metric  = METRICS.find(m => m.id === metricId) || METRICS[0]
-    const sensors = getSensors()
+    const metric      = METRICS.find(m => m.id === metricId) || METRICS[0]
+    const sensors     = getSensors()
 
     let orgOpts
     if (isAdmin) {
@@ -200,8 +208,8 @@ export function initCapteursScreen(screenEl, role) {
                 <i class="bi bi-broadcast"></i>
               </div>
               <div class="m-sensor-info">
-                <span class="m-sensor-name">${modelName(s.model)}</span>
-                <span class="m-sensor-sub">${s.serial}${sensorCommune(s) ? ` · ${sensorCommune(s)}` : ''}</span>
+                <span class="m-sensor-name">${modelName(s.model)} - ${s.model}</span>
+                <span class="m-sensor-sub">${[sensorCommune(s), getSensorName(s)].filter(Boolean).join(' - ')}</span>
               </div>
               ${valHtml}
             </div>`}).join('')}</div>`
@@ -255,7 +263,7 @@ export function initCapteursScreen(screenEl, role) {
         if (measures) {
           cm.bindTooltip(`${getVal(s.id)} ${metric.unit}`, { permanent: true, direction: 'top', className: 'm-map-tip', interactive: true })
         }
-        cm.on('click', () => initSensorDetail(s))
+        cm.on('click', () => initSensorDetail(s, 'donnees', role))
         bounds.push([pos.lat, pos.lng])
       })
       if (bounds.length) {
@@ -267,7 +275,9 @@ export function initCapteursScreen(screenEl, role) {
   }
 
   window.addEventListener('m-tab-change', e => {
-    if (e.detail === 'capteurs' && view === 'carte' && mapInstance) {
+    if (e.detail !== 'capteurs') return
+    render()
+    if (view === 'carte' && mapInstance) {
       setTimeout(() => {
         mapInstance.invalidateSize()
         if (mapBounds?.length) mapInstance.fitBounds(mapBounds, { padding: [32, 32] })
@@ -290,10 +300,12 @@ export function initCapteursScreen(screenEl, role) {
     content.querySelectorAll('.m-tappable[data-sensor-id]').forEach(row => {
       row.addEventListener('click', () => {
         const sensor = allSensors.find(s => s.id === +row.dataset.sensorId); if (!sensor) return
-        initSensorDetail(sensor)
+        initSensorDetail(sensor, 'donnees', role)
       })
     })
   }
 
   render()
+
+  window.addEventListener('weenat-sensor-renamed', () => { if (view === 'liste') render() })
 }

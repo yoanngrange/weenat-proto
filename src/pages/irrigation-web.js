@@ -1,6 +1,7 @@
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../data/irrigations.js'
 import { patchParcel, applyStoredPlotPatches } from '../data/store.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
+import { IRRIG_TYPES } from '../data/constants.js'
 
 const TODAY = new Date().toISOString().split('T')[0]
 const ADHERENT_ORG_ID = 1
@@ -253,8 +254,6 @@ function showWebToast(msg) {
 
 // ─── Ask irrigation type if missing ──────────────────────────────────────────
 
-const IRRIG_TYPES_LIST = ['Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Goutte à goutte enterré', 'Micro aspersion', 'Couverture intégrale', 'Gravitaire', 'Aspersion']
-
 function askIrrigTypeIfNeeded(ids, callback) {
   const missing = plots.filter(p => ids.has(p.id) && (!p.irrigation || p.irrigation === 'Non irrigué'))
   if (!missing.length) { callback(); return }
@@ -276,7 +275,7 @@ function askIrrigTypeIfNeeded(ids, callback) {
           <label class="iw-label">Type d'irrigation</label>
           <select class="iw-input" id="iw-ask-type">
             <option value="">— Choisir un type —</option>
-            ${IRRIG_TYPES_LIST.map(t => `<option value="${t}">${t}</option>`).join('')}
+            ${IRRIG_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
           </select>
         </div>
       </div>

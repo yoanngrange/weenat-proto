@@ -13,7 +13,7 @@ function envIcon(env) {
   return ''
 }
 function textureDisplay(parcel) {
-  if (parcel.substrate) return 'substrat : ' + parcel.substrate
+  if (parcel.substrate) return 'Substrat : ' + parcel.substrate
   return parcel.texture || '—'
 }
 
@@ -81,6 +81,7 @@ function setupWidgetMenus() {
 }
 
 const FC_MONTHS_LONG = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+const FC_DAYS_SHORT  = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
 
 function plotForecastDay(plot, dayIdx) {
   const s = plot.id * 7 + dayIdx * 31
@@ -103,29 +104,27 @@ function renderForecastTable() {
   const myPlots = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
   const now = new Date()
 
-  const dayHeaders = [0, 1, 2].map(i => {
+  const dayHeaders = [0, 1, 2, 3, 4].map(i => {
     const d = new Date(now); d.setDate(d.getDate() + i)
     const label = i === 0 ? `Aujourd'hui ${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
                 : i === 1 ? `Demain ${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
-                : `${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
-    return `<th colspan="4" class="tdb-fc-day-hd">${label}</th>`
+                : `${FC_DAYS_SHORT[d.getDay()]}. ${d.getDate()} ${FC_MONTHS_LONG[d.getMonth()]}`
+    return `<th colspan="3" class="tdb-fc-day-hd">${label}</th>`
   }).join('')
 
-  const subHeaders = [0, 1, 2].map(() =>
+  const subHeaders = [0, 1, 2, 3, 4].map(() =>
     `<th class="tdb-num tdb-fc-sub">Pluie</th>
      <th class="tdb-num tdb-fc-sub">T° min/max</th>
-     <th class="tdb-num tdb-fc-sub">Vent</th>
-     <th class="tdb-num tdb-fc-sub">ETR</th>`
+     <th class="tdb-num tdb-fc-sub">Vent</th>`
   ).join('')
 
   const rows = myPlots.map(p => {
-    const dayCells = [0, 1, 2].map(i => {
+    const dayCells = [0, 1, 2, 3, 4].map(i => {
       const f = plotForecastDay(p, i)
       const pluieCell = f.pluie > 0 ? `<span class="tdb-fc-rain">${f.pluie} mm</span>` : '<span class="tdb-fc-dry">—</span>'
       return `<td class="tdb-num tdb-fc-cell">${pluieCell}</td>
         <td class="tdb-num tdb-fc-cell">${f.tMin}°C / ${f.tMax}°C</td>
-        <td class="tdb-num tdb-fc-cell">${f.vent} km/h</td>
-        <td class="tdb-num tdb-fc-cell">${f.etr} mm</td>`
+        <td class="tdb-num tdb-fc-cell">${f.vent} km/h</td>`
     }).join('')
     return `<tr>
       <td><a href="previsions.html?plot=${p.id}" class="tdb-plot-link">${p.name}</a></td>
@@ -198,7 +197,11 @@ function renderParcelTable(isAdherent, selectedOrgId = null) {
     </div>`
   })()
 
-  const rows = visiblePlots.map(p => {
+  const COL = 11
+  const GHD = (label) =>
+    `<tr><td colspan="${COL}" style="padding:8px 12px 4px;font-size:12px;font-weight:700;color:var(--txt2);background:var(--bg2);border-top:2px solid var(--bdr);letter-spacing:.02em">⬡ ${label}</td></tr>`
+
+  const makeRow = p => {
     const d = plotAgroData(p)
     const irrig = plotIrrigationData(p)
     const irrigCell = irrig.planned
@@ -209,7 +212,7 @@ function renderParcelTable(isAdherent, selectedOrgId = null) {
       <td>${p.crop || '<span class="tdb-missing">—</span>'}</td>
       <td>${p.irrigation || '<span class="tdb-missing">—</span>'}</td>
       <td style="text-align:center">${envIcon(p.env)}</td>
-      <td>${p.substrate ? 'substrat : ' + p.substrate : (p.texture || '<span class="tdb-missing">—</span>')}</td>
+      <td>${textureDisplay(p)}</td>
       <td class="tdb-num">${d.teneurEau} mm</td>
       <td class="tdb-num">${d.pluie7j} mm</td>
       <td class="tdb-num">${d.etp7j} mm</td>
@@ -217,7 +220,24 @@ function renderParcelTable(isAdherent, selectedOrgId = null) {
       <td class="tdb-num ${d.balance >= 0 ? 'tdb-irrig-ok' : 'tdb-irrig-needed'}">${d.balance >= 0 ? '0 mm' : '<i class="bi bi-droplet-fill"></i> +' + Math.abs(d.balance) + ' mm'}</td>
       ${irrigCell}
     </tr>`
-  }).join('')
+  }
+
+  const sortByNeed = (a, b) => plotAgroData(a).balance - plotAgroData(b).balance
+
+  const groups = buildGroups(visiblePlots)
+  const groupedIds = new Set(groups.flatMap(g => g.ids))
+  const ungrouped = visiblePlots.filter(p => !groupedIds.has(p.id))
+
+  let rows = ''
+  for (const g of groups) {
+    const gPlots = g.ids.map(id => visiblePlots.find(p => p.id === id)).filter(Boolean).sort(sortByNeed)
+    if (!gPlots.length) continue
+    rows += GHD(g.label) + gPlots.map(makeRow).join('')
+  }
+  if (ungrouped.length) {
+    if (groups.length) rows += GHD('Autres parcelles')
+    rows += ungrouped.sort(sortByNeed).map(makeRow).join('')
+  }
 
   const headers = [
     { label: 'Parcelle',         tip: 'Nom de la parcelle' },
@@ -302,12 +322,14 @@ function renderTreatmentTable() {
 
   const rows = myPlots.map(p => {
     const d = plotTreatmentData(p)
-    const risk = d.daysAgo > 21 ? { cls: 'risk-red', label: 'Élevé' }
-               : d.daysAgo > 16 ? { cls: 'risk-orange', label: 'Modéré' }
-               : { cls: 'risk-green', label: 'Faible' }
+    const risk = d.daysAgo > 21 ? { cls: 'tdb-risk-high',   label: 'Élevé' }
+               : d.daysAgo > 16 ? { cls: 'tdb-risk-medium', label: 'Modéré' }
+               : { cls: 'tdb-risk-low', label: 'Faible' }
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '—'}</td>
+      <td>${d.product}</td>
+      <td><span class="tdb-risk-badge ${risk.cls}">${risk.label}</span></td>
       <td class="${d.isUrgent ? 'tdb-win-urgent' : ''}">${d.isUrgent ? '<i class="bi bi-alarm-fill"></i> ' : ''}${d.winDateStr} — ${d.winHour}:00 → ${(d.winHour + d.winDur) % 24}:00</td>
     </tr>`
   }).join('')
@@ -317,6 +339,8 @@ function renderTreatmentTable() {
       <tr>
         <th>Parcelle</th>
         <th>Culture</th>
+        <th>Dernier produit</th>
+        <th>Risque maladie</th>
         <th>Prochaine fenêtre favorable</th>
       </tr>
     </thead>

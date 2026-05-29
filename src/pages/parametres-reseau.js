@@ -14,8 +14,31 @@ const state = {
   telephone: network.telephone,
   siteWeb: network.siteWeb || '',
   siege: { ...network.siege },
-  antennes: network.antennes.map(a => ({ ...a }))
+  antennes: network.antennes.map(a => ({ ...a })),
+  logoDataUrl: null,
 }
+
+// Persistent file input for logo upload (survives renderForm() re-renders)
+const _logoFileInput = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' })
+_logoFileInput.style.display = 'none'
+document.addEventListener('DOMContentLoaded', () => document.body.appendChild(_logoFileInput))
+_logoFileInput.addEventListener('change', () => {
+  const file = _logoFileInput.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = e => { state.logoDataUrl = e.target.result; renderPreview(); syncFormLogo() }
+  reader.readAsDataURL(file)
+})
+
+function syncFormLogo() {
+  const el = document.getElementById('logo-placeholder')
+  if (!el) return
+  el.innerHTML = state.logoDataUrl
+    ? `<img src="${state.logoDataUrl}" style="width:48px;height:48px;object-fit:contain;border-radius:6px">`
+    : getInitials(state.nom)
+}
+
+const IRRIGATION_MODELS = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6', 'EC'])
+const VIRTUAL_MODELS    = new Set(['SMV'])
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -60,10 +83,10 @@ function renderForm() {
         </div>
         <div class="share-toggle-row">
           <div class="share-toggle-info">
-            <span class="share-toggle-label">Stations virtuelles</span>
+            <span class="share-toggle-label">Stations météo virtuelles</span>
             <span class="share-toggle-desc">Les stations météo virtuelles sont partagées</span>
           </div>
-          <label class="toggle-switch">
+          <label météo class="toggle-switch">
             <input type="checkbox" id="share-virtual">
             <span class="toggle-knob"></span>
           </label>
@@ -100,7 +123,7 @@ function renderForm() {
         <div class="form-row">
           <label>Logo</label>
           <div class="logo-upload-area">
-            <span id="logo-placeholder" class="logo-initials">${getInitials(state.nom)}</span>
+            <span id="logo-placeholder" class="logo-initials">${state.logoDataUrl ? `<img src="${state.logoDataUrl}" style="width:48px;height:48px;object-fit:contain;border-radius:6px">` : getInitials(state.nom)}</span>
             <button type="button" class="btn-secondary btn-sm" id="logo-upload-btn">
               <i class="bi bi-upload"></i> Importer un logo
             </button>
@@ -170,6 +193,12 @@ function renderForm() {
   bindSiege('f-siege-adresse', 'adresse')
   bindSiege('f-siege-cp', 'codePostal')
   bindSiege('f-siege-ville', 'ville')
+
+  document.getElementById('logo-upload-btn').addEventListener('click', () => _logoFileInput.click())
+
+  ;['share-meteo', 'share-irrigation', 'share-virtual'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', renderPreview)
+  })
 
   document.getElementById('add-antenne-btn').addEventListener('click', () => {
     state.antennes.push({ nom: '', adresse: '', codePostal: '', ville: '', telephone: '' })
@@ -283,7 +312,14 @@ function bindAntennesOnLoad() {
 function renderPreview() {
   const col = document.getElementById('settings-preview-col')
 
-  const totalSensors = sensors.length
+  const shareMeteo      = document.getElementById('share-meteo')?.checked !== false
+  const shareIrrigation = !!document.getElementById('share-irrigation')?.checked
+  const shareVirtual    = !!document.getElementById('share-virtual')?.checked
+  const totalSensors = sensors.filter(s => {
+    if (VIRTUAL_MODELS.has(s.model))    return shareVirtual
+    if (IRRIGATION_MODELS.has(s.model)) return shareIrrigation
+    return shareMeteo
+  }).length
   const totalParcels = plots.length
   const totalAdherents = orgs.length
 
@@ -300,7 +336,7 @@ function renderPreview() {
     <div class="preview-label"><i class="bi bi-eye"></i> Aperçu — Page Informations</div>
     <div id="network-preview">
       <div class="info-header">
-        <div class="info-logo-avatar">${getInitials(state.nom)}</div>
+        <div class="info-logo-avatar"${state.logoDataUrl ? ' style="background:transparent;padding:0;overflow:hidden"' : ''}>${state.logoDataUrl ? `<img src="${state.logoDataUrl}" style="width:100%;height:100%;object-fit:contain">` : getInitials(state.nom)}</div>
         <div>
           <h1 class="info-nom">${esc(state.nom) || '—'}</h1>
           <div class="info-contacts">

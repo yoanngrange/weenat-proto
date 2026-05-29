@@ -252,10 +252,5 @@ export function initAlertesScreen(screenEl, role) {
     })
   }
 
-  // Bouton + (navbar)
-  screenEl.querySelector('.m-navbar-action')?.addEventListener('click', () => {
-    showToast('Création d\'alerte — à venir')
-  })
-
   render()
 }

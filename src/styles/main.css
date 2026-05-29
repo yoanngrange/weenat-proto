@@ -30,11 +30,6 @@ html, body {
   display: flex;
 }
 
-#sidebar {
-  width: 250px;
-  flex-shrink: 0;
-}
-
 #main-content {
   flex: 1;
   min-width: 0;
@@ -834,7 +829,7 @@ th.sort-desc::after {
 
 #hourly-strip {
   display: flex;
-  min-width: max-content;
+  width: 100%;
 }
 
 .hs-col {
@@ -842,9 +837,10 @@ th.sort-desc::after {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 8px 10px 6px;
+  padding: 8px 6px 6px;
   border-right: 1px solid var(--bdr);
-  min-width: 52px;
+  flex: 1;
+  min-width: 44px;
   position: relative;
   cursor: default;
 }
@@ -6171,19 +6167,17 @@ tr.row-selected td {
 
 /* Prévisions 5j */
 .w-prev5-loc { font-size: 12px; font-weight: 600; color: var(--txt2); display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
-.w-prev5-models { display: flex; gap: 4px; margin-bottom: 6px; }
-.w-prev5-model-btn { padding: 3px 10px; border-radius: 12px; border: 1.5px solid var(--bdr); background: none; font-size: 11px; font-weight: 600; cursor: pointer; color: var(--txt3); font-family: inherit; }
-.w-prev5-model-btn.active { border-color: var(--pri); color: var(--pri); background: rgba(1,114,164,.07); }
+.w-prev5-model-hdr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 3px; }
+.w-prev5-model-lbl { font-size: 10px; font-weight: 600; color: var(--txt3); }
+.w-prev5-model-lbl span { font-weight: 400; }
 .w-prev5-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
 .w-prev5-day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 3px; border-radius: 8px; background: var(--bg); border: 1px solid var(--bdr2); }
 .w-prev5-daylbl { font-size: 10px; font-weight: 700; color: var(--txt); text-transform: uppercase; }
 .w-prev5-date { font-size: 9px; color: var(--txt3); }
-.w-prev5-icon { font-size: 18px; margin: 2px 0; }
+.w-prev5-icon { font-size: 18px; margin: 2px 0; color: var(--txt2); }
 .w-prev5-row { font-size: 10px; font-weight: 600; color: var(--txt2); display: flex; align-items: center; gap: 2px; }
 .w-prev5-tmax { color: #e07050; }
 .w-prev5-tmin { color: #5b8dd9; }
-.w-prev5-more { display: block; margin-top: 6px; font-size: 11px; color: var(--pri); text-decoration: none; font-weight: 600; text-align: right; }
-.w-prev5-more:hover { text-decoration: underline; }
 
 /* Weephyt */
 .w-weephyt-wrap { display: flex; flex-direction: column; gap: 8px; height: 100%; }
@@ -6197,13 +6191,12 @@ tr.row-selected td {
 .w-weephyt-src { font-size: 10px; color: var(--txt3); margin-top: auto; }
 
 /* Cumuls */
-.w-cumuls-list { display: flex; flex-direction: column; gap: 4px; }
+.w-cumuls-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .w-cumul-item { display: flex; align-items: flex-start; gap: 8px; background: var(--bg); border: 1px solid var(--bdr2); border-radius: 7px; padding: 7px 8px; }
 .w-cumul-icon { font-size: 14px; flex-shrink: 0; margin-top: 2px; }
 .w-cumul-body { flex: 1; min-width: 0; }
 .w-cumul-lbl { font-size: 11px; color: var(--txt3); display: flex; align-items: center; gap: 4px; }
-.w-cumul-cfg { background: none; border: none; cursor: pointer; color: var(--txt3); font-size: 11px; padding: 0; line-height: 1; }
-.w-cumul-cfg:hover { color: var(--txt); }
+.w-cumul-cfg:hover { color: var(--txt); border-color: var(--txt3) !important; }
 .w-cumul-val { font-size: 15px; font-weight: 700; line-height: 1.2; }
 .w-cumul-unit { font-size: 11px; font-weight: 400; color: var(--txt2); }
 .w-cumul-date { font-size: 10px; color: var(--txt3); margin-top: 2px; }
@@ -6610,6 +6603,10 @@ tr.row-selected td {
 .risk-green  { background: #E6F7F0; color: #1a7a4a; }
 .risk-orange { background: #FEF3E2; color: #B45309; }
 .risk-red    { background: #FEE8E8; color: #C0392B; }
+.tdb-risk-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.tdb-risk-low    { background: #E6F7F0; color: #1a7a4a; }
+.tdb-risk-medium { background: #FEF3E2; color: #B45309; }
+.tdb-risk-high   { background: #FEE8E8; color: #C0392B; }
 .tdb-stage-key { background: var(--warn2); color: var(--warn); font-weight: 600; }
 .tdb-stage-sel {
   padding: 3px 6px;

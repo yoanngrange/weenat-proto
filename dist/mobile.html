@@ -918,6 +918,7 @@
       width: 100%; padding: 10px 12px; font-size: 16px; font-family: inherit;
       border: 1px solid rgba(0,0,0,.15); border-radius: 10px; background: #f2f2f7;
       color: #000; margin-bottom: 12px; min-height: 44px;
+      text-overflow: ellipsis; overflow: hidden; white-space: nowrap;
     }
     .m-prev-cards { display: flex; flex-direction: column; gap: 10px; }
     .m-prev-card {
@@ -991,15 +992,16 @@
     .m-reseau-branch-city { color: #8e8e93; }
 
     /* Support */
-    .m-support-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+    .m-support-center { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; background: #0172A4; color: #fff; border-radius: 12px; font-size: 16px; font-weight: 500; text-decoration: none; min-height: 48px; margin-top: 10px; }
+    .m-support-center:active { opacity: .85; }
+    .m-support-list { display: flex; flex-direction: column; gap: 2px; }
+    .m-support-list-label { font-size: 12px; font-weight: 600; color: #8e8e93; text-transform: uppercase; letter-spacing: .04em; padding: 6px 0 4px; }
     .m-support-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: .5px solid rgba(0,0,0,.06); text-decoration: none; min-height: 52px; }
     .m-support-row:active { opacity: .7; }
     .m-support-ico { width: 36px; height: 36px; border-radius: 9px; background: #0172A420; color: #0172A4; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; }
     .m-support-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
     .m-support-info span { font-size: 13px; color: #8e8e93; }
     .m-support-info strong { font-size: 15px; font-weight: 500; color: #000; }
-    .m-support-center { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 13px; background: #0172A4; color: #fff; border-radius: 12px; font-size: 16px; font-weight: 500; text-decoration: none; min-height: 48px; }
-    .m-support-center:active { opacity: .85; }
 
     /* Support chat button */
     .m-support-chat-btn {
@@ -1346,20 +1348,24 @@
     .m-wcumuls-val { font-weight: 700; }
     .m-wcumuls-unit { font-size: 11px; font-weight: 400; color: #8e8e93; }
     /* Prévisions 5j widget */
-    .m-wprev5-grid {
-      display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px;
-    }
+    .m-wprev5-loc { font-size: 12px; font-weight: 600; color: #8e8e93; display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+    .m-wprev5-model-hdr { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-bottom: 3px; }
+    .m-wprev5-model-lbl { font-size: 10px; font-weight: 600; color: #8e8e93; }
+    .m-wprev5-model-lbl span { font-weight: 400; }
+    .m-wprev5-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
     .m-wprev5-col {
       display: flex; flex-direction: column; align-items: center; gap: 2px;
-      padding: 6px 3px; border-radius: 10px; background: #f5f5f5;
+      padding: 5px 3px; border-radius: 8px; background: #f5f5f7; border: 1px solid rgba(0,0,0,.06);
     }
-    .m-wprev5-col--today { background: rgba(1,114,164,.08); }
-    .m-wprev5-day { font-size: 10px; font-weight: 700; color: #3c3c43; text-transform: uppercase; }
-    .m-wprev5-icon { font-size: 20px; margin: 2px 0; color: #3c3c43; }
-    .m-wprev5-tmax { font-size: 13px; font-weight: 700; color: #e07050; }
-    .m-wprev5-tmin { font-size: 11px; font-weight: 500; color: #5b8dd9; }
-    .m-wprev5-rain { font-size: 10px; color: #45b7d1; font-weight: 600; }
+    .m-wprev5-day { font-size: 10px; font-weight: 700; color: #1c1c1e; text-transform: uppercase; }
+    .m-wprev5-date { font-size: 9px; color: #8e8e93; }
+    .m-wprev5-icon { font-size: 18px; margin: 2px 0; color: #636366; }
+    .m-wprev5-rain { font-size: 10px; color: #45b7d1; font-weight: 600; display: flex; align-items: center; gap: 2px; }
     .m-wprev5-rain--none { color: #c7c7cc; }
+    .m-wprev5-tmax { font-size: 11px; font-weight: 700; color: #e07050; }
+    .m-wprev5-tmin { font-size: 10px; font-weight: 600; color: #5b8dd9; }
+    .m-wprev5-wind { font-size: 9px; font-weight: 600; color: #8e8e93; }
+    .m-wprev5-wind span { font-weight: 400; }
     /* Sensor widget */
     .m-wsensor-vals { display: flex; flex-direction: column; gap: 4px; }
     .m-wsensor-val-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
@@ -1367,7 +1373,7 @@
     .m-wsensor-value { font-weight: 700; }
 
     .m-add-widget-btn {
-      width: calc(100% - 32px); margin: 4px 16px 4px;
+      width: calc(100% - 32px); margin: 4px 16px 16px 16px;
       padding: 13px; border: 1px dashed rgba(0,0,0,.15);
       border-radius: 12px; background: none;
       font-size: 15px; color: #0172A4; cursor: pointer;
@@ -1570,7 +1576,7 @@
       font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
     }
     .m-wf-create-btn:disabled { opacity: .4; cursor: default; }
-    .m-wf-max-msg { font-size: 13px; color: #8e8e93; text-align: center; padding: 4px 0; }
+    .m-wf-max-msg { display: flex; align-items: center; gap: 12px; background: #f2f2f7; border-radius: 10px; padding: 12px 14px; margin-top: 4px; }
     .m-wf-empty   { text-align: center; padding: 12px; font-size: 14px; color: #8e8e93; }
     .m-wf-card { background: #fff; border: 1px solid #E0DED8; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
     .m-wf-card-hd { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -1605,17 +1611,33 @@
     .m-cumuls-saved-val { font-size: 19px; font-weight: 700; color: #1c1c1e; }
     .m-cumuls-saved-unit { font-size: 13px; font-weight: 400; color: #8e8e93; }
     .m-cumuls-saved-row2 { font-size: 13px; color: #3a3a3c; }
-    .m-cumuls-saved-row3 { font-size: 12px; color: #8e8e93; }
+    .m-cumuls-saved-row3 { font-size: 12px; color: #8e8e93; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
     .m-cumuls-del {
       position: absolute; top: 8px; right: 8px;
       background: none; border: none; color: #c7c7cc;
       font-size: 19px; line-height: 1; cursor: pointer; padding: 0 2px;
+    }
+    .m-cumuls-edit {
+      background: none; border: none; color: #0172A4;
+      font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; padding: 0; white-space: nowrap; flex-shrink: 0;
     }
     .m-cumuls-del:hover { color: #ff3b30; }
 
     /* m-list-row-col (used in exploitation/reseau screens) */
     .m-list-row-col { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
     .m-list-row-sub { font-size: 12px; color: #8e8e93; }
+    .m-web-only-hint { display: block; font-size: 10px; color: #c7c7cc; margin-top: 2px; font-style: italic; }
+    .m-adh-action { width: 30px; height: 30px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; cursor: pointer; margin-right: 4px; }
+    .m-adh-action--ok { background: rgba(48,209,88,.15); color: #30d158; }
+    .m-adh-action--ko { background: rgba(255,59,48,.12); color: #ff3b30; }
+    .m-conflict-banner { display: flex; align-items: flex-start; gap: 10px; background: rgba(255,159,10,.1); border: 1px solid rgba(255,159,10,.35); border-radius: 10px; padding: 12px 14px; margin: 12px 0 4px; font-size: 13px; color: #3a2a00; line-height: 1.4; }
+    /* List-page search bar (inside sticky .m-detail-header) */
+    .m-lp-search { padding: 0 16px 10px; }
+    .m-lp-search-inner { display: flex; align-items: center; gap: 8px; background: rgba(118,118,128,.12); border-radius: 10px; padding: 8px 12px; }
+    .m-lp-search-inner i { color: #8e8e93; font-size: 14px; flex-shrink: 0; }
+    .m-lp-search-input { flex: 1; border: none; background: transparent; outline: none; font-size: 15px; font-family: inherit; color: #1c1c1e; }
+    .m-lp-search-input::placeholder { color: #8e8e93; }
+    .m-lp-search-input::-webkit-search-decoration, .m-lp-search-input::-webkit-search-cancel-button { display: none; }
 
     /* Mini map in params — isolation pour que les z-index Leaflet ne débordent pas */
     .m-minimap-container {
@@ -1738,15 +1760,15 @@
     /* Tooltip parcelle/capteur — spécificité suffisante pour écraser Leaflet */
     .leaflet-tooltip.m-map-tip,
     .m-map-tip {
-      background: #1a1a1a !important;
-      border: none !important;
-      border-radius: 6px !important;
-      padding: 4px 10px !important;
-      color: #fff !important;
-      font-size: 14px !important;
+      background: #fff !important;
+      border: 2px solid #0172A4 !important;
+      border-radius: 8px !important;
+      padding: 6px 14px !important;
+      color: #0172A4 !important;
+      font-size: 15px !important;
       font-weight: 700 !important;
       white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(0,0,0,.5) !important;
+      box-shadow: 0 3px 12px rgba(0,0,0,.35) !important;
       cursor: pointer !important;
       opacity: 1 !important;
     }
@@ -1804,7 +1826,7 @@
       display: flex; align-items: center; justify-content: center;
       font-size: 16px; flex-shrink: 0;
     }
-    .m-sensor-info { flex: 1; min-width: 0; }
+    .m-sensor-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .m-sensor-name {
       font-size: 15px; font-weight: 500; color: #000;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1954,6 +1976,9 @@
     }
     .m-list-chevron { color: #c7c7cc; font-size: 13px; flex-shrink: 0; }
 
+    /* ── Inputs within phone-screen must override user-select:none ── */
+    #phone-screen input, #phone-screen textarea { user-select: text !important; -webkit-user-select: text !important; }
+
     /* ── iOS Toggle ── */
     .m-toggle { position: relative; display: inline-block; width: 51px; height: 31px; flex-shrink: 0; }
     .m-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
@@ -1990,7 +2015,7 @@
       position: absolute;
       inset: 0;
       background: rgba(0,0,0,0);
-      z-index: 100;
+      z-index: 1100;
       display: flex;
       align-items: flex-end;
       transition: background .25s;
@@ -2139,15 +2164,34 @@
       font-size: 12px;
       letter-spacing: .03em;
     }
+
+    /* ── Image upload (notes) ── */
+    .jrn-img-zone { border:1px dashed rgba(0,0,0,.15);border-radius:8px;padding:10px 12px 12px;background:#fafafa;margin-top:8px }
+    .jrn-img-previews { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;min-height:0 }
+    .jrn-img-previews:empty { margin-bottom:0 }
+    .jrn-img-thumb-wrap { position:relative;width:72px;height:72px;flex-shrink:0 }
+    .jrn-img-thumb { width:72px;height:72px;object-fit:cover;border-radius:6px;cursor:pointer;display:block;border:1px solid rgba(0,0,0,.1) }
+    .jrn-img-thumb:hover { opacity:.85 }
+    .jrn-img-thumb-rm { position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#ff3b30;color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;box-shadow:0 1px 3px rgba(0,0,0,.25) }
+    .jrn-img-spinner-wrap { width:72px;height:72px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px dashed rgba(0,0,0,.15);background:#f2f2f7 }
+    .jrn-img-spinner { width:22px;height:22px;border:3px solid rgba(0,0,0,.1);border-top-color:#0172A4;border-radius:50%;animation:jrn-spin .7s linear infinite }
+    @keyframes jrn-spin { to { transform:rotate(360deg) } }
+    .jrn-img-add-btn { display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid rgba(0,0,0,.15);border-radius:6px;background:#fff;color:#636366;font-size:12px;cursor:pointer;font-family:inherit }
+    .jrn-img-error { font-size:11px;color:#ff3b30;margin-top:4px }
+    /* Lightbox */
+    .img-lightbox { position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center }
+    .img-lightbox-img { max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px }
+    .img-lightbox-close { position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:36px;cursor:pointer;line-height:1;padding:4px;opacity:.8 }
   </style>
-  <script type="module" crossorigin src="/weenat-proto/assets/mobile-CNBMRn0S.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/mobile-D0Qm-PSj.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-urzhAbT6.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-DRCbE3kB.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-DDe0aa9W.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-BFmvZ9cD.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-InOgbptE.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-Bk1sI8WC.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-Cx4wNzLL.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/network-YzWdS0n_.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-MeXOpmvP.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-WiYYdaCC.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/constants-C2D4LmLD.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-C_ssoUx1.js">
 </head>
 <body>
@@ -2215,8 +2259,7 @@
           <div class="m-navbar">
             <a class="m-navbar-logo"><img src="/weenat-proto/assets/favicon-Ba1UlvcJ.svg" class="m-navbar-favicon" alt="W"></a>
             <span class="m-navbar-title">Paramètres</span>
-            <button class="m-navbar-action" id="param-plus-btn" style="display:none"><i class="bi bi-plus"></i></button>
-            <div id="param-plus-spacer" style="width:32px"></div>
+            <button class="m-navbar-action" id="param-plus-btn"><i class="bi bi-plus"></i></button>
           </div>
           <div class="m-segment-wrap">
             <div class="m-segment" id="param-segment"></div>
@@ -2262,5 +2305,6 @@
 
   <div class="swipe-hint">← swipe ou clic pour naviguer entre les onglets →</div>
 
+  <script src="/weenat-proto/js/menu-switch.js"></script>
 </body>
 </html>

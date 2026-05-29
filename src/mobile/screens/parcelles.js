@@ -16,7 +16,7 @@ const METRIC_REQUIRES = {
 function hasMetric(plot, metricId) {
   const req = METRIC_REQUIRES[metricId]
   if (!req) return true
-  return allSensors.some(s => s.parcelId === plot.id && req.includes(s.model))
+  return allSensors.some(s => s.parcelIds.includes(plot.id) && req.includes(s.model))
 }
 
 const METRICS = [
@@ -165,7 +165,7 @@ export function initParcellesScreen(screenEl, role) {
       const bounds = []
       plots.forEach(p => {
         const label = hasMetric(p, metricId) ? `${getVal(p.id)} ${metric.unit}` : '—'
-        const linkedSensorIds = allSensors.filter(s => s.parcelId === p.id).map(s => s.id)
+        const linkedSensorIds = allSensors.filter(s => s.parcelIds.includes(p.id)).map(s => s.id)
         const openDetail = () => initParcelDetail(p, linkedSensorIds)
         const center = [p.lat, p.lng]
 
@@ -225,7 +225,7 @@ export function initParcellesScreen(screenEl, role) {
     content.querySelectorAll('.m-tappable[data-plot-id]').forEach(row => {
       row.addEventListener('click', () => {
         const plot = allPlots.find(p => p.id === +row.dataset.plotId); if (!plot) return
-        const linkedSensorIds = allSensors.filter(s => s.parcelId === plot.id).map(s => s.id)
+        const linkedSensorIds = allSensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
         initParcelDetail(plot, linkedSensorIds)
       })
     })

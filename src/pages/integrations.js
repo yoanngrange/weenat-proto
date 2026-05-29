@@ -45,6 +45,7 @@ function renderIntegrationStats(adherentMode = false) {
       ).length
     })
     const activeIntegrations = integrations.filter(i => ADHERENT_ACTIVE_IDS.has(i.id))
+      .sort((a, b) => adherentCounts[b.id] - adherentCounts[a.id])
     const maxCount = Math.max(...activeIntegrations.map(i => adherentCounts[i.id]), 1)
     const top5Rows = activeIntegrations.map((i, idx) => `
       <div class="integ-top5-row">

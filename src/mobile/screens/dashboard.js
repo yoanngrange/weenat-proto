@@ -4,6 +4,8 @@ import { orgs as allOrgs }       from '../../data/orgs.js'
 import { network }               from '../../data/network.js'
 import { pushDetail, popDetail } from '../nav.js'
 import { IRRIG_SEASON, buildGroups } from '../../data/irrigations.js'
+import { flexLayer, checkIcon, buildSelectionHTML } from './irrigation.js'
+import { applyStoredPlotPatches } from '../../data/store.js'
 
 const ORG_ID   = { admin: 100, adherent: 1 }
 const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
@@ -16,16 +18,17 @@ function _saveDash(patch) { try { localStorage.setItem(DASH_KEY, JSON.stringify(
 // ─── Widget catalog ───────────────────────────────────────────────────────────
 // fixed:true = toujours en fin de liste, pas de menu (infos réseau + support)
 const CATALOG = [
-  { id: 'bilan_hydrique', title: 'Irrigation',      icon: 'bi-droplet-fill',              color: '#0172A4', active: true,  available: true,  fixed: false },
-  { id: 'previsions',     title: 'Prévisions',                        icon: 'bi-cloud-sun-fill',            color: '#f5a623', active: true,  available: true,  fixed: false },
-  { id: 'cumuls',         title: 'Cumuls',                            icon: 'bi-bar-chart-fill',            color: '#bf5af2', active: true,  available: true,  fixed: false },
-  { id: 'temps_reel',     title: 'Mesures',                           icon: 'bi-activity',                  color: '#ff9f0a', active: true,  available: true,  fixed: false },
-  { id: 'traitements',    title: 'Traitements',                        icon: 'bi-shield-fill',               color: '#4ecdc4', active: true,  available: true,  fixed: false },
-  { id: 'cultures',       title: 'Cultures',                           icon: 'bi-flower1',                   color: '#a2c4c9', active: true,  available: true,  fixed: false },
-  { id: 'evenements',     title: 'Anomalies capteurs',                 icon: 'bi-exclamation-triangle-fill', color: '#ff3b30', active: true,  available: true,  fixed: false },
+  { id: 'bilan_hydrique', title: 'Irrigation',        icon: 'bi-droplet',              color: '#0172A4', active: true,  available: true,  fixed: false },
+  { id: 'previsions',     title: 'Prévisions',         icon: 'bi-cloud-sun',            color: '#f5a623', active: true,  available: true,  fixed: false },
+  { id: 'cumuls',         title: 'Cumuls',             icon: 'bi-bar-chart',            color: '#bf5af2', active: true,  available: true,  fixed: false },
+  { id: 'temps_reel',     title: 'Mesures',            icon: 'bi-activity',             color: '#ff9f0a', active: true,  available: true,  fixed: false },
+  { id: 'traitements',    title: 'Traitements',        icon: 'bi-shield',               color: '#4ecdc4', active: true,  available: true,  fixed: false },
+  { id: 'cultures',       title: 'Cultures',           icon: 'bi-flower1',              color: '#a2c4c9', active: true,  available: true,  fixed: false },
+  { id: 'evenements',     title: 'Anomalies capteurs', icon: 'bi-exclamation-triangle', color: '#ff3b30', active: true,  available: true,  fixed: false },
+  { id: 'notes',          title: 'Notes',              icon: 'bi-pencil-square',        color: '#636366', active: false, available: true,  fixed: false },
   // Widgets fixes — toujours actifs, toujours en fin de liste
-  { id: 'mon_reseau',     title: 'Infos Réseau',                      icon: 'bi-diagram-3-fill',            color: '#5b8dd9', active: true,  available: true,  fixed: true  },
-  { id: 'support',        title: 'Support',                           icon: 'bi-question-circle-fill',      color: '#30d158', active: true,  available: true,  fixed: true  },
+  { id: 'mon_reseau',     title: 'Infos Réseau',       icon: 'bi-diagram-3',            color: '#5b8dd9', active: true,  available: true,  fixed: true  },
+  { id: 'support',        title: 'Besoin d\'aide ?',   icon: 'bi-question-circle',      color: '#30d158', active: true,  available: true,  fixed: true  },
 ]
 
 // ─── UI helpers (shared pattern, TODO: extract to ui.js) ──────────────────────
@@ -76,7 +79,7 @@ const WEATHER_COND = [
   { icon: 'bi-cloud-sun-fill',   label: 'Nuageux',    color: '#8e8e93' },
   { icon: 'bi-cloud-fill',       label: 'Couvert',    color: '#636366' },
   { icon: 'bi-cloud-drizzle-fill', label: 'Averses',  color: '#5b8dd9' },
-  { icon: 'bi-cloud-rain-fill',  label: 'Pluie',      color: '#45b7d1' },
+  { icon: 'bi-cloud-rain-fill',  label: 'Pluie',      color: '#2E75B6' },
 ]
 
 function makeForecast() {
@@ -134,8 +137,15 @@ function makeBilan(plot) {
 
 // ─── Mesures & Cumuls — constantes partagées ─────────────────────────────────
 
-const WF_MAX    = 4  // max items per widget
-const WF_COLORS = ['#0172A4', '#ff8500', '#30d158', '#bf5af2']
+const WF_MAX    = 4  // max mesures
+const CUMUL_MAX = 5  // max cumuls
+const WF_COLORS = ['#0172A4', '#ff8500', '#30d158', '#bf5af2']  // fallback (multi-série même métrique)
+const TR_COLORS = {
+  pluie: '#2E75B6', temperature: '#FBAF05', humidite: '#5B12A4',
+  etp: '#7DBDD7', rayonnement: '#CBCB0B', temp_rosee: '#72B0D8',
+  vent: '#616161', par: '#4CBB17', humectation: '#00887E',
+  pothydr: '#A6C157', teneur: '#ED9A2C', temp_sol: '#795548',
+}
 
 const TR_ALL_METRICS = {
   pluie: 'Pluie', temperature: 'Température', humidite: 'Humidité',
@@ -182,7 +192,7 @@ function msrGetMetrics(subjectKey, sensors) {
   if (!subjectKey) return []
   if (subjectKey.startsWith('p-')) {
     const set = new Set(ALWAYS)
-    sensors.filter(s => s.parcelId === +subjectKey.slice(2))
+    sensors.filter(s => s.parcelIds.includes(+subjectKey.slice(2)))
       .forEach(s => (TR_SENSOR_METRICS[s.model] || []).forEach(m => set.add(m)))
     return [...set].filter(id => id in TR_ALL_METRICS)
   }
@@ -197,7 +207,9 @@ function msrXLabels(period, step) {
                            : period === '30d'  ? ['J-30','J-22','J-14','J-7','Auj.']
                            : ['J-7','J-5','J-3','J-1','Auj.']
   if (step === '1w')  return period === '365d' ? ['S-52','S-38','S-26','S-13','Auj.'] : ['S-4','S-3','S-2','S-1','Auj.']
-  if (step === '1mo') return period === '365d' ? ['Jan','Avr','Jul','Oct','Déc'] : ['M-4','M-3','M-2','M-1','Auj.']
+  if (step === '1mo') return period === '365d'
+    ? ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
+    : ['M-4','M-3','M-2','M-1','Auj.']
   return []
 }
 
@@ -239,9 +251,10 @@ function trMockSeries(subjectKey, metricId, count) {
 const MSR_BAR_METRICS = new Set(['pluie', 'etp'])
 
 function msrCardHtml(m, idx) {
-  const count = { '1d': 24, 'hier': 24, '7d': 42, '30d': 60, '365d': 90 }[m.period] || 42
+  const count = (m.period === '365d' && m.step === '1mo') ? 12
+    : { '1d': 24, 'hier': 24, '7d': 42, '30d': 60, '365d': 90 }[m.period] || 42
   const data  = trMockSeries(m.subjectKey, m.metricId, count)
-  const W = 270, H = 60, PL = 26, PB = 12
+  const W = 270, H = 100, PL = 28, PB = 14
   const yMax = Math.max(...data, 1)
   const isBar = MSR_BAR_METRICS.has(m.metricId)
   let chartEl
@@ -249,14 +262,15 @@ function msrCardHtml(m, idx) {
   for (let i = 0; i <= 2; i++) {
     const y = Math.round(i / 2 * (H - PB - 4) + 4)
     grid += `<line x1="${PL}" y1="${y}" x2="${PL+W}" y2="${y}" stroke="#E8E6E0" stroke-width=".5"/>`
-    grid += `<text x="${PL-3}" y="${y+3}" text-anchor="end" font-size="7" fill="#B0AEA8">${+(yMax*(1-i/2)).toFixed(yMax<5?1:0)}</text>`
+    grid += `<text x="${PL-3}" y="${y+3}" text-anchor="end" font-size="8" fill="#636366">${+(yMax*(1-i/2)).toFixed(yMax<5?1:0)}</text>`
   }
   const xlbls  = msrXLabels(m.period, m.step)
   const xTicks = xlbls.map((lbl, i) =>
-    `<text x="${PL + Math.round(i/(xlbls.length-1)*W)}" y="${H+2}" text-anchor="middle" font-size="7" fill="#B0AEA8">${lbl}</text>`
+    `<text x="${PL + Math.round(i/(xlbls.length-1)*W)}" y="${H+3}" text-anchor="middle" font-size="9" fill="#3c3c43">${lbl}</text>`
   ).join('')
   const serialData = JSON.stringify(data.map(v => +v.toFixed(2)))
-  const barColor = m.metricId === 'pluie' ? '#45b7d1' : m.color
+  const resolvedColor = TR_COLORS[m.metricId] || m.color
+  const barColor = m.metricId === 'pluie' ? '#2E75B6' : resolvedColor
 
   if (isBar) {
     const bw = Math.max(1, W / count * 0.7)
@@ -273,7 +287,7 @@ function msrCardHtml(m, idx) {
     ).join(' ')
     chartEl = `<svg viewBox="0 0 ${PL+W} ${H+6}" style="width:100%;display:block;overflow:visible">
       ${grid}
-      <polyline points="${pts}" fill="none" stroke="${m.color}" stroke-width="1.5" stroke-linejoin="round"/>
+      <polyline points="${pts}" fill="none" stroke="${resolvedColor}" stroke-width="2" stroke-linejoin="round"/>
       <line class="m-tr-cursor" x1="0" y1="0" x2="0" y2="${H}" stroke="#333" stroke-width=".7" stroke-dasharray="3,2" opacity="0"/>
       ${xTicks}
     </svg>`
@@ -283,7 +297,8 @@ function msrCardHtml(m, idx) {
     <div class="m-wf-card">
       <div class="m-wf-card-hd">
         <div>
-          <div class="m-wf-card-title" style="color:${m.metricId==='pluie'?barColor:m.color}">${m.metricLabel} <span style="font-weight:400;color:#636366">· ${m.subjectLabel}</span></div>
+          <div class="m-wf-card-title" style="color:${m.metricId==='pluie'?barColor:resolvedColor}">${m.metricLabel}</div>
+          <div class="m-wf-card-sub" style="color:#3c3c43;font-weight:500">${m.subjectLabel}</div>
           <div class="m-wf-card-sub">${m.periodLabel} · ${m.stepLabel}</div>
         </div>
         <button class="m-wf-del" data-widget="temps_reel" data-idx="${idx}" type="button">×</button>
@@ -298,18 +313,27 @@ function msrCardHtml(m, idx) {
 function buildMesures(plots, sensors) {
   const atMax = mesuresList.length >= WF_MAX
   const plotOpts   = plots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
-  const sensorOpts = sensors.filter(s => s.parcelId).map(s => {
-    const p = plots.find(x => x.id === s.parcelId)
+  const sensorOpts = sensors.filter(s => s.parcelIds.length > 0).map(s => {
+    const p = plots.find(x => s.parcelIds.includes(x.id))
     return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
   }).join('')
   const defSteps = msrStepOpts('7d')
   const listHtml = mesuresList.length
     ? mesuresList.map(msrCardHtml).join('')
-    : `<div class="m-wf-empty">Aucune mesure enregistrée</div>`
+    : `<div class="m-wf-empty">Aucune mesure configurée</div>`
   return `
-    <div class="m-list-section-header">Nouvelle mesure</div>
-    <div class="m-wf-form${atMax ? ' m-wf-disabled' : ''}">
-      <select class="m-wf-sel" id="msr-subject" ${atMax ? 'disabled' : ''}>
+    <div id="msr-list">${listHtml}</div>
+    <div class="m-list-section-header" style="margin-top:${mesuresList.length ? '16px' : '0'}">Ajouter une mesure</div>
+    ${atMax ? `
+    <div class="m-wf-max-msg">
+      <i class="bi bi-slash-circle" style="font-size:18px;color:#8e8e93"></i>
+      <div>
+        <div style="font-weight:600;color:#1c1c1e;font-size:13px">Limite atteinte (${WF_MAX}/${WF_MAX})</div>
+        <div style="color:#636366;font-size:12px;margin-top:2px">Supprimez une mesure pour en ajouter une nouvelle.</div>
+      </div>
+    </div>` : `
+    <div class="m-wf-form">
+      <select class="m-wf-sel" id="msr-subject">
         <option value="">— Parcelle ou capteur —</option>
         <optgroup label="Parcelles">${plotOpts}</optgroup>
         ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
@@ -318,18 +342,15 @@ function buildMesures(plots, sensors) {
         <option value="">— Métrique —</option>
       </select>
       <div class="m-wf-row">
-        <select class="m-wf-sel" id="msr-period" ${atMax ? 'disabled' : ''}>
+        <select class="m-wf-sel" id="msr-period">
           ${MSR_PERIODS.map(p => `<option value="${p.id}"${p.id==='7d'?' selected':''}>${p.label}</option>`).join('')}
         </select>
-        <select class="m-wf-sel" id="msr-step" ${atMax ? 'disabled' : ''}>
+        <select class="m-wf-sel" id="msr-step">
           ${defSteps.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
         </select>
       </div>
       <button class="m-wf-create-btn" id="msr-create" disabled>Créer la mesure</button>
-      ${atMax ? `<div class="m-wf-max-msg">Quantité maximale atteinte. Supprimez une mesure pour en ajouter une nouvelle.</div>` : ''}
-    </div>
-    <div class="m-list-section-header" style="margin-top:16px">Mesures enregistrées</div>
-    <div id="msr-list">${listHtml}</div>`
+    </div>`}`
 }
 
 // ─── Widget HTML builders ─────────────────────────────────────────────────────
@@ -348,7 +369,7 @@ function makePlanif7j(plot, plotList) {
 
 const BH_LIMIT = 9
 
-function buildBilanHydrique(plots, expanded = false) {
+function buildBilanHydrique(plots, expanded = false, sensorlessEnabled = (_loadDash().sensorlessEnabled ?? true)) {
   if (!plots.length) {
     return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucune parcelle</p></div>`
   }
@@ -357,23 +378,32 @@ function buildBilanHydrique(plots, expanded = false) {
   const groupedIds = new Set(groups.flatMap(g => g.ids))
   const standalones = plots.filter(p => !groupedIds.has(p.id))
 
-  // Ordered list of all plots (groups first, then standalones)
+  const sortByBilanDesc = (a, b) => makeBilan(b).bilan - makeBilan(a).bilan
+
+  // Ordered list of all plots (groups first sorted by need, then standalones)
   const ordered = [
-    ...groups.flatMap(g => g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)),
-    ...standalones
+    ...groups.flatMap(g =>
+      g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean).sort(sortByBilanDesc)
+    ),
+    ...standalones.slice().sort(sortByBilanDesc),
   ]
   const visible    = expanded ? ordered : ordered.slice(0, BH_LIMIT)
   const visibleIds = new Set(visible.map(p => p.id))
   const remaining  = ordered.length - visible.length
 
   const makeRow = p => {
+    const hasSoilSensor = allSensors.some(s =>
+      s.parcelIds.includes(p.id) && (s.model.startsWith('CHP') || s.model.startsWith('CAPA') || s.model.startsWith('EC'))
+    )
     const { j0, j7, bilan } = makeBilan(p)
     const planif = makePlanif7j(p, plots)
+    const j0Html = hasSoilSensor ? j0 : '<span style="color:#aeaeb2">—</span>'
+    const j7Html = hasSoilSensor ? j7 : '<span style="color:#aeaeb2">—</span>'
     return `
       <button class="m-bh-th-n m-bh-plot-link" data-plot-id="${p.id}">${p.name}</button>
-      <div class="m-bh-td">${j0}</div>
-      <div class="m-bh-td">${j7}</div>
-      <div class="m-bh-td m-bh-td--reco">${bilan > 0 ? bilan : '—'}</div>
+      <div class="m-bh-td">${j0Html}</div>
+      <div class="m-bh-td">${j7Html}</div>
+      ${sensorlessEnabled ? `<div class="m-bh-td m-bh-td--reco">${bilan > 0 ? bilan : '—'}</div>` : ''}
       <div class="m-bh-td m-bh-td--planif">${planif > 0 ? planif : '—'}</div>`
   }
 
@@ -381,11 +411,19 @@ function buildBilanHydrique(plots, expanded = false) {
   for (const g of groups) {
     const gPlots = g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)
       .filter(p => visibleIds.has(p.id))
+      .sort(sortByBilanDesc)
     if (!gPlots.length) continue
-    rows += `<div class="m-bh-group-row">⬡ ${g.label}</div>`
+    rows += `<div class="m-bh-group-row" style="background:rgba(0,0,0,.035)">⬡ ${g.label}</div>`
     rows += gPlots.map(makeRow).join('')
   }
-  rows += standalones.filter(p => visibleIds.has(p.id)).map(makeRow).join('')
+  const visStandalones = standalones.filter(p => visibleIds.has(p.id)).sort(sortByBilanDesc)
+  if (visStandalones.length && groups.length) {
+    rows += `<div class="m-bh-group-row">⬡ Autres parcelles</div>`
+  }
+  rows += visStandalones.map(makeRow).join('')
+
+  const cols = sensorlessEnabled ? '1fr 38px 38px 46px 46px' : '1fr 38px 38px 46px'
+  const irrigSpan = sensorlessEnabled ? 2 : 1
 
   const expandBtn = ordered.length > BH_LIMIT
     ? `<button class="m-bh-expand" id="bh-expand" data-expanded="${expanded}">
@@ -396,16 +434,18 @@ function buildBilanHydrique(plots, expanded = false) {
     : ''
 
   return `
-    <div class="m-bh-table">
-      <div class="m-bh-gh"></div>
-      <div class="m-bh-gh" style="grid-column:span 2">Niveau RFU</div>
-      <div class="m-bh-gh" style="grid-column:span 2">Irrigations J+7</div>
-      <div class="m-bh-th m-bh-unit-lbl">mm</div>
-      <div class="m-bh-th">J0</div>
-      <div class="m-bh-th">J+7</div>
-      <div class="m-bh-th">Reco.</div>
-      <div class="m-bh-th">Planif.</div>
-      ${rows}
+    <div style="background:#f5f5f7;border-radius:10px;padding:8px;margin-bottom:8px">
+      <div class="m-bh-table" style="grid-template-columns:${cols}">
+        <div class="m-bh-gh"></div>
+        <div class="m-bh-gh" style="grid-column:span 2">Niveau RFU</div>
+        <div class="m-bh-gh" style="grid-column:span ${irrigSpan}">Irrigations J+7</div>
+        <div class="m-bh-th m-bh-unit-lbl">données en mm</div>
+        <div class="m-bh-th">J0</div>
+        <div class="m-bh-th">J+7</div>
+        ${sensorlessEnabled ? `<div class="m-bh-th">Reco.</div>` : ''}
+        <div class="m-bh-th">Planif.</div>
+        ${rows}
+      </div>
     </div>
     ${expandBtn}
     <div class="m-bh-actions">
@@ -421,16 +461,21 @@ function buildBilanHydrique(plots, expanded = false) {
     </div>`
 }
 
-function buildPrevisions(plots, sensors, forecast) {
+const trunc = (str, max = 40) => str.length > max ? str.slice(0, max - 1) + '…' : str
+
+function buildPrevisions(plots, sensors, forecast, role) {
   const orgById = Object.fromEntries(allOrgs.map(o => [o.id, o]))
   const plotOpts = plots.map(p => {
     const commune = p.ville || orgById[p.orgId]?.ville || null
-    const label = [p.name, p.crop || null, commune].filter(Boolean).join(' · ')
+    const label = trunc([p.name, p.crop || null, commune].filter(Boolean).join(' · '))
     return `<option value="p-${p.id}">${label}</option>`
   }).join('')
-  const sensorOpts = sensors.map(s =>
-    `<option value="s-${s.id}">${s.model} — ${s.serial}</option>`
-  ).join('')
+  const sensorOpts = sensors.map(s => {
+    const ville = s.parcelIds.map(id => plots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville
+      || orgById[s.orgId]?.ville || ''
+    const label = trunc(`${s.serial}${ville ? ` — ${ville}` : ''}`)
+    return `<option value="s-${s.id}">${label}</option>`
+  }).join('')
   const opts = `
     <optgroup label="Parcelles">${plotOpts}</optgroup>
     ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}`
@@ -460,9 +505,14 @@ function buildPrevisions(plots, sensors, forecast) {
   const visible = forecast.slice(0, 3).map(makeCard).join('')
   const extra   = forecast.slice(3).map(makeCard).join('')
 
+  const exploit = allOrgs.find(o => o.id === (role === 'admin' ? 100 : 1))
+  const exploitAddr = exploit?.adresse || ''
+  const addrOpt = exploitAddr
+    ? `<option value="addr">${trunc(`${exploit.name} — ${exploit.ville || exploitAddr}`)}</option>`
+    : ''
   return `
     <div class="m-w-section-hd" style="margin-top:0">Lieu des prévisions</div>
-    <select class="m-prev-select">${opts}</select>
+    <select class="m-prev-select">${addrOpt}${opts}</select>
     <div class="m-prev-cards">
       ${visible}
       <div class="m-prev-extra" style="display:none">${extra}</div>
@@ -491,17 +541,17 @@ function getAvailableMetrics(subjectVal) {
     if (!sensor) return CUMULS_METRICS
     return CUMULS_METRICS.filter(m => m.needsModels === null || m.needsModels.includes(sensor.model))
   }
-  const linkedModels = new Set(allSensors.filter(s => s.parcelId === +subjectVal.slice(2)).map(s => s.model))
+  const linkedModels = new Set(allSensors.filter(s => s.parcelIds.includes(+subjectVal.slice(2))).map(s => s.model))
   return CUMULS_METRICS.filter(m => m.needsModels === null || m.needsModels.some(mod => linkedModels.has(mod)))
 }
 
 const CUMUL_ICONS = {
-  pluie: { icon: 'bi-droplet-fill',    color: '#45b7d1' },
-  dj:    { icon: 'bi-thermometer-sun', color: '#ff9f0a' },
-  hf:    { icon: 'bi-thermometer-low', color: '#5ac8fa' },
-  etp:   { icon: 'bi-moisture',        color: '#30d158' },
-  rayo:  { icon: 'bi-sun-fill',        color: '#f5c842' },
-  humec: { icon: 'bi-droplet-half',    color: '#bf5af2' },
+  pluie: { icon: 'bi-droplet-fill',    color: '#2E75B6' },
+  dj:    { icon: 'bi-thermometer-sun', color: '#FBAF05' },
+  hf:    { icon: 'bi-thermometer-low', color: '#FEE7B4' },
+  etp:   { icon: 'bi-moisture',        color: '#7DBDD7' },
+  rayo:  { icon: 'bi-sun-fill',        color: '#CBCB0B' },
+  humec: { icon: 'bi-droplet-half',    color: '#00887E' },
 }
 
 function renderCumulCards() {
@@ -509,7 +559,10 @@ function renderCumulCards() {
     return `<div style="text-align:center;padding:16px;font-size:13px;color:#8e8e93">Aucun cumul enregistré</div>`
   }
   return cumulsList.map((c, idx) => {
-    const from = new Date(c.fromDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+    const thresholdText = c.thresholds
+      ? c.metricId === 'hf' ? ` · seuil < ${c.thresholds.cold}°C`
+      : c.metricId === 'dj' ? ` · ${c.thresholds.low}–${c.thresholds.high}°C`
+      : '' : ''
     return `<div class="m-cumuls-saved-card" style="position:relative">
       <button class="m-cumuls-del" data-cidx="${idx}" type="button" title="Supprimer">×</button>
       <div class="m-cumuls-saved-row1">
@@ -517,12 +570,10 @@ function renderCumulCards() {
         <span class="m-cumuls-saved-val">${c.value} <span class="m-cumuls-saved-unit">${c.unit}</span></span>
       </div>
       <div class="m-cumuls-saved-row2">${c.subjectLabel}</div>
-      <div class="m-cumuls-saved-row3">depuis le ${from}${
-        c.thresholds
-          ? c.metricId === 'hf' ? ` · seuil < ${c.thresholds.cold}°C`
-          : c.metricId === 'dj' ? ` · ${c.thresholds.low}–${c.thresholds.high}°C`
-          : '' : ''
-      }</div>
+      <div class="m-cumuls-saved-row3">
+        <span>depuis le ${c.fromDate}${thresholdText}</span>
+        <button class="m-cumuls-edit" data-cidx="${idx}" type="button" title="Modifier"><i class="bi bi-pencil"></i> Modifier</button>
+      </div>
     </div>`
   }).join('')
 }
@@ -536,16 +587,16 @@ function computeCumul(subjectVal, fromDate, metricId) {
 }
 
 function buildCumuls(plots, sensors) {
-  const atMax      = cumulsList.length >= WF_MAX
+  const atMax      = cumulsList.length >= CUMUL_MAX
   const defaultFrom = `${new Date().getFullYear()}-01-01`
 
-  const qualSensors = sensors.filter(s => s.parcelId && CUMUL_QUALIFYING_MODELS.has(s.model))
-  const qualPlotIds = new Set(qualSensors.map(s => s.parcelId))
+  const qualSensors = sensors.filter(s => s.parcelIds.length > 0 && CUMUL_QUALIFYING_MODELS.has(s.model))
+  const qualPlotIds = new Set(qualSensors.flatMap(s => s.parcelIds))
   const qualPlots   = plots.filter(p => qualPlotIds.has(p.id))
 
   const plotOpts   = qualPlots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
   const sensorOpts = qualSensors.map(s => {
-    const p = plots.find(x => x.id === s.parcelId)
+    const p = plots.find(x => s.parcelIds.includes(x.id))
     return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
   }).join('')
 
@@ -554,9 +605,18 @@ function buildCumuls(plots, sensors) {
     : `<div class="m-wf-empty">Aucun cumul enregistré</div>`
 
   return `
-    <div class="m-list-section-header">Nouveau cumul</div>
-    <div class="m-wf-form${atMax ? ' m-wf-disabled' : ''}">
-      <select class="m-wf-sel" id="cumuls-subject" ${atMax ? 'disabled' : ''}>
+    <div id="cumuls-saved-list" style="display:flex;flex-direction:column;gap:8px">${listHtml}</div>
+    <div class="m-list-section-header" style="margin-top:${cumulsList.length ? '16px' : '0'}">Ajouter un cumul</div>
+    ${atMax ? `
+    <div class="m-wf-max-msg">
+      <i class="bi bi-slash-circle" style="font-size:18px;color:#8e8e93"></i>
+      <div>
+        <div style="font-weight:600;color:#1c1c1e;font-size:13px">Limite atteinte (${CUMUL_MAX}/${CUMUL_MAX})</div>
+        <div style="color:#636366;font-size:12px;margin-top:2px">Supprimez un cumul pour en ajouter un nouveau.</div>
+      </div>
+    </div>` : `
+    <div class="m-wf-form">
+      <select class="m-wf-sel" id="cumuls-subject">
         <option value="">— Parcelle ou capteur —</option>
         <optgroup label="Parcelles">${plotOpts}</optgroup>
         ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
@@ -568,15 +628,12 @@ function buildCumuls(plots, sensors) {
       <div class="m-wf-row">
         <div class="m-wf-field">
           <span class="m-wf-label">Depuis le</span>
-          <input type="date" class="m-wf-date" id="cumuls-from" value="${defaultFrom}" ${atMax ? 'disabled' : ''}>
+          <input type="date" class="m-wf-date" id="cumuls-from" value="${defaultFrom}">
         </div>
       </div>
       <div id="cumuls-date-err" class="m-wf-err" style="display:none">Période supérieure à 365 jours. Choisissez une date plus récente.</div>
       <button class="m-wf-create-btn" id="cumuls-create" disabled>Créer le cumul</button>
-      ${atMax ? `<div class="m-wf-max-msg">Quantité maximale atteinte. Supprimez un cumul pour en ajouter un nouveau.</div>` : ''}
-    </div>
-    <div class="m-list-section-header" style="margin-top:16px">Cumuls enregistrés</div>
-    <div id="cumuls-saved-list">${listHtml}</div>`
+    </div>`}`
 }
 
 // ─── Traitements phytosanitaires ─────────────────────────────────────────────
@@ -609,35 +666,268 @@ function plotTreatmentData(plot) {
   return { product, winDateStr, winHour, winDur, isUrgent, minutesFromNow }
 }
 
+const TRAIT_GREEN = '#1a9e40'
+
 function buildTraitements(plots) {
   const withData = plots.filter(p => p.crop).map(p => ({ p, d: plotTreatmentData(p) }))
   const upcoming = withData
-    .filter(({ d }) => d.minutesFromNow >= 0 && d.minutesFromNow <= 2880)
+    .filter(({ d }) => d.minutesFromNow >= 0 && d.minutesFromNow <= 1440)
     .sort((a, b) => a.d.minutesFromNow - b.d.minutesFromNow)
-  if (!upcoming.length) return `<div class="m-widget-empty">Aucune fenêtre favorable dans les prochaines 48h</div>`
-  const visible = upcoming.slice(0, 10)
-  const rows = visible.map(({ p, d }) => {
-    const urgColor = d.isUrgent ? '#ff9f0a' : '#1c1c1e'
-    const urgIcon  = d.isUrgent ? '<i class="bi bi-alarm-fill" style="color:#ff9f0a"></i> ' : ''
-    const hh = String(d.winHour).padStart(2, '0')
-    return `<div class="m-w-row">
-      <div class="m-w-row-main">
-        <div class="m-w-row-name">${p.name}</div>
-        <div class="m-w-row-sub">${p.crop}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:12px;font-weight:600;color:${urgColor}">${urgIcon}${d.winDateStr} · ${hh}:00</div>
-        <div style="font-size:11px;color:#8e8e93">fenêtre de ${d.winDur} heures</div>
-      </div>
-    </div>`
+  if (!upcoming.length) return `<div class="m-widget-empty">Aucune fenêtre favorable dans les prochaines 24h</div>`
+  const rows = upcoming.slice(0, 10).map(({ p, d }) => {
+    const hh    = String(d.winHour).padStart(2, '0')
+    const heEnd = String((d.winHour + d.winDur) % 24).padStart(2, '0')
+    return `
+      <div class="m-trait-card" data-plot-id="${p.id}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:12px;padding:11px 14px;margin-bottom:8px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#1c1c1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+            <div style="font-size:11px;color:#8e8e93;margin-top:1px">${p.crop}</div>
+          </div>
+          <div style="background:#edf7f0;color:${TRAIT_GREEN};font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;display:flex;align-items:center;gap:4px;flex-shrink:0">
+            <i class="bi bi-check2-circle" style="font-size:12px"></i>
+            ${d.winDateStr} · ${hh}h–${heEnd}h
+          </div>
+        </div>
+      </div>`
   }).join('')
-  return `<div class="m-w-list">${rows}</div>
-    <div class="m-w-see-more" data-action="weephyt">
-      <i class="bi bi-box-arrow-up-right"></i> Voir les fenêtres des autres parcelles
+  return `
+    <div style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Fenêtres météo favorables</div>
+    <div style="margin-bottom:4px">${rows}</div>
+    <div class="m-bh-actions" style="--trait-green:#30d158">
+      <button class="m-bh-action" id="trait-btn-saisir" style="background:#1a9e40;border-color:#1a9e40">
+        <i class="bi bi-eyedropper-fill"></i> Saisir un traitement
+      </button>
+      <button class="m-bh-action m-bh-action--cal" id="trait-btn-voir">
+        <i class="bi bi-calendar3"></i> Voir les traitements
+      </button>
     </div>`
 }
 
-// ─── Capteurs avec événements ─────────────────────────────────────────────────
+// ─── Traitement saisie ────────────────────────────────────────────────────────
+
+const TRAIT_KEY = 'weenat-m-traitements'
+function _loadTraitements() { try { return JSON.parse(localStorage.getItem(TRAIT_KEY)) || [] } catch { return [] } }
+function _saveTraitements(list) { localStorage.setItem(TRAIT_KEY, JSON.stringify(list)) }
+
+function openTraitementSaisie(plots, showToastFn) {
+  let selectedIds = new Set()
+  const groups    = buildGroups(plots)
+  const today     = new Date().toISOString().split('T')[0]
+
+  function selHTML() { return buildSelectionHTML(groups, plots, selectedIds) }
+
+  function renderBar(layer) {
+    const n   = selectedIds.size
+    const sum = layer.querySelector('.irr-summary')
+    const btn = layer.querySelector('.irr-save-btn')
+    if (!sum || !btn) return
+    sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''}`
+    btn.disabled = n === 0
+  }
+
+  function bindSel(layer) {
+    layer.querySelectorAll('.irr-group-card').forEach(el => {
+      el.addEventListener('click', () => {
+        const ids = el.dataset.gids.split(',').map(Number)
+        const all = ids.every(id => selectedIds.has(id))
+        ids.forEach(id => all ? selectedIds.delete(id) : selectedIds.add(id))
+        layer.querySelector('#trait-sel-list').innerHTML = selHTML()
+        bindSel(layer); renderBar(layer)
+      })
+    })
+    layer.querySelectorAll('.irr-plot-row').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = +el.dataset.pid
+        selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id)
+        layer.querySelector('#trait-sel-list').innerHTML = selHTML()
+        bindSel(layer); renderBar(layer)
+      })
+    })
+  }
+
+  const layer = flexLayer(pushDetail(`
+    <div class="irr-detail-header" style="--irr-accent:#30d158">
+      <div class="irr-header-row">
+        <button class="irr-back" id="trait-back"><i class="bi bi-chevron-left"></i> Annuler</button>
+        <span class="irr-header-title">Saisir un traitement</span>
+        <div style="width:60px"></div>
+      </div>
+      <div class="irr-fixed-inputs">
+        <div class="irr-fields-row" style="margin-bottom:0">
+          <div class="irr-field-card">
+            <div class="irr-field-lbl">Date</div>
+            <input type="date" class="irr-date-input" id="trait-date" value="${today}">
+          </div>
+          <div class="irr-field-card">
+            <div class="irr-field-lbl">Produit</div>
+            <input type="text" class="irr-qty-input" id="trait-produit" placeholder="Ex : Prosaro" style="font-size:13px">
+          </div>
+        </div>
+        <div class="irr-fields-row" style="margin-top:6px;margin-bottom:0">
+          <div class="irr-field-card">
+            <div class="irr-field-lbl">Dose</div>
+            <input type="text" class="irr-qty-input" id="trait-dose" placeholder="Ex : 1 L/ha" style="font-size:13px">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="irr-scroll-body">
+      <div id="trait-sel-list">${selHTML()}</div>
+    </div>
+    <div class="irr-bottom-bar" style="border-top-color:rgba(48,209,88,.2)">
+      <div class="irr-summary"></div>
+      <button class="irr-save-btn" disabled style="background:#1a9e40;border-color:#1a9e40">Enregistrer</button>
+    </div>
+  `))
+
+  bindSel(layer); renderBar(layer)
+  layer.querySelector('#trait-back').addEventListener('click', popDetail)
+  layer.querySelector('.irr-save-btn').addEventListener('click', () => {
+    const date    = layer.querySelector('#trait-date').value || today
+    const produit = layer.querySelector('#trait-produit').value.trim() || '—'
+    const dose    = layer.querySelector('#trait-dose').value.trim() || '—'
+    const list    = _loadTraitements()
+    list.unshift({ id: Date.now(), date, produit, dose, plotIds: [...selectedIds] })
+    _saveTraitements(list)
+    popDetail()
+    showToastFn('Traitement enregistré')
+  })
+}
+
+function openTraitementsCalendar(plots, role, showToastFn) {
+  const orgId = role === 'adherent' ? ORG_ID.adherent : null
+  const filterablePlots = orgId !== null ? allPlots.filter(p => p.orgId === orgId) : allPlots
+  let filterPlotId = null   // null = toutes
+
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Tableau de bord</span></button>
+        <span style="font-size:17px;font-weight:600;flex:1;text-align:center;padding-right:44px">Traitements</span>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div class="m-detail-content" style="top:52px;overflow-y:auto">
+      <div style="padding:10px 16px 4px">
+        <select id="trait-filter" style="width:100%;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:8px;font-family:inherit;background:#fafafa">
+          <option value="">Toutes les parcelles</option>
+          ${filterablePlots.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </div>
+      <div id="trait-cal-content" style="padding:6px 16px 16px"></div>
+    </div>`)
+
+  layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+
+  const fmtDate = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}` }
+
+  function renderList() {
+    const el   = layer.querySelector('#trait-cal-content')
+    let list = _loadTraitements()
+    if (filterPlotId !== null) list = list.filter(t => (t.plotIds || []).includes(filterPlotId))
+    if (!list.length) {
+      el.innerHTML = `<div style="padding:32px 0;text-align:center;color:#8e8e93;font-size:14px">Aucun traitement enregistré</div>`
+      return
+    }
+    el.innerHTML = list.map(t => {
+      const pNames = (t.plotIds || []).map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
+      return `
+        <div class="m-trait-cal-card" data-id="${t.id}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:12px;padding:12px 14px;margin-bottom:10px;cursor:pointer;position:relative">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:12px;color:#8e8e93">${fmtDate(t.date)}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;font-weight:600;color:#1a9e40;background:#edf7f0;padding:2px 8px;border-radius:20px">${pNames.length} parcelle${pNames.length > 1 ? 's' : ''}</span>
+              <i class="bi bi-chevron-right" style="font-size:12px;color:#c7c7cc"></i>
+            </div>
+          </div>
+          <div style="font-size:14px;font-weight:600;color:#1c1c1e;margin-bottom:3px">${t.produit}</div>
+          <div style="font-size:12px;color:#636366"><i class="bi bi-eyedropper" style="color:#1a9e40"></i> ${t.dose}</div>
+          ${pNames.length ? `<div style="font-size:11px;color:#8e8e93;margin-top:6px">${pNames.join(', ')}</div>` : ''}
+        </div>`
+    }).join('')
+
+    el.querySelectorAll('.m-trait-cal-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const tid = +card.dataset.id
+        const all = _loadTraitements()
+        const t   = all.find(x => x.id === tid); if (!t) return
+        const pNames = (t.plotIds || []).map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
+        const body = document.createElement('div')
+        body.innerHTML = `
+          <div style="padding:0 0 12px">
+            <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">${fmtDate(t.date)}</div>
+            <div style="font-size:15px;font-weight:600;color:#1c1c1e;margin-bottom:2px">${t.produit}</div>
+            <div style="font-size:13px;color:#636366;margin-bottom:6px"><i class="bi bi-eyedropper" style="color:#1a9e40"></i> ${t.dose}</div>
+            ${pNames.length ? `<div style="font-size:12px;color:#8e8e93">${pNames.join(', ')}</div>` : ''}
+          </div>
+          <div class="m-sheet-links">
+            <a class="m-sheet-link" id="tcal-edit">Modifier</a>
+            <a class="m-sheet-link m-sheet-link--danger" id="tcal-del">Supprimer</a>
+          </div>`
+        const sheet = showSheet({ title: 'Traitement', body, doneLabel: 'Fermer', onDone: () => {} })
+
+        body.querySelector('#tcal-del').addEventListener('click', () => {
+          const updated = _loadTraitements().filter(x => x.id !== tid)
+          _saveTraitements(updated)
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => { sheet.remove(); renderList() }, 280)
+          showToastFn('Traitement supprimé')
+        })
+
+        body.querySelector('#tcal-edit').addEventListener('click', () => {
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => sheet.remove(), 280)
+          openTraitementEdit(t, plots, showToastFn, renderList)
+        })
+      })
+    })
+  }
+
+  layer.querySelector('#trait-filter').addEventListener('change', e => {
+    filterPlotId = e.target.value ? +e.target.value : null
+    renderList()
+  })
+
+  renderList()
+}
+
+function openTraitementEdit(t, plots, showToastFn, onSaved) {
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div>
+        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Date</div>
+        <input type="date" id="tedit-date" value="${t.date}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+      </div>
+      <div>
+        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Produit</div>
+        <input type="text" id="tedit-produit" value="${t.produit}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+      </div>
+      <div>
+        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Dose</div>
+        <input type="text" id="tedit-dose" value="${t.dose}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+      </div>
+    </div>`
+  const sheet = showSheet({
+    title: 'Modifier le traitement', body,
+    doneLabel: 'Enregistrer',
+    onDone: () => {
+      const all = _loadTraitements()
+      const idx = all.findIndex(x => x.id === t.id)
+      if (idx !== -1) {
+        all[idx].date    = body.querySelector('#tedit-date').value    || t.date
+        all[idx].produit = body.querySelector('#tedit-produit').value.trim() || t.produit
+        all[idx].dose    = body.querySelector('#tedit-dose').value.trim()    || t.dose
+        _saveTraitements(all)
+      }
+      showToastFn('Traitement modifié')
+      onSaved()
+    }
+  })
+}
+
+// ─── Anomalies capteur ─────────────────────────────────────────────────
 
 const SENSOR_EVENT_CFG = {
   'capteur couché':         { icon: 'bi-arrow-down-circle-fill', color: '#ff9f0a' },
@@ -650,7 +940,7 @@ function buildEvenements(plots, sensors) {
   const withEvents = sensors.filter(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
   if (!withEvents.length) return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucun événement en cours</p></div>`
   return `<div class="m-w-list">${withEvents.map(s => {
-    const parcel  = plots.find(p => p.id === s.parcelId)
+    const parcel  = plots.find(p => s.parcelIds.includes(p.id))
     const evList  = Array.isArray(s.event) ? s.event : [s.event]
     const badges  = evList.map(ev => {
       const cfg = SENSOR_EVENT_CFG[ev] || { icon: 'bi-exclamation-circle-fill', color: '#ff9f0a' }
@@ -726,8 +1016,89 @@ function buildCultures(plots) {
       <div class="m-crop-plots">${plotRows}</div>
     </details>`
   }).join('')
-  return `<div class="m-widget-hint">Appuyez sur une parcelle pour renseigner ou mettre à jour les stades phénologiques</div>
+  return `<div class="m-widget-hint">Sélectionnez une culture, puis sur une parcelle pour renseigner ou mettre à jour les stades phénologiques.</div>
     ${groups}`
+}
+
+// ─── Widget Notes ─────────────────────────────────────────────────────────────
+const NOTES_KEY = 'weenat-m-notes'
+function _loadNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY)) || [] } catch { return [] } }
+function _saveNotes(list) { localStorage.setItem(NOTES_KEY, JSON.stringify(list)) }
+
+function buildNotes(role) {
+  const notes = _loadNotes()
+  const fmtDate = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+  const ellipsis = t => t.length > 70 ? t.slice(0, 70) + '…' : t
+
+  const noteCard = (n, i) => {
+    const truncated  = n.text.length > 70
+    const photoCount = (n.imageIds || []).length
+    const photosBadge = photoCount > 0
+      ? `<span style="font-size:11px;color:#636366"><i class="bi bi-image"></i> ${photoCount} photo${photoCount > 1 ? 's' : ''}</span>`
+      : ''
+    const linkChip = n.linkedType
+      ? `<span style="font-size:10px;background:${n.linkedType === 'parcel' ? '#eef4ff' : '#f0faf0'};color:${n.linkedType === 'parcel' ? '#3a7bd5' : '#2a7a3a'};border-radius:4px;padding:1px 6px;display:inline-flex;align-items:center;gap:3px"><i class="bi bi-${n.linkedType === 'parcel' ? 'geo-alt' : 'broadcast'}"></i>${n.linkedName || ''}</span>`
+      : ''
+    return `
+      <div class="m-note-card" data-idx="${i}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative;cursor:${truncated || photoCount > 0 || n.linkedType ? 'pointer' : 'default'}">
+        <button class="m-note-del" data-idx="${i}" style="position:absolute;top:8px;right:8px;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:22px;height:22px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#636366">×</button>
+        <div style="font-size:11px;color:#8e8e93;margin-bottom:3px;display:flex;gap:8px;align-items:center">
+          <span>${fmtDate(n.date)}${n.time ? ' · ' + n.time : ''}</span>
+          ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}
+        </div>
+        <div style="font-size:13px;color:#1c1c1e;white-space:pre-wrap;word-break:break-word">${ellipsis(n.text)}</div>
+        ${linkChip || photosBadge ? `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${linkChip}${photosBadge}</div>` : ''}
+      </div>`
+  }
+
+  const recent5 = notes.slice(0, 5)
+  const listHtml = recent5.length
+    ? recent5.map((n, i) => noteCard(n, i)).join('')
+    : ''
+
+  const now = new Date()
+  const today = now.toISOString().slice(0, 10)
+  const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+  const currentOrg = allOrgs.find(o => o.id === (role === 'admin' ? 100 : 1))
+  const auteur = currentOrg ? `${currentOrg.prenomProprietaire} ${currentOrg.nomProprietaire}` : ''
+
+  const orgId = currentOrg?.id
+  const visiblePlots   = role === 'adherent' ? allPlots.filter(p => p.orgId === orgId) : allPlots
+  const visibleSensors = role === 'adherent'
+    ? allSensors.filter(s => s.parcelIds.some(id => visiblePlots.some(p => p.id === id)))
+    : allSensors
+
+  const plotOpts = visiblePlots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
+  const sensorOpts = visibleSensors.map(s => {
+    const ville = s.parcelIds.map(id => allPlots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville || ''
+    return `<option value="s-${s.id}">${s.serial}${ville ? ' — ' + ville : ''}</option>`
+  }).join('')
+
+  const inputStyle = 'width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit;background:#fafafa'
+
+  return `
+    ${listHtml ? `<div id="notes-list" style="margin-bottom:12px">${listHtml}</div>` : ''}
+    <div style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Ajouter une note</div>
+    <select id="notes-link" style="${inputStyle};margin-bottom:6px;color:#1c1c1e">
+      <option value="">— Sans lien —</option>
+      <optgroup label="Parcelles">${plotOpts}</optgroup>
+      <optgroup label="Capteurs">${sensorOpts}</optgroup>
+    </select>
+    <textarea id="notes-input" placeholder="Votre note…" rows="2"
+      style="${inputStyle};resize:none;margin-bottom:6px"></textarea>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="date" id="notes-date" value="${today}" style="${inputStyle}">
+      <input type="time" id="notes-time" value="${currentTime}" style="${inputStyle}">
+    </div>
+    <div class="jrn-img-zone" style="margin-bottom:8px">
+      <div class="jrn-img-previews" id="notes-previews"></div>
+      <button type="button" class="jrn-img-add-btn" id="notes-img-btn"><i class="bi bi-camera"></i> Ajouter une photo</button>
+      <input type="file" id="notes-img-input" accept="image/*" multiple style="display:none">
+      <div class="jrn-img-error" id="notes-img-error"></div>
+    </div>
+    <input type="hidden" id="notes-auteur" value="${auteur}">
+    <button id="notes-add" style="width:100%;background:#0172A4;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:6px">Ajouter la note</button>
+    <button id="notes-view" style="width:100%;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer">Voir les notes${notes.length ? ` (${notes.length})` : ''}</button>`
 }
 
 function buildMonReseau(role) {
@@ -737,9 +1108,9 @@ function buildMonReseau(role) {
   return `
     <div class="m-reseau-name">${network.nom}</div>
     <div class="m-reseau-stats">
-      <div class="m-reseau-stat"><strong>${nbAdherents}</strong><span>Adhérents</span></div>
-      <div class="m-reseau-stat"><strong>${nbParcelles}</strong><span>Parcelles</span></div>
       <div class="m-reseau-stat"><strong>${nbCapteurs}</strong><span>Capteurs</span></div>
+      <div class="m-reseau-stat"><strong>${nbParcelles}</strong><span>Parcelles</span></div>
+      <div class="m-reseau-stat"><strong>${nbAdherents}</strong><span>Adhérents</span></div>
     </div>
     <div class="m-reseau-contacts">
       <div class="m-reseau-row"><i class="bi bi-envelope"></i><span>${network.email}</span></div>
@@ -755,12 +1126,13 @@ function buildSupport() {
     <button class="m-support-chat-btn" id="open-chat-btn" type="button">
       <div class="m-support-chat-avatar"><i class="bi bi-robot"></i></div>
       <div class="m-support-chat-info">
-        <span>Assistant Weenat</span>
+        <span>Assistant virtuel Weenat</span>
         <em>Réponse immédiate</em>
       </div>
       <i class="bi bi-chevron-right" style="color:#c7c7cc"></i>
     </button>
     <div class="m-support-list">
+      <div class="m-support-list-label">Infos équipe support</div>
       <a class="m-support-row" href="mailto:support@weenat.com">
         <div class="m-support-ico"><i class="bi bi-envelope-fill"></i></div>
         <div class="m-support-info"><span>Email</span><strong>support@weenat.com</strong></div>
@@ -884,7 +1256,7 @@ export function initDashboardScreen(screenEl, role) {
   const orgId = ORG_ID[role] || 1
   const exploitPlots = orgId === 100 ? allPlots : allPlots.filter(p => p.orgId === orgId)
   const plotIds = new Set(exploitPlots.map(p => p.id))
-  const exploitSensors = allSensors.filter(s => plotIds.has(s.parcelId))
+  const exploitSensors = allSensors.filter(s => s.parcelIds.some(id => plotIds.has(id)))
   let forecast = makeForecast()
   let bhSelectedOrgId = null
 
@@ -897,7 +1269,7 @@ export function initDashboardScreen(screenEl, role) {
   function orgSelectorHTML() {
     if (role !== 'admin') return ''
     const adherentOrgs = allOrgs.filter(o => o.id !== 100).sort((a, b) => a.name.localeCompare(b.name))
-    return `<select id="bh-org-select" style="width:100%;padding:8px 10px;border:none;border-bottom:.5px solid rgba(0,0,0,.1);background:#f9f9fb;font-size:14px;font-family:inherit;color:#1c1c1e;outline:none">
+    return `<select id="bh-org-select" style="width:100%;padding:8px 10px;border:none;border-bottom:.5px solid rgba(0,0,0,.1);background:#f9f9fb;font-size:14px;font-family:inherit;color:#1c1c1e;outline:none;margin-bottom:10px">
       <option value="all">Toutes les organisations</option>
       <option value="100">Breiz'Agri Conseil</option>
       ${adherentOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('')}
@@ -944,12 +1316,13 @@ export function initDashboardScreen(screenEl, role) {
       ${[...custom, ...fixed].map(w => {
         let body = ''
         if (w.id === 'bilan_hydrique') body = orgSelectorHTML() + buildBilanHydrique(getBhPlots())
-        else if (w.id === 'previsions')  body = buildPrevisions(exploitPlots, exploitSensors, forecast)
+        else if (w.id === 'previsions')  body = buildPrevisions(exploitPlots, exploitSensors, forecast, role)
         else if (w.id === 'cumuls')      body = buildCumuls(exploitPlots, exploitSensors)
         else if (w.id === 'temps_reel')  body = buildMesures(exploitPlots, exploitSensors)
         else if (w.id === 'traitements') body = buildTraitements(exploitPlots)
         else if (w.id === 'evenements')  body = buildEvenements(exploitPlots, exploitSensors)
         else if (w.id === 'cultures')    body = buildCultures(exploitPlots)
+        else if (w.id === 'notes')       body = buildNotes(role)
         else if (w.id === 'mon_reseau')  body = buildMonReseau(role)
         else if (w.id === 'support')     body = buildSupport()
         return widgetCard(w, body)
@@ -998,7 +1371,7 @@ export function initDashboardScreen(screenEl, role) {
               <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;${i < d.hours.length-1 ? 'border-bottom:.5px solid rgba(0,0,0,.06)' : ''}">
                 <span style="font-size:12px;color:#8e8e93;width:28px;flex-shrink:0">${h.label}</span>
                 <i class="bi ${h.icon}" style="color:#8e8e93;font-size:14px;width:18px;text-align:center;flex-shrink:0"></i>
-                <span style="font-size:12px;color:#45b7d1;width:44px;flex-shrink:0">${h.pluie > 0 ? `${h.pluie}mm` : ''}</span>
+                <span style="font-size:12px;color:#2E75B6;width:44px;flex-shrink:0">${h.pluie > 0 ? `${h.pluie}mm` : ''}</span>
                 <span style="font-size:14px;font-weight:600;width:40px;flex-shrink:0">${h.temp}°C</span>
                 <span style="font-size:12px;color:#8e8e93">${h.hum}%</span>
                 <span style="font-size:12px;color:#8e8e93;margin-left:auto">${h.vent} km/h</span>
@@ -1040,8 +1413,17 @@ export function initDashboardScreen(screenEl, role) {
       })
     })
 
-    content.querySelector('[data-action="weephyt"]')?.addEventListener('click', () => {
-      showToast('Page Weephyt — à venir')
+    content.querySelector('#trait-btn-saisir')?.addEventListener('click', () => {
+      openTraitementSaisie(exploitPlots, showToast)
+    })
+    content.querySelector('#trait-btn-voir')?.addEventListener('click', () => {
+      openTraitementsCalendar(exploitPlots, role, showToast)
+    })
+    content.querySelectorAll('.m-trait-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const plot = allPlots.find(p => p.id === +card.dataset.plotId)
+        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Tableau de bord'))
+      })
     })
 
     content.querySelectorAll('[data-sensor-id]').forEach(row => {
@@ -1053,7 +1435,7 @@ export function initDashboardScreen(screenEl, role) {
     content.querySelectorAll('[data-widget="cultures"] [data-plot-id]').forEach(row => {
       row.addEventListener('click', () => {
         const plot = allPlots.find(p => p.id === +row.dataset.plotId)
-        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'params'))
+        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'params', 'Tableau de bord'))
       })
     })
 
@@ -1062,7 +1444,7 @@ export function initDashboardScreen(screenEl, role) {
       content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
         btn.addEventListener('click', () => {
           const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
-          if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, []))
+          if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Tableau de bord'))
         })
       })
     }
@@ -1197,10 +1579,275 @@ export function initDashboardScreen(screenEl, role) {
           persist(); rebuildCumulsWidget()
         })
       })
+      content.querySelectorAll('.m-cumuls-edit').forEach(btn => {
+        btn.addEventListener('click', () => openCumulEditSheet(+btn.dataset.cidx))
+      })
+
+      function buildThresholdHtml(metricId, thresholds = {}) {
+        if (metricId === 'hf') return `
+          <div class="m-wf-field">
+            <span class="m-wf-label">Seuil de froid (°C)</span>
+            <input type="number" class="m-wf-date" id="cedit-th-cold" value="${thresholds.cold ?? 7.2}" step="0.1" min="-20" max="20">
+          </div>`
+        if (metricId === 'dj') return `
+          <div class="m-wf-row">
+            <div class="m-wf-field"><span class="m-wf-label">Seuil bas (°C)</span><input type="number" class="m-wf-date" id="cedit-th-low" value="${thresholds.low ?? 0}" step="1" min="-20" max="50"></div>
+            <div class="m-wf-field"><span class="m-wf-label">Seuil haut (°C)</span><input type="number" class="m-wf-date" id="cedit-th-high" value="${thresholds.high ?? 18}" step="1" min="0" max="50"></div>
+          </div>`
+        return ''
+      }
+
+      function openCumulEditSheet(idx) {
+        const c = cumulsList[idx]
+        if (!c) return
+        const qualSensors = exploitSensors.filter(s => s.parcelIds.length > 0 && CUMUL_QUALIFYING_MODELS.has(s.model))
+        const qualPlotIds = new Set(qualSensors.flatMap(s => s.parcelIds))
+        const qualPlots   = exploitPlots.filter(p => qualPlotIds.has(p.id))
+        const plotOpts    = qualPlots.map(p => `<option value="p-${p.id}"${c.subjectKey===`p-${p.id}`?' selected':''}>${p.name}</option>`).join('')
+        const sensorOpts  = qualSensors.map(s => {
+          const p = exploitPlots.find(x => s.parcelIds.includes(x.id))
+          return `<option value="s-${s.id}"${c.subjectKey===`s-${s.id}`?' selected':''}>${s.model} — ${s.serial}${p?` · ${p.name}`:''}</option>`
+        }).join('')
+        const avail      = getAvailableMetrics(c.subjectKey)
+        const metricOpts = avail.map(m => `<option value="${m.id}"${c.metricId===m.id?' selected':''}>${m.label}</option>`).join('')
+
+        const el = document.createElement('div')
+        el.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:4px 0'
+        el.innerHTML = `
+          <select class="m-wf-sel" id="cedit-subject">
+            <option value="">— Parcelle ou capteur —</option>
+            <optgroup label="Parcelles">${plotOpts}</optgroup>
+            ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}
+          </select>
+          <select class="m-wf-sel" id="cedit-metric">
+            <option value="">— Métrique —</option>${metricOpts}
+          </select>
+          <div id="cedit-thresholds">${buildThresholdHtml(c.metricId, c.thresholds)}</div>
+          <div class="m-wf-field">
+            <span class="m-wf-label">Depuis le</span>
+            <input type="date" class="m-wf-date" id="cedit-from" value="${c.fromDate}">
+          </div>`
+
+        el.querySelector('#cedit-subject').addEventListener('change', () => {
+          const subj = el.querySelector('#cedit-subject').value
+          const metSel = el.querySelector('#cedit-metric')
+          const avail2 = getAvailableMetrics(subj)
+          metSel.innerHTML = `<option value="">— Métrique —</option>` + avail2.map(m => `<option value="${m.id}">${m.label}</option>`).join('')
+          el.querySelector('#cedit-thresholds').innerHTML = ''
+        })
+        el.querySelector('#cedit-metric').addEventListener('change', () => {
+          el.querySelector('#cedit-thresholds').innerHTML = buildThresholdHtml(el.querySelector('#cedit-metric').value)
+        })
+
+        showSheet({
+          title: 'Modifier le cumul',
+          body: el,
+          doneLabel: 'Enregistrer',
+          onDone: () => {
+            const subj   = el.querySelector('#cedit-subject').value || c.subjectKey
+            const metric = el.querySelector('#cedit-metric').value  || c.metricId
+            const from   = el.querySelector('#cedit-from').value    || c.fromDate
+            if (!subj || !metric || !from) return
+            const tooOld = (Date.now() - new Date(from)) / 86400000 > 365
+            if (tooOld) { showToast('Date trop ancienne (max 365 jours)'); return }
+            const m   = CUMULS_METRICS.find(x => x.id === metric)
+            const cfg = CUMUL_ICONS[metric] || { icon: 'bi-bar-chart-fill', color: '#636366' }
+            const subjSel = el.querySelector('#cedit-subject')
+            const thresholds = metric === 'hf'
+              ? { cold: +(el.querySelector('#cedit-th-cold')?.value ?? 7.2) }
+              : metric === 'dj'
+              ? { low: +(el.querySelector('#cedit-th-low')?.value ?? 0), high: +(el.querySelector('#cedit-th-high')?.value ?? 18) }
+              : null
+            cumulsList[idx] = {
+              ...c,
+              metricId: metric, metricLabel: m?.label || metric, unit: m?.unit || '',
+              icon: cfg.icon, color: cfg.color,
+              subjectKey: subj, subjectLabel: (subjSel.options[subjSel.selectedIndex]?.text || subj).trim(),
+              fromDate: from,
+              value: String(computeCumul(subj, from, metric) ?? '—'),
+              thresholds,
+            }
+            persist(); rebuildCumulsWidget()
+          }
+        })
+      }
     }
     bindCumulsEvents()
 
     content.querySelector('#open-chat-btn')?.addEventListener('click', showChatSheet)
+
+    // ── Notes ─────────────────────────────────────────────────────────────────
+    function rebuildNotesWidget() {
+      const bd = content.querySelector('[data-widget="notes"] .m-widget-bd')
+      if (bd) { bd.innerHTML = buildNotes(role); bindNotesEvents() }
+    }
+    let _notesPending = []
+    function bindNotesEvents() {
+      _notesPending = []
+      const inputEl    = content.querySelector('#notes-img-input')
+      const addBtnEl   = content.querySelector('#notes-img-btn')
+      const previewsEl = content.querySelector('#notes-previews')
+      const errEl      = content.querySelector('#notes-img-error')
+      if (inputEl && addBtnEl && previewsEl && window.setupImgUpload) {
+        window.setupImgUpload(inputEl, addBtnEl, previewsEl, errEl, _notesPending)
+      }
+
+      content.querySelector('#notes-add')?.addEventListener('click', async () => {
+        const text   = content.querySelector('#notes-input')?.value.trim()
+        const date   = content.querySelector('#notes-date')?.value || new Date().toISOString().slice(0, 10)
+        const time   = content.querySelector('#notes-time')?.value || ''
+        const auteur = content.querySelector('#notes-auteur')?.value || ''
+        if (!text) return
+        const linkVal = content.querySelector('#notes-link')?.value || ''
+        let linkedType = null, linkedId = null, linkedName = ''
+        if (linkVal.startsWith('p-')) {
+          linkedType = 'parcel'; linkedId = +linkVal.slice(2)
+          linkedName = allPlots.find(p => p.id === linkedId)?.name || ''
+        } else if (linkVal.startsWith('s-')) {
+          linkedType = 'sensor'; linkedId = +linkVal.slice(2)
+          const s = allSensors.find(x => x.id === linkedId)
+          linkedName = s ? s.serial : ''
+        }
+        const imageIds = []
+        if (_notesPending.length && window.ImageStore) {
+          for (const dataURL of _notesPending) {
+            const id = `note-img-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            await window.ImageStore.store(id, dataURL)
+            imageIds.push(id)
+          }
+        }
+        const notes = _loadNotes()
+        notes.unshift({ date, time, text, auteur, imageIds, linkedType, linkedId, linkedName })
+        _saveNotes(notes)
+        content.querySelector('#notes-input').value = ''
+        rebuildNotesWidget()
+      })
+
+      content.querySelector('#notes-view')?.addEventListener('click', () => {
+        const fmtDate = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+        const ellipsis = t => t.length > 70 ? t.slice(0, 70) + '…' : t
+        const body = document.createElement('div')
+
+        function renderNotesList() {
+          const notes = _loadNotes()
+          if (!notes.length) {
+            body.innerHTML = `<div style="padding:24px;text-align:center;color:#8e8e93;font-size:14px">Aucune note</div>`
+            return
+          }
+          body.innerHTML = notes.map((n, i) => {
+            const photoCount = (n.imageIds || []).length
+            const linkChip = n.linkedType
+              ? `<span style="font-size:10px;background:${n.linkedType === 'parcel' ? '#eef4ff' : '#f0faf0'};color:${n.linkedType === 'parcel' ? '#3a7bd5' : '#2a7a3a'};border-radius:4px;padding:1px 6px;display:inline-flex;align-items:center;gap:3px"><i class="bi bi-${n.linkedType === 'parcel' ? 'geo-alt' : 'broadcast'}"></i>${n.linkedName || ''}</span>`
+              : ''
+            return `
+              <div class="m-note-card" data-idx="${i}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative;cursor:pointer">
+                <button class="m-note-del" data-idx="${i}" style="position:absolute;top:8px;right:8px;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#636366">×</button>
+                <div style="font-size:11px;color:#8e8e93;margin-bottom:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <span>${fmtDate(n.date)}${n.time ? ' · ' + n.time : ''}</span>
+                  ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}
+                </div>
+                <div style="font-size:13px;color:#1c1c1e;white-space:pre-wrap;word-break:break-word">${ellipsis(n.text)}</div>
+                ${linkChip || photoCount > 0 ? `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${linkChip}${photoCount > 0 ? `<span style="font-size:11px;color:#636366"><i class="bi bi-image"></i> ${photoCount} photo${photoCount > 1 ? 's' : ''}</span>` : ''}</div>` : ''}
+              </div>`
+          }).join('')
+
+          body.querySelectorAll('.m-note-del').forEach(btn => {
+            btn.addEventListener('click', async e => {
+              e.stopPropagation()
+              const notes = _loadNotes()
+              const idx = +btn.dataset.idx
+              const removed = notes[idx]
+              if (removed?.imageIds?.length && window.ImageStore) await window.ImageStore.remove(removed.imageIds)
+              notes.splice(idx, 1)
+              _saveNotes(notes)
+              renderNotesList()
+              rebuildNotesWidget()
+            })
+          })
+          body.querySelectorAll('.m-note-card').forEach(card => {
+            card.addEventListener('click', async () => {
+              const notes = _loadNotes()
+              const n = notes[+card.dataset.idx]
+              if (!n) return
+              const detailLinkChip = n.linkedType
+                ? `<span style="font-size:11px;background:${n.linkedType === 'parcel' ? '#eef4ff' : '#f0faf0'};color:${n.linkedType === 'parcel' ? '#3a7bd5' : '#2a7a3a'};border-radius:4px;padding:2px 7px;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-${n.linkedType === 'parcel' ? 'geo-alt' : 'broadcast'}"></i>${n.linkedName || ''}</span>`
+                : ''
+              const el = document.createElement('div')
+              el.innerHTML = `
+                <div style="font-size:11px;color:#8e8e93;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <span>${fmtDate(n.date)}${n.time ? ' · ' + n.time : ''}</span>
+                  ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}
+                  ${detailLinkChip}
+                </div>
+                <div style="font-size:14px;color:#1c1c1e;white-space:pre-wrap;word-break:break-word;line-height:1.5">${n.text}</div>
+                ${(n.imageIds || []).length ? `<div style="margin-top:14px"><div class="jrn-img-previews" id="note-detail-photos"></div></div>` : ''}`
+              showSheet({ title: 'Note', body: el, doneLabel: 'Fermer', onDone: () => {} })
+              if ((n.imageIds || []).length && window.ImageStore) {
+                const photosEl = el.querySelector('#note-detail-photos')
+                for (const id of n.imageIds) {
+                  const dataURL = await window.ImageStore.get(id)
+                  if (!dataURL) continue
+                  const wrap = document.createElement('div'); wrap.className = 'jrn-img-thumb-wrap'
+                  const img = document.createElement('img'); img.className = 'jrn-img-thumb'; img.src = dataURL; img.alt = ''
+                  img.addEventListener('click', () => { if (window.openLightbox) window.openLightbox(dataURL) })
+                  wrap.appendChild(img); photosEl.appendChild(wrap)
+                }
+              }
+            })
+          })
+        }
+
+        renderNotesList()
+        showSheet({ title: 'Notes', body, doneLabel: 'Fermer', onDone: () => {} })
+      })
+
+      // Bind inline list (5 dernières)
+      const fmtDateInline = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+      content.querySelectorAll('#notes-list .m-note-del').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          e.stopPropagation()
+          const notes = _loadNotes()
+          const idx = +btn.dataset.idx
+          const removed = notes[idx]
+          if (removed?.imageIds?.length && window.ImageStore) await window.ImageStore.remove(removed.imageIds)
+          notes.splice(idx, 1)
+          _saveNotes(notes)
+          rebuildNotesWidget()
+        })
+      })
+      content.querySelectorAll('#notes-list .m-note-card').forEach(card => {
+        card.addEventListener('click', async () => {
+          const notes = _loadNotes()
+          const n = notes[+card.dataset.idx]
+          if (!n) return
+          const detailLinkChip = n.linkedType
+            ? `<span style="font-size:11px;background:${n.linkedType === 'parcel' ? '#eef4ff' : '#f0faf0'};color:${n.linkedType === 'parcel' ? '#3a7bd5' : '#2a7a3a'};border-radius:4px;padding:2px 7px;display:inline-flex;align-items:center;gap:4px"><i class="bi bi-${n.linkedType === 'parcel' ? 'geo-alt' : 'broadcast'}"></i>${n.linkedName || ''}</span>`
+            : ''
+          const el = document.createElement('div')
+          el.innerHTML = `
+            <div style="font-size:11px;color:#8e8e93;margin-bottom:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span>${fmtDateInline(n.date)}${n.time ? ' · ' + n.time : ''}</span>
+              ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}
+              ${detailLinkChip}
+            </div>
+            <div style="font-size:14px;color:#1c1c1e;white-space:pre-wrap;word-break:break-word;line-height:1.5">${n.text}</div>
+            ${(n.imageIds || []).length ? `<div style="margin-top:14px"><div class="jrn-img-previews" id="note-detail-photos"></div></div>` : ''}`
+          showSheet({ title: 'Note', body: el, doneLabel: 'Fermer', onDone: () => {} })
+          if ((n.imageIds || []).length && window.ImageStore) {
+            const photosEl = el.querySelector('#note-detail-photos')
+            for (const id of n.imageIds) {
+              const dataURL = await window.ImageStore.get(id)
+              if (!dataURL) continue
+              const wrap = document.createElement('div'); wrap.className = 'jrn-img-thumb-wrap'
+              const img = document.createElement('img'); img.className = 'jrn-img-thumb'; img.src = dataURL; img.alt = ''
+              img.addEventListener('click', () => { if (window.openLightbox) window.openLightbox(dataURL) })
+              wrap.appendChild(img); photosEl.appendChild(wrap)
+            }
+          }
+        })
+      })
+    }
+    bindNotesEvents()
 
     // ── Mesures ───────────────────────────────────────────────────────────────
     function bindChartTooltips() {
@@ -1274,7 +1921,7 @@ export function initDashboardScreen(screenEl, role) {
           periodLabel:  (periodSel.options[periodSel.selectedIndex]?.text || period).trim(),
           step,
           stepLabel:    (stepSel.options[stepSel.selectedIndex]?.text || step).trim(),
-          color:        WF_COLORS[mesuresList.length % WF_COLORS.length],
+          color:        TR_COLORS[metric] || WF_COLORS[mesuresList.length % WF_COLORS.length],
         })
         persist(); rebuildMesuresWidget()
       })
@@ -1303,16 +1950,23 @@ export function initDashboardScreen(screenEl, role) {
         e.stopPropagation()
         const w = CATALOG.find(x => x.id === btn.dataset.widget); if (!w) return
         const body = document.createElement('div')
+        const isBH = w.id === 'bilan_hydrique'
+        const sensorlessOn = _loadDash().sensorlessEnabled ?? true
         body.innerHTML = `
           <div class="m-sheet-links">
-            <a class="m-sheet-link" id="menu-config">Configurer</a>
+            ${isBH ? `<a class="m-sheet-link" id="menu-sensorless">${sensorlessOn ? 'Désactiver' : 'Activer'} réservoir sensorless</a>` : ''}
             <a class="m-sheet-link" id="menu-move">Déplacer</a>
             <a class="m-sheet-link m-sheet-link--danger" id="menu-remove">Retirer</a>
           </div>`
         const sheet = showSheet({ title: w.title, body, doneLabel: 'Fermer', onDone: () => {} })
-        body.querySelector('#menu-config').addEventListener('click', () => {
+        body.querySelector('#menu-sensorless')?.addEventListener('click', () => {
+          _saveDash({ sensorlessEnabled: !sensorlessOn })
           sheet.classList.remove('m-sheet-overlay--show')
-          setTimeout(() => { sheet.remove(); showToast('Configuration à venir') }, 280)
+          setTimeout(() => {
+            sheet.remove()
+            const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
+            if (bd) { bd.innerHTML = orgSelectorHTML() + buildBilanHydrique(getBhPlots()); bindBhPlotLinks(); bindBhButtons(); bindBhExpand(); if (role === 'admin') bindBhOrgSelect() }
+          }, 280)
         })
         body.querySelector('#menu-move').addEventListener('click', () => {
           sheet.classList.remove('m-sheet-overlay--show')
@@ -1376,10 +2030,10 @@ export function initDashboardScreen(screenEl, role) {
           <div class="m-add-section-label">Mon exploitation</div>
           <div class="m-add-list">
             ${[
-              { action:'parcelle',            icon:'bi-geo-alt-fill',    label:'Parcelle' },
+              { action:'parcelle',            icon:'bi-geo-alt',         label:'Parcelle' },
               { action:'capteur',             icon:'bi-broadcast',       label:'Capteur' },
-              { action:'station',             icon:'bi-cloud-sun-fill',  label:'Station météo virtuelle' },
-              { action:'membre',              icon:'bi-person-plus-fill',label:'Membre' },
+              { action:'station',             icon:'bi-cloud-sun',       label:'Station météo virtuelle' },
+              { action:'membre',              icon:'bi-person-plus',     label:'Membre' },
               { action:'irrigation',          icon:'bi-droplet',         label:'Irrigation' },
               { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
               { action:'note',                icon:'bi-pencil-square',   label:'Note' },
@@ -1401,7 +2055,7 @@ export function initDashboardScreen(screenEl, role) {
           <div class="m-add-section-label" style="margin-top:16px">Mon compte</div>
           <div class="m-add-list">
             <button class="m-add-item" data-action="alerte">
-              <i class="bi bi-bell-fill"></i>
+              <i class="bi bi-bell"></i>
               <span>Alerte</span>
             </button>
           </div>
@@ -1450,5 +2104,17 @@ export function initDashboardScreen(screenEl, role) {
     showSheet({ title: 'Widgets disponibles', body, doneLabel: 'Fermer', onDone: () => {} })
   }
 
+  window.addEventListener('storage', e => {
+    if (e.key !== 'weenat_proto_store') return
+    applyStoredPlotPatches(allPlots)
+    const bd = content.querySelector('[data-widget="bilan_hydrique"] .m-widget-bd')
+    if (bd) {
+      bd.innerHTML = orgSelectorHTML() + buildBilanHydrique(getBhPlots())
+      bindBhPlotLinks(); bindBhButtons(); bindBhExpand()
+      if (role === 'admin') bindBhOrgSelect()
+    }
+  })
+
+  window.showMobileAddPage = showAddPage
   render()
 }

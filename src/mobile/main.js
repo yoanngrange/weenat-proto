@@ -147,19 +147,10 @@ const PARAM_TABS = [
 const paramControllers = {}
 
 function updateParamPlusBtn(activeTabId) {
-  const btn     = document.getElementById('param-plus-btn')
-  const spacer  = document.getElementById('param-plus-spacer')
-  const ctrl    = paramControllers[activeTabId]
-  if (btn && spacer) {
-    if (ctrl?.onAdd) {
-      btn.style.display = ''
-      spacer.style.display = 'none'
-      btn.onclick = ctrl.onAdd
-    } else {
-      btn.style.display = 'none'
-      spacer.style.display = ''
-    }
-  }
+  const btn  = document.getElementById('param-plus-btn')
+  if (!btn) return
+  const ctrl = paramControllers[activeTabId]
+  btn.onclick = ctrl?.onAdd ?? (() => window.showMobileAddPage?.())
 }
 
 function initParamSegment() {
@@ -217,10 +208,10 @@ function openMobileAddModal() {
       <div style="background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden">
         <div style="padding:10px 14px 4px;font-size:12px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em">Mon exploitation</div>
         ${[
-          { action:'parcelle',            icon:'bi-geo-alt-fill',    label:'Parcelle' },
+          { action:'parcelle',            icon:'bi-geo-alt',         label:'Parcelle' },
           { action:'capteur',             icon:'bi-broadcast',       label:'Capteur' },
-          { action:'station',             icon:'bi-cloud-sun-fill',  label:'Station météo virtuelle' },
-          { action:'membre',              icon:'bi-person-plus-fill',label:'Membre' },
+          { action:'station',             icon:'bi-cloud-sun',       label:'Station météo virtuelle' },
+          { action:'membre',              icon:'bi-person-plus',     label:'Membre' },
           { action:'irrigation',          icon:'bi-droplet',         label:'Irrigation' },
           { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
           { action:'note',                icon:'bi-pencil-square',   label:'Note' },
@@ -253,10 +244,14 @@ function openMobileAddModal() {
   phone.appendChild(modal)
 }
 
-// Wire + buttons for screens without their own handler (dashboard and alertes have their own)
-;['screen-parcelles', 'screen-capteurs'].forEach(id => {
-  document.querySelector(`#${id} .m-navbar-action`)?.addEventListener('click', openMobileAddModal)
+window.openMobileAddModal = openMobileAddModal
+
+// Wire + buttons — same modal on all main screens
+;['screen-parcelles', 'screen-capteurs', 'screen-alertes'].forEach(id => {
+  document.querySelector(`#${id} .m-navbar-action`)?.addEventListener('click', () => window.showMobileAddPage?.())
 })
+// Paramètres: wire initial state on the first (active) tab
+updateParamPlusBtn('param-compte')
 
 // ─── Export for screens ───────────────────────────────────────────────────────
 export { plots, sensors, orgs, navigateTo, activeTab }

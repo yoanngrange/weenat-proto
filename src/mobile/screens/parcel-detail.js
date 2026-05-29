@@ -7,23 +7,88 @@ import { plots as allPlots }    from '../../data/plots.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
 
+// Widget catalog — each item maps to a shared widget ID (same as web parcel page)
 const WIDGET_CATALOG = [
-  { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
-  { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
-  { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
-  { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
-  { title: 'Capteurs', items: ['Anémomètre',"Capteur d'humectation foliaire",'Capteur PAR','Pyranomètre','Station météo','Station Météo Virtuelle','Thermomètre de sol','Thermomètre-Hygromètre'] },
-  { title: 'Irrigation', items: ['Bilan hydrique','Irrigations','Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
+  { title: 'Cumuls',                    items: [{ label: 'Cumuls',                 id: 'cumuls'        }] },
+  { title: 'Prévisions',                items: [{ label: 'Prévisions à 5 jours',   id: 'previsions-5j' },
+                                                  { label: 'Prévisions à 6 heures', id: 'previsions-6h' }] },
+  { title: 'Outils aide à la décision', items: [{ label: "Maï'zy",                id: 'maizy'         },
+                                                  { label: 'Weephyt',              id: 'weephyt'       },
+                                                  { label: 'Decitrait',            id: 'decitrait'     },
+                                                  { label: 'Tavelure Pomme',       id: 'tavelure'      }] },
+  { title: 'Indicateurs',               items: [{ label: 'DPV',                    id: 'dpv'           },
+                                                  { label: 'THI',                  id: 'thi'           },
+                                                  { label: 'Température de rosée', id: 'temp-rosee'    },
+                                                  { label: 'Température du sol',   id: 'temp-sol'      }] },
+  { title: 'Capteurs',                  items: [{ label: 'Station météo',           id: 'w-station'     },
+                                                  { label: 'Thermo-hygromètre',    id: 'w-thygro'      },
+                                                  { label: 'Thermomètre de sol',   id: 'w-tsol'        },
+                                                  { label: 'Anémomètre',           id: 'w-anem'        },
+                                                  { label: 'Pyranomètre',          id: 'w-pyrano'      },
+                                                  { label: 'Humectation foliaire', id: 'w-lws'         },
+                                                  { label: 'Capteur PAR',          id: 'w-par'         },
+                                                  { label: 'Sonde capacitive',     id: 'w-capa'        },
+                                                  { label: 'Tensiomètre',          id: 'w-tensio'      },
+                                                  { label: 'Fertirrigation',       id: 'w-ec'          }] },
+  { title: 'Irrigation',                items: [{ label: 'Irrigations',             id: 'irrigations'   }] },
 ]
 
-function openWidgetCatalog() {
-  const sectionsHtml = WIDGET_CATALOG.map(sec => `
-    <div class="m-list-section-header">${sec.title}</div>
-    ${sec.items.map(item => `
-      <div class="m-wcat-item">
-        <span>${item}</span>
-        <button class="m-wcat-add" type="button"><i class="bi bi-plus-circle"></i></button>
-      </div>`).join('')}`).join('')
+// Sensor model → widget ID mapping (shared with widgetsView renderer)
+const WIDGET_SENSOR_MODELS = {
+  'w-station': ['P+', 'PT', 'P', 'SMV'],
+  'w-thygro':  ['TH'],
+  'w-tsol':    ['T_MINI'],
+  'w-anem':    ['W'],
+  'w-pyrano':  ['PYRANO'],
+  'w-lws':     ['LWS'],
+  'w-par':     ['PAR'],
+  'w-capa':    ['CAPA-30-3', 'CAPA-60-6'],
+  'w-tensio':  ['CHP-15/30', 'CHP-30/60', 'CHP-60/90'],
+  'w-ec':      ['EC'],
+}
+
+// ─── Shared widget storage (mirrors web dash-widgets-parcel-* key) ─────────────
+const _PARCEL_DASH_KEY = id => `dash-widgets-parcel-${id}`
+
+function _computeDefaultWidgetIds(parcel, linkedSensorIds) {
+  const linked  = linkedSensorIds.map(id => allSensors.find(s => s.id === id)).filter(Boolean)
+  const models  = new Set(linked.map(s => s.model))
+  const ids     = ['previsions-5j', 'cumuls']
+  const hasIrrig = parcel.irrigation && parcel.irrigation !== 'Non irrigué'
+  if (hasIrrig) ids.push('irrigations')
+  Object.entries(WIDGET_SENSOR_MODELS).forEach(([wid, wModels]) => {
+    if (wModels.some(m => models.has(m))) ids.push(wid)
+  })
+  return ids
+}
+
+function _getParcelWidgetIds(parcel, linkedSensorIds) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(_PARCEL_DASH_KEY(parcel.id)))
+    if (Array.isArray(stored) && stored.length) return stored
+  } catch (_) {}
+  return _computeDefaultWidgetIds(parcel, linkedSensorIds)
+}
+
+function _saveParcelWidgetIds(parcelId, ids) {
+  localStorage.setItem(_PARCEL_DASH_KEY(parcelId), JSON.stringify(ids))
+}
+
+function openWidgetCatalog(parcel, linkedSensorIds, onWidgetAdded) {
+  const activeIds = new Set(_getParcelWidgetIds(parcel, linkedSensorIds))
+
+  const sectionsHtml = WIDGET_CATALOG.map((sec, i) => `
+    <div class="m-list-section-header"${i > 0 ? ' style="margin-top:20px"' : ''}>${sec.title}</div>
+    ${sec.items.map(item => {
+      const already = activeIds.has(item.id)
+      return `
+        <div class="m-wcat-item">
+          <span>${item.label}</span>
+          ${already
+            ? `<span style="font-size:12px;color:#30d158;display:flex;align-items:center;gap:4px"><i class="bi bi-check-circle-fill"></i> Ajouté</span>`
+            : `<button class="m-wcat-add" data-wid="${item.id}" type="button"><i class="bi bi-plus-circle"></i></button>`}
+        </div>`
+    }).join('')}`).join('')
 
   const layer = pushDetail(`
     <div class="m-detail-header">
@@ -40,7 +105,16 @@ function openWidgetCatalog() {
 
   layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
   layer.querySelectorAll('.m-wcat-add').forEach(btn => {
-    btn.addEventListener('click', () => showToast('Widget bientôt disponible'))
+    btn.addEventListener('click', () => {
+      const wid = btn.dataset.wid
+      const ids = _getParcelWidgetIds(parcel, linkedSensorIds)
+      if (!ids.includes(wid)) {
+        ids.push(wid)
+        _saveParcelWidgetIds(parcel.id, ids)
+      }
+      popDetail()
+      onWidgetAdded?.()
+    })
   })
 }
 
@@ -102,18 +176,18 @@ function openAddPage(parcel) {
 
 // ─── Chart helpers ────────────────────────────────────────────────────────────
 const CHART_METRICS = {
-  etp:          { label: 'Évapotranspiration',   unit: 'mm/j', color: '#c090e0', cumul: true,  cumulsType: 'etp'   },
-  rayonnement:  { label: 'Rayonnement solaire',  unit: 'W/m²', color: '#f5c842', cumul: false, cumulsType: 'rayo'  },
-  temp_rosee:   { label: 'Température de rosée', unit: '°C',   color: '#80c8e8', cumul: false },
-  pluie:        { label: 'Pluie',                unit: 'mm',   color: '#45b7d1', cumul: true,  cumulsType: 'pluie' },
-  temperature:  { label: 'Température',          unit: '°C',   color: '#e07050', cumul: false, cumulsType: 'temp'  },
-  humidite:     { label: 'Humidité',          unit: '%',    color: '#4ecdc4', cumul: false },
-  pothydr:      { label: 'Potentiel hydrique',   unit: 'kPa',  color: '#5b8dd9', cumul: false },
-  teneur:       { label: 'Teneur en eau',         unit: '%vol', color: '#f0c060', cumul: false },
-  temp_sol:     { label: 'Température sol',       unit: '°C',   color: '#bb8fce', cumul: false },
-  humectation:  { label: 'Humectation foliaire', unit: '%',    color: '#60a090', cumul: false, cumulsType: 'hws'   },
-  vent:         { label: 'Vent',                 unit: 'km/h', color: '#82b8e0', cumul: false },
-  par:          { label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#a0d070', cumul: false },
+  etp:          { label: 'Évapotranspiration',   unit: 'mm/j', color: '#7DBDD7', cumul: true,  cumulsType: 'etp'   },
+  rayonnement:  { label: 'Rayonnement solaire',  unit: 'W/m²', color: '#CBCB0B', cumul: false, cumulsType: 'rayo'  },
+  temp_rosee:   { label: 'Température de rosée', unit: '°C',   color: '#72B0D8', cumul: false },
+  pluie:        { label: 'Pluie',                unit: 'mm',   color: '#2E75B6', cumul: true,  cumulsType: 'pluie' },
+  temperature:  { label: 'Température',          unit: '°C',   color: '#FBAF05', cumul: false, cumulsType: 'temp'  },
+  humidite:     { label: 'Humidité',          unit: '%',    color: '#5B12A4', cumul: false },
+  pothydr:      { label: 'Potentiel hydrique',   unit: 'kPa',  color: '#A6C157', cumul: false },
+  teneur:       { label: 'Teneur en eau',         unit: '%vol', color: '#ED9A2C', cumul: false },
+  temp_sol:     { label: 'Température sol',       unit: '°C',   color: '#795548', cumul: false },
+  humectation:  { label: 'Humectation foliaire', unit: '%',    color: '#00887E', cumul: false, cumulsType: 'hws'   },
+  vent:         { label: 'Vent',                 unit: 'km/h', color: '#616161', cumul: false },
+  par:          { label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#4CBB17', cumul: false },
 }
 
 const SENSOR_MODEL_METRICS = {
@@ -340,7 +414,7 @@ function irrigationWidget(parcel) {
           <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
             <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
           </span>
-          <button class="m-widget-menu" type="button">•••</button>
+          <button class="m-widget-menu" data-wid="irrigations" type="button">•••</button>
         </div>
         <div style="font-size:13px;color:#8e8e93">Aucune irrigation enregistrée cette saison</div>
       </div>`
@@ -352,7 +426,7 @@ function irrigationWidget(parcel) {
         <span style="font-size:13px;font-weight:700;color:#1c1c1e;display:flex;align-items:center;gap:6px">
           <i class="bi bi-droplet-fill" style="color:#0172A4"></i> Irrigation
           ${irrType ? `<span style="background:rgba(1,114,164,.1);color:#0172A4;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:600">${irrType}</span>` : ''}
-          ${(parcel.substrate || parcel.texture) ? `<span style="background:#f0f0f0;color:#636366;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:500">${parcel.substrate ? 'substrat : ' + parcel.substrate : parcel.texture}</span>` : ''}
+          ${(parcel.substrate || parcel.texture) ? `<span style="background:#f0f0f0;color:#636366;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:500">${parcel.substrate ? 'Substrat : ' + parcel.substrate : parcel.texture}</span>` : ''}
         </span>
         <button class="m-widget-menu" type="button">•••</button>
       </div>
@@ -373,95 +447,179 @@ function irrigationWidget(parcel) {
 }
 
 function widgetsView(parcel, linkedSensorIds = []) {
-  const sensors = linkedSensorIds.map(id => allSensors.find(s => s.id === id)).filter(Boolean)
-  const sensorWidgets = mWidgetSensorCards(sensors)
+  const activeIds = _getParcelWidgetIds(parcel, linkedSensorIds)
+  const sensors   = linkedSensorIds.map(id => allSensors.find(s => s.id === id)).filter(Boolean)
+
+  let html = ''
+  for (const wid of activeIds) {
+    if (wid === 'irrigations')    html += irrigationWidget(parcel)
+    else if (wid === 'cumuls')    html += mWidgetCumuls(parcel, linkedSensorIds)
+    else if (wid === 'previsions-5j') html += mWidgetPrev5j(parcel)
+    else if (WIDGET_SENSOR_MODELS[wid]) {
+      const wModels  = new Set(WIDGET_SENSOR_MODELS[wid])
+      const wSensors = sensors.filter(s => wModels.has(s.model))
+      if (wSensors.length) html += mWidgetSensorCards(wSensors, wid)
+    }
+  }
+
   return `
     <div class="m-detail-section">
       <button class="m-add-widget-btn"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
-      ${irrigationWidget(parcel)}
-      ${mWidgetCumuls(parcel)}
-      ${mWidgetPrev5j()}
-      ${sensorWidgets}
+      ${html}
     </div>`
 }
 
 // ─── Mobile widgets ───────────────────────────────────────────────────────────
 
-function mWidgetCard(title, icon, color, body) {
+function mWidgetCard(title, icon, color, body, id = '') {
   return `
     <div class="m-widget-card">
       <div class="m-widget-card-hd">
         <span class="m-widget-card-title" style="color:${color}"><i class="bi ${icon}"></i> ${title}</span>
-        <button class="m-widget-menu" type="button">•••</button>
+        <button class="m-widget-menu" data-wid="${id}" type="button">•••</button>
       </div>
       ${body}
     </div>`
 }
 
-function mWidgetCumuls(parcel) {
-  const seed = parcel.id || 1
-  const rnd0 = (a, b) => +(a + ((seed * 9301 + 49297) % 233280) / 233280 * (b - a)).toFixed(1)
-  const pluie = rnd0(40, 180)
-  const etp   = rnd0(60, 200)
-  const djc   = Math.round(rnd0(80, 320))
-  const rayo  = Math.round(rnd0(120, 600))
-  const hfroid = Math.round(rnd0(20, 120))
-
-  const items = [
-    { label: 'Pluie',           val: pluie,  unit: 'mm',   color: '#45b7d1', icon: 'bi-cloud-rain-heavy' },
-    { label: 'ETP',             val: etp,    unit: 'mm',   color: '#c090e0', icon: 'bi-sun' },
-    { label: 'Degrés jours',    val: djc,    unit: 'DJ',   color: '#e07050', icon: 'bi-thermometer-half' },
-    { label: 'Ensoleillement',  val: rayo,   unit: 'h',    color: '#f5c842', icon: 'bi-brightness-high' },
-    { label: 'Heures de froid', val: hfroid, unit: 'h',    color: '#7bc4b0', icon: 'bi-snow' },
-  ]
-
-  const body = `
-    <div class="m-wcumuls-list">
-      ${items.map(it => `
-        <div class="m-wcumuls-row">
-          <i class="bi ${it.icon}" style="color:${it.color};width:16px;text-align:center"></i>
-          <span class="m-wcumuls-label">${it.label}</span>
-          <span class="m-wcumuls-val" style="color:${it.color}">${it.val} <span class="m-wcumuls-unit">${it.unit}</span></span>
-        </div>`).join('')}
-    </div>
-    <div class="m-widget-footer">Depuis le 1er janvier 2026</div>`
-
-  return mWidgetCard('Cumuls saison', 'bi-bar-chart-line', '#0172A4', body)
+function _pcumulVal(parcelId, cid, fromDate) {
+  const seed = (parcelId * 9301 + 49297) % 233280
+  const RATES = {
+    etp:    1.0 + (seed % 60) / 100,
+    pluie:  0.8 + (seed % 70) / 100,
+    djc:    4.0 + (seed % 60) / 10,
+    hfroid: 0.4 + (seed % 12) / 10,
+    humec:  0.1 + (seed % 20) / 100,
+    enso:   4.0 + (seed % 40) / 10,
+  }
+  const rate = RATES[cid] ?? 1
+  const days = Math.max(0, Math.round((Date.now() - new Date(fromDate)) / 86400000))
+  return Math.round(rate * days * 10) / 10
 }
 
-function mWidgetPrev5j() {
-  const DAYS = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
-  const ICONS = ['bi-sun', 'bi-cloud-sun', 'bi-cloud', 'bi-cloud-rain', 'bi-cloud-drizzle', 'bi-cloud-lightning', 'bi-cloud-snow']
-  const today = new Date()
-  const seed0 = today.getDate()
+const _pcumulKey = id => `m-pcumuls-${id}`
+function _loadPCumul(id) { try { return JSON.parse(localStorage.getItem(_pcumulKey(id))) || {} } catch { return {} } }
+function _savePCumul(id, patch) {
+  const s = _loadPCumul(id)
+  localStorage.setItem(_pcumulKey(id), JSON.stringify({ ...s, ...patch }))
+}
 
-  const days = Array.from({ length: 5 }, (_, i) => {
-    const d = new Date(today); d.setDate(today.getDate() + i)
-    const s = seed0 + i * 7
-    const tmax = Math.round(16 + ((s * 127 + 31) % 100) / 100 * 12)
-    const tmin = Math.round(tmax - 4 - ((s * 31 + 17) % 40) / 10)
-    const pluie = ((s * 41 + 13) % 100) < 35 ? Math.round(2 + (s * 13) % 18) : 0
-    const icon = ICONS[pluie > 0 ? (pluie > 8 ? 3 : 4) : ((s % 3 === 0) ? 1 : (s % 5 === 0 ? 2 : 0))]
-    return { day: DAYS[d.getDay()], tmax, tmin, pluie, icon }
+const _PCUMUL_CFG_FIELDS = {
+  djc:    [{ key: 'djMin', label: 'T min (°C)', def: 0 }, { key: 'djMax', label: 'T max (°C)', def: 18 }],
+  hfroid: [{ key: 'hfSeuil', label: 'Seuil (°C)', def: 7.2 }],
+}
+
+function mWidgetCumuls(parcel, linkedSensorIds = []) {
+  const metSet = new Set()
+  linkedSensorIds.forEach(id => {
+    const s = allSensors.find(x => x.id === id)
+    if (s) (SENSOR_MODEL_METRICS[s.model] || []).forEach(m => metSet.add(m))
   })
+  const jan1 = `${new Date().getFullYear()}-01-01`
+  const st = _loadPCumul(parcel.id)
+  const hidden = new Set(st.hidden || [])
+  const dates = st.dates || {}
+  const cfg = st.cfg || {}
+  const seed = parcel.id || 1
+  const ri = (a, b) => Math.round(a + ((seed * 9301 + 49297) % 233280) / 233280 * (b - a))
 
-  const body = `
-    <div class="m-wprev5-grid">
-      ${days.map((d, i) => `
-        <div class="m-wprev5-col${i === 0 ? ' m-wprev5-col--today' : ''}">
-          <div class="m-wprev5-day">${i === 0 ? "Auj." : d.day}</div>
-          <i class="bi ${d.icon} m-wprev5-icon"></i>
-          <div class="m-wprev5-tmax">${d.tmax}°</div>
-          <div class="m-wprev5-tmin">${d.tmin}°</div>
-          ${d.pluie > 0 ? `<div class="m-wprev5-rain">${d.pluie}mm</div>` : `<div class="m-wprev5-rain m-wprev5-rain--none">—</div>`}
-        </div>`).join('')}
-    </div>
-    <div class="m-widget-footer">Source : Modèle Arome · 3 km</div>`
+  const allAvailable = [
+    { id: 'etp',    label: 'ETP',             unit: 'mm', color: '#7DBDD7', icon: 'bi-moisture',         val: _pcumulVal(parcel.id, 'etp',    dates['etp']    || jan1), show: true },
+    { id: 'pluie',  label: 'Pluie',           unit: 'mm', color: '#2E75B6', icon: 'bi-cloud-rain-heavy', val: _pcumulVal(parcel.id, 'pluie',  dates['pluie']  || jan1), show: metSet.has('pluie') },
+    { id: 'djc',    label: 'Degrés jours',    unit: 'DJ', color: '#FBAF05', icon: 'bi-thermometer-half', val: _pcumulVal(parcel.id, 'djc',    dates['djc']    || jan1), show: metSet.has('temperature'), cfg: true,
+      cfgLabel: `${cfg.djMin ?? 0}–${cfg.djMax ?? 18}°C` },
+    { id: 'hfroid', label: 'Heures de froid', unit: 'h',  color: '#FEE7B4', icon: 'bi-snow',             val: _pcumulVal(parcel.id, 'hfroid', dates['hfroid'] || jan1), show: metSet.has('temperature'), cfg: true,
+      cfgLabel: `< ${cfg.hfSeuil ?? 7.2}°C` },
+    { id: 'humec',  label: 'Humectation',     unit: 'h',  color: '#00887E', icon: 'bi-droplet',          val: _pcumulVal(parcel.id, 'humec',  dates['humec']  || jan1), show: metSet.has('humectation') },
+    { id: 'enso',   label: 'Ensoleillement',  unit: 'h',  color: '#CBCB0B', icon: 'bi-brightness-high',  val: _pcumulVal(parcel.id, 'enso',   dates['enso']   || jan1), show: true },
+  ].filter(i => i.show)
 
-  return mWidgetCard('Prévisions 5 jours', 'bi-cloud-sun', '#4ecdc4', body)
+  const allItems   = allAvailable.filter(i => !hidden.has(i.id))
+  const hiddenItems = allAvailable.filter(i => hidden.has(i.id))
+
+  const restoreHtml = hiddenItems.length
+    ? `<div style="border-top:1px solid rgba(0,0,0,.06);padding:8px 0 0;margin-top:8px">
+        <div style="font-size:11px;color:#8e8e93;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Disponibles</div>
+        ${hiddenItems.map(it => `
+          <button class="m-pcumul-add" data-cid="${it.id}" data-pid="${parcel.id}" type="button"
+            style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px dashed rgba(0,0,0,.15);border-radius:10px;padding:9px 12px;background:none;cursor:pointer;font-family:inherit;margin-bottom:6px">
+            <i class="bi ${it.icon}" style="color:${it.color};font-size:16px;flex-shrink:0"></i>
+            <span style="font-size:13px;color:#3a3a3c;flex:1">${it.label}</span>
+            <i class="bi bi-plus-circle" style="color:#0172A4;font-size:16px;flex-shrink:0"></i>
+          </button>`).join('')}
+      </div>`
+    : ''
+
+  const body = allItems.length
+    ? `<div class="m-cumuls-saved" style="padding:0 0 4px">${allItems.map(it => {
+        const d = dates[it.id] || jan1
+        return `<div class="m-cumuls-saved-card" style="position:relative">
+          <button class="m-pcumul-del" data-cid="${it.id}" data-pid="${parcel.id}" type="button" style="position:absolute;top:8px;right:8px;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:22px;height:22px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#636366">×</button>
+          <div class="m-cumuls-saved-row1" style="padding-right:32px">
+            <span class="m-cumuls-saved-metric"><i class="bi ${it.icon}" style="color:${it.color}"></i> ${it.label}</span>
+            <span class="m-cumuls-saved-val" style="color:${it.color}">${it.val}<span class="m-cumuls-saved-unit"> ${it.unit}</span></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+            <span style="font-size:12px;color:#8e8e93">Depuis le</span>
+            <input type="date" class="m-pcumul-date" data-cid="${it.id}" data-pid="${parcel.id}" value="${d}" style="border: 1px solid #CCC;background: transparent;font-size: 12px;color: #8e8e93;cursor: pointer;font-family: inherit;padding: 4px;border-radius: 5px;">
+            ${it.cfg ? `<button class="m-pcumul-cfg" data-cid="${it.id}" data-pid="${parcel.id}" style="border: 1px solid #CCC;background: transparent;font-size: 11px;color: #8e8e93;cursor: pointer;font-family: inherit;padding: 5px;border-radius: 5px;"><i class="bi bi-gear"></i> ${it.cfgLabel}</button>` : ''}
+          </div>
+        </div>`
+      }).join('')}${restoreHtml}</div>`
+    : `<div style="font-size:13px;color:#8e8e93;padding:4px 0 4px">Tous les cumuls ont été supprimés.</div>${restoreHtml}`
+
+  return mWidgetCard('Cumuls', 'bi-bar-chart-fill', '#0172A4', body, 'cumuls')
 }
 
-function mWidgetSensorCards(sensors) {
+function mWidgetPrev5j(parcel) {
+  const DN = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
+  const MN = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const WI = ['bi-sun','bi-cloud-sun','bi-cloud','bi-cloud-rain','bi-cloud-lightning-rain']
+  const WL = ['Ensoleillé','Part. nuageux','Couvert','Pluvieux','Orageux']
+  const today = new Date()
+  const org = orgs.find(o => o.id === parcel?.orgId)
+  const city = parcel?.ville || org?.ville || '—'
+  const pid = parcel?.id || 1
+  const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
+
+  const makeDay = (i, off) => {
+    const d = new Date(today); d.setDate(d.getDate() + i)
+    const wi = Math.floor(((pid * 7 + i * 3) % 11) / 2.2)
+    return {
+      lbl: i === 0 ? 'Auj.' : DN[d.getDay()],
+      date: `${d.getDate()} ${MN[d.getMonth()]}`,
+      tmax: rnd(17 + off, 34 + off), tmin: rnd(4 + off, 15 + off),
+      pluie: wi >= 3 ? rnd(2, 18) : 0,
+      vent: rnd(10, 35), wi
+    }
+  }
+
+  // AROME 0–72h (j0–j2), ICON EU 72–136h (j3–j4)
+  const days = [0,1,2].map(i => makeDay(i, 0)).concat([3,4].map(i => makeDay(i, -1)))
+
+  const dayHtml = d => `
+    <div class="m-wprev5-col">
+      <div class="m-wprev5-day">${d.lbl}</div>
+      <div class="m-wprev5-date">${d.date}</div>
+      <i class="bi ${WI[d.wi]} m-wprev5-icon" title="${WL[d.wi]}"></i>
+      <div class="m-wprev5-rain${d.pluie === 0 ? ' m-wprev5-rain--none' : ''}">${d.pluie > 0 ? d.pluie + ' mm' : '—'}</div>
+      <div class="m-wprev5-tmax">${d.tmax}°</div>
+      <div class="m-wprev5-tmin">${d.tmin}°</div>
+      <div class="m-wprev5-wind">${d.vent} <span>km/h</span></div>
+    </div>`
+
+  const body = `
+    <div class="m-wprev5-loc"><i class="bi bi-geo-alt-fill" style="color:#0172A4"></i> ${city}</div>
+    <div class="m-wprev5-model-hdr">
+      <span class="m-wprev5-model-lbl" style="grid-column:1/4">AROME <span>(Météo France)</span></span>
+      <span class="m-wprev5-model-lbl" style="grid-column:4/6">ICON EU <span>(DWD)</span></span>
+    </div>
+    <div class="m-wprev5-grid">${days.map(dayHtml).join('')}</div>`
+
+  return mWidgetCard('Prévisions 5 jours', 'bi-cloud-sun', '#5b8dd9', body, 'previsions-5j')
+}
+
+function mWidgetSensorCards(sensors, wid = '') {
   if (!sensors.length) return ''
   const MODEL_ICON = {
     'P+': 'bi-cloud-rain-heavy', 'PT': 'bi-cloud-rain-heavy', 'P': 'bi-cloud-rain-heavy',
@@ -521,7 +679,7 @@ function mWidgetSensorCards(sensors) {
       </div>
       <div class="m-widget-footer">${sensor.serial}</div>`
 
-    return mWidgetCard(name, icon, color, body)
+    return mWidgetCard(name, icon, color, body, wid)
   }).join('')
 }
 
@@ -561,22 +719,32 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h') {
   })
   const unique = [...new Set(['etp', 'rayonnement', 'temp_rosee', ...sensorMetrics])]
 
+  const today   = new Date().toISOString().slice(0, 10)
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
   return `
-    <div class="m-period-bar">
-      <select class="m-period-sel">
-        <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
-        <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
-        <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
-        <option value="hier"${period==='hier'?' selected':''}>Hier</option>
-        <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
-        <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
-      </select>
-      <select class="m-step-sel">
-        <option value="1h"${step === '1h' ? ' selected' : ''}>Horaire</option>
-        <option value="1d"${step === '1d' ? ' selected' : ''}>Journalier</option>
-        <option value="1w"${step === '1w' ? ' selected' : ''}>Hebdo</option>
-      </select>
-      <button class="m-export-btn" title="Exporter CSV"><i class="bi bi-download"></i></button>
+    <div class="m-period-bar" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;gap:8px">
+        <select class="m-period-sel" style="flex:1;min-width:0">
+          <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
+          <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
+          <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
+          <option value="hier"${period==='hier'?' selected':''}>Hier</option>
+          <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
+          <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
+        </select>
+        <select class="m-step-sel" style="flex:1;min-width:0">
+          <option value="1h"${step === '1h' ? ' selected' : ''}>Horaire</option>
+          <option value="1d"${step === '1d' ? ' selected' : ''}>Journalier</option>
+          <option value="1w"${step === '1w' ? ' selected' : ''}>Hebdo</option>
+        </select>
+      </div>
+      ${period === 'custom' ? `
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <label style="font-size:12px;color:#8e8e93;white-space:nowrap">Du</label>
+        <input type="date" class="m-custom-from" value="${weekAgo}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+        <label style="font-size:12px;color:#8e8e93;white-space:nowrap">au</label>
+        <input type="date" class="m-custom-to" value="${today}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+      </div>` : ''}
     </div>
     <div class="m-detail-section">
       ${unique.map(id => chartCard(id, period)).join('')}
@@ -589,13 +757,19 @@ function paramsView(parcel, org, linkedSensorIds) {
   const textureOpts  = ['Limon', 'Limon argileux', 'Limon fin', 'Argile', 'Argile limoneuse', 'Sable limoneux']
   const envOptions   = ['Plein champ', 'Sous abri', 'Serre', 'Arboriculture', 'Maraîchage', 'Vignoble']
 
-  const linkedNames = linkedSensorIds.map(id => {
-    const s = allSensors.find(x => x.id === id)
-    return s ? `${s.model} — ${s.serial}` : null
-  }).filter(Boolean)
+  const linkedSensors = linkedSensorIds.map(id => allSensors.find(x => x.id === id)).filter(Boolean)
+  const linkedNames = linkedSensors.map(s => `${s.model} — ${s.serial}`)
+  const hasPPlus = linkedSensors.some(s => s.model === 'P+' || s.model === 'PT')
+  const hasP     = linkedSensors.some(s => s.model === 'P')
+  const rainConflict = hasPPlus && hasP
 
   return `
     <div class="m-detail-section">
+      ${rainConflict ? `
+        <div class="m-conflict-banner">
+          <i class="bi bi-exclamation-triangle-fill" style="color:#ff9f0a;flex-shrink:0"></i>
+          <span>Ce capteur pluviomètre (P) est redondant avec la station météo (P+) déjà liée. Les données pluie peuvent se cumuler en double dans les bilans. Envisagez de délier l'un des deux.</span>
+        </div>` : ''}
       <div class="m-list-section-header">Identification</div>
       <div class="m-list">
         <div class="m-list-row" data-action="edit-name">
@@ -702,8 +876,8 @@ function paramsView(parcel, org, linkedSensorIds) {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'widgets') {
-  const org = orgs.find(o => o.id === parcel.orgId)
+export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'widgets', backLabel = 'Parcelles') {
+  let org = orgs.find(o => o.id === parcel.orgId)
   let activeView    = initialView
   let currentPeriod = '7d'
   let currentStep   = '1h'
@@ -713,14 +887,14 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
   const layer = pushDetail(`
     <div class="m-detail-header">
       <div class="m-detail-topbar">
-        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Parcelles</span></button>
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>${backLabel}</span></button>
         <button class="m-detail-plus" id="d-plus"><i class="bi bi-plus"></i></button>
       </div>
       <div class="m-detail-identity">
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${parcel.name}</div>
-          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[parcel.crop, city].filter(Boolean).join(' · ')}</div>` : ''}
+          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[city, parcel.crop].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
         <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
@@ -731,6 +905,33 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
       <button class="m-detail-tab ${initialView === 'params'  ? 'active' : ''}" data-view="params">Paramètres</button>
     </div>
     <div id="detail-content" class="m-detail-content"></div>`)
+
+  function pickExploitation() {
+    const available = orgs.filter(o => o.id !== 100 && o.statut !== 'inactif')
+    const body = document.createElement('div')
+    const renderPicker = () => {
+      body.innerHTML = available.map(o => `
+        <div class="m-sheet-option${o.id === parcel.orgId ? ' m-sheet-option--active' : ''}" data-pick-org="${o.id}">
+          <span>${o.name}</span>
+          ${o.id === parcel.orgId ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+        </div>`).join('')
+      body.querySelectorAll('[data-pick-org]').forEach(row => {
+        row.addEventListener('click', () => {
+          const newOrgId = +row.dataset.pickOrg
+          if (newOrgId !== parcel.orgId) {
+            parcel.orgId = newOrgId
+            org = orgs.find(o => o.id === newOrgId)
+            renderView()
+            showToast('Exploitation mise à jour')
+          }
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => sheet.remove(), 280)
+        })
+      })
+    }
+    const sheet = showSheet({ title: 'Exploitation', body, doneLabel: 'Fermer', onDone: () => {} })
+    renderPicker()
+  }
 
   function renderView() {
     const c = layer.querySelector('#detail-content')
@@ -771,13 +972,117 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
     // Param rows
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
-      row.addEventListener('click', () => showToast('Fonctionnalité à venir'))
+      row.addEventListener('click', () => {
+        if (row.dataset.action === 'edit-exploitation') pickExploitation()
+        else showToast('Fonctionnalité à venir')
+      })
     })
-    // Widget menus
+    // Widget menus — retirer le widget
     layer.querySelectorAll('.m-widget-menu').forEach(btn => {
-      btn.addEventListener('click', e => { e.stopPropagation(); showToast('Options widget') })
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const wid = btn.dataset.wid
+        if (!wid) return
+        layer.querySelector('.m-widget-dd')?.remove()
+        const dd = document.createElement('div')
+        dd.className = 'm-widget-dd'
+        dd.style.cssText = 'position:absolute;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.18);z-index:200;overflow:hidden;min-width:180px'
+        dd.innerHTML = `<button class="m-widget-dd-remove" data-wid="${wid}" style="display:block;width:100%;text-align:left;padding:14px 16px;border:none;background:none;font-size:14px;color:#ff3b30;font-family:inherit;cursor:pointer">Retirer le widget</button>`
+        const content = layer.querySelector('.m-detail-content')
+        const rect    = btn.getBoundingClientRect()
+        const cRect   = content.getBoundingClientRect()
+        dd.style.top   = `${rect.bottom - cRect.top + content.scrollTop + 4}px`
+        dd.style.right = `${cRect.right - rect.right}px`
+        content.style.position = 'relative'
+        content.appendChild(dd)
+        dd.querySelector('.m-widget-dd-remove').addEventListener('click', () => {
+          dd.remove()
+          const ids = _getParcelWidgetIds(parcel, linkedSensorIds).filter(id => id !== wid)
+          _saveParcelWidgetIds(parcel.id, ids)
+          renderView()
+        })
+        setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
+      })
     })
-    layer.querySelector('.m-add-widget-btn')?.addEventListener('click', openWidgetCatalog)
+    layer.querySelector('.m-add-widget-btn')?.addEventListener('click', () => openWidgetCatalog(parcel, linkedSensorIds, renderView))
+
+    // Parcel cumuls — delete
+    layer.querySelectorAll('.m-pcumul-del').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const pid = +btn.dataset.pid
+        const st = _loadPCumul(pid)
+        const hidden = new Set(st.hidden || [])
+        hidden.add(btn.dataset.cid)
+        _savePCumul(pid, { hidden: [...hidden] })
+        renderView()
+      })
+    })
+    // Parcel cumuls — date
+    layer.querySelectorAll('.m-pcumul-date').forEach(input => {
+      input.addEventListener('change', () => {
+        const pid = +input.dataset.pid
+        const cid = input.dataset.cid
+        const newDate = input.value
+        if (!newDate) return
+        const tooOld = (Date.now() - new Date(newDate)) / 86400000 > 365
+        if (tooOld) return
+        const st = _loadPCumul(pid)
+        const dates = st.dates || {}
+        dates[cid] = newDate
+        _savePCumul(pid, { dates })
+        const card = input.closest('.m-cumuls-saved-card')
+        const valEl = card?.querySelector('.m-cumuls-saved-val')
+        if (valEl) {
+          const unitEl = card.querySelector('.m-cumuls-saved-unit')
+          const unit = unitEl?.textContent.trim() || ''
+          const newVal = _pcumulVal(pid, cid, newDate)
+          valEl.innerHTML = `${newVal}<span class="m-cumuls-saved-unit"> ${unit}</span>`
+        }
+      })
+    })
+    // Parcel cumuls — cfg
+    layer.querySelectorAll('.m-pcumul-cfg').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const pid = +btn.dataset.pid
+        const cid = btn.dataset.cid
+        const st = _loadPCumul(pid)
+        const cfg = { ...st.cfg }
+        const fields = _PCUMUL_CFG_FIELDS[cid]
+        if (!fields) return
+        layer.querySelector('.m-pcumul-cfg-panel')?.remove()
+        const panel = document.createElement('div')
+        panel.className = 'm-pcumul-cfg-panel'
+        panel.style.cssText = 'background:#f2f2f7;border-radius:12px;padding:12px 14px;margin:4px 0 0;display:flex;flex-direction:column;gap:8px'
+        panel.innerHTML = fields.map(f => `
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px">
+            <span>${f.label}</span>
+            <input type="number" class="m-pcumul-cfg-inp" data-key="${f.key}" value="${cfg[f.key] ?? f.def}" step="0.1" style="width:80px;padding:4px 8px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;font-family:inherit">
+          </label>`).join('') +
+          `<button class="m-pcumul-cfg-ok" style="padding:8px;background:#0172A4;color:#fff;border:none;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer">OK</button>`
+        btn.closest('.m-cumuls-saved-card').after(panel)
+        panel.querySelector('.m-pcumul-cfg-ok').addEventListener('click', () => {
+          panel.querySelectorAll('.m-pcumul-cfg-inp').forEach(inp => { cfg[inp.dataset.key] = parseFloat(inp.value) || 0 })
+          _savePCumul(pid, { cfg })
+          panel.remove()
+          renderView()
+        })
+      })
+    })
+    // Parcel cumuls — restore hidden item
+    layer.querySelectorAll('.m-pcumul-add').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const pid = +btn.dataset.pid
+        const cid = btn.dataset.cid
+        const st = _loadPCumul(pid)
+        const hidden = new Set(st.hidden || [])
+        hidden.delete(cid)
+        _savePCumul(pid, { hidden: [...hidden] })
+        renderView()
+      })
+    })
   }
 
   // Tabs
@@ -804,26 +1109,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
 
   // Plus
   layer.querySelector('#d-plus').addEventListener('click', () => {
-    const body = `
-      <a class="m-sheet-link" data-a="widget"><i class="bi bi-grid-1x2"></i> Widget</a>
-      <a class="m-sheet-link" data-a="irrigation"><i class="bi bi-droplet"></i> Irrigation</a>
-      <a class="m-sheet-link" data-a="strategie-irrigation"><i class="bi bi-arrow-repeat"></i> Stratégie d'irrigation</a>
-      <a class="m-sheet-link" data-a="capteur"><i class="bi bi-broadcast"></i> Capteur</a>
-      <a class="m-sheet-link" data-a="alerte"><i class="bi bi-bell"></i> Alerte</a>
-      <a class="m-sheet-link" data-a="integration" style="color:#8e8e93">
-        <i class="bi bi-plug"></i> Intégration <span style="font-size:11px">(version web uniquement)</span>
-      </a>
-      <a class="m-sheet-link" data-a="note"><i class="bi bi-pencil"></i> Note</a>
-      <a class="m-sheet-link" data-a="traitement"><i class="bi bi-eyedropper"></i> Traitement</a>`
-    const el = document.createElement('div'); el.innerHTML = body
-    const sh = showSheet({ title: 'Ajouter à la parcelle', body: el, doneLabel: 'Fermer', onDone: () => {} })
-    el.querySelectorAll('[data-a]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const a = btn.dataset.a
-        sh.classList.remove('m-sheet-overlay--show')
-        setTimeout(() => { sh.remove(); showToast(a === 'integration' ? 'Disponible sur la version web' : 'Fonctionnalité à venir') }, 280)
-      })
-    })
+    window.showMobileAddPage?.()
   })
 
   // Journal icon
@@ -869,7 +1155,7 @@ function openMobileParcelJournal(parcel) {
         <div style="width:38px"></div>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${parcel.name}</div>
-          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[parcel.crop, city].filter(Boolean).join(' · ')}</div>` : ''}
+          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[city, parcel.crop].filter(Boolean).join(' · ')}</div>` : ''}
         </div>
         <div style="width:38px"></div>
       </div>
@@ -881,7 +1167,10 @@ function openMobileParcelJournal(parcel) {
 
   function renderJournal() {
     const el = layer.querySelector('#mjrn-content')
-    const entries = getMJournal(parcel.id).slice().sort((a, b) => b.date.localeCompare(a.date))
+    const dashNotes = (() => { try { return JSON.parse(localStorage.getItem('weenat-m-notes')) || [] } catch { return [] } })()
+      .filter(n => n.linkedType === 'parcel' && n.linkedId === parcel.id)
+      .map((n, i) => ({ id: `dash-${i}`, type: 'note', date: n.date, texte: n.text, auteur: n.auteur, _fromDashboard: true }))
+    const entries = [...getMJournal(parcel.id), ...dashNotes].sort((a, b) => b.date.localeCompare(a.date))
     const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
 
     const CFG = {
@@ -908,6 +1197,7 @@ function openMobileParcelJournal(parcel) {
         const c = CFG[e.type] || CFG.note
         const isTraitement = e.type === 'traitement'
         const isLast = idx === entries.length - 1
+        const fromDash = !!e._fromDashboard
         html += `
           <div class="m-jrn-entry" data-id="${e.id}">
             <div class="m-jrn-aside">
@@ -920,9 +1210,12 @@ function openMobileParcelJournal(parcel) {
               <div class="m-jrn-hd">
                 <span class="m-jrn-date">${fmt(e.date)}</span>
                 <span class="journal-type-badge journal-type-badge--${c.badgeCls}">${c.label}</span>
-                <button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>
+                ${fromDash
+                  ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
+                  : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
+              ${e.auteur && fromDash ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${e.auteur}</div>` : ''}
               ${isTraitement && (e.produit || e.dose || e.cible) ? `
                 <div class="m-jrn-meta">
                   ${e.produit ? `<span class="m-jrn-chip"><i class="bi bi-flask"></i>${e.produit}</span>` : ''}

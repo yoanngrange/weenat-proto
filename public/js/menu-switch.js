@@ -82,6 +82,8 @@ function addThumbToPreview(previewsEl, dataURL, pendingImages) {
   wrap.appendChild(img); wrap.appendChild(rm); previewsEl.appendChild(wrap)
 }
 
+window.openLightbox  = openLightbox
+window.setupImgUpload = setupImgUpload
 function setupImgUpload(inputEl, addBtnEl, previewsEl, errEl, pendingImages) {
   addBtnEl.addEventListener('click', () => inputEl.click())
   inputEl.addEventListener('change', async () => {

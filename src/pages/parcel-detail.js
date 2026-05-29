@@ -6,6 +6,7 @@ import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getParcel, patchParcel } from '../data/store.js'
 import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
+import { IRRIG_TYPES, SOIL_TYPES } from '../data/constants.js'
 
 const urlParams = new URLSearchParams(window.location.search)
 const parcelId  = parseInt(urlParams.get('id'))
@@ -20,69 +21,71 @@ function rndf(min, max) { return parseFloat((Math.random() * (max - min) + min).
 
 // Always-available on every parcel (derived from closest weather station)
 const ALWAYS_METRICS = [
-  { id: 'etp',        name: 'Évapotranspiration (ETP)',  unit: 'mm/j', color: '#c090e0', base: () => rndf(0.5, 5),   cumul: { label: 'Cumul ETP',    unit: 'mm'  }, isCumul: false, chartType: 'bar' },
-  { id: 'rayonnement',name: 'Rayonnement',               unit: 'W/m²', color: '#f5c842', base: () => rnd(0, 900),    cumul: { label: 'Énergie',      unit: 'Wh/m²' }, isCumul: false },
-  { id: 'temp_rosee', name: 'Température de rosée',      unit: '°C',   color: '#80c8e8', base: () => rnd(2, 16),     isCumul: false },
+  { id: 'etp',        name: 'Évapotranspiration (ETP)',  unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5),   cumul: { label: 'Cumul ETP',    unit: 'mm'  }, isCumul: false, chartType: 'bar' },
+  { id: 'rayonnement',name: 'Rayonnement',               unit: 'W/m²', color: '#CBCB0B', base: () => rnd(0, 900),    cumul: { label: 'Énergie',      unit: 'Wh/m²' }, isCumul: false },
+  { id: 'temp_rosee', name: 'Température de rosée',      unit: '°C',   color: '#72B0D8', base: () => rnd(2, 16),     isCumul: false },
 ]
 
 const METRICS_BY_MODEL = {
   'P+':       [
-    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'PT': [
-    { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
-    { id: 'temp',  name: 'Température', unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
+    { id: 'temp',  name: 'Température', unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'etp',   name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'P': [
-    { id: 'pluie', name: 'Pluie', unit: 'mm', color: '#45b7d1', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'pluie', name: 'Pluie', unit: 'mm', color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
   ],
   'SMV': [
-    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#45b7d1', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité', unit: '%',   color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
+    { id: 'etp',      name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'TH': [
-    { id: 'temp',     name: 'Température',  unit: '°C', color: '#e07050', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
-    { id: 'humidite', name: 'Humidité', unit: '%',  color: '#4ecdc4', base: () => rnd(40, 90) },
+    { id: 'temp',     name: 'Température',  unit: '°C', color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'humidite', name: 'Humidité', unit: '%',  color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'CHP-15/30': [
-    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#A6C157', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#795548', base: () => rnd(8, 22)   },
   ],
   'CHP-30/60': [
-    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#A6C157', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#795548', base: () => rnd(8, 22)   },
   ],
   'CHP-60/90': [
-    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#5b8dd9', base: () => rnd(10, 150) },
-    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#bb8fce', base: () => rnd(8, 22)   },
+    { id: 'pothydr', name: 'Potentiel hydrique', unit: 'kPa', color: '#A6C157', base: () => rnd(10, 150) },
+    { id: 'tsol',    name: 'Température du sol',          unit: '°C',  color: '#795548', base: () => rnd(8, 22)   },
   ],
   'CAPA-30-3': [
-    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#f0cc60', base: () => rnd(15, 45) },
-    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#c89c30', base: () => rnd(15, 45) },
-    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#a07010', base: () => rnd(15, 45) },
-    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#105200', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#8C5E82', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#46DA82', base: () => rnd(15, 45) },
+    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#795548', base: () => rnd(8, 22)  },
   ],
   'CAPA-60-6': [
-    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#f0d070', base: () => rnd(15, 45) },
-    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#d8b050', base: () => rnd(15, 45) },
-    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#c09030', base: () => rnd(15, 45) },
-    { id: 'vwc40', name: 'Teneur en eau du sol 40 cm', unit: '%vol', color: '#a87010', base: () => rnd(17, 43) },
-    { id: 'vwc50', name: 'Teneur en eau du sol 50 cm', unit: '%vol', color: '#905200', base: () => rnd(18, 42) },
-    { id: 'vwc60', name: 'Teneur en eau du sol 60 cm', unit: '%vol', color: '#783400', base: () => rnd(18, 42) },
-    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#bb8fce', base: () => rnd(8, 22)  },
+    { id: 'vwc10', name: 'Teneur en eau du sol 10 cm', unit: '%vol', color: '#105200', base: () => rnd(15, 45) },
+    { id: 'vwc20', name: 'Teneur en eau du sol 20 cm', unit: '%vol', color: '#8C5E82', base: () => rnd(15, 45) },
+    { id: 'vwc30', name: 'Teneur en eau du sol 30 cm', unit: '%vol', color: '#46DA82', base: () => rnd(15, 45) },
+    { id: 'vwc40', name: 'Teneur en eau du sol 40 cm', unit: '%vol', color: '#949494', base: () => rnd(17, 43) },
+    { id: 'vwc50', name: 'Teneur en eau du sol 50 cm', unit: '%vol', color: '#870021', base: () => rnd(18, 42) },
+    { id: 'vwc60', name: 'Teneur en eau du sol 60 cm', unit: '%vol', color: '#F608C2', base: () => rnd(18, 42) },
+    { id: 'tsol',  name: 'Température du sol',      unit: '°C',   color: '#795548', base: () => rnd(8, 22)  },
   ],
   'T_MINI': [
-    { id: 'tsol', name: 'Température du sol', unit: '°C', color: '#bb8fce', base: () => rnd(8, 22) },
+    { id: 'tsol', name: 'Température du sol', unit: '°C', color: '#795548', base: () => rnd(8, 22) },
   ],
   'LWS': [
-    { id: 'humec', name: 'Humectation foliaire', unit: 'h', color: '#78d8a0', base: () => rnd(0, 12) },
+    { id: 'humec', name: 'Humectation foliaire', unit: 'h', color: '#00887E', base: () => rnd(0, 12) },
   ],
   'T_GEL': [
-    { id: 'tseche',  name: 'Temp. sèche',  unit: '°C', color: '#e07050', base: () => rnd(-2, 12) },
-    { id: 'thumide', name: 'Temp. humide', unit: '°C', color: '#4ecdc4', base: () => rnd(-4, 10) },
+    { id: 'tseche',  name: 'Temp. sèche',  unit: '°C', color: '#23B19B', base: () => rnd(-2, 12) },
+    { id: 'thumide', name: 'Temp. humide', unit: '°C', color: '#5E88EC', base: () => rnd(-4, 10) },
   ],
   'W': [
     { id: '_vent', name: 'Vent', unit: 'km/h · direction', color: '#7bc4b0', isWindComposite: true, base: () => rnd(0, 40) },
@@ -189,7 +192,7 @@ function initState() {
   parcelState = { ...parcelBase, ...stored }
 
   if (!parcelState.linkedSensorIds) {
-    const defaults = allSensors.filter(s => s.parcelId === parcelId).map(s => s.id)
+    const defaults = allSensors.filter(s => s.parcelIds.includes(parcelId)).map(s => s.id)
     parcelState.linkedSensorIds = stored.linkedSensorIds ?? defaults
   }
   if (!parcelState.integrations) {
@@ -243,8 +246,7 @@ function getDisplayCount() {
 
 // Catalog item name → widget ID
 const CATALOG_ITEM_ID = {
-  'Cumul Degrés jours': 'cumuls', 'Cumul Pluie': 'cumuls', 'Cumul Ensoleillement': 'cumuls',
-  'Cumul Evapotranspiration': 'cumuls', 'Cumul Heures froides': 'cumuls', 'Cumul Humectation foliaire': 'cumuls',
+  'Cumuls': 'cumuls',
   "Maï'zy": 'maizy', 'Suivi de culture': 'suivi-culture', 'Weephyt': 'weephyt',
   'Decitrait': 'decitrait', 'Tavelure Pomme': 'tavelure',
   'DPV': 'dpv', 'THI': 'thi', 'Température de rosée': 'temp-rosee',
@@ -261,7 +263,7 @@ const CATALOG_ITEM_ID = {
 }
 
 const WIDGET_CATALOG_WEB = [
-  { title: 'Cumuls', items: ['Cumul Degrés jours','Cumul Pluie','Cumul Ensoleillement','Cumul Evapotranspiration','Cumul Heures froides','Cumul Humectation foliaire'] },
+  { title: 'Cumuls', items: ['Cumuls'] },
   { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
   { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
@@ -299,7 +301,7 @@ function openWebWidgetCatalog() {
     if (item === 'Sonde de fertirrigation') return models.has('EC')
     if (item === 'DPV' || item === 'THI' || item === 'Température de rosée') return hasTH
     if (item === 'Température du sol') return hasTsol
-    if (item.startsWith('Cumul')) return hasCumul
+    if (item === 'Cumuls') return hasCumul
     return true
   }
 
@@ -428,10 +430,10 @@ function renderJournalTab() {
   let html = `
     <div class="journal-add-bar">
       <button class="btn-secondary btn-sm" id="jrn-add-note" style="gap:6px">
-        <i class="bi bi-pencil-square"></i> Note
+        <i class="bi bi-pencil-square"></i> Ajouter une Note
       </button>
       <button class="btn-secondary btn-sm" id="jrn-add-traitement" style="gap:6px">
-        <i class="bi bi-eyedropper"></i> Traitement
+        <i class="bi bi-eyedropper"></i> Ajouter un Traitement
       </button>
     </div>
     <div class="journal-timeline">
@@ -753,7 +755,6 @@ function renderChartsContent(container, linkedSensorIds) {
 
   // ALWAYS_METRICS: skip any metric already provided by a sensor
   ALWAYS_METRICS
-    .filter(m => !(m.id === 'etp' && stepMins < 1440))
     .filter(m => !sensorMetricIds.has(m.id))
     .forEach(m => allCards.push({ key: `always-${m.id}`, type: 'metric', metric: m, source: 'parcelle', emissionMins: null, unavailable: stepMins < 60 }))
 
@@ -818,10 +819,14 @@ function renderCharts() {
 
     const leftMetrics = getParcelFlatMetrics(parcelState.linkedSensorIds)
     const stored = getParcel(compareParcelId)
-    const compareLinkedIds = stored?.linkedSensorIds ?? allSensors.filter(s => s.parcelId === compareParcelId).map(s => s.id)
+    const compareLinkedIds = stored?.linkedSensorIds ?? allSensors.filter(s => s.parcelIds.includes(compareParcelId)).map(s => s.id)
     const rightMetrics = getParcelFlatMetrics(compareLinkedIds)
-    const leftIds = leftMetrics.map(m => m.id)
-    const allIds = [...leftIds, ...rightMetrics.map(m => m.id).filter(id => !leftIds.includes(id))]
+    const leftIds    = leftMetrics.map(m => m.id)
+    const rightIds   = rightMetrics.map(m => m.id)
+    const sharedIds  = leftIds.filter(id => rightIds.includes(id))
+    const leftOnly   = leftIds.filter(id => !rightIds.includes(id))
+    const rightOnly  = rightIds.filter(id => !leftIds.includes(id))
+    const allIds     = [...sharedIds, ...leftOnly, ...rightOnly]
 
     allIds.forEach(id => {
       const leftM  = leftMetrics.find(m => m.id === id)
@@ -1183,6 +1188,13 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
         sum += genRealisticVal(metricId, base / rawPerStep, minsAgo + j * (stepMins / rawPerStep))
       }
       return sum
+    } else if (rawPerStep > 1) {
+      // Average sub-samples to avoid single-point solar bias (e.g. ETP/rayonnement at night = 0)
+      let sum = 0
+      for (let j = 0; j < rawPerStep; j++) {
+        sum += genRealisticVal(metricId, base, minsAgo + j * (stepMins / rawPerStep))
+      }
+      return sum / rawPerStep
     } else {
       return genRealisticVal(metricId, base, minsAgo)
     }
@@ -1880,8 +1892,7 @@ function renderPanel() {
 
 // ─── Identification (editable) ────────────────────────────────────────────────
 
-const SOIL_TYPES  = ['Argilo-limoneux', 'Argileux', 'Limoneux', 'Sablo-limoneux', 'Sableux', 'Limon argileux', 'Limon fin', 'Argile sableux', 'Limono-argileux fin', 'Sable limoneux', 'Argile limoneuse']
-const IRRIG_TYPES = ['Goutte à goutte', 'Aspersion', 'Submersion', 'Enrouleur', 'Pivot', 'Rampe', 'Micro aspersion', 'Couverture intégrale', 'Goutte à goutte enterré', 'Gravitaire', 'Non irrigué']
+// IRRIG_TYPES and SOIL_TYPES imported from constants.js
 const CROP_LIST = [
   'Abricotier', 'Ail', 'Amandier', 'Artichaut', 'Asperge', 'Aubergine', 'Avoine', 'Basilic',
   'Betterave fourragère', 'Betterave sucrière', 'Blé dur', 'Blé tendre', 'Brocoli', 'Carotte',
@@ -1904,16 +1915,16 @@ const CROP_LIST = [
 function renderIdentification(org) {
   const el = document.getElementById('panel-ident')
   const p  = parcelState
-  const texture    = p.texture    || SOIL_TYPES[p.id % SOIL_TYPES.length]
-  const irrigation = p.irrigation || IRRIG_TYPES[p.id % IRRIG_TYPES.length]
+  const texture    = p.texture    || null
+  const irrigation = p.irrigation || null
   const crop       = p.crop       || CROP_LIST[0]
 
   el.innerHTML = `
     ${editableRow('Nom',          p.name || '—', 'name', 'text')}
     ${editableSelect('Culture',   crop,          'crop',       CROP_LIST)}
     ${readonlyRow('Surface',     (p.area   ? `${p.area} ha` : '—') + ' <span class="field-computed">(calculé)</span>')}
-    ${editableSelect('Texture sol', texture,    'texture',    SOIL_TYPES)}
-    ${editableSelect('Irrigation',  irrigation, 'irrigation', IRRIG_TYPES, 'integ-pill')}
+    ${editableSelectNullable('Texture sol', texture,    'texture',    SOIL_TYPES,  'Indéfini')}
+    ${editableSelectNullable('Irrigation',  irrigation, 'irrigation', IRRIG_TYPES, 'Non renseigné')}
     ${readonlyRow('Exploitation', org ? org.name : '—')}
   `
 
@@ -1921,9 +1932,9 @@ function renderIdentification(org) {
     saveState({ name: v })
     updateBreadcrumb(v, { label: 'Parcelles', href: 'parcelles.html' })
   })
-  bindEditable(el, 'crop',       crop,                v => saveState({ crop: v }))
-  bindEditable(el, 'texture',    texture,             v => saveState({ texture: v }))
-  bindEditable(el, 'irrigation', irrigation,          v => saveState({ irrigation: v }))
+  bindEditable(el, 'crop',       crop,                 v => saveState({ crop: v }))
+  bindEditable(el, 'texture',    texture || '',        v => saveState({ texture: v || null }))
+  bindEditable(el, 'irrigation', irrigation || '',     v => saveState({ irrigation: v || null }))
 }
 
 function editableRow(label, value, field, inputType = 'text') {
@@ -1940,6 +1951,17 @@ function editableSelect(label, value, field, options) {
     <div class="panel-row" data-field="${field}">
       <span class="panel-row-key">${label}</span>
       <select class="panel-field-input" data-val>
+        ${options.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('')}
+      </select>
+    </div>`
+}
+
+function editableSelectNullable(label, value, field, options, blankLabel = '—') {
+  return `
+    <div class="panel-row" data-field="${field}">
+      <span class="panel-row-key">${label}</span>
+      <select class="panel-field-input" data-val>
+        <option value=""${!value ? ' selected' : ''}>${blankLabel}</option>
         ${options.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('')}
       </select>
     </div>`
@@ -2492,7 +2514,7 @@ function exportCsv() {
   let cols
   if (compareParcelId) {
     const cPlot    = plots.find(p => p.id === compareParcelId)
-    const cIds     = allSensors.filter(s => s.parcelId === compareParcelId).map(s => s.id)
+    const cIds     = allSensors.filter(s => s.parcelIds.includes(compareParcelId)).map(s => s.id)
     const cMetrics = getParcelFlatMetrics(cIds)
     const cName    = cPlot?.name || 'Comparaison'
     cols = [
@@ -2585,36 +2607,36 @@ function initTabs() {
 // ─── Dashboard (Widgets) ──────────────────────────────────────────────────────
 
 const WIDGET_DEFS = {
-  'previsions-5j':   { size:'2x2', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'weephyt':         { size:'2x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
-  'cumuls':          { size:'1x2', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#e07050', render: renderWCumuls },
-  'bilan':           { size:'3x2', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'irrigations':     { size:'3x2', title:'Irrigations',               icon:'bi-moisture',              color:'#2ea0b0', render: renderWIrrigations, footer: { label:"Voir l'irrigation", href:'#' } },
-  'gel':             { size:'2x2', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#4ecdc4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'dpv':             { size:'1x2', title:'DPV',                        icon:'bi-droplet-half',          color:'#e07050', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'thi':             { size:'1x2', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'temp-rosee':      { size:'2x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#45b7d1', render: renderWTempRosee,  footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'temp-sol':        { size:'2x1', title:'Température du sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWTempSol,    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'maizy':           { size:'2x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:"Voir Maï'zy", href:'#' } },
-  'tavelure':        { size:'2x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure,           footer: { label:'Voir Tavelure', href:'#' } },
-  'suivi-culture':   { size:'2x1', title:'Suivi de culture',           icon:'bi-flower2',               color:'#78d8a0', render: renderWPlaceholder },
-  'decitrait':       { size:'2x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder,        footer: { label:'Voir Decitrait', href:'#' } },
-  'previsions-6h':   { size:'2x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'previsions-jour': { size:'2x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'previsions-tensio':{ size:'2x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#e07050', render: renderWSensor('w-station'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#4ecdc4', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#bb8fce', render: renderWSensor('w-tsol'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#7bc4b0', render: renderWSensor('w-anem'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#f5c842', render: renderWSensor('w-pyrano'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#78d8a0', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#c47a00', render: renderWSensor('w-par'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#f0cc60', render: renderWSensor('w-capa'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#5b8dd9', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#f0a030', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'profil-capteurs': { size:'2x2', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
-  'niveau-reservoir':{ size:'2x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
-  'profil-reservoir':{ size:'2x2', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
+  'previsions-5j':   { size:'1x1', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'weephyt':         { size:'1x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
+  'cumuls':          { size:'1x1', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#2E75B6', render: renderWCumuls },
+  'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:"Voir l'irrigation", href:'#' } },
+  'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'dpv':             { size:'1x1', title:'DPV',                        icon:'bi-droplet-half',          color:'#5E88EC', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'thi':             { size:'1x1', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'temp-rosee':      { size:'1x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#72B0D8', render: renderWTempRosee,  footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'temp-sol':        { size:'1x1', title:'Température du sol',         icon:'bi-layers',                color:'#795548', render: renderWTempSol,    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'maizy':           { size:'1x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:"Voir Maï'zy", href:'#' } },
+  'tavelure':        { size:'1x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure,           footer: { label:'Voir Tavelure', href:'#' } },
+  'suivi-culture':   { size:'1x1', title:'Suivi de culture',           icon:'bi-flower2',               color:'#78d8a0', render: renderWPlaceholder },
+  'decitrait':       { size:'1x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder,        footer: { label:'Voir Decitrait', href:'#' } },
+  'previsions-6h':   { size:'1x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'previsions-jour': { size:'1x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'previsions-tensio':{ size:'1x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#A6C157', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
+  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#FBAF05', render: renderWSensor('w-station'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#FBAF05', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#795548', render: renderWSensor('w-tsol'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#616161', render: renderWSensor('w-anem'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#CBCB0B', render: renderWSensor('w-pyrano'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#00887E', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#4CBB17', render: renderWSensor('w-par'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#ED9A2C', render: renderWSensor('w-capa'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#A6C157', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'profil-capteurs': { size:'1x1', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
+  'niveau-reservoir':{ size:'1x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
+  'profil-reservoir':{ size:'1x1', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
 }
 
 const DASH_STORAGE_KEY = () => `dash-widgets-parcel-${parcelId}`
@@ -2692,7 +2714,6 @@ function initDashGrid() {
       const dd = document.createElement('div')
       dd.className = 'dash-dropdown'
       dd.innerHTML = `
-        <button class="dash-dd-item" data-action="settings" data-wid="${btn.dataset.wid}">Paramétrer le widget</button>
         <button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${btn.dataset.wid}">Retirer le widget</button>`
       const rect = btn.getBoundingClientRect()
       const gridRect = grid.getBoundingClientRect()
@@ -2706,7 +2727,6 @@ function initDashGrid() {
         saveWidgetIds(cur)
         initDashGrid()
       })
-      dd.querySelector('[data-action="settings"]').addEventListener('click', () => dd.remove())
       setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
     })
   })
@@ -2781,23 +2801,19 @@ function wGauge(pct, zones, label, valueStr) {
 
 // ── Widget render functions ────────────────────────────────────────────────────
 
-let _prev5Model = 'AROME'
-
 function renderWPrev5j(el) {
   const DN=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
   const MN=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
   const WI=['bi-sun','bi-cloud-sun','bi-cloud','bi-cloud-rain','bi-cloud-lightning-rain']
-  const WC=['#f5c842','#8baac8','#8090a0','#45b7d1','#c070d0']
   const WL=['Ensoleillé','Part. nuageux','Couvert','Pluvieux','Orageux']
   const today=new Date()
   const p=plots.find(pl=>pl.id===parcelId)
   const org=orgs.find(o=>o.id===p?.orgId)
   const city=p?.ville||org?.ville||'—'
 
-  const days=Array.from({length:5},(_,i)=>{
+  const makeDay=(i,off)=>{
     const d=new Date(today); d.setDate(d.getDate()+i)
     const wi=Math.floor(((parcelId*7+i*3)%11)/2.2)
-    const off=_prev5Model==='ICON_EU'?-1:0
     return{
       lbl:i===0?'Auj.':DN[d.getDay()],
       date:`${d.getDate()} ${MN[d.getMonth()]}`,
@@ -2806,30 +2822,29 @@ function renderWPrev5j(el) {
       vent:rnd(10,35),rafales:rnd(25,70),
       wi
     }
-  })
+  }
+  // AROME 0–72h (j0–j2), ICON EU 72–136h (j3–j4)
+  const days=[0,1,2].map(i=>makeDay(i,0)).concat([3,4].map(i=>makeDay(i,-1)))
+
+  const dayHtml=d=>`
+    <div class="w-prev5-day">
+      <div class="w-prev5-daylbl">${d.lbl}</div>
+      <div class="w-prev5-date">${d.date}</div>
+      <i class="bi ${WI[d.wi]} w-prev5-icon" title="${WL[d.wi]}"></i>
+      <div class="w-prev5-row"><i class="bi bi-droplet-fill" style="color:#45b7d1;font-size:9px"></i><span>${d.pluie>0?d.pluie+' mm':'—'}</span></div>
+      <div class="w-prev5-row w-prev5-tmax"><i class="bi bi-thermometer-high" style="font-size:9px"></i>${d.tmax}°</div>
+      <div class="w-prev5-row w-prev5-tmin"><i class="bi bi-thermometer-low" style="font-size:9px"></i>${d.tmin}°</div>
+      <div class="w-prev5-row" style="color:var(--txt3)"><i class="bi bi-wind" style="font-size:9px"></i>${d.vent}</div>
+      <div class="w-prev5-row" style="color:var(--txt3);font-size:9px"><i class="bi bi-arrow-up-right" style="font-size:9px"></i>${d.rafales}</div>
+    </div>`
 
   el.innerHTML=`
     <div class="w-prev5-loc"><i class="bi bi-geo-alt-fill" style="color:var(--pri)"></i> ${city}</div>
-    <div class="w-prev5-models">
-      <button class="w-prev5-model-btn${_prev5Model==='AROME'?' active':''}" data-model="AROME">AROME</button>
-      <button class="w-prev5-model-btn${_prev5Model==='ICON_EU'?' active':''}" data-model="ICON_EU">ICON EU</button>
+    <div class="w-prev5-model-hdr">
+      <span class="w-prev5-model-lbl" style="grid-column:1/4">AROME <span>(Météo France)</span></span>
+      <span class="w-prev5-model-lbl" style="grid-column:4/6">ICON EU <span>(DWD)</span></span>
     </div>
-    <div class="w-prev5-grid">${days.map(d=>`
-      <div class="w-prev5-day">
-        <div class="w-prev5-daylbl">${d.lbl}</div>
-        <div class="w-prev5-date">${d.date}</div>
-        <i class="bi ${WI[d.wi]} w-prev5-icon" style="color:${WC[d.wi]}" title="${WL[d.wi]}"></i>
-        <div class="w-prev5-row"><i class="bi bi-droplet-fill" style="color:#45b7d1;font-size:9px"></i><span>${d.pluie>0?d.pluie+' mm':'—'}</span></div>
-        <div class="w-prev5-row w-prev5-tmax"><i class="bi bi-thermometer-high" style="font-size:9px"></i>${d.tmax}°</div>
-        <div class="w-prev5-row w-prev5-tmin"><i class="bi bi-thermometer-low" style="font-size:9px"></i>${d.tmin}°</div>
-        <div class="w-prev5-row" style="color:var(--txt3)"><i class="bi bi-wind" style="font-size:9px"></i>${d.vent}</div>
-        <div class="w-prev5-row" style="color:var(--txt3);font-size:9px"><i class="bi bi-arrow-up-right" style="font-size:9px"></i>${d.rafales}</div>
-      </div>`).join('')}</div>
-    <a href="javascript:void 0" class="w-prev5-more">Voir plus de prévisions →</a>`
-
-  el.querySelectorAll('.w-prev5-model-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{ _prev5Model=btn.dataset.model; renderWPrev5j(el) })
-  })
+    <div class="w-prev5-grid">${days.map(dayHtml).join('')}</div>`
 }
 
 function renderWWeephyt(el) {
@@ -2885,14 +2900,14 @@ function renderWCumuls(el) {
   const cfg=state.cfg||{}
 
   const allItems=[
-    {id:'etp',  label:'ETP',         value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
-    {id:'pluie',label:'Pluie',       value:rnd(10,50),             unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
-    {id:'djc',  label:'DJ',          value:rnd(40,180),            unit:'DJ',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp'),cfg:true,
+    {id:'etp',  label:'Évapotranspiration',value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
+    {id:'pluie',label:'Pluie',             value:rnd(10,50),             unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
+    {id:'djc',  label:'Degrés jours',      value:rnd(40,180),            unit:'DJ',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp'),cfg:true,
       cfgLabel:`${cfg.djMin??0}–${cfg.djMax??18}°C`,cfgFields:[{key:'djMin',label:'T min',def:0},{key:'djMax',label:'T max',def:18}]},
-    {id:'hfroid',label:'Heure de froid',value:rnd(5,40),          unit:'h', color:'#5b8dd9',icon:'bi-snow',show:met.has('temp'),cfg:true,
+    {id:'hfroid',label:'Heures de froid',  value:rnd(5,40),              unit:'h', color:'#5b8dd9',icon:'bi-snow',show:met.has('temp'),cfg:true,
       cfgLabel:`< ${cfg.hfSeuil??7.2}°C`,cfgFields:[{key:'hfSeuil',label:'Seuil',def:7.2}]},
-    {id:'humec',label:'Humectation', value:rndf(2,20).toFixed(1), unit:'h', color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
-    {id:'enso', label:'Ensoleillement',value:rndf(30,90).toFixed(1),unit:'h',color:'#f5c842',icon:'bi-brightness-high',show:met.has('rayonnement')},
+    {id:'humec',label:'Humectation',       value:rndf(2,20).toFixed(1),  unit:'h', color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
+    {id:'enso', label:'Ensoleillement',    value:rndf(30,90).toFixed(1), unit:'h', color:'#f5c842',icon:'bi-brightness-high',show:true},
   ].filter(i=>i.show&&!hidden.has(i.id))
 
   el.innerHTML=`<div class="w-cumuls-list">${allItems.map(i=>{
@@ -2902,9 +2917,9 @@ function renderWCumuls(el) {
       <div class="w-cumul-item">
         <i class="bi ${i.icon} w-cumul-icon" style="color:${i.color}"></i>
         <div class="w-cumul-body">
-          <div class="w-cumul-lbl">${i.label}${i.cfg?`<button class="w-cumul-cfg" data-cid="${i.id}" title="Paramétrer"><i class="bi bi-gear"></i></button>`:''}</div>
+          <div class="w-cumul-lbl">${i.label}</div>
           <div class="w-cumul-val" style="color:${i.color}">${i.value}<span class="w-cumul-unit"> ${i.unit}</span></div>
-          <div class="w-cumul-date">Depuis le <input type="date" class="w-cumul-date-input" data-cid="${i.id}" value="${d}"></div>
+          <div class="w-cumul-date">Depuis le <input type="date" class="w-cumul-date-input" data-cid="${i.id}" value="${d}" style="border:1px solid var(--bdr2);background:transparent;font-size:12px;color:var(--txt3);cursor:pointer;font-family:inherit;padding:3px 5px;border-radius:5px">${i.cfg?`<button class="w-cumul-cfg" data-cid="${i.id}" style="border:1px solid var(--bdr2);background:transparent;font-size:12px;color:var(--txt3);cursor:pointer;font-family:inherit;padding:3px 5px;border-radius:5px;line-height:1"><i class="bi bi-gear"></i> ${i.cfgLabel}</button>`:''}</div>
         </div>
         <button class="w-cumul-del" data-cid="${i.id}" title="Retirer">×</button>
       </div>`
@@ -2933,6 +2948,7 @@ function renderWCumuls(el) {
       el.querySelector('.w-cumul-cfg-panel')?.remove()
       const panel=document.createElement('div')
       panel.className='w-cumul-cfg-panel'
+      panel.style.gridColumn='1 / -1'
       panel.innerHTML=`<div class="w-cumul-cfg-title">Paramétrer ${item.label}</div>`+
         item.cfgFields.map(f=>`
           <label class="w-cumul-cfg-row">
@@ -2957,27 +2973,27 @@ function renderWGel(el) {
   const N=25, base=rndf(0,5)
   const tS=Array.from({length:N},(_,i)=>+(base+i*0.18+rndf(-0.8,0.8)).toFixed(1))
   const tH=tS.map(v=>+(v-rndf(1,2.5)).toFixed(1))
-  const chart=wLineChart([{values:tS,color:'#e07050'},{values:tH,color:'#4ecdc4'}],380,100)
+  const chart=wLineChart([{values:tS,color:'#23B19B'},{values:tH,color:'#5E88EC'}],380,100)
   const tSN=tS[N-1],tHN=tH[N-1]
   const gelColor=tHN<=0?'#e07050':tHN<=2?'#f5a030':'#2d9e5f'
   const gelRisk=tHN<=0?'Gel probable':tHN<=2?'Risque faible':'Pas de gel'
   const hLev=rnd(5,8),hMin=String(Math.floor(Math.random()*60)).padStart(2,'0')
   el.innerHTML=`<div class="w-gel-wrap">
     <div class="w-gel-legend">
-      <span style="color:#e07050"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sèche</span>
-      <span style="color:#4ecdc4"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. humide</span>
+      <span style="color:#23B19B"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sèche</span>
+      <span style="color:#5E88EC"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. humide</span>
       <span style="font-size:10px;color:var(--txt3)">12 dernières heures</span>
     </div>
     <div class="w-gel-chart">${chart}</div>
     <div class="w-gel-cards">
-      <div class="w-gel-card"><span class="w-gel-card-lbl">T. sèche </span><span class="w-gel-card-val" style="color:#e07050">${tSN}°C</span></div>
-      <div class="w-gel-card"><span class="w-gel-card-lbl">T. humide </span><span class="w-gel-card-val" style="color:#4ecdc4">${tHN}°C</span></div>
+      <div class="w-gel-card"><span class="w-gel-card-lbl">T. sèche </span><span class="w-gel-card-val" style="color:#23B19B">${tSN}°C</span></div>
+      <div class="w-gel-card"><span class="w-gel-card-lbl">T. humide </span><span class="w-gel-card-val" style="color:#5E88EC">${tHN}°C</span></div>
     </div>
     <div class="w-gel-meteo">
-      <div class="w-gel-meteo-row"><i class="bi bi-sunrise" style="color:#f5c842"></i><span>Lever du soleil</span><strong>${hLev}h${hMin}</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-sunrise" style="color:#CBCB0B"></i><span>Lever du soleil</span><strong>${hLev}h${hMin}</strong></div>
       <div class="w-gel-meteo-row"><i class="bi bi-cloud" style="color:#8090a0"></i><span>Couverture nuageuse</span><strong>${rnd(20,80)} %</strong></div>
-      <div class="w-gel-meteo-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i><span>Humidité</span><strong>${rnd(60,90)} %</strong></div>
-      <div class="w-gel-meteo-row"><i class="bi bi-wind" style="color:#7bc4b0"></i><span>Vent moyen</span><strong>${rnd(5,25)} km/h</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-droplet-half" style="color:#5B12A4"></i><span>Humidité</span><strong>${rnd(60,90)} %</strong></div>
+      <div class="w-gel-meteo-row"><i class="bi bi-wind" style="color:#616161"></i><span>Vent moyen</span><strong>${rnd(5,25)} km/h</strong></div>
     </div>
   </div>`
 }
@@ -2998,8 +3014,8 @@ function renderWDpv(el) {
   el.innerHTML=`<div class="w-dpv-wrap">
     <div class="w-dpv-gauge" style="color:${dpvColor}">${wGauge(pct,zones,dpvLabel,dpv+' kPa')}</div>
     <div class="w-dpv-details">
-      <div class="w-dpv-row"><i class="bi bi-thermometer-half" style="color:#e07050"></i> ${temp.toFixed(1)} °C</div>
-      <div class="w-dpv-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i> ${hr} %</div>
+      <div class="w-dpv-row"><i class="bi bi-thermometer-half" style="color:#FBAF05"></i> ${temp.toFixed(1)} °C</div>
+      <div class="w-dpv-row"><i class="bi bi-droplet-half" style="color:#5B12A4"></i> ${hr} %</div>
     </div>
     ${src?`<div class="w-sensor-src">${MODEL_NAMES[src.model]||src.model} · ${src.serial}</div>`:''}
   </div>`
@@ -3026,8 +3042,8 @@ function renderWThi(el) {
       <button class="w-thi-info-btn" title="Légende THI"><i class="bi bi-info-circle"></i></button>
     </div>
     <div class="w-thi-details">
-      <div class="w-thi-row"><i class="bi bi-thermometer-half" style="color:#e07050"></i> ${temp.toFixed(1)} °C</div>
-      <div class="w-thi-row"><i class="bi bi-droplet-half" style="color:#4ecdc4"></i> ${hr} %</div>
+      <div class="w-thi-row"><i class="bi bi-thermometer-half" style="color:#FBAF05"></i> ${temp.toFixed(1)} °C</div>
+      <div class="w-thi-row"><i class="bi bi-droplet-half" style="color:#5B12A4"></i> ${hr} %</div>
     </div>
     <div class="w-thi-forecast">
       <div class="w-thi-fc-label">Prévisions</div>
@@ -3066,10 +3082,10 @@ function renderWTempRosee(el) {
   const hr=Array.from({length:N},(_,i)=>Math.max(30,Math.min(100,70-15*Math.sin(i/24*2*Math.PI-Math.PI/2)+rndf(-3,3))))
   const rosee=temp.map((t,i)=>{const h=hr[i]/100,a=17.27,b=237.3;const g=Math.log(h)+a*t/(b+t);return +(b*g/(a-g)).toFixed(1)})
   el.innerHTML=`<div class="w-temprosee-wrap">
-    ${wLineChart([{values:temp,color:'#e07050'},{values:rosee,color:'#45b7d1'}],380,100)}
+    ${wLineChart([{values:temp,color:'#FBAF05'},{values:rosee,color:'#72B0D8'}],380,100)}
     <div class="w-temprosee-legend">
-      <span style="color:#e07050"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Température (${temp[N-1]}°C)</span>
-      <span style="color:#45b7d1"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Point de rosée (${rosee[N-1]}°C)</span>
+      <span style="color:#FBAF05"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Température (${temp[N-1]}°C)</span>
+      <span style="color:#72B0D8"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> Point de rosée (${rosee[N-1]}°C)</span>
       <span style="font-size:10px;color:var(--txt3)">3 derniers jours</span>
     </div>
   </div>`
@@ -3095,12 +3111,12 @@ function renderWTempSol(el) {
       <rect x="${PL}" y="${yOMx.toFixed(1)}" width="${iW}" height="${(yOM-yOMx).toFixed(1)}" fill="rgba(45,158,95,.1)"/>
       <line x1="${PL}" y1="${yOM.toFixed(1)}" x2="${W-PR}" y2="${yOM.toFixed(1)}" stroke="#2d9e5f" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>
       <line x1="${PL}" y1="${yOMx.toFixed(1)}" x2="${W-PR}" y2="${yOMx.toFixed(1)}" stroke="#2d9e5f" stroke-width="1" stroke-dasharray="4,3" opacity=".5"/>
-      <path d="${d}" fill="none" stroke="#bb8fce" stroke-width="2" stroke-linejoin="round"/>
+      <path d="${d}" fill="none" stroke="#795548" stroke-width="2" stroke-linejoin="round"/>
       <text x="${PL-3}" y="${(PT+4)}" text-anchor="end" font-size="9" fill="var(--txt3)">${maxV.toFixed(0)}</text>
       <text x="${PL-3}" y="${(PT+iH+4)}" text-anchor="end" font-size="9" fill="var(--txt3)">${minV.toFixed(0)}</text>
     </svg>
     <div class="w-tsol-legend">
-      <span style="color:#bb8fce"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sol · ${vals[N-1]}°C</span>
+      <span style="color:#795548"><i class="bi bi-dash" style="font-size:14px;vertical-align:middle"></i> T. sol · ${vals[N-1]}°C</span>
       <span style="color:#2d9e5f;font-size:10px"><i class="bi bi-square-fill" style="opacity:.3"></i> Zone optimale ${optMin}–${optMax}°C</span>
       <span style="font-size:10px;color:var(--txt3)">48 dernières heures</span>
     </div>
@@ -3188,26 +3204,26 @@ function renderWSensor(type) {
     const rowsMap={
       'w-station':()=>{
         const r=[]
-        if(ms.some(m=>m.id==='temp'))     r.push({label:'Température',val:rnd(10,30)+' °C',  color:'#e07050',icon:'bi-thermometer-half'})
-        if(ms.some(m=>m.id==='pluie'))    r.push({label:'Pluie 24h',   val:rnd(0,14)+' mm',   color:'#45b7d1',icon:'bi-cloud-rain-heavy'})
-        if(ms.some(m=>m.id==='humidite')) r.push({label:'Humidité',    val:rnd(40,90)+' %',   color:'#4ecdc4',icon:'bi-droplet-half'})
+        if(ms.some(m=>m.id==='temp'))     r.push({label:'Température',val:rnd(10,30)+' °C',  color:'#FBAF05',icon:'bi-thermometer-half'})
+        if(ms.some(m=>m.id==='pluie'))    r.push({label:'Pluie 24h',   val:rnd(0,14)+' mm',   color:'#2E75B6',icon:'bi-cloud-rain-heavy'})
+        if(ms.some(m=>m.id==='humidite')) r.push({label:'Humidité',    val:rnd(40,90)+' %',   color:'#5B12A4',icon:'bi-droplet-half'})
         return r
       },
       'w-thygro':()=>[
-        {label:'Température',val:rnd(10,30)+' °C',color:'#e07050',icon:'bi-thermometer-half'},
-        {label:'Humidité',   val:rnd(40,90)+' %', color:'#4ecdc4',icon:'bi-droplet-half'},
+        {label:'Température',val:rnd(10,30)+' °C',color:'#FBAF05',icon:'bi-thermometer-half'},
+        {label:'Humidité',   val:rnd(40,90)+' %', color:'#5B12A4',icon:'bi-droplet-half'},
       ],
-      'w-tsol': ()=>[{label:'Temp. sol',      val:rnd(8,22)+' °C',       color:'#bb8fce',icon:'bi-layers'}],
+      'w-tsol': ()=>[{label:'Temp. sol',      val:rnd(8,22)+' °C',       color:'#795548',icon:'bi-layers'}],
       'w-anem': ()=>[
-        {label:'Vitesse',   val:rnd(0,40)+' km/h',color:'#7bc4b0',icon:'bi-wind'},
-        {label:'Direction', val:['N','NE','E','SE','S','SO','O','NO'][rnd(0,7)],color:'#7bc4b0',icon:'bi-compass'},
+        {label:'Vitesse',   val:rnd(0,40)+' km/h',color:'#616161',icon:'bi-wind'},
+        {label:'Direction', val:['N','NE','E','SE','S','SO','O','NO'][rnd(0,7)],color:'#616161',icon:'bi-compass'},
       ],
-      'w-pyrano':()=>[{label:'Rayonnement',val:rnd(100,900)+' W/m²',     color:'#f5c842',icon:'bi-sun'}],
-      'w-lws':   ()=>[{label:'Humectation', val:rndf(0,12).toFixed(1)+' h/j',color:'#78d8a0',icon:'bi-droplet'}],
-      'w-par':   ()=>[{label:'PPFD',         val:rnd(100,2000)+' µmol/m²/s',color:'#c47a00',icon:'bi-brightness-high'}],
+      'w-pyrano':()=>[{label:'Rayonnement',val:rnd(100,900)+' W/m²',     color:'#CBCB0B',icon:'bi-sun'}],
+      'w-lws':   ()=>[{label:'Humectation', val:rndf(0,12).toFixed(1)+' h/j',color:'#00887E',icon:'bi-droplet'}],
+      'w-par':   ()=>[{label:'PPFD',         val:rnd(100,2000)+' µmol/m²/s',color:'#4CBB17',icon:'bi-brightness-high'}],
       'w-capa':  ()=>ms.filter(m=>m.id.startsWith('vwc')).slice(0,3).map(m=>({label:m.name,val:rnd(15,45)+' %vol',color:m.color,icon:'bi-moisture'})),
-      'w-tensio':()=>[{label:'Potentiel hydrique',val:rnd(10,150)+' kPa',color:'#5b8dd9',icon:'bi-graph-down'}],
-      'w-ec':    ()=>[{label:'Conductivité',val:rndf(0.1,3).toFixed(2)+' mS/cm',color:'#f0a030',icon:'bi-plug'}],
+      'w-tensio':()=>[{label:'Potentiel hydrique',val:rnd(10,150)+' kPa',color:'#A6C157',icon:'bi-graph-down'}],
+      'w-ec':    ()=>[{label:'Conductivité',val:rndf(0.1,3).toFixed(2)+' mS/cm',color:'#2BCDDE',icon:'bi-plug'}],
     }
     const rows=(rowsMap[type]||(() => []))()
     el.innerHTML=`

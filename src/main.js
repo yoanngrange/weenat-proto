@@ -5,6 +5,8 @@ import { sensors } from './data/sensors.js'
 import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
 import { applyStoredPlotPatches } from './data/store.js'
+import { ADHERENT_ORG_ID, ADMIN_ORG_ID, IRRIG_TYPES, SOIL_TYPES } from './data/constants.js'
+import { IRRIG_SEASON, buildGroups } from './data/irrigations.js'
 applyStoredPlotPatches(plots)
 
 const _iconBase = import.meta.env.BASE_URL + 'icons/'
@@ -15,12 +17,9 @@ function envIcon(env) {
 }
 function textureDisplay(parcel) {
   if (parcel.substrate) return 'Substrat : ' + parcel.substrate
-  return parcel.texture || '—'
+  return parcel.texture || 'Indéfini'
 }
-
-let currentRole = 'admin' // 'admin' or 'adherent'
-const ADHERENT_ORG_ID = 1   // Ferme du Bocage (exploitation de l'adhérent)
-const ADMIN_ORG_ID    = 100  // Breiz'Agri Conseil (exploitation propre du réseau)
+let currentRole = 'admin'
 let currentSection = 'exploitation'
 let currentView = 'map'
 let currentMetric = 'pluie'
@@ -53,6 +52,7 @@ function saveFavorites() {
 }
 let map
 let markers = []
+let _filteredSensors = []
 
 const pageType = (() => {
   const page = window.location.pathname.split('/').pop()
@@ -82,11 +82,32 @@ const MODEL_METRICS = {
   'EC':        ['conductivite'],
 }
 
+// Inversion MODEL_METRICS : metric → Set des modèles de capteurs qui la fournissent
+const METRIC_SENSORS = (() => {
+  const map = {}
+  Object.entries(MODEL_METRICS).forEach(([model, metrics]) => {
+    metrics.forEach(m => { if (!map[m]) map[m] = new Set(); map[m].add(model) })
+  })
+  return map
+})()
+
+// Métriques calculées sans capteur (disponibles sur toutes les parcelles)
+const ALWAYS_COMPUTED_METRICS = new Set(['etat-hydrique', 'irrigations'])
+
+function parcelHasMetric(parcel, metric) {
+  if (ALWAYS_COMPUTED_METRICS.has(metric)) return true
+  const needed = METRIC_SENSORS[metric]
+  if (!needed) return false
+  return _filteredSensors.some(s => s.parcelIds.includes(parcel.id) && needed.has(s.model))
+}
+
 // Labels de toutes les métriques (ordre d'affichage dans le sélecteur)
 const METRIC_LABELS = {
   'pluie':             'Pluie',
   'temp':                   'Température',
   'humidite':               'Humidité',
+  'etat-hydrique':          'État hydrique',
+  'irrigations':            'Irrigations',
   'vent':                   'Vent',
   'rayonnement':            'Rayonnement',
   'intensite-humectation':  "Intensité d'humectation foliaire",
@@ -186,7 +207,13 @@ const metricAggregates = {
   'conductivite': [
     { value: 'reel', label: 'Temps réel' },
     { value: 'moyenne-7', label: 'Moyenne 7 jours' }
-  ]
+  ],
+  'irrigations': [
+    { value: '7jours',   label: '7 derniers jours' },
+    { value: '30jours',  label: '30 derniers jours' },
+    { value: 'saison',   label: 'Cette saison' },
+    { value: 'planif7j', label: 'Planifié 7 jours' },
+  ],
 }
 
 // Initialize app
@@ -212,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMap()
   initExportButton()
   initSelectionListeners()
+  window.addEventListener('irrig-updated', updateContent)
   updateView()
 })
 
@@ -426,8 +454,7 @@ function populateFilterDropdowns() {
   makeCheckboxPanel('panel-etat-hydrique', null,
     { set: v => { selectedEtatsHydriques = v } }, 'badge-etat-hydrique')
 
-  const textures = [...new Set(plots.map(p => p.texture))].sort()
-  makeCheckboxPanel('panel-texture', textures,
+  makeCheckboxPanel('panel-texture', SOIL_TYPES,
     { set: v => { selectedTextures = v } }, 'badge-texture')
 
   makeCheckboxPanel('panel-integration', INTEGRATION_NAMES.sort(),
@@ -597,13 +624,13 @@ function getFilteredData() {
     if (currentSection === 'reseau') {
       // Adhérent Mon réseau : tous les capteurs météo du réseau (pas irrigation)
       filteredSensors = sensors.filter(s => METEO_MODELS.has(s.model))
-      filteredParcels = plots.filter(p => filteredSensors.some(s => s.parcelId === p.id))
+      filteredParcels = plots.filter(p => filteredSensors.some(s => s.parcelIds.includes(p.id)))
     } else {
       // Adhérent Mon exploitation : son org uniquement
       filteredParcels = plots.filter(p => p.orgId === ADHERENT_ORG_ID)
       filteredSensors = sensors.filter(s =>
-        filteredParcels.some(p => p.id === s.parcelId) ||
-        (s.parcelId === null && s.orgId === ADHERENT_ORG_ID)
+        filteredParcels.some(p => s.parcelIds.includes(p.id)) ||
+        (!s.parcelIds.length && s.orgId === ADHERENT_ORG_ID)
       )
     }
   } else {
@@ -623,12 +650,12 @@ function getFilteredData() {
   // Apply multi-select filters
   if (selectedCultures.length > 0) {
     filteredParcels = filteredParcels.filter(p => selectedCultures.includes(p.crop))
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   if (selectedIrrigations.length > 0) {
     filteredParcels = filteredParcels.filter(p => selectedIrrigations.includes(p.irrigation))
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   if (selectedEtatsHydriques.length > 0) {
@@ -641,26 +668,26 @@ function getFilteredData() {
         return false
       })
     )
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   if (selectedTextures.length > 0) {
     filteredParcels = filteredParcels.filter(p => selectedTextures.includes(p.texture))
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   if (selectedIntegrations.length > 0) {
     filteredParcels = filteredParcels.filter(p =>
       selectedIntegrations.some(integ => (p.integrations || []).includes(integ))
     )
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   const orgEl = document.getElementById('org-filter')
   const org = orgEl ? orgEl.value : ''
   if (org) {
     filteredParcels = filteredParcels.filter(p => p.orgId == org)
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   const modelEl = document.getElementById('model-filter')
@@ -671,17 +698,17 @@ function getFilteredData() {
 
   if (selectedModels.length > 0) {
     filteredSensors = filteredSensors.filter(s => selectedModels.includes(s.model))
-    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelIds.includes(p.id)))
   }
 
   if (selectedEvents.length > 0) {
     filteredSensors = filteredSensors.filter(s => selectedEvents.includes(s.event))
-    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelIds.includes(p.id)))
   }
 
   if (selectedTelecoms.length > 0) {
     filteredSensors = filteredSensors.filter(s => selectedTelecoms.includes(s.telecom))
-    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelId === p.id))
+    filteredParcels = filteredParcels.filter(p => filteredSensors.some(s => s.parcelIds.includes(p.id)))
   }
 
   // Legacy simple selects (capteurs-reseau only)
@@ -696,7 +723,7 @@ function getFilteredData() {
   if (filterMonSecteur) {
     const secteurOrgIds = new Set(orgs.filter(o => MON_SECTEUR_DEPTS.has(o.departement)).map(o => o.id))
     filteredParcels = filteredParcels.filter(p => secteurOrgIds.has(p.orgId))
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
   }
 
   if (filterMonFavoris) {
@@ -706,7 +733,7 @@ function getFilteredData() {
 
   if (selectedOrgs.length > 0) {
     filteredSensors = filteredSensors.filter(s => {
-      const parcel = plots.find(p => p.id === s.parcelId)
+      const parcel = plots.find(p => s.parcelIds.includes(p.id))
       return selectedOrgs.includes(parcel ? parcel.orgId : s.orgId)
     })
     filteredParcels = filteredParcels.filter(p => selectedOrgs.includes(p.orgId))
@@ -715,7 +742,7 @@ function getFilteredData() {
   if (selectedVilles.length > 0) {
     const villeOrgIds = new Set(orgs.filter(o => selectedVilles.includes(o.ville)).map(o => o.id))
     filteredSensors = filteredSensors.filter(s => {
-      const parcel = plots.find(p => p.id === s.parcelId)
+      const parcel = plots.find(p => s.parcelIds.includes(p.id))
       return villeOrgIds.has(parcel ? parcel.orgId : s.orgId)
     })
     filteredParcels = filteredParcels.filter(p => villeOrgIds.has(p.orgId))
@@ -723,7 +750,7 @@ function getFilteredData() {
 
   if (selectedParcelNames.length > 0) {
     const parcelIds = new Set(plots.filter(p => selectedParcelNames.includes(p.name)).map(p => p.id))
-    filteredSensors = filteredSensors.filter(s => parcelIds.has(s.parcelId))
+    filteredSensors = filteredSensors.filter(s => s.parcelIds.some(id => parcelIds.has(id)))
     filteredParcels = filteredParcels.filter(p => parcelIds.has(p.id))
   }
 
@@ -732,7 +759,7 @@ function getFilteredData() {
       members.filter(m => selectedMemberNames.includes(`${m.prenom} ${m.nom}`))
         .flatMap(m => m.parcelIds)
     )
-    filteredSensors = filteredSensors.filter(s => memberParcelIds.has(s.parcelId))
+    filteredSensors = filteredSensors.filter(s => s.parcelIds.some(id => memberParcelIds.has(id)))
     filteredParcels = filteredParcels.filter(p => memberParcelIds.has(p.id))
   }
 
@@ -801,21 +828,23 @@ function updateMetricSelector(filteredParcels, filteredSensors) {
   const sel = document.getElementById('metric-selector')
   if (!sel) return
 
-  // Sur les pages capteurs : métriques des capteurs visibles
-  // Sur les pages parcelles : métriques des capteurs liés aux parcelles visibles
   const sensorList = pageType.startsWith('parcelles')
-    ? sensors.filter(s => filteredParcels.some(p => p.id === s.parcelId))
+    ? filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
     : filteredSensors
 
-  const available = getAvailableMetrics(sensorList)
-  if (available.length === 0) return
+  let available = getAvailableMetrics(sensorList)
+
+  if (pageType.startsWith('parcelles')) {
+    const alwaysOn = ['etat-hydrique', 'irrigations']
+    alwaysOn.forEach(m => { if (!available.includes(m)) available.push(m) })
+  }
 
   sel.innerHTML = available
     .map(m => `<option value="${m}">${METRIC_LABELS[m]}</option>`)
     .join('')
 
   if (!available.includes(currentMetric)) {
-    currentMetric = available[0]
+    currentMetric = available[0] || 'pluie'
   }
   sel.value = currentMetric
   updateAggregateOptions()
@@ -829,6 +858,7 @@ function updateContent() {
   if (metricControls) metricControls.style.display = currentView === 'admin' ? 'none' : ''
 
   const { parcels: filteredParcels, sensors: filteredSensors } = getFilteredData()
+  _filteredSensors = filteredSensors
 
   updateMetricSelector(filteredParcels, filteredSensors)
 
@@ -894,7 +924,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
 
     if (currentView === 'map') {
       filteredSensors.forEach(sensor => {
-        const parcel = plots.find(p => p.id === sensor.parcelId)
+        const parcel = plots.find(p => sensor.parcelIds.includes(p.id))
         if (!parcel) return
 
         const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
@@ -904,8 +934,10 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         const circle = L.circleMarker([parcel.lat, parcel.lng], {
           radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
         }).addTo(map)
+        const displayName = getSensorDisplayName(sensor)
+        const nameStr = displayName !== sensor.serial ? `${displayName}<br><span style="font-weight:400;color:#636366">${sensor.serial} · ${sensor.model}</span>` : `<strong>${sensor.serial} · ${sensor.model}</strong>`
         circle.bindTooltip(
-          `<strong>${sensor.serial} · ${sensor.model}</strong>${valLine}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
+          `${nameStr}${valLine}<br>Signal: ${sensor.networkQuality}%${eventStr}`,
           { sticky: true, opacity: 0.95 }
         )
         circle.on('click', () => { window.location.href = `capteur-detail.html?id=${sensor.id}` })
@@ -1031,6 +1063,7 @@ function getMetricTooltipValue(parcel) {
 
 function computeMetricValue(parcel, metric, aggregate) {
   const noise = Math.round((Math.sin(parcel.id * 1.3 + aggregate.length * 2) * 3))
+  const dj = parcel.degresJour || parcel.id * 12
   if (metric === 'pluie') {
     const base = Math.max(3, Math.round(parcel.area * 1.8 + parcel.reserveHydrique / 8))
     switch (aggregate) {
@@ -1044,7 +1077,7 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'temp') {
-    const base = 10 + parcel.degresJour / 140
+    const base = 10 + dj / 140
     switch (aggregate) {
       case 'reel': return Math.round(base + noise * 0.4)
       case 'min-jour': return Math.round(base - 4 + noise * 0.1)
@@ -1095,7 +1128,7 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'rayonnement') {
-    const base = 150 + parcel.degresJour / 5
+    const base = 150 + dj / 5
     switch (aggregate) {
       case 'reel': return Math.round(base + noise * 15)
       case 'today': return Math.round(base * 3 + noise * 50)
@@ -1106,7 +1139,7 @@ function computeMetricValue(parcel, metric, aggregate) {
 
 
   if (metric === 'temp-sol') {
-    const base = Math.round(8 + parcel.degresJour / 160)
+    const base = Math.round(8 + dj / 160)
     switch (aggregate) {
       case 'reel': return base + noise
       case 'min-jour': return base - 3 + noise
@@ -1117,7 +1150,7 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'temp-seche') {
-    const base = Math.round(-1 + parcel.degresJour / 300)
+    const base = Math.round(-1 + dj / 300)
     switch (aggregate) {
       case 'reel': return base + noise
       case 'min-jour': return base - 2 + noise
@@ -1127,7 +1160,7 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'temp-humide') {
-    const base = Math.round(-3 + parcel.degresJour / 320)
+    const base = Math.round(-3 + dj / 320)
     switch (aggregate) {
       case 'reel': return base + noise
       case 'min-jour': return base - 2 + noise
@@ -1137,13 +1170,13 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'potentiel-hydrique') {
-    // kPa : 0 = saturé, -1500 = point de flétrissement
-    const base = -Math.round(20 + (100 - parcel.reserveHydrique) * 8 + (parcel.id % 40))
+    // kPa : 0 = saturé, 200 = très sec
+    const base = Math.round(Math.max(0, Math.min(200, 10 + (100 - parcel.reserveHydrique) * 1.8 + (parcel.id % 20))))
     switch (aggregate) {
-      case 'reel': return base + noise * 5
-      case 'min-jour': return base + 15 + noise * 3
-      case 'max-jour': return base - 20 + noise * 5
-      case 'moyenne-7': return base + 5 + noise * 2
+      case 'reel': return Math.max(0, Math.min(200, base + noise * 3))
+      case 'min-jour': return Math.max(0, base - 15)
+      case 'max-jour': return Math.min(200, base + 20)
+      case 'moyenne-7': return Math.max(0, Math.min(200, base - 5 + noise * 2))
       default: return base
     }
   }
@@ -1192,6 +1225,21 @@ function computeMetricValue(parcel, metric, aggregate) {
     }
   }
 
+  if (metric === 'irrigations') {
+    const label = [parcel.crop, parcel.irrigation].filter(Boolean).join(' · ')
+    if (!label) return 0
+    const today = new Date().toISOString().split('T')[0]
+    const ago = days => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().split('T')[0] }
+    const ahead = days => { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0] }
+    switch (aggregate) {
+      case '7jours':   return IRRIG_SEASON.filter(i =>  i.real && i.label === label && i.iso >= ago(7)).reduce((s, i) => s + i.mm, 0)
+      case '30jours':  return IRRIG_SEASON.filter(i =>  i.real && i.label === label && i.iso >= ago(30)).reduce((s, i) => s + i.mm, 0)
+      case 'saison':   return IRRIG_SEASON.filter(i =>  i.real && i.label === label).reduce((s, i) => s + i.mm, 0)
+      case 'planif7j': return IRRIG_SEASON.filter(i => !i.real && i.label === label && i.iso >= today && i.iso <= ahead(7)).reduce((s, i) => s + i.mm, 0)
+      default:         return IRRIG_SEASON.filter(i =>  i.real && i.label === label).reduce((s, i) => s + i.mm, 0)
+    }
+  }
+
   return parcel.reserveHydrique
 }
 
@@ -1206,7 +1254,9 @@ function getAggregateLabel(aggregate) {
     'min-jour': 'Min du jour',
     'max-jour': 'Max du jour',
     'moyenne-7': 'Moyenne 7 jours',
-    'moyenne-30': 'Moyenne 30 jours'
+    'moyenne-30': 'Moyenne 30 jours',
+    'saison': 'Cette saison',
+    'planif7j': 'Planifié 7 j.',
   }
   return labels[aggregate] || aggregate
 }
@@ -1216,6 +1266,7 @@ function getMetricUnit(metric) {
   if (metric === 'temp') return '°C'
   if (metric === 'humidite') return '%'
   if (metric === 'etat-hydrique') return 'mm'
+  if (metric === 'irrigations') return 'mm'
   if (metric === 'ru') return '%'
   if (metric === 'vent') return 'km/h'
   if (metric === 'rayonnement') return 'W/m²'
@@ -1233,30 +1284,37 @@ function getMetricUnit(metric) {
 function getMetricColor(parcel, metric) {
   if (metric === 'pluie') {
     const value = computeMetricValue(parcel, metric, currentAggregate)
-    if (value < 8) return '#74b9ff'
-    if (value < 18) return '#0984e3'
-    return '#0652DD'
+    if (value < 8)  return '#C1E1FF'
+    if (value < 18) return '#2E75B6'
+    return '#0B3A64'
   }
 
   if (metric === 'temp') {
     const value = computeMetricValue(parcel, metric, currentAggregate)
-    if (value < 12) return '#0984e3'
-    if (value < 18) return '#f39c12'
-    return '#e74c3c'
+    if (value < 12) return '#FEE7B4'
+    if (value < 18) return '#FBAF05'
+    return '#7D5702'
   }
 
   if (metric === 'humidite') {
     const value = computeMetricValue(parcel, metric, currentAggregate)
-    if (value < 40) return '#e74c3c'
-    if (value < 70) return '#f1c40f'
-    return '#24B066'
+    if (value < 40) return '#E3C7FF'
+    if (value < 70) return '#5B12A4'
+    return '#29084A'
   }
 
   if (metric === 'etat-hydrique') {
     const value = computeMetricValue(parcel, metric, currentAggregate)
-    if (value < 100) return '#e74c3c'
-    if (value < 180) return '#f39c12'
-    return '#24B066'
+    if (value < 100) return '#50A2EC'
+    if (value < 180) return '#0B3A64'
+    return '#03101C'
+  }
+
+  if (metric === 'irrigations') {
+    const value = computeMetricValue(parcel, metric, currentAggregate)
+    if (value === 0) return '#c7c7cc'
+    if (value < 30) return '#FFDFB8'
+    return '#FF8C00'
   }
 
   if (metric === 'ru') {
@@ -1267,60 +1325,65 @@ function getMetricColor(parcel, metric) {
 
   if (metric === 'vent') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 15) return '#74b9ff'
-    if (v < 30) return '#f39c12'
-    return '#e74c3c'
+    if (v < 15) return '#E1E1E1'
+    if (v < 30) return '#616161'
+    return '#343232'
   }
 
   if (metric === 'rayonnement') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 200) return '#74b9ff'
-    if (v < 400) return '#f8e840'
-    return '#e07050'
+    if (v < 200) return '#FBFBB6'
+    if (v < 400) return '#CBCB0B'
+    return '#838307'
   }
 
-
-  if (metric === 'temp-sol' || metric === 'temp-seche' || metric === 'temp-humide') {
+  if (metric === 'temp-sol') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 5) return '#74b9ff'
-    if (v < 15) return '#f39c12'
-    return '#e74c3c'
+    if (v < 8)  return '#D9C6BF'
+    if (v < 18) return '#795548'
+    return '#484646'
   }
 
-  if (metric === 'intensite-humectation') {
+  if (metric === 'temp-seche') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 30) return '#74b9ff'
-    if (v < 70) return '#f39c12'
-    return '#0984e3'
+    if (v < 0)  return '#9DECDF'
+    if (v < 10) return '#23B19B'
+    return '#177365'
   }
 
-  if (metric === 'duree-humectation') {
+  if (metric === 'temp-humide') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 2) return '#74b9ff'
-    if (v < 6) return '#f39c12'
-    return '#0984e3'
+    if (v < 0)  return '#D2DEFA'
+    if (v < 10) return '#5E88EC'
+    return '#1B56E4'
+  }
+
+  if (metric === 'intensite-humectation' || metric === 'duree-humectation') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 30) return '#B2FFF9'
+    if (v < 70) return '#00887E'
+    return '#003D39'
   }
 
   if (metric === 'potentiel-hydrique') {
-    // Plus négatif = plus sec
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < -300) return '#E05252'
-    if (v < -100) return '#FBAF05'
-    return '#24B066'
+    if (v < 80)  return '#E2EAC7'
+    if (v < 150) return '#A6C157'
+    return '#7D9537'
   }
 
   if (metric === 'teneur-eau') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v < 15) return '#E05252'
-    if (v < 30) return '#FBAF05'
-    return '#24B066'
+    if (v < 15) return '#F7D2A1'
+    if (v < 30) return '#ED9A2C'
+    return '#BC7210'
   }
 
   if (metric === 'conductivite') {
     const v = computeMetricValue(parcel, metric, currentAggregate)
-    if (v > 1.5) return '#E05252'
-    if (v > 0.8) return '#FBAF05'
-    return '#24B066'
+    if (v < 0.8) return '#BDEFF5'
+    if (v < 1.5) return '#2BCDDE'
+    return '#16828D'
   }
 
   return '#0172A4'
@@ -1332,10 +1395,14 @@ function getSensorColor(sensor) {
 
 function getMetricDisplay(parcel, metric) {
   if (metric === 'ru') return `Réserve utile: ${parcel.reserveHydrique}%`
-  if (metric === 'temp') return `Température estimée: ${Math.floor(12 + parcel.degresJour / 20)}°C`
+  if (metric === 'temp') return `Température estimée: ${Math.floor(12 + (parcel.degresJour || parcel.id * 12) / 20)}°C`
   if (metric === 'pluie') return `Pluie estimée: ${Math.floor(parcel.reserveHydrique / 10)} mm`
   if (metric === 'humidite') return `Humidité estimée: ${Math.min(100, parcel.reserveHydrique + 15)}%`
   if (metric === 'etat-hydrique') return `État hydrique: ${Math.round(parcel.reserveHydrique * 2.6)} mm`
+  if (metric === 'irrigations') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    return `Irrigations: ${v} mm`
+  }
   return `Valeur: ${parcel.reserveHydrique}%`
 }
 
@@ -1441,6 +1508,11 @@ function formatSerial(sensor) {
   return sensor.serial || `WEE-${String(sensor.id).padStart(5, '0')}`
 }
 
+const SENSOR_NAMES_KEY = 'weenat-sensor-names'
+function _getSensorNames() { try { return JSON.parse(localStorage.getItem(SENSOR_NAMES_KEY)) || {} } catch { return {} } }
+function getSensorDisplayName(sensor) { return _getSensorNames()[sensor.id] || sensor.serial || `WEE-${sensor.id}` }
+function setSensorName(sensorId, name) { const n = _getSensorNames(); if (name) n[sensorId] = name; else delete n[sensorId]; localStorage.setItem(SENSOR_NAMES_KEY, JSON.stringify(n)) }
+
 function getSensorAge(sensor) {
   const minutes = 1 + (sensor.id * 7) % 14
   return `il y a ${minutes} min`
@@ -1497,9 +1569,9 @@ function computeSensorValue(sensor, metric, aggregate) {
   }
   if (metric === 'potentiel-hydrique') {
     if (!CHP_MODELS.has(sensor.model)) return null
-    const base = -150 - (sensor.id % 200)
-    const vals = { reel: base + n(1) * 5, 'min-jour': base - 50 + n(2) * 5, 'max-jour': base + 30 + n(3) * 5, 'moyenne-7': base - 20 + n(4) * 3 }
-    return [vals[aggregate] ?? base, 'hPa']
+    const base = Math.round(Math.max(0, Math.min(200, 20 + (sensor.id % 150))))
+    const vals = { reel: Math.max(0, Math.min(200, base + n(1) * 5)), 'min-jour': Math.max(0, base - 30), 'max-jour': Math.min(200, base + 25), 'moyenne-7': Math.max(0, Math.min(200, base - 10 + n(4) * 3)) }
+    return [vals[aggregate] ?? base, 'kPa']
   }
   if (metric === 'teneur-eau') {
     if (!CAPA_MODELS.has(sensor.model)) return null
@@ -1560,6 +1632,7 @@ function createSensorTable(sensors) {
   html += '<th data-column="brand">Marque</th>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
+  html += '<th data-column="nom">Nom</th>'
   html += '<th data-column="city">Ville</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
   html += '<th data-column="org">Organisation</th>'
@@ -1568,7 +1641,7 @@ function createSensorTable(sensors) {
   html += '</tr></thead><tbody>'
 
   sensors.forEach(sensor => {
-    const parcel = plots.find(p => p.id === sensor.parcelId)
+    const parcel = plots.find(p => sensor.parcelIds.includes(p.id))
     const org = parcel ? orgs.find(o => o.id === parcel.orgId) : orgs.find(o => o.id === sensor.orgId)
     const brand = getSensorBrand(sensor)
     const typeName = MODEL_TYPE[sensor.model] || sensor.model
@@ -1578,10 +1651,13 @@ function createSensorTable(sensors) {
       ? `${sensorVal[0]} ${sensorVal[1]}`
       : '<span class="tag-none">—</span>'
     const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
+    const sensorCustomName = getSensorDisplayName(sensor)
+    const nomHtml = sensorCustomName !== sensor.serial ? `<span style="font-weight:500">${sensorCustomName}</span>` : '<span class="tag-none">—</span>'
     html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
       <td>${brand}</td>
       <td><strong>${sensor.model}</strong><br><span style="font-size:10px;color:var(--txt3)">${typeName}</span></td>
       <td>${formatSerial(sensor)}</td>
+      <td>${nomHtml}</td>
       <td>${city}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       <td>${org ? org.name : '—'}</td>
@@ -1661,12 +1737,12 @@ function renderAdmin(filteredParcels, filteredSensors) {
     // Parcel-specific stats
     const totalArea = filteredParcels.reduce((s, p) => s + p.area, 0)
     const avgArea = filteredParcels.length ? totalArea / filteredParcels.length : 0
-    const withSensors = filteredParcels.filter(p => sensors.some(s => s.parcelId === p.id)).length
+    const withSensors = filteredParcels.filter(p => sensors.some(s => s.parcelIds.includes(p.id))).length
     const withoutSensors = filteredParcels.length - withSensors
     const withInteg = filteredParcels.filter(p => (p.integrations || []).length > 0).length
     const uniqueCultures = new Set(filteredParcels.map(p => p.crop)).size
     const withIrrigation = filteredParcels.filter(p => p.irrigation && p.irrigation !== 'Non irrigué').length
-    const totalSensorsLinked = filteredParcels.reduce((s, p) => s + sensors.filter(se => se.parcelId === p.id).length, 0)
+    const totalSensorsLinked = filteredParcels.reduce((s, p) => s + sensors.filter(se => se.parcelIds.includes(p.id)).length, 0)
 
     container.innerHTML += `
       <div id="stats-cards">
@@ -1807,6 +1883,7 @@ function createAdminTable(sensorList) {
   html += '<th class="col-check"><input type="checkbox" id="check-all-admin-sensor"></th>'
   html += '<th data-column="model">Modèle</th>'
   html += '<th data-column="serial">N° série</th>'
+  html += '<th data-column="nom">Nom</th>'
   html += '<th data-column="telecom">Télécom</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
   html += '<th data-column="networkQuality">Qualité réseau</th>'
@@ -1817,7 +1894,7 @@ function createAdminTable(sensorList) {
   html += '</tr></thead><tbody>'
 
   sensorList.forEach(sensor => {
-    const parcel = plots.find(p => p.id === sensor.parcelId)
+    const parcel = plots.find(p => sensor.parcelIds.includes(p.id))
 
     const parcelHtml = parcel
       ? `<div class="admin-item-row">
@@ -1843,10 +1920,13 @@ function createAdminTable(sensorList) {
 
     const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
 
+    const adminCustomName = getSensorDisplayName(sensor)
+    const adminNomCell = `<input type="text" class="inline-edit sensor-name-edit" data-sensor-id="${sensor.id}" value="${adminCustomName !== sensor.serial ? adminCustomName : ''}" placeholder="${sensor.serial}" style="min-width:100px">`
     html += `<tr>
       <td class="col-check"><input type="checkbox" class="sensor-admin-check" data-id="${sensor.id}"></td>
       <td>${sensor.model}</td>
       <td>${formatSerial(sensor)}</td>
+      <td>${adminNomCell}</td>
       <td>${sensor.telecom}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       <td>${sensor.networkQuality}%</td>
@@ -1907,7 +1987,7 @@ function initSensorAdminTable(container) {
   container.querySelector('#sensor-bulk-parcel-sel')?.addEventListener('change', e => {
     const parcelId = parseInt(e.target.value); if (!parcelId) return
     const ids = [...container.querySelectorAll('.sensor-admin-check:checked')].map(cb => parseInt(cb.dataset.id))
-    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.parcelId = parcelId })
+    ids.forEach(id => { const s = sensors.find(x => x.id === id); if (s) s.parcelIds = [parcelId] })
     e.target.value = ''
     showToast(`Parcelle assignée à ${ids.length} capteur${ids.length > 1 ? 's' : ''}.`)
     updateContent()
@@ -1942,7 +2022,7 @@ function initSensorAdminTable(container) {
       e.stopPropagation()
       const sensorId = parseInt(btn.dataset.sensorId)
       const sensor = sensors.find(s => s.id === sensorId)
-      if (sensor) sensor.parcelId = null
+      if (sensor) sensor.parcelIds = []
       updateContent()
     })
   })
@@ -1955,6 +2035,11 @@ function initSensorAdminTable(container) {
       const member = members.find(m => m.id === memberId)
       if (member) member.parcelIds = member.parcelIds.filter(id => id !== parcelId)
       updateContent()
+    })
+  })
+  container.querySelectorAll('.sensor-name-edit').forEach(input => {
+    input.addEventListener('change', () => {
+      setSensorName(parseInt(input.dataset.sensorId), input.value.trim())
     })
   })
 }
@@ -1982,7 +2067,7 @@ function createParcelMetricTable(parcels) {
   html += '</tr></thead><tbody>'
 
   parcels.forEach(parcel => {
-    const sensorCount = sensors.filter(s => s.parcelId === parcel.id).length
+    const sensorCount = sensors.filter(s => s.parcelIds.includes(parcel.id)).length
     const integList = (parcel.integrations || [])
     const integHtml = integList.length
       ? integList.map(i => `<span class="tag">${i}</span>`).join(' ')
@@ -2054,8 +2139,8 @@ function initAdminMinimaps(container) {
 
 function createParcelAdminTable(parcels) {
   const crops = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
-  const textures = [...new Set(plots.map(p => p.texture).filter(Boolean))].sort()
-  const irrigationTypes = ["Non irrigué","Pivot","Enrouleur","Rampe","Goutte à goutte","Goutte à goutte enterré","Micro aspersion","Couverture intégrale","Gravitaire"]
+  const textures = SOIL_TYPES
+  const irrigationTypes = IRRIG_TYPES
 
   let html = `
     <div id="bulk-bar" class="bulk-bar hidden">
@@ -2094,7 +2179,7 @@ function createParcelAdminTable(parcels) {
   html += '</tr></thead><tbody>'
 
   parcels.forEach(parcel => {
-    const parcelSensors = sensors.filter(s => s.parcelId === parcel.id)
+    const parcelSensors = sensors.filter(s => s.parcelIds.includes(parcel.id))
     const integList = parcel.integrations || []
     const cityName = parcel.ville || parcel.city || ''
 
@@ -2186,7 +2271,7 @@ function initParcelAdminTable(container) {
       e.stopPropagation()
       const sensorId = parseInt(btn.dataset.sensorId)
       const sensor = sensors.find(s => s.id === sensorId)
-      if (sensor) sensor.parcelId = null
+      if (sensor) sensor.parcelIds = []
       const { parcels } = getFilteredData()
       container.innerHTML = createParcelAdminTable(parcels)
       initParcelAdminTable(container)
@@ -2286,7 +2371,7 @@ function initParcelAdminTable(container) {
     bulkTextureBtn.addEventListener('click', () => {
       const checked = getCheckedAdminIds(container)
       if (!checked.length) return
-      const textures = [...new Set(plots.map(p => p.texture))].sort()
+      const textures = SOIL_TYPES
       const val = prompt(`Nouvelle texture pour ${checked.length} parcelle(s) :\n${textures.join(', ')}`)
       if (val && textures.includes(val)) {
         checked.forEach(id => {
@@ -2305,7 +2390,7 @@ function initParcelAdminTable(container) {
   container.querySelector('#bulk-env-btn')?.addEventListener('click', () => {
     const checked = getCheckedAdminIds(container)
     if (!checked.length) return
-    const options = ["Non irrigué", "Pivot", "Enrouleur", "Rampe", "Goutte à goutte", "Goutte à goutte enterré", "Micro aspersion", "Couverture intégrale", "Gravitaire"]
+    const options = IRRIG_TYPES
     const val = prompt(`Type d'irrigation pour ${checked.length} parcelle(s) :\n${options.join(', ')}`)
     if (val && options.includes(val)) {
       checked.forEach(id => {
