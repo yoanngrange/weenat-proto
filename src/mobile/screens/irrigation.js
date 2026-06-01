@@ -1029,7 +1029,7 @@ export function openCalendar(plots, initialFilter) {
         <div class="irr-strat-opt" id="strat-modify">
           <div class="irr-strat-opt-icon" style="background:#E6F1FB">✎</div>
           <div>
-            <div class="irr-strat-opt-title">Modifier les paramètres</div>
+            <div class="irr-strat-opt-title">Modifier la saison</div>
             <div class="irr-strat-opt-sub">Quantité, fréquence, dates · Les irrigations passées sont conservées</div>
           </div>
         </div>

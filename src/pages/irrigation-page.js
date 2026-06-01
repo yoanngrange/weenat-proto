@@ -150,7 +150,8 @@ function renderTimeline(irrig) {
   const first = new Date(sorted[0].iso), last = new Date(sorted[sorted.length-1].iso)
   const tot = Math.max(last - first, 1)
   const W = 500, BY = 24, BH = 5, DR = 5, DCY = BY-DR-4, MLY = DCY-DR-3, DY = BY+BH+13, SH = DY+2
-  const xOf = d => Math.round((d - first) / tot * W)
+  const PAD = DR + 2
+  const xOf = d => Math.round(PAD + (d - first) / tot * (W - 2 * PAD))
   const fmtD = iso => { const [,m,d] = iso.split('-'); return `${parseInt(d)}/${parseInt(m)}` }
   const ticks = []; const c = new Date(first.getFullYear(), first.getMonth()+1, 1)
   while (c <= last) { ticks.push(new Date(c)); c.setMonth(c.getMonth()+1) }
@@ -423,6 +424,150 @@ function showEditIrrigModal(idxs, iso) {
   })
 }
 
+function openDetailItemEdit(ir, onDone) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  let editDate = ir.iso, editMm = ir.mm
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>${ir.real ? "Modifier l'irrigation réalisée" : "Modifier l'irrigation planifiée"}</span>
+        <button class="irr-edit-close" id="irr-di-close">×</button>
+      </div>
+      <div class="irr-edit-body">
+        <div class="irr-edit-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <label style="font-size:12px;color:var(--txt3)">Date</label>
+          <input type="date" id="irr-di-date" value="${ir.iso}" style="width:100%;padding:6px;border:1px solid var(--bdr2);border-radius:6px;font-size:13px">
+        </div>
+        <div class="irr-edit-row" style="margin-top:10px">
+          <span class="irr-edit-label">Quantité</span>
+          <input type="number" id="irr-di-qty" value="${ir.mm}" min="1" style="width:64px" />
+          <span>mm</span>
+        </div>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--danger" id="irr-di-del">Supprimer</button>
+        <div style="display:flex;gap:8px">
+          <button class="iw-btn iw-btn--sec" id="irr-di-cancel">Annuler</button>
+          <button class="iw-btn iw-btn--pri" id="irr-di-save">Enregistrer</button>
+        </div>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-di-close').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-di-cancel').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-di-date').addEventListener('change', e => { editDate = e.target.value })
+  ov.querySelector('#irr-di-qty').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) editMm = v })
+  ov.querySelector('#irr-di-del').addEventListener('click', () => {
+    const idx = IRRIG_SEASON.indexOf(ir)
+    if (idx >= 0) IRRIG_SEASON.splice(idx, 1)
+    saveIrrig(); ov.remove(); onDone()
+  })
+  ov.querySelector('#irr-di-save').addEventListener('click', () => {
+    ir.iso  = editDate
+    ir.mm   = editMm
+    ir.real = editDate <= TODAY
+    saveIrrig(); ov.remove(); onDone()
+  })
+}
+
+function openModifierSaison(plotId, onDone) {
+  const irrig     = IRRIG_SEASON.filter(i => i.plotId === plotId && i.fromStrategy && i.seasonId)
+  const sorted    = [...irrig].sort((a, b) => a.iso < b.iso ? -1 : 1)
+  const seasonIds = new Set(irrig.map(i => i.seasonId))
+
+  let debut = sorted[0]?.iso || TODAY
+  let fin   = sorted[sorted.length - 1]?.iso || addDays(TODAY, 90)
+  let qty   = sorted[0]?.mm || 10
+  let freq  = sorted.length >= 2
+    ? Math.max(1, Math.round((new Date(sorted[sorted.length - 1].iso) - new Date(sorted[0].iso)) / 86400000 / (sorted.length - 1)))
+    : 7
+
+  document.querySelector('.irr-edit-overlay')?.remove()
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+
+  function computeOccs() {
+    if (!debut || !fin || freq <= 0) return []
+    const occs = [], end = new Date(fin)
+    let cur = new Date(debut)
+    while (cur <= end && occs.length < 200) {
+      occs.push(cur.toISOString().split('T')[0])
+      cur.setDate(cur.getDate() + freq)
+    }
+    return occs
+  }
+
+  function updatePreview() {
+    const occs = computeOccs()
+    const future = occs.filter(iso => iso > TODAY).length
+    ov.querySelector('#irr-ms-preview').textContent = occs.length > 0
+      ? `↗ ${occs.length} irrigations · ${occs.length * qty} mm · dont ${future} à venir`
+      : 'Ajustez les dates et la fréquence'
+  }
+
+  ov.innerHTML = `
+    <div class="irr-edit-modal" style="max-width:460px">
+      <div class="irr-edit-hd">
+        <span>Modifier la saison</span>
+        <button class="irr-edit-close" id="irr-ms-close">×</button>
+      </div>
+      <div class="irr-edit-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:12px;color:var(--txt3);display:block;margin-bottom:4px">Début</label>
+            <input type="date" id="irr-ms-debut" value="${debut}" style="width:100%;padding:6px;border:1px solid var(--bdr2);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--txt3);display:block;margin-bottom:4px">Fin</label>
+            <input type="date" id="irr-ms-fin" value="${fin}" style="width:100%;padding:6px;border:1px solid var(--bdr2);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--txt3);display:block;margin-bottom:4px">Quantité (mm/irrig.)</label>
+            <input type="number" id="irr-ms-qty" value="${qty}" min="1" style="width:100%;padding:6px;border:1px solid var(--bdr2);border-radius:6px;font-size:13px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--txt3);display:block;margin-bottom:4px">Fréquence (jours)</label>
+            <input type="number" id="irr-ms-freq" value="${freq}" min="1" max="30" style="width:100%;padding:6px;border:1px solid var(--bdr2);border-radius:6px;font-size:13px">
+          </div>
+        </div>
+        <div id="irr-ms-preview" style="margin-top:12px;font-size:12px;color:var(--txt3)"></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--txt3);line-height:1.4">
+          Les irrigations déjà réalisées sont conservées. Les irrigations futures sont recalculées.
+        </div>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-ms-cancel">Annuler</button>
+        <button class="iw-btn iw-btn--pri" id="irr-ms-save">Enregistrer</button>
+      </div>
+    </div>`
+
+  document.body.appendChild(ov)
+  updatePreview()
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-ms-close').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-ms-cancel').addEventListener('click', () => ov.remove())
+
+  ov.querySelector('#irr-ms-debut').addEventListener('change', e => { debut = e.target.value; updatePreview() })
+  ov.querySelector('#irr-ms-fin').addEventListener('change', e => { fin = e.target.value; updatePreview() })
+  ov.querySelector('#irr-ms-qty').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { qty = v; updatePreview() } })
+  ov.querySelector('#irr-ms-freq').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { freq = v; updatePreview() } })
+
+  ov.querySelector('#irr-ms-save').addEventListener('click', () => {
+    // Remove all strategy irrigations for this season (past and future) then fully regenerate
+    const kept = IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId)))
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...kept)
+    const newId = generateSeasonId()
+    for (const iso of computeOccs()) {
+      IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId: newId })
+    }
+    saveIrrig(); ov.remove(); onDone()
+  })
+}
+
 function highlightTableRow(plotId) {
   const right = document.getElementById('irr-right')
   if (!right) return
@@ -465,7 +610,7 @@ function renderDetailPanel(p) {
     ? `<div><strong>Saison :</strong> ${fmtDateShort(debut)} → ${fmtDateShort(fin)}</div>`
     : '<div style="color:var(--txt3)">Pas de saison enregistrée</div>'
 
-  const real = irrig.filter(i => i.real).sort((a,b) => a.iso > b.iso ? -1 : 1)
+  const real = irrig.filter(i => i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
   const plan = irrig.filter(i => !i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
 
   const item = ir => {
@@ -478,7 +623,8 @@ function renderDetailPanel(p) {
       <div class="irr-pr-date" style="color:${col};min-width:52px;font-size:13px;font-weight:600">${dateStr}</div>
       <div class="irr-pr-info"><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div></div>
       <div class="irr-pr-mm" style="color:${col}">${ir.mm} mm</div>
-      <button class="irr-pr-del" data-idx="${idx}">🗑</button>
+      <button class="irr-pr-edit" data-idx="${idx}" title="Modifier">✎</button>
+      <button class="irr-pr-del"  data-idx="${idx}" title="Supprimer">🗑</button>
     </div>`
   }
 
@@ -486,8 +632,9 @@ function renderDetailPanel(p) {
     <div class="irr-det-strat-bar">
       <button class="irr-det-strat-btn" id="irr-det-strat-toggle">Modifier la saison ▾</button>
       <div class="irr-det-strat-opts" id="irr-det-strat-opts" style="display:none">
-        <button class="irr-det-strat-opt" id="irr-det-stop">Arrêter la saison <span>supprime les irrigations futures de cette parcelle</span></button>
-        <button class="irr-det-strat-opt irr-det-strat-opt--del" id="irr-det-del-all">Supprimer la saison <span>supprime toutes les irrigations de cette parcelle</span></button>
+        <button class="irr-det-strat-opt" id="irr-det-modify"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink:0"><path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z"/></svg><div>Modifier la saison <span>début, fin, quantité, fréquence</span></div></button>
+        <button class="irr-det-strat-opt" id="irr-det-stop"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink:0"><path d="M5.5 9.5A.5.5 0 0 1 6 9h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg><div>Arrêter la saison<span>supprime les irrigations futures de cette parcelle</span></div></button>
+        <button class="irr-det-strat-opt irr-det-strat-opt--del" id="irr-det-del-all"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" style="flex-shrink:0"><path d="M6.146 7.146a.5.5 0 0 1 .708 0L8 8.293l1.146-1.147a.5.5 0 1 1 .708.708L8.707 9l1.147 1.146a.5.5 0 0 1-.708.708L8 9.707l-1.146 1.147a.5.5 0 0 1-.708-.708L7.293 9 6.146 7.854a.5.5 0 0 1 0-.708"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/></svg><div>Supprimer la saison<span>supprime toutes les irrigations de cette parcelle</span></div></button>
       </div>
     </div>` : ''
 
@@ -524,6 +671,10 @@ function renderDetailPanel(p) {
     const opts = panel.querySelector('#irr-det-strat-opts')
     opts.style.display = opts.style.display === 'none' ? '' : 'none'
   })
+  panel.querySelector('#irr-det-modify')?.addEventListener('click', () => {
+    panel.querySelector('#irr-det-strat-opts').style.display = 'none'
+    openModifierSaison(p.id, () => { renderDetailPanel(p); showGlobaleView(true) })
+  })
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
       ...IRRIG_SEASON.filter(i => !(i.plotId === p.id && seasonIds.has(i.seasonId) && !i.real && i.iso > TODAY)))
@@ -535,6 +686,12 @@ function renderDetailPanel(p) {
     saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
   })
 
+  panel.querySelectorAll('.irr-pr-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ir = IRRIG_SEASON[+btn.dataset.idx]
+      if (ir) openDetailItemEdit(ir, () => { renderDetailPanel(p); showGlobaleView(true) })
+    })
+  })
   panel.querySelectorAll('.irr-pr-del').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = +btn.dataset.idx

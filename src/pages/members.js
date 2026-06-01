@@ -27,6 +27,7 @@ let selectedRoles   = []
 let selectedStatuts = ['actif', 'invité']
 let currentSort     = { column: null, direction: 'asc' }
 let selectedIds     = new Set()
+let activeRender    = null
 
 const ADHERENT_MEMBERS = [
   { id: 901, prenom: 'Marie',       nom: 'Martin',     email: 'marie.martin@ferme-du-bocage.fr',     role: 'propriétaire', statut: 'actif' },
@@ -37,8 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
   const role = localStorage.getItem('menuRole') || 'admin-reseau'
   if (role === 'adherent-reseau') {
+    activeRender = renderAdherentMembers
+    initFilters()
     renderAdherentMembers()
   } else {
+    activeRender = render
     initFilters()
     render()
   }
@@ -109,7 +113,7 @@ function makeCheckboxPanel(panelId, values, onChange, badgeId, preChecked = []) 
       const checked = cbAll.checked ? values : []
       onChange(checked)
       updateBadge(badgeId, checked.length)
-      render()
+      activeRender()
     })
 
     cbs().forEach(cb => {
@@ -118,7 +122,7 @@ function makeCheckboxPanel(panelId, values, onChange, badgeId, preChecked = []) 
         if (cbAll) cbAll.checked = checked.length === values.length
         onChange(checked)
         updateBadge(badgeId, checked.length)
-        render()
+        activeRender()
       })
     })
   }
@@ -390,17 +394,27 @@ function updateStats(list) {
 }
 
 function renderAdherentMembers() {
+  let list = [...ADHERENT_MEMBERS]
+  if (selectedRoles.length)   list = list.filter(m => selectedRoles.includes(m.role))
+  if (selectedStatuts.length) list = list.filter(m => selectedStatuts.includes(m.statut))
+
   const statsEl = document.getElementById('stats-cards')
   if (statsEl) {
     statsEl.innerHTML = [
-      { label: 'Membres', value: 2 },
-      { label: 'Actifs', value: 2 },
+      { label: 'Membres', value: list.length },
+      { label: 'Actifs', value: list.filter(m => m.statut === 'actif').length },
     ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div></div>`).join('')
   }
 
   const tbody = document.querySelector('#members-table tbody')
   if (!tbody) return
-  tbody.innerHTML = ADHERENT_MEMBERS.map(m => `
+
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--txt3)">Aucun membre ne correspond aux filtres.</td></tr>'
+    return
+  }
+
+  tbody.innerHTML = list.map(m => `
     <tr>
       <td class="col-check"></td>
       <td><span class="member-name">${m.prenom} ${m.nom}</span><div class="member-email-sub">${m.email}</div></td>

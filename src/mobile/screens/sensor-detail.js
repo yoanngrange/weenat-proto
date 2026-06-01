@@ -1,5 +1,5 @@
 import { pushDetail, popDetail } from '../nav.js'
-import { showToast, showSheet } from '../ui.js'
+import { showToast, showSheet, showConfirmSheet } from '../ui.js'
 import { plots as allPlots }   from '../../data/plots.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs }                from '../../data/orgs.js'
@@ -21,6 +21,23 @@ const MODEL_BRANDS = {
   'LWS': 'Weenat', 'CHP-15/30': 'CoRHIZE', 'CHP-30/60': 'CoRHIZE', 'CHP-60/90': 'CoRHIZE',
   'CAPA-30-3': 'CoRHIZE', 'CAPA-60-6': 'CoRHIZE', 'EC': 'CoRHIZE',
   'SMV': 'Weenat (virtuel)',
+}
+
+function chpDepthRange(model) {
+  if (model === 'CHP-15/30') return [15, 30]
+  if (model === 'CHP-30/60') return [15, 60]
+  if (model === 'CHP-60/90') return [15, 90]
+  return null
+}
+
+function buildSensorSubtitle(sensor, city) {
+  const modelPart = MODEL_NAMES[sensor.model]
+    ? `${MODEL_NAMES[sensor.model]} · ${sensor.model}`
+    : sensor.model
+  const depthPart = chpDepthRange(sensor.model) && sensor.depth != null
+    ? `${sensor.depth} cm`
+    : null
+  return [modelPart, depthPart, city].filter(Boolean).join(' · ')
 }
 
 const MODEL_METRICS_MAP = {
@@ -336,6 +353,26 @@ function paramsView(sensor) {
         </div>
       </div>
 
+      ${(() => {
+        const range = chpDepthRange(sensor.model)
+        if (!range) return ''
+        const cur = sensor.depth ?? range[0]
+        return `
+          <div class="m-list-section-header">Configuration</div>
+          <div class="m-list">
+            <div class="m-list-row m-list-row--last" style="flex-wrap:wrap;gap:8px">
+              <span class="m-list-row-label">Profondeur d'installation</span>
+              <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+                <input type="number" id="chp-depth-input" value="${cur}" min="${range[0]}" max="${range[1]}" step="5"
+                  style="width:62px;border:1px solid rgba(0,0,0,.15);border-radius:8px;padding:5px 8px;font-size:14px;font-family:inherit;background:#f5f5f7;text-align:center;-webkit-appearance:none">
+                <span style="font-size:13px;color:#8e8e93">cm</span>
+                <button id="chp-depth-save" style="background:#0172A4;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer">Enregistrer</button>
+              </div>
+              <div style="width:100%;font-size:11px;color:#8e8e93;margin-top:-4px">De ${range[0]} à ${range[1]} cm</div>
+            </div>
+          </div>`
+      })()}
+
       <div class="m-list-section-header">Géolocalisation</div>
       <div class="m-list">
         ${primaryPlot ? `<div id="sensor-minimap" class="m-minimap-container"></div>` : ''}
@@ -353,7 +390,16 @@ function paramsView(sensor) {
       <div class="m-list-section-header">Anomalies</div>
       <div class="m-list">
         ${events.length
-          ? events.map(e => `<div class="m-list-row"><i class="bi bi-exclamation-triangle-fill" style="color:#ff3b30"></i><span class="m-list-row-label" style="color:#ff3b30">${e}</span></div>`).join('')
+          ? events.map((ev, idx) => {
+              const canStop = ev.toLowerCase().includes('déplacé')
+              return `<div class="m-list-row" style="justify-content:space-between;gap:10px">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden">
+                  <i class="bi bi-exclamation-triangle-fill" style="color:#ff3b30;flex-shrink:0"></i>
+                  <span class="m-list-row-label" style="color:#ff3b30">${ev}</span>
+                </div>
+                ${canStop ? `<button class="ev-stop-btn" data-ev-idx="${idx}" style="flex-shrink:0;background:rgba(255,59,48,.1);border:1px solid #ff3b30;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff3b30;font-family:inherit;cursor:pointer;white-space:nowrap">Arrêter</button>` : ''}
+              </div>`
+            }).join('')
           : '<div class="m-list-row"><i class="bi bi-check-circle-fill" style="color:#30d158"></i><span class="m-list-row-label">Aucun événement en cours</span></div>'}
         <div class="m-list-row">
           <span class="m-list-row-label">Qualité du signal</span>
@@ -417,7 +463,7 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${sensor.serial}</div>
-          <div class="m-detail-subtitle">${[MODEL_NAMES[sensor.model] ? `${MODEL_NAMES[sensor.model]} · ${sensor.model}` : sensor.model, sensorCity].filter(Boolean).join(' · ')}</div>
+          <div class="m-detail-subtitle">${buildSensorSubtitle(sensor, sensorCity)}</div>
         </div>
         <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
@@ -473,19 +519,47 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
           openMobileSensorJournal(sensor, { openForm: true })
         } else if (action === 'add-plot') {
           openPlotPicker(sensor, role, renderView)
+        } else if (action === 'delete') {
+          const linkedPlot = allPlots.find(p => sensor.parcelIds?.includes(p.id))
+          showConfirmSheet({
+            title: "Retirer de l'exploitation",
+            message: `Retirer <strong>${sensor.model} ${sensor.serial}</strong> de l'exploitation ?${linkedPlot ? `<br><br>Parcelle liée : <strong>${linkedPlot.name}</strong>.` : ''}<br><br>Le capteur restera visible dans le catalogue réseau.`,
+            confirmLabel: "Retirer",
+            onConfirm: () => showToast("Capteur retiré de l'exploitation (fonctionnalité à venir)")
+          })
         } else {
           showToast('Fonctionnalité à venir')
         }
+      })
+    })
+    layer.querySelectorAll('.ev-stop-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const idx = +btn.dataset.evIdx
+        if (Array.isArray(sensor.event)) {
+          sensor.event = sensor.event.filter((_, j) => j !== idx)
+          if (!sensor.event.length) sensor.event = null
+        } else {
+          sensor.event = null
+        }
+        renderView()
       })
     })
     layer.querySelectorAll('[data-unlink-plot-btn]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
         const plotId = +btn.dataset.unlinkPlotBtn
-        sensor.parcelIds = sensor.parcelIds.filter(id => id !== plotId)
         const plot = allPlots.find(p => p.id === plotId)
-        showToast(`Délié de ${plot?.name || 'la parcelle'}`)
-        renderView()
+        showConfirmSheet({
+          title: 'Délier la parcelle',
+          message: `Délier ce capteur de <strong>${plot?.name || 'la parcelle'}</strong> ?`,
+          confirmLabel: 'Délier',
+          onConfirm: () => {
+            sensor.parcelIds = sensor.parcelIds.filter(id => id !== plotId)
+            showToast(`Délié de ${plot?.name || 'la parcelle'}`)
+            renderView()
+          }
+        })
       })
     })
     layer.querySelector('#sensor-name-input')?.addEventListener('change', e => {
@@ -498,6 +572,19 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
       const titleEl = layer.querySelector('.m-detail-title')
       if (titleEl) titleEl.textContent = name || sensor.serial
       window.dispatchEvent(new CustomEvent('weenat-sensor-renamed'))
+    })
+    layer.querySelector('#chp-depth-save')?.addEventListener('click', () => {
+      const input = layer.querySelector('#chp-depth-input')
+      const range = chpDepthRange(sensor.model)
+      if (!input || !range) return
+      let val = parseInt(input.value)
+      if (isNaN(val)) return
+      val = Math.max(range[0], Math.min(range[1], val))
+      input.value = val
+      sensor.depth = val
+      const subtitleEl = layer.querySelector('.m-detail-subtitle')
+      if (subtitleEl) subtitleEl.textContent = buildSensorSubtitle(sensor, sensorCity)
+      showToast(`Profondeur enregistrée : ${val} cm`)
     })
   }
 
@@ -599,11 +686,17 @@ function openPlotPicker(sensor, role, onChanged) {
 
       row.addEventListener('click', () => {
         if (linked) {
-          // Délier
-          sensor.parcelIds = sensor.parcelIds.filter(id => id !== plot.id)
-          showToast(`Délié de ${plot.name}`)
-          renderList(query)
-          onChanged()
+          showConfirmSheet({
+            title: 'Délier la parcelle',
+            message: `Délier ce capteur de <strong>${plot.name}</strong> ?`,
+            confirmLabel: 'Délier',
+            onConfirm: () => {
+              sensor.parcelIds = sensor.parcelIds.filter(id => id !== plot.id)
+              showToast(`Délié de ${plot.name}`)
+              renderList(query)
+              onChanged()
+            }
+          })
         } else {
           // Lier — vérifier conflit
           const conflicting = allSensors.find(s =>

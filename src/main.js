@@ -68,16 +68,16 @@ const MODEL_METRICS = {
   'P+':        ['pluie', 'temp', 'humidite'],
   'TH':        ['temp', 'humidite'],
   'T_MINI':    ['temp-sol'],
-  'T_GEL':     ['temp-seche', 'temp-humide'],
+  'T_GEL':     ['temp-seche', 'temp-humide', 'temp-rosee'],
   'W':         ['vent'],
   'PYRANO':    ['rayonnement'],
-  'PAR':       ['rayonnement'],
+  'PAR':       ['par'],
   'LWS':       ['intensite-humectation', 'duree-humectation'],
   'CHP-15/30': ['potentiel-hydrique', 'temp-sol'],
   'CHP-30/60': ['potentiel-hydrique', 'temp-sol'],
   'CHP-60/90': ['potentiel-hydrique', 'temp-sol'],
-  'CAPA-30-3': ['teneur-eau', 'temp-sol'],
-  'CAPA-60-6': ['teneur-eau', 'temp-sol'],
+  'CAPA-30-3': ['teneur-eau', 'temp-sol', 'rfu'],
+  'CAPA-60-6': ['teneur-eau', 'temp-sol', 'rfu'],
   'SMV':       ['pluie', 'temp', 'humidite'],
   'EC':        ['conductivite'],
 }
@@ -92,32 +92,52 @@ const METRIC_SENSORS = (() => {
 })()
 
 // Métriques calculées sans capteur (disponibles sur toutes les parcelles)
-const ALWAYS_COMPUTED_METRICS = new Set(['etat-hydrique', 'irrigations'])
+const ALWAYS_COMPUTED_METRICS = new Set(['etp', 'irrigations'])
+
+// Profondeurs de mesure par modèle (pour l'affichage multi-horizon)
+const SENSOR_DEPTHS = {
+  'CHP-15/30': ['15 cm', '30 cm'],
+  'CHP-30/60': ['30 cm', '60 cm'],
+  'CHP-60/90': ['60 cm', '90 cm'],
+  'CAPA-30-3': ['10 cm', '20 cm', '30 cm'],
+  'CAPA-60-6': ['10 cm', '20 cm', '30 cm', '40 cm', '50 cm', '60 cm'],
+}
+const MULTI_HORIZON_METRICS = new Set(['potentiel-hydrique', 'teneur-eau', 'temp-sol'])
 
 function parcelHasMetric(parcel, metric) {
+  if (metric === 'voir-tout') return true
   if (ALWAYS_COMPUTED_METRICS.has(metric)) return true
   const needed = METRIC_SENSORS[metric]
   if (!needed) return false
   return _filteredSensors.some(s => s.parcelIds.includes(parcel.id) && needed.has(s.model))
 }
 
+// Comme parcelHasMetric mais traite irrigations=0 comme "pas de données"
+function parcelHasDisplayData(parcel, metric) {
+  if (metric === 'irrigations') return IRRIG_SEASON.some(i => i.plotId === parcel.id)
+  return parcelHasMetric(parcel, metric)
+}
+
 // Labels de toutes les métriques (ordre d'affichage dans le sélecteur)
 const METRIC_LABELS = {
-  'pluie':             'Pluie',
+  'pluie':                  'Pluie',
   'temp':                   'Température',
   'humidite':               'Humidité',
-  'etat-hydrique':          'État hydrique',
-  'irrigations':            'Irrigations',
   'vent':                   'Vent',
-  'rayonnement':            'Rayonnement',
-  'intensite-humectation':  "Intensité d'humectation foliaire",
-  'duree-humectation':      "Durée d'humectation foliaire",
+  'etp':                    'Évapotranspiration',
+  'rayonnement':            'Rayonnement solaire',
   'potentiel-hydrique':     'Potentiel hydrique',
   'teneur-eau':             'Teneur en eau du sol',
-  'temp-sol':               'Température du sol',
-  'temp-seche':             'Température sèche',
-  'temp-humide':            'Température humide',
   'conductivite':           'Électro-conductivité',
+  'temp-sol':               'Température du sol',
+  'rfu':                    'Réservoir',
+  'irrigations':            'Irrigations',
+  'intensite-humectation':  "Intensité d'humectation foliaire",
+  'duree-humectation':      "Durée d'humectation foliaire",
+  'temp-humide':            'Température humide',
+  'temp-seche':             'Température sèche',
+  'temp-rosee':             'Température de rosée',
+  'par':                    'Rayonnement PAR',
 }
 
 const metricAggregates = {
@@ -157,14 +177,16 @@ const metricAggregates = {
   ],
   rayonnement: [
     { value: 'reel', label: 'Temps réel' },
-    { value: 'today', label: "Aujourd'hui (cumul)" },
-    { value: '7jours', label: '7 jours (cumul)' }
+    { value: 'today', label: "Aujourd'hui" },
+    { value: '7jours', label: '7 jours' },
+    { value: '30jours', label: '30 jours' }
   ],
   'temp-sol': [
     { value: 'reel', label: 'Temps réel' },
     { value: 'min-jour', label: 'Min du jour' },
     { value: 'max-jour', label: 'Max du jour' },
-    { value: 'moyenne-7', label: 'Moyenne 7 jours' }
+    { value: 'moyenne-7', label: 'Moyenne 7 jours' },
+    { value: 'moyenne-30', label: 'Moyenne 30 jours' }
   ],
   'temp-gel': [
     { value: 'reel', label: 'Temps réel' },
@@ -213,6 +235,24 @@ const metricAggregates = {
     { value: '30jours',  label: '30 derniers jours' },
     { value: 'saison',   label: 'Cette saison' },
     { value: 'planif7j', label: 'Planifié 7 jours' },
+  ],
+  'etp': [
+    { value: 'today',   label: "Aujourd'hui" },
+    { value: '7jours',  label: '7 jours' },
+    { value: '30jours', label: '30 jours' },
+  ],
+  'rfu': [
+    { value: 'reel', label: 'Temps réel' },
+  ],
+  'temp-rosee': [
+    { value: 'reel',      label: 'Temps réel' },
+    { value: 'min-jour',  label: 'Min du jour' },
+    { value: 'max-jour',  label: 'Max du jour' },
+  ],
+  'par': [
+    { value: 'reel',   label: 'Temps réel' },
+    { value: 'today',  label: "Aujourd'hui (cumul)" },
+    { value: '7jours', label: '7 jours (cumul)' },
   ],
 }
 
@@ -569,7 +609,15 @@ function initFilterDropdownToggle() {
 
 function updateAggregateOptions() {
   const aggregateSelect = document.getElementById('aggregate-selector')
+  const aggregateGroup  = aggregateSelect?.closest('.control-group')
   if (!aggregateSelect) return
+
+  if (currentMetric === 'voir-tout') {
+    if (aggregateGroup) aggregateGroup.style.display = 'none'
+    return
+  }
+  if (aggregateGroup) aggregateGroup.style.display = ''
+
   const options = metricAggregates[currentMetric] || []
   aggregateSelect.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')
   if (!options.some(opt => opt.value === currentAggregate)) {
@@ -721,9 +769,12 @@ function getFilteredData() {
   if (telecomVal) filteredSensors = filteredSensors.filter(s => s.telecom === telecomVal)
 
   if (filterMonSecteur) {
-    const secteurOrgIds = new Set(orgs.filter(o => MON_SECTEUR_DEPTS.has(o.departement)).map(o => o.id))
-    filteredParcels = filteredParcels.filter(p => secteurOrgIds.has(p.orgId))
-    filteredSensors = filteredSensors.filter(s => filteredParcels.some(p => s.parcelIds.includes(p.id)))
+    const currentUser = currentRole === 'adherent'
+      ? members.find(m => m.id === 31)
+      : members.find(m => m.id === 1)
+    const myParcelIds = new Set(currentUser?.parcelIds || [])
+    filteredParcels = filteredParcels.filter(p => myParcelIds.has(p.id))
+    filteredSensors = filteredSensors.filter(s => s.parcelIds.some(pid => myParcelIds.has(pid)))
   }
 
   if (filterMonFavoris) {
@@ -835,15 +886,14 @@ function updateMetricSelector(filteredParcels, filteredSensors) {
   let available = getAvailableMetrics(sensorList)
 
   if (pageType.startsWith('parcelles')) {
-    const alwaysOn = ['etat-hydrique', 'irrigations']
+    const alwaysOn = ['etp', 'irrigations']
     alwaysOn.forEach(m => { if (!available.includes(m)) available.push(m) })
   }
 
-  sel.innerHTML = available
-    .map(m => `<option value="${m}">${METRIC_LABELS[m]}</option>`)
-    .join('')
+  sel.innerHTML = `<option value="voir-tout">Voir tout</option>` +
+    available.map(m => `<option value="${m}">${METRIC_LABELS[m]}</option>`).join('')
 
-  if (!available.includes(currentMetric)) {
+  if (currentMetric !== 'voir-tout' && !available.includes(currentMetric)) {
     currentMetric = available[0] || 'pluie'
   }
   sel.value = currentMetric
@@ -905,14 +955,16 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       const labelLat = parcel.lat || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[0], 0) / parcel.latlngs.length : null)
       const labelLng = parcel.lng || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[1], 0) / parcel.latlngs.length : null)
       if (labelLat && labelLng) {
-        const hasData = parcelHasMetric(parcel, currentMetric)
-        const badgeHtml = hasData
-          ? (() => {
-              const value = computeMetricValue(parcel, currentMetric, currentAggregate)
-              const color = getMetricColor(parcel, currentMetric)
-              return `<div class="map-value-badge" style="border-color:${color};color:${color}">${fmtMetricValue(value, currentMetric)}</div>`
-            })()
-          : `<div class="map-value-badge map-value-badge--na">—</div>`
+        const hasData = currentMetric !== 'voir-tout' && parcelHasDisplayData(parcel, currentMetric)
+        const badgeHtml = currentMetric === 'voir-tout'
+          ? ''
+          : hasData
+            ? (() => {
+                const value = computeMetricValue(parcel, currentMetric, currentAggregate)
+                const color = getMetricColor(parcel, currentMetric)
+                return `<div class="map-value-badge" style="border-color:${color};color:${color}">${fmtMetricValue(value, currentMetric)}</div>`
+              })()
+            : `<div class="map-value-badge map-value-badge--na">—</div>`
         const label = L.marker([labelLat, labelLng], {
           icon: L.divIcon({ className: '', html: badgeHtml, iconSize: [0, 0], iconAnchor: [0, 0] }),
           interactive: false,
@@ -1056,8 +1108,33 @@ function fmtMetricValue(value, metric) {
   return `${value} ${getMetricUnit(metric)}`
 }
 
+function computeHorizonValues(parcel, metric, aggregate) {
+  if (!MULTI_HORIZON_METRICS.has(metric)) return null
+  const linkedSensors = _filteredSensors.filter(s =>
+    s.parcelIds.includes(parcel.id) && (MODEL_METRICS[s.model] || []).includes(metric)
+  )
+  const allDepths = []
+  linkedSensors.forEach(s => {
+    const depths = SENSOR_DEPTHS[s.model]
+    if (!depths) return
+    const base = computeMetricValue(parcel, metric, aggregate)
+    depths.forEach((depth, i) => {
+      const noise = Math.round(Math.sin(parcel.id * 1.3 + s.id * 2.7 + i * 5.1) * 8)
+      allDepths.push({ depth, value: Math.max(0, base + noise) })
+    })
+  })
+  return allDepths.length >= 2 ? allDepths : null
+}
+
 function getMetricTooltipValue(parcel) {
-  if (!parcelHasMetric(parcel, currentMetric)) return 'Donnée non disponible'
+  if (currentMetric === 'voir-tout') return ''
+  if (!parcelHasDisplayData(parcel, currentMetric)) return 'Donnée non disponible'
+  const horizons = computeHorizonValues(parcel, currentMetric, currentAggregate)
+  if (horizons) {
+    const unit = getMetricUnit(currentMetric)
+    const label = getAggregateLabel(currentAggregate)
+    return `${label} :<br>` + horizons.map(h => `${h.value}${unit ? ' ' + unit : ''} @ ${h.depth}`).join('<br>')
+  }
   const value = computeMetricValue(parcel, currentMetric, currentAggregate)
   return `${getAggregateLabel(currentAggregate)} : ${fmtMetricValue(value, currentMetric)}`
 }
@@ -1240,6 +1317,40 @@ function computeMetricValue(parcel, metric, aggregate) {
     }
   }
 
+  if (metric === 'etp') {
+    const base = +(2 + dj / 500).toFixed(1)
+    switch (aggregate) {
+      case 'today':   return +Math.max(0, base + noise * 0.1).toFixed(1)
+      case '7jours':  return +Math.max(0, base * 6 + noise * 0.3).toFixed(1)
+      case '30jours': return +Math.max(0, base * 25 + noise).toFixed(1)
+      default: return base
+    }
+  }
+
+  if (metric === 'rfu') {
+    return Math.max(0, Math.min(100, Math.round(parcel.reserveHydrique * 0.8 + noise * 2)))
+  }
+
+  if (metric === 'temp-rosee') {
+    const base = Math.round(-2 + dj / 350)
+    switch (aggregate) {
+      case 'reel':     return base + noise
+      case 'min-jour': return base - 3 + noise
+      case 'max-jour': return base + 2 + noise
+      default: return base
+    }
+  }
+
+  if (metric === 'par') {
+    const base = Math.round(300 + dj / 8)
+    switch (aggregate) {
+      case 'reel':   return Math.max(0, Math.round(base + noise * 30))
+      case 'today':  return Math.max(0, Math.round(base * 8 + noise * 100))
+      case '7jours': return Math.max(0, Math.round(base * 50 + noise * 300))
+      default: return Math.max(0, Math.round(base))
+    }
+  }
+
   return parcel.reserveHydrique
 }
 
@@ -1266,13 +1377,17 @@ function getMetricUnit(metric) {
   if (metric === 'temp') return '°C'
   if (metric === 'humidite') return '%'
   if (metric === 'etat-hydrique') return 'mm'
+  if (metric === 'etp') return 'mm'
   if (metric === 'irrigations') return 'mm'
   if (metric === 'ru') return '%'
+  if (metric === 'rfu') return 'mm'
   if (metric === 'vent') return 'km/h'
   if (metric === 'rayonnement') return 'W/m²'
+  if (metric === 'par') return 'µmol/m²/s'
   if (metric === 'temp-sol') return '°C'
   if (metric === 'temp-seche') return '°C'
   if (metric === 'temp-humide') return '°C'
+  if (metric === 'temp-rosee') return '°C'
   if (metric === 'intensite-humectation') return '%'
   if (metric === 'duree-humectation') return ''
   if (metric === 'potentiel-hydrique') return 'kPa'
@@ -1386,6 +1501,34 @@ function getMetricColor(parcel, metric) {
     return '#16828D'
   }
 
+  if (metric === 'etp') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 2)  return '#D6EDF9'
+    if (v < 5)  return '#2E75B6'
+    return '#0B3A64'
+  }
+
+  if (metric === 'rfu') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 30) return '#E05252'
+    if (v < 60) return '#FBAF05'
+    return '#24B066'
+  }
+
+  if (metric === 'temp-rosee') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 5)  return '#D2DEFA'
+    if (v < 12) return '#5E88EC'
+    return '#1B56E4'
+  }
+
+  if (metric === 'par') {
+    const v = computeMetricValue(parcel, metric, currentAggregate)
+    if (v < 500)  return '#F9EED2'
+    if (v < 1200) return '#E8B44C'
+    return '#9B6E00'
+  }
+
   return '#0172A4'
 }
 
@@ -1426,13 +1569,15 @@ function renderList(filteredParcels, filteredSensors) {
   container.innerHTML = ''
 
   if (pageType.startsWith('parcelles')) {
-    // Default sort: metric value descending
+    // Default sort: metric value descending (or by name when voir-tout)
     const sorted = !currentSort.column
-      ? [...filteredParcels].sort((a, b) => {
-          const av = computeMetricValue(a, currentMetric, currentAggregate) || 0
-          const bv = computeMetricValue(b, currentMetric, currentAggregate) || 0
-          return bv - av
-        })
+      ? currentMetric === 'voir-tout'
+        ? [...filteredParcels].sort((a, b) => getPlotDisplayName(a).localeCompare(getPlotDisplayName(b), 'fr'))
+        : [...filteredParcels].sort((a, b) => {
+            const av = computeMetricValue(a, currentMetric, currentAggregate) || 0
+            const bv = computeMetricValue(b, currentMetric, currentAggregate) || 0
+            return bv - av
+          })
       : filteredParcels
     if (sorted.length > 0) {
       container.innerHTML = createParcelMetricTable(sorted)
@@ -1702,6 +1847,7 @@ function createSensorTable(sensors) {
   const metricLabel = METRIC_LABELS[currentMetric] || 'Mesure'
   const aggLabel = getAggregateLabel(currentAggregate)
   const isAdherent = currentRole === 'adherent'
+  const aggregates = isAdherent ? (metricAggregates[currentMetric] || []) : []
 
   let html = '<table id="sensor-table"><thead><tr>'
   html += '<th data-column="brand">Marque</th>'
@@ -1712,8 +1858,14 @@ function createSensorTable(sensors) {
   html += '<th data-column="lastMessage">Dernier message</th>'
   if (!isAdherent) html += '<th data-column="org">Organisation</th>'
   html += '<th data-column="anomalies">Anomalies</th>'
-  if (isAdherent) html += '<th data-column="membres">Membres</th>'
-  html += `<th data-column="mesure" class="col-active-header">${metricLabel}<br><small style="font-weight:400">${aggLabel}</small></th>`
+  if (isAdherent) {
+    aggregates.forEach(agg => {
+      const isActive = agg.value === currentAggregate
+      html += `<th data-column="agg-${agg.value}" class="${isActive ? 'col-active-header' : ''}">${metricLabel}<br><small>${agg.label}</small></th>`
+    })
+  } else {
+    html += `<th data-column="mesure" class="col-active-header">${metricLabel}<br><small style="font-weight:400">${aggLabel}</small></th>`
+  }
   html += '</tr></thead><tbody>'
 
   sensors.forEach(sensor => {
@@ -1722,10 +1874,6 @@ function createSensorTable(sensors) {
     const brand = getSensorBrand(sensor)
     const typeName = MODEL_TYPE[sensor.model] || sensor.model
     const city = org?.ville || '—'
-    const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
-    const mesureHtml = sensorVal
-      ? `${sensorVal[0]} ${sensorVal[1]}`
-      : '<span class="tag-none">—</span>'
     const sensorCustomName = getSensorDisplayName(sensor)
     const nomHtml = sensorCustomName !== sensor.serial ? `<span style="font-weight:500">${sensorCustomName}</span>` : '<span class="tag-none">—</span>'
     html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
@@ -1736,10 +1884,20 @@ function createSensorTable(sensors) {
       <td>${city}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       ${!isAdherent ? `<td>${org ? org.name : '—'}</td>` : ''}
-      <td>${buildEventIconsHtml(sensor.event)}</td>
-      ${isAdherent ? `<td class="admin-links-cell">${buildSensorMembresHtmlAdherent(sensor)}</td>` : ''}
-      <td class="col-active num">${mesureHtml}</td>
-    </tr>`
+      <td>${buildEventIconsHtml(sensor.event)}</td>`
+    if (isAdherent) {
+      aggregates.forEach(agg => {
+        const isActive = agg.value === currentAggregate
+        const val = computeSensorValue(sensor, currentMetric, agg.value)
+        const display = val ? `${val[0]} ${val[1]}` : '<span class="tag-none">—</span>'
+        html += `<td class="num${isActive ? ' col-active' : ''}">${display}</td>`
+      })
+    } else {
+      const sensorVal = computeSensorValue(sensor, currentMetric, currentAggregate)
+      const mesureHtml = sensorVal ? `${sensorVal[0]} ${sensorVal[1]}` : '<span class="tag-none">—</span>'
+      html += `<td class="col-active num">${mesureHtml}</td>`
+    }
+    html += '</tr>'
   })
   html += '</tbody></table>'
 
@@ -1856,44 +2014,51 @@ function renderAdmin(filteredParcels, filteredSensors) {
 }
 
 
+function openExportListModal() {
+  const existing = document.getElementById('export-list-modal')
+  if (existing) existing.remove()
+
+  const modal = document.createElement('div')
+  modal.id = 'export-list-modal'
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:360px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Exporter la liste des parcelles</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div style="padding:16px 20px;display:flex;gap:12px">
+        <button class="btn-secondary export-fmt-btn" data-fmt="csv" style="flex:1;flex-direction:column;height:64px;gap:4px">
+          <i class="bi bi-filetype-csv" style="font-size:20px"></i>
+          <span>CSV</span>
+        </button>
+        <button class="btn-secondary export-fmt-btn" data-fmt="xlsx" style="flex:1;flex-direction:column;height:64px;gap:4px">
+          <i class="bi bi-file-earmark-excel" style="font-size:20px;color:#1d6f42"></i>
+          <span>Excel</span>
+        </button>
+      </div>
+    </div>
+  `
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  modal.querySelectorAll('.export-fmt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showToast(`Export ${btn.dataset.fmt.toUpperCase()} en cours…`)
+      modal.remove()
+    })
+  })
+  document.body.appendChild(modal)
+}
+
 function initExportButton() {
   document.getElementById('import-btn')?.addEventListener('click', () => {
     showToast('Import CSV/Excel — fonctionnalité à venir')
   })
 
-  const exportBtn = document.getElementById('export-btn')
-  if (!exportBtn) return
-  exportBtn.addEventListener('click', () => {
-    const { parcels: filteredParcels, sensors: filteredSensors } = getFilteredData()
-    const isList = currentView === 'list'
-    const selectedSensorItems = selectedSensors.length > 0
-      ? filteredSensors.filter(sensor => selectedSensors.includes(sensor.id))
-      : filteredSensors
-    const selectedParcelItems = selectedParcels.length > 0
-      ? filteredParcels.filter(parcel => selectedParcels.includes(parcel.id))
-      : filteredParcels
+  document.getElementById('export-csv-btn')?.addEventListener('click', openExportListModal)
 
-    const items = isList
-      ? [
-        ...selectedSensorItems.map(sensor => ({ id: sensor.id, label: `${sensor.model} ${sensor.serial}`, selected: true })),
-        ...selectedParcelItems.map(parcel => ({ id: `p-${parcel.id}`, label: parcel.name, selected: true }))
-      ]
-      : []
-
-    openExportModal({
-      title: isList ? 'Exporter des données sélectionnées' : 'Exporter des données',
-      contextLabel: isList ? 'Liste de sélection' : 'Réseau',
-      items,
-      type: isList ? 'sensor' : 'sensor',
-      availableMeasures: [
-        { id: 'pluie', label: 'Pluie' },
-        { id: 'temperature', label: 'Température' },
-        { id: 'humidite', label: 'Humidité' },
-        { id: 'vent', label: 'Vent' },
-        { id: 'etp', label: 'ETP' },
-        { id: 'rayonnement', label: 'Rayonnement' }
-      ]
-    })
+  document.getElementById('export-btn')?.addEventListener('click', () => {
+    showToast('Création de parcelle — fonctionnalité à venir')
   })
 }
 
@@ -2170,12 +2335,21 @@ function createParcelMetricTable(parcels) {
     html += `<td class="num">${sensorCount > 0 ? sensorCount : '<span class="warn-text">0</span>'}</td>`
     html += `<td class="integrations-cell">${integHtml}</td>`
     if (isAdherent) html += `<td class="admin-links-cell">${buildMembresHtmlAdherent(parcel)}</td>`
-    const hasData = parcelHasMetric(parcel, currentMetric)
+    const hasData = parcelHasDisplayData(parcel, currentMetric)
     aggregates.forEach(agg => {
       const isActive = agg.value === currentAggregate
-      const display = hasData
-        ? fmtMetricValue(computeMetricValue(parcel, currentMetric, agg.value), currentMetric)
-        : '<span class="tdb-missing">—</span>'
+      let display
+      if (!hasData) {
+        display = '<span class="tdb-missing">—</span>'
+      } else {
+        const horizons = computeHorizonValues(parcel, currentMetric, agg.value)
+        if (horizons) {
+          const unit = getMetricUnit(currentMetric)
+          display = horizons.map(h => `${h.value}${unit ? ` ${unit}` : ''} <span class="tdb-depth">@ ${h.depth}</span>`).join('<br>')
+        } else {
+          display = fmtMetricValue(computeMetricValue(parcel, currentMetric, agg.value), currentMetric)
+        }
+      }
       html += `<td class="num${isActive ? ' col-active' : ''}">${display}</td>`
     })
     html += '</tr>'

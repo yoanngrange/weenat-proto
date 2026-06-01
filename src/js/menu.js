@@ -103,7 +103,7 @@ class WeenatMenu {
     html += `      </div>
           <div class="menu-switch">
             <button id="role-switch" class="role-switch-btn">
-              <small>Admin réseau ↔ Adhérent réseau</small>
+              <small>Admin ↔ Affiliate</small>
             </button>
           </div>
         </div>

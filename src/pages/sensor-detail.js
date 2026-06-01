@@ -27,6 +27,7 @@ const METRIC_DEFS = {
   humidite_sol_10:  { name: 'Teneur en eau du sol 10 cm',      unit: '%vol',      color: '#105200', baseVal: () => rnd(15, 45)   },
   humidite_sol_20:  { name: 'Teneur en eau du sol 20 cm',      unit: '%vol',      color: '#8C5E82', baseVal: () => rnd(15, 45)   },
   humidite_sol_30:  { name: 'Teneur en eau du sol 30 cm',      unit: '%vol',      color: '#46DA82', baseVal: () => rnd(15, 45)   },
+  humidite_sol_ec:  { name: 'Teneur en eau du sol',            unit: '%vol',      color: '#46DA82', baseVal: () => rnd(15, 45)   },
   humidite_sol_40:  { name: 'Teneur en eau du sol 40 cm',      unit: '%vol',      color: '#949494', baseVal: () => rnd(17, 43)   },
   humidite_sol_50:  { name: 'Teneur en eau du sol 50 cm',      unit: '%vol',      color: '#870021', baseVal: () => rnd(18, 42)   },
   humidite_sol_60:  { name: 'Teneur en eau du sol 60 cm',      unit: '%vol',      color: '#F608C2', baseVal: () => rnd(18, 42)   },
@@ -66,7 +67,7 @@ const METRICS_BY_MODEL = {
   'CHP-60/90': ['humidite_sol_60', 'humidite_sol_90', 'temp_sol'],
   'CAPA-30-3': ['_capa_vwc', '_capa_temp'],
   'CAPA-60-6': ['_capa_vwc', '_capa_temp'],
-  'EC':       ['humidite_sol_30', 'temp_sol', 'conductivite'],
+  'EC':       ['humidite_sol_ec', 'temp_sol', 'conductivite'],
   'LWS':      ['_lws_intensite', '_lws_duree'],
   'PYRANO':   ['rayonnement'],
   'PAR':      ['par'],
@@ -211,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (_sidebar2) new MutationObserver(() => {
     const p = plots.find(pl => sensor.parcelIds?.includes(pl.id)) || null
     renderPanelMembres(p)
+    applyAccessControl()
   }).observe(_sidebar2, { attributes: true, attributeFilter: ['data-role'] })
 })
 
@@ -1012,6 +1014,7 @@ function renderPanel() {
   renderPanelMembres(parcel)
   renderActions()
   renderMaintenance()
+  applyAccessControl()
 }
 
 function renderIdentification(parcel, org, stored) {
@@ -1053,7 +1056,7 @@ function renderLocalisation(parcel, org) {
       <span class="panel-row-key">Commune</span>
       <span class="panel-row-val">${city}${dept ? ` (${dept})` : ''}</span>
     </div>
-    ${parcel ? `<div class="panel-row"><span class="panel-row-key">Parcelle</span><span class="panel-row-val">${parcel.name} — ${parcel.area} ha</span></div>` : ''}
+    ${parcel ? `<div class="panel-row" id="panel-loc-parcel"><span class="panel-row-key">Parcelle</span><span class="panel-row-val">${parcel.name} — ${parcel.area} ha</span></div>` : ''}
     ${lat != null ? `<div class="panel-row"><a href="https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}" target="_blank" class="itinerary-link"><i class="bi bi-signpost-2"></i> Obtenir l'itinéraire</a></div>` : ''}
   `
 }
@@ -1083,15 +1086,33 @@ function renderSignalQuality() {
 function renderEvents() {
   const evBody = document.getElementById('panel-events')
   if (sensor.event) {
-    evBody.innerHTML = `
-      <div class="event-item event-item--warn">
-        <i class="bi bi-exclamation-triangle-fill"></i>
-        <div>
-          <div class="event-item-label">${sensor.event}</div>
-          <div class="event-item-date">Depuis le 28/03/2026</div>
+    const events = Array.isArray(sensor.event) ? sensor.event : [sensor.event]
+    evBody.innerHTML = events.map((ev, i) => {
+      const canStop = ev.toLowerCase().includes('déplacé')
+      return `
+      <div class="event-item event-item--warn" style="justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:10px;min-width:0">
+          <i class="bi bi-exclamation-triangle-fill" style="flex-shrink:0;margin-top:2px"></i>
+          <div>
+            <div class="event-item-label">${ev}</div>
+            <div class="event-item-date">Depuis le 28/03/2026</div>
+          </div>
         </div>
-      </div>
-    `
+        ${canStop ? `<button class="btn-secondary btn-sm ev-stop-btn" data-ev-idx="${i}" style="flex-shrink:0;white-space:nowrap">Arrêter l'événement</button>` : ''}
+      </div>`
+    }).join('')
+    evBody.querySelectorAll('.ev-stop-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = +btn.dataset.evIdx
+        if (Array.isArray(sensor.event)) {
+          sensor.event = sensor.event.filter((_, j) => j !== idx)
+          if (!sensor.event.length) sensor.event = null
+        } else {
+          sensor.event = null
+        }
+        renderEvents()
+      })
+    })
   } else {
     evBody.innerHTML = `<div class="panel-empty"><i class="bi bi-check-circle" style="color:var(--ok)"></i> Aucun événement</div>`
   }
@@ -1303,10 +1324,49 @@ function exportCsv() {
   triggerCsvDownload([header, ...rows].join('\r\n'), `${sensor.serial}_${currentPeriod}_${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
+function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfirm }) {
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:400px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">${title}</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px">
+        <p style="margin:0;font-size:13px;color:var(--txt2);line-height:1.5">${message}</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary confirm-cancel">Annuler</button>
+          <button class="btn-danger confirm-ok">${confirmLabel}</button>
+        </div>
+      </div>
+    </div>`
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.querySelector('.confirm-cancel').addEventListener('click', () => modal.remove())
+  modal.querySelector('.confirm-ok').addEventListener('click', () => { modal.remove(); onConfirm() })
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  document.body.appendChild(modal)
+}
+
 function renderActions() {
-  document.getElementById('panel-actions').innerHTML = `
-    <button class="action-btn action-btn--danger"><i class="bi bi-x-circle"></i> Retirer de l'exploitation</button>
+  const el = document.getElementById('panel-actions')
+  el.innerHTML = `
+    <button class="action-btn action-btn--danger" id="unlink-sensor-btn"><i class="bi bi-x-circle"></i> Retirer de l'exploitation</button>
   `
+  el.querySelector('#unlink-sensor-btn').addEventListener('click', () => {
+    const linkedParcels = plots.filter(p => sensor.parcelIds.includes(p.id))
+    const parcelList = linkedParcels.length
+      ? linkedParcels.map(p => `<strong>${p.name}</strong>`).join(', ')
+      : 'aucune parcelle'
+    showConfirmModal({
+      title: 'Retirer le capteur de l\'exploitation',
+      message: `Retirer <strong>${sensor.model} ${sensor.serial}</strong> de l'exploitation ?<br><br>` +
+               `Parcelles liées : ${parcelList}.<br><br>` +
+               `Le capteur restera visible dans le catalogue réseau.`,
+      confirmLabel: 'Retirer',
+      onConfirm: () => showToast('Capteur retiré de l\'exploitation (fonctionnalité à venir)')
+    })
+  })
 }
 
 function renderMaintenance() {
@@ -1474,23 +1534,56 @@ function initMiniMap() {
   if (!org?.lat) return
 
   const map = L.map('sensor-mini-map', { zoomControl: false, attributionControl: false })
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map)
 
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Esri'
-  }).addTo(map)
-
-  // Draw parcel shape if available
   const latlngs = parcel?.latlngs
   if (Array.isArray(latlngs) && latlngs.length >= 3) {
+    // Show parcel polygon with very light fill
     const poly = L.polygon(latlngs, {
-      color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.25
+      color: '#0172A4', weight: 1.5, fillColor: '#0172A4', fillOpacity: 0.3
+    }).addTo(map)
+    // Place sensor dot at polygon centroid
+    const centerLat = latlngs.reduce((s, ll) => s + ll[0], 0) / latlngs.length
+    const centerLng = latlngs.reduce((s, ll) => s + ll[1], 0) / latlngs.length
+    L.circleMarker([centerLat, centerLng], {
+      radius: 6, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2
     }).addTo(map)
     map.fitBounds(poly.getBounds(), { padding: [10, 10] })
   } else {
     map.setView([org.lat, org.lng], 13)
     L.circleMarker([org.lat, org.lng], {
-      radius: 6, color: 'white', fillColor: 'var(--pri)', fillOpacity: 1, weight: 2
+      radius: 6, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2
     }).addTo(map)
+  }
+}
+
+// ─── Access control (adherent viewing external sensor) ────────────────────────
+
+function applyAccessControl() {
+  const role = document.getElementById('sidebar')?.getAttribute('data-role') || ''
+  const isAdherentExternal = role === 'adherent-reseau' && sensor?.orgId !== 1
+
+  ;[
+    document.querySelector('#panel-plots')?.closest('.panel-section'),
+    document.querySelector('#panel-config')?.closest('.panel-section'),
+    document.getElementById('panel-membres-section'),
+    document.getElementById('panel-conseillers-section'),
+    document.querySelector('#panel-actions')?.closest('.panel-section'),
+    document.querySelector('#panel-maint')?.closest('.panel-section'),
+  ].forEach(el => { if (el) el.style.display = isAdherentExternal ? 'none' : '' })
+
+  const journalTab = document.querySelector('.detail-tab-btn[data-pane="tab-journal"]')
+  if (journalTab) journalTab.style.display = isAdherentExternal ? 'none' : ''
+
+  const parcelLocRow = document.getElementById('panel-loc-parcel')
+  if (parcelLocRow) parcelLocRow.style.display = isAdherentExternal ? 'none' : ''
+
+  const nameInput = document.querySelector('#panel-ident [data-field="label"] input')
+  if (nameInput) {
+    nameInput.readOnly = isAdherentExternal
+    nameInput.style.cssText = isAdherentExternal
+      ? 'cursor:default;background:transparent;border:none;padding:0;pointer-events:none;color:var(--txt)'
+      : ''
   }
 }
 
@@ -1655,10 +1748,6 @@ function openSensorJournalForm() {
           <input type="date" id="sjrn-f-date" class="journal-form-input" value="${new Date().toISOString().slice(0,10)}">
         </div>
         <div class="journal-form-row">
-          <label class="journal-form-label">Intervenant</label>
-          <input type="text" id="sjrn-f-user" class="journal-form-input" value="${getDefaultSensorJournalUser()}" placeholder="Nom de l'intervenant">
-        </div>
-        <div class="journal-form-row">
           <label class="journal-form-label">Note</label>
           <textarea id="sjrn-f-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
         </div>
@@ -1673,7 +1762,7 @@ function openSensorJournalForm() {
   modal.querySelector('#sjrn-f-save').addEventListener('click', () => {
     const type  = modal.querySelector('#sjrn-f-type').value
     const date  = modal.querySelector('#sjrn-f-date').value || new Date().toISOString().slice(0,10)
-    const user  = modal.querySelector('#sjrn-f-user').value.trim() || getDefaultSensorJournalUser()
+    const user  = getDefaultSensorJournalUser()
     const texte = modal.querySelector('#sjrn-f-texte').value.trim()
     saveSensorJournal([{ id: Date.now(), type, date, user, texte }, ...getSensorJournal()])
     modal.remove()

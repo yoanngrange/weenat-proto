@@ -2057,6 +2057,7 @@ export function initDashboardScreen(screenEl, role) {
               { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
               { action:'note',                icon:'bi-pencil-square',   label:'Note' },
               { action:'traitement',          icon:'bi-eyedropper',      label:'Traitement' },
+              { action:'maintenance',         icon:'bi-tools',           label:'Opération de maintenance' },
             ].map(it => `
               <button class="m-add-item" data-action="${it.action}">
                 <i class="bi ${it.icon}"></i>

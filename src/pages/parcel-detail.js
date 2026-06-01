@@ -105,6 +105,36 @@ const METRICS_BY_MODEL = {
 // CHP tensiometers: multiple can coexist on the same parcel — skip conflict check
 const TENSIO_MODELS = ['CHP-15/30', 'CHP-30/60', 'CHP-60/90']
 
+// Soil sensor groups: mutually exclusive (you can't mix these categories on one parcel)
+const SOIL_GROUPS = [
+  { name: 'Tensiomètre (CHP)', models: new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90']) },
+  { name: 'Sonde capacitive (CAPA)', models: new Set(['CAPA-30-3', 'CAPA-60-6']) },
+  { name: 'Sonde fertirrigation (EC)', models: new Set(['EC']) },
+  { name: 'Thermomètre de sol (T_MINI)', models: new Set(['T_MINI']) },
+]
+
+function getSoilGroup(model) {
+  return SOIL_GROUPS.find(g => g.models.has(model)) || null
+}
+
+// CAPA horizon definitions (per model) — used for multi-curve charts (VWC and Tsol)
+const CAPA_HORIZONS_PARCEL = {
+  'CAPA-30-3': [
+    { depth: 10, label: '10 cm', vwcColor: '#105200', tsolColor: '#FFA040' },
+    { depth: 20, label: '20 cm', vwcColor: '#8C5E82', tsolColor: '#E07050' },
+    { depth: 30, label: '30 cm', vwcColor: '#46DA82', tsolColor: '#A04030' },
+  ],
+  'CAPA-60-6': [
+    { depth: 10, label: '10 cm', vwcColor: '#105200', tsolColor: '#FFA040' },
+    { depth: 20, label: '20 cm', vwcColor: '#8C5E82', tsolColor: '#E07050' },
+    { depth: 30, label: '30 cm', vwcColor: '#46DA82', tsolColor: '#A04030' },
+    { depth: 40, label: '40 cm', vwcColor: '#949494', tsolColor: '#804828' },
+    { depth: 50, label: '50 cm', vwcColor: '#870021', tsolColor: '#603818' },
+    { depth: 60, label: '60 cm', vwcColor: '#F608C2', tsolColor: '#402810' },
+  ],
+}
+const CAPA_MODELS = ['CAPA-30-3', 'CAPA-60-6']
+
 const MODEL_NAMES = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
   'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
@@ -202,6 +232,21 @@ function initState() {
     parcelState.alertes = []
   }
 
+  // Resolve soil exclusivity conflicts from saved state: keep only the first group found
+  const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+  const firstGroup = SOIL_GROUPS.find(g => linked.some(s => g.models.has(s.model)))
+  if (firstGroup) {
+    const hasConflict = SOIL_GROUPS.some(g => g !== firstGroup && linked.some(s => g.models.has(s.model)))
+    if (hasConflict) {
+      parcelState.linkedSensorIds = parcelState.linkedSensorIds.filter(sid => {
+        const s = allSensors.find(x => x.id === sid)
+        if (!s) return true
+        const g = getSoilGroup(s.model)
+        return !g || g === firstGroup
+      })
+      patchParcel(parcelId, { linkedSensorIds: parcelState.linkedSensorIds })
+    }
+  }
 }
 
 function saveState(patch) {
@@ -734,7 +779,8 @@ function setupChartDragDrop(container) {
 function renderChartsContent(container, linkedSensorIds) {
   const linkedSensors = allSensors.filter(s => linkedSensorIds.includes(s.id))
   const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
-  const otherSensors  = linkedSensors.filter(s => !TENSIO_MODELS.includes(s.model))
+  const capaSensors   = linkedSensors.filter(s => CAPA_MODELS.includes(s.model))
+  const otherSensors  = linkedSensors.filter(s => !TENSIO_MODELS.includes(s.model) && !CAPA_MODELS.includes(s.model))
   const stepMins = getStepMinutes()
 
   // Collect sensor metric IDs for deduplication
@@ -766,6 +812,17 @@ function renderChartsContent(container, linkedSensorIds) {
     })
   }
 
+  // CAPA sensors: one multi-curve VWC card + one multi-curve Tsol card per sensor
+  capaSensors.forEach(s => {
+    const horizons = CAPA_HORIZONS_PARCEL[s.model] || []
+    const source = `${MODEL_NAMES[s.model] || s.model} · ${s.serial}`
+    const emissionMins = Math.floor(5 + Math.random() * 55)
+    if (horizons.length > 0) {
+      allCards.push({ key: `capa-vwc-${s.id}`,  type: 'capa-vwc',  sensor: s, horizons, source, emissionMins })
+      allCards.push({ key: `capa-tsol-${s.id}`, type: 'capa-tsol', sensor: s, horizons, source, emissionMins })
+    }
+  })
+
   // ALWAYS_METRICS: skip any metric already provided by a sensor
   ALWAYS_METRICS
     .filter(m => !sensorMetricIds.has(m.id))
@@ -786,6 +843,10 @@ function renderChartsContent(container, linkedSensorIds) {
       renderWindCompositeChart(container, card.source, card.emissionMins, card.key)
     } else if (card.type === 'tensio') {
       appendTensioCard(container, card.metricId, card.tensioSensors, card.source, card.emissionMins, card.key)
+    } else if (card.type === 'capa-vwc') {
+      appendCapaVwcCard(container, card.horizons, card.source, card.emissionMins, card.key)
+    } else if (card.type === 'capa-tsol') {
+      appendCapaTsolCard(container, card.horizons, card.source, card.emissionMins, card.key)
     }
   })
 
@@ -931,6 +992,39 @@ function appendTensioCard(container, metricId, tensioSensors, source = null, emi
   })
 
   container.appendChild(card)
+}
+
+function _buildCapaMultiCard(container, horizons, colorKey, title, unit, svgClass, dataKey, cardKey) {
+  const card = document.createElement('div')
+  card.className = `chart-card ${dataKey}-multi-card`
+  card.dataset[dataKey + 'Curves'] = JSON.stringify(horizons.map(h => ({ depth: h.depth, color: h[colorKey] })))
+  if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
+
+  const legend = horizons.map(h =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--txt2)">
+      <span style="display:inline-block;width:20px;height:2px;background:${h[colorKey]};vertical-align:middle;border-radius:1px"></span>
+      ${h.label}
+    </span>`
+  ).join('')
+
+  card.innerHTML = `
+    <div class="chart-card-header">
+      <span class="chart-card-name" style="color:${horizons[0]?.[colorKey] || '#46DA82'}">${title}</span>
+      <span class="chart-card-unit">${unit}</span>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 14px 2px">${legend}</div>
+    <svg class="chart-svg ${svgClass}" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+  `
+  container.appendChild(card)
+  return card
+}
+
+function appendCapaVwcCard(container, horizons, source = null, emissionMins = null, cardKey = null) {
+  _buildCapaMultiCard(container, horizons, 'vwcColor', 'Teneur en eau du sol', '%vol', 'capa-svg', 'capa', cardKey)
+}
+
+function appendCapaTsolCard(container, horizons, source = null, emissionMins = null, cardKey = null) {
+  _buildCapaMultiCard(container, horizons, 'tsolColor', 'Température du sol par horizon', '°C', 'capa-tsol-svg', 'capaT', cardKey)
 }
 
 function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false, sensorId = null) {
@@ -1121,6 +1215,18 @@ function drawAllCharts() {
       if (svg && curves.length > 0) drawTensioMultiChart(svg, curves, count, step)
       return
     }
+    if (card.classList.contains('capa-multi-card')) {
+      const svg = card.querySelector('.capa-svg')
+      const curves = JSON.parse(card.dataset.capaCurves || '[]')
+      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'vwc')
+      return
+    }
+    if (card.classList.contains('capaT-multi-card')) {
+      const svg = card.querySelector('.capa-tsol-svg')
+      const curves = JSON.parse(card.dataset.capaTCurves || '[]')
+      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'tsol')
+      return
+    }
     const svg = card.querySelector('.chart-svg')
     if (!svg) return  // custom-rendered cards (vent, etc.) — already drawn
     const base      = parseFloat(card.dataset.base)
@@ -1182,6 +1288,61 @@ function drawTensioMultiChart(svg, curves, count, step) {
   })
 
   // X-axis baseline + labels
+  out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
+  const labelStep = Math.max(1, Math.floor(count / 6))
+  for (let i = 0; i < count; i += labelStep) {
+    const minsAgo = (count - 1 - i) * step
+    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+  }
+
+  svg.innerHTML = out
+}
+
+// CAPA multi-horizon chart — VWC (%vol) or Tsol (°C) depending on mode
+function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
+  const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
+  const innerW = W - PAD.l - PAD.r
+  const innerH = H - PAD.t - PAD.b
+
+  const allSeries = curves.map((c, ci) => {
+    if (mode === 'tsol') {
+      const base = 16 - c.depth * 0.06 + ci * 0.5 + Math.random() * 3
+      return Array.from({ length: count }, (_, idx) => {
+        const minsAgo = (count - 1 - idx) * step
+        return genRealisticVal('tsol', base, minsAgo)
+      })
+    }
+    const base = 35 - c.depth * 0.15 + ci * 2 + Math.random() * 8
+    return Array.from({ length: count }, (_, idx) => {
+      const minsAgo = (count - 1 - idx) * step
+      return Math.max(10, Math.min(55, genRealisticVal('teneur-eau', base, minsAgo)))
+    })
+  })
+
+  const allVals = allSeries.flat()
+  const minV = Math.floor(Math.min(...allVals) - 2)
+  const maxV = Math.ceil(Math.max(...allVals) + 2)
+  const range = maxV - minV || 1
+
+  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
+
+  const clipId = `cc-${Math.random().toString(36).slice(2)}`
+  let out = `<defs><clipPath id="${clipId}"><rect x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}"/></clipPath></defs>`
+
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD.t + (i / 4) * innerH
+    const v = maxV - (i / 4) * range
+    out += `<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W - PAD.r}" y2="${y.toFixed(1)}" stroke="var(--bdr2)" stroke-width="1"/>`
+    out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${v.toFixed(0)}</text>`
+  }
+
+  allSeries.forEach((vals, ci) => {
+    const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
+    const path = smoothPath(pts)
+    out += `<path d="${path}" fill="none" stroke="${curves[ci].color}" stroke-width="2" stroke-linecap="round" clip-path="url(#${clipId})"/>`
+  })
+
   out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
   const labelStep = Math.max(1, Math.floor(count / 6))
   for (let i = 0; i < count; i += labelStep) {
@@ -2180,9 +2341,21 @@ function renderLinkedSensors() {
   el.querySelectorAll('.remove-sensor-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = parseInt(btn.dataset.id)
-      saveState({ linkedSensorIds: parcelState.linkedSensorIds.filter(x => x !== id) })
-      renderLinkedSensors()
-      renderCharts()
+      const s = allSensors.find(x => x.id === id)
+      const label = s ? `${MODEL_NAMES[s.model] || s.model} — ${s.serial}` : `capteur #${id}`
+      showConfirmModal({
+        title: 'Retirer le capteur',
+        message: `Retirer <strong>${label}</strong> de cette parcelle ?<br><br>Les données historiques sont conservées.`,
+        confirmLabel: 'Retirer',
+        onConfirm: () => {
+          const remaining = parcelState.linkedSensorIds.filter(x => x !== id)
+          saveState({ linkedSensorIds: remaining })
+          pruneWidgetsAfterRemoval(remaining)
+          renderLinkedSensors()
+          renderCharts()
+          initDashGrid()
+        }
+      })
     })
   })
 
@@ -2196,6 +2369,37 @@ function renderLinkedSensors() {
 
       const sensor = allSensors.find(s => s.id === id)
       if (!sensor) return
+
+      // Soil category exclusivity check — remove conflicting sensors first
+      const newGroup = getSoilGroup(sensor.model)
+      if (newGroup) {
+        const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+        const conflictingSensors = linkedSensors.filter(s => {
+          const g = getSoilGroup(s.model)
+          return g && g !== newGroup
+        })
+        if (conflictingSensors.length > 0) {
+          const conflictList = conflictingSensors.map(s => `${MODEL_NAMES[s.model] || s.model} — ${s.serial}`).join(', ')
+          showConfirmModal({
+            title: 'Capteur incompatible',
+            message: `Cette parcelle utilise déjà : <strong>${conflictList}</strong>.<br><br>` +
+                     `Les capteurs de sol (CHP, CAPA, EC, T_MINI) sont exclusifs — une seule technologie par parcelle.<br><br>` +
+                     `Retirer ${conflictingSensors.length > 1 ? 'ces capteurs' : 'ce capteur'} et ajouter le nouveau ?`,
+            confirmLabel: 'Remplacer',
+            onConfirm: () => {
+              const conflictIds = new Set(conflictingSensors.map(s => s.id))
+              const cleaned = parcelState.linkedSensorIds.filter(x => !conflictIds.has(x))
+              saveState({ linkedSensorIds: [...cleaned, id] })
+              pruneWidgetsAfterRemoval(cleaned)
+              addWidgetsForSensor(sensor)
+              renderLinkedSensors()
+              renderCharts()
+              initDashGrid()
+            }
+          })
+          return
+        }
+      }
 
       // Conflict check (skip for tensiometers)
       if (!TENSIO_MODELS.includes(sensor.model)) {
@@ -2218,11 +2422,7 @@ function renderLinkedSensors() {
       }
 
       saveState({ linkedSensorIds: [...parcelState.linkedSensorIds, id] })
-      // Auto-add relevant widgets for new sensor model
-      if (sensor.model === 'T_GEL') {
-        const cur = getActiveWidgetIds()
-        if (!cur.includes('gel')) { cur.push('gel'); saveWidgetIds(cur) }
-      }
+      addWidgetsForSensor(sensor)
       renderLinkedSensors()
       renderCharts()
       initDashGrid()
@@ -2559,10 +2759,49 @@ function exportCsv() {
   triggerCsvDownload([header, ...rows].join('\r\n'), `${name}_${currentPeriod}_${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
+function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfirm }) {
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:400px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">${title}</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px">
+        <p style="margin:0;font-size:13px;color:var(--txt2);line-height:1.5">${message}</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn-secondary confirm-cancel">Annuler</button>
+          <button class="btn-danger confirm-ok">${confirmLabel}</button>
+        </div>
+      </div>
+    </div>`
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.querySelector('.confirm-cancel').addEventListener('click', () => modal.remove())
+  modal.querySelector('.confirm-ok').addEventListener('click', () => { modal.remove(); onConfirm() })
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+  document.body.appendChild(modal)
+}
+
 function renderActions() {
-  document.getElementById('panel-actions').innerHTML = `
-    <button class="action-btn action-btn--danger"><i class="bi bi-archive"></i> Archiver la parcelle</button>
+  const el = document.getElementById('panel-actions')
+  el.innerHTML = `
+    <button class="action-btn action-btn--danger" id="archive-parcel-btn"><i class="bi bi-archive"></i> Archiver la parcelle</button>
   `
+  el.querySelector('#archive-parcel-btn').addEventListener('click', () => {
+    const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
+    const sensorList = linkedSensors.length
+      ? linkedSensors.map(s => `<strong>${s.model} ${s.serial}</strong>`).join(', ')
+      : 'aucun capteur lié'
+    showConfirmModal({
+      title: 'Archiver la parcelle',
+      message: `Vous êtes sur le point d'archiver <strong>${parcelState.name || parcelBase.name}</strong>.<br><br>` +
+               `Capteurs liés : ${sensorList}.<br><br>` +
+               `L'archivage masque la parcelle sans supprimer les données historiques.`,
+      confirmLabel: 'Archiver',
+      onConfirm: () => showToast('Parcelle archivée (fonctionnalité à venir)')
+    })
+  })
 }
 
 // ─── Mini map (Géolocalisation) ───────────────────────────────────────────────
@@ -2676,14 +2915,57 @@ function saveWidgetIds(ids) {
   localStorage.setItem(DASH_STORAGE_KEY(), JSON.stringify(ids))
 }
 
+function pruneWidgetsAfterRemoval(remainingLinkedIds) {
+  const remaining = allSensors.filter(s => remainingLinkedIds.includes(s.id))
+  const models = new Set(remaining.map(s => s.model))
+  const hasCapa   = [...models].some(m => m.startsWith('CAPA-'))
+  const hasTensio = [...models].some(m => TENSIO_MODELS.includes(m))
+  // cumuls always valid: ETP + ensoleillement are sensor-independent; renderWCumuls filters pluie/DJ/HF internally
+  const valid = new Set(['previsions-5j', 'weephyt', 'cumuls'])
+  if (models.has('P+') || models.has('PT') || models.has('SMV') || models.has('P')) valid.add('w-station')
+  if (models.has('TH'))     valid.add('w-thygro')
+  if (models.has('T_MINI')) valid.add('w-tsol')
+  if (models.has('W'))      valid.add('w-anem')
+  if (models.has('PYRANO')) valid.add('w-pyrano')
+  if (models.has('LWS'))    valid.add('w-lws')
+  if (models.has('T_GEL'))  valid.add('gel')
+  if (models.has('PAR'))    valid.add('w-par')
+  if (hasCapa)              valid.add('w-capa')
+  if (hasTensio)            valid.add('w-tensio')
+  if (models.has('EC'))     valid.add('w-ec')
+  if (hasTensio || hasCapa) valid.add('bilan')
+  const hasIrrig = !!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué'
+  if (hasIrrig) valid.add('irrigations')
+  const saved = getActiveWidgetIds()
+  const pruned = saved.filter(id => valid.has(id))
+  if (pruned.length !== saved.length) saveWidgetIds(pruned)
+}
+
+function addWidgetsForSensor(sensor) {
+  const cur = getActiveWidgetIds()
+  const push = id => { if (!cur.includes(id)) cur.push(id) }
+  const m = sensor.model
+  if (m === 'P+' || m === 'PT' || m === 'SMV' || m === 'P') push('w-station')
+  if (m === 'TH')     push('w-thygro')
+  if (m === 'T_MINI') push('w-tsol')
+  if (m === 'W')      push('w-anem')
+  if (m === 'PYRANO') push('w-pyrano')
+  if (m === 'LWS')    push('w-lws')
+  if (m === 'T_GEL')  push('gel')
+  if (m === 'PAR')    push('w-par')
+  if (m === 'EC')     push('w-ec')
+  if (m.startsWith('CAPA-')) { push('w-capa'); push('bilan') }
+  if (TENSIO_MODELS.includes(m)) { push('w-tensio'); push('bilan') }
+  saveWidgetIds(cur)
+}
+
 function computeDefaultWidgetIds() {
   const linked  = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
   const models  = new Set(linked.map(s => s.model))
   const hasCapa   = [...models].some(m => m.startsWith('CAPA-'))
   const hasTensio = [...models].some(m => TENSIO_MODELS.includes(m))
-  const hasCumul  = linked.some(s => (METRICS_BY_MODEL[s.model]||[]).some(m => m.cumul))
-  const ids = ['previsions-5j', 'weephyt']
-  if (hasCumul) ids.push('cumuls')
+  // cumuls always present: ETP + ensoleillement are always shown regardless of sensors
+  const ids = ['previsions-5j', 'weephyt', 'cumuls']
   if (models.has('P+') || models.has('PT') || models.has('SMV') || models.has('P')) ids.push('w-station')
   if (models.has('TH'))     ids.push('w-thygro')
   if (models.has('T_MINI')) ids.push('w-tsol')

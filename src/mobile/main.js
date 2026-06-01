@@ -216,6 +216,7 @@ function openMobileAddModal() {
           { action:'strategie-irrigation',icon:'bi-arrow-repeat',    label:"Saison d'irrigation" },
           { action:'note',                icon:'bi-pencil-square',   label:'Note' },
           { action:'traitement',          icon:'bi-eyedropper',      label:'Traitement' },
+          { action:'maintenance',         icon:'bi-tools',           label:'Opération de maintenance' },
         ].map(it => `
           <button class="m-add-row" data-action="${it.action}" style="display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:none;background:none;font-size:16px;font-family:inherit;cursor:pointer;border-top:.5px solid rgba(0,0,0,.08);text-align:left">
             <i class="bi ${it.icon}" style="color:#0172A4;width:22px;text-align:center;flex-shrink:0"></i>

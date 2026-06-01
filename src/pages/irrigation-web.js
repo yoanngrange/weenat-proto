@@ -55,8 +55,9 @@ function renderTimeline(irrig) {
   const MLBL_Y  = DOT_CY - DOT_R - 3
   const DATE_Y  = BAR_Y + BAR_H + 13
   const SVG_H   = DATE_Y + 2
+  const PAD     = DOT_R + 2
 
-  const xOf = d => Math.round((d - first) / totalMs * SVG_W)
+  const xOf = d => Math.round(PAD + (d - first) / totalMs * (SVG_W - 2 * PAD))
   const fmtD = iso => { const [, m, d] = iso.split('-'); return `${parseInt(d)}/${parseInt(m)}` }
 
   const ticks = []
@@ -671,7 +672,7 @@ function openEditStratModal(plotId, onDone) {
       <div class="iw-strat-opt" id="strat-modify">
         <div class="iw-strat-opt-icon" style="background:#E6F1FB">✎</div>
         <div>
-          <div class="iw-strat-opt-title">Modifier les paramètres</div>
+          <div class="iw-strat-opt-title">Modifier la saison</div>
           <div class="iw-strat-opt-sub">Quantité, fréquence, dates · Les irrigations passées sont conservées</div>
         </div>
       </div>

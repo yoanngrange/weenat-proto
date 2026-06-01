@@ -1,6 +1,7 @@
 import { plots as allPlots }   from '../../data/plots.js'
 import { orgs }                from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
+import { IRRIG_SEASON }        from '../../data/irrigations.js'
 import { initParcelDetail }    from './parcel-detail.js'
 
 const ADMIN_ORG_ID = 100
@@ -23,7 +24,7 @@ const METRICS = [
   { id: 'pluie',    label: 'Pluie',               unit: 'mm',  aggs: ["Aujourd'hui", 'Hier', '7 derniers jours', '30 jours'], defaultAgg: '7 derniers jours' },
   { id: 'irrigation', label: 'Irrigations',       unit: 'mm',  aggs: ['30 derniers jours', '7 derniers jours', "Aujourd'hui", 'Demain', '7 prochains jours', '30 prochains jours', 'Toute la saison'], defaultAgg: "Aujourd'hui" },
   { id: 'etp',      label: 'Évapotranspiration',  unit: 'mm',  aggs: ["Aujourd'hui", '7 derniers jours'],                     defaultAgg: "Aujourd'hui"      },
-  { id: 'temp',     label: 'Température air',      unit: '°C',  aggs: ['Actuel', 'Min du jour', 'Max du jour'],                defaultAgg: 'Actuel'           },
+  { id: 'temp',     label: 'Température',      unit: '°C',  aggs: ['Actuel', 'Min du jour', 'Max du jour'],                defaultAgg: 'Actuel'           },
   { id: 'temp_rosee',label: 'Température de rosée',unit: '°C', aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
   { id: 'rayonnement',label: 'Rayonnement solaire',unit: 'W/m²',aggs: ['Actuel', 'Journalier'],                               defaultAgg: 'Actuel'           },
   { id: 'rfu',      label: 'Réservoir',            unit: 'mm',  aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
@@ -33,9 +34,26 @@ const METRICS = [
   { id: 'humectation', label: 'Humectation foliaire',  unit: '%',          aggs: ['Actuel', 'Heures du jour'],           defaultAgg: 'Actuel'           },
 ]
 
+function irrigSum(plotId, agg) {
+  const today = new Date().toISOString().split('T')[0]
+  const ago = d => { const dt = new Date(); dt.setDate(dt.getDate() - d); return dt.toISOString().split('T')[0] }
+  const ahead = d => { const dt = new Date(); dt.setDate(dt.getDate() + d); return dt.toISOString().split('T')[0] }
+  const all = IRRIG_SEASON.filter(i => i.plotId === plotId)
+  switch (agg) {
+    case "Aujourd'hui":         return all.filter(i => i.iso === today).reduce((s, i) => s + i.mm, 0)
+    case '7 derniers jours':    return all.filter(i => i.real && i.iso >= ago(7)).reduce((s, i) => s + i.mm, 0)
+    case '30 derniers jours':   return all.filter(i => i.real && i.iso >= ago(30)).reduce((s, i) => s + i.mm, 0)
+    case 'Demain':              return all.filter(i => !i.real && i.iso === ahead(1)).reduce((s, i) => s + i.mm, 0)
+    case '7 prochains jours':   return all.filter(i => !i.real && i.iso > today && i.iso <= ahead(7)).reduce((s, i) => s + i.mm, 0)
+    case '30 prochains jours':  return all.filter(i => !i.real && i.iso > today && i.iso <= ahead(30)).reduce((s, i) => s + i.mm, 0)
+    case 'Toute la saison':     return all.filter(i => i.real).reduce((s, i) => s + i.mm, 0)
+    default:                    return all.filter(i => i.real).reduce((s, i) => s + i.mm, 0)
+  }
+}
+
 function mockVal(id) {
   switch (id) {
-    case 'irrigation':  return Math.round(Math.random() > 0.4 ? Math.random() * 45 : 0)
+    case 'irrigation':  return 0 // remplacé par irrigSum() dans getVal()
     case 'pluie':       return +(Math.random() * 50).toFixed(1)
     case 'etp':         return +(Math.random() * 8).toFixed(1)
     case 'temp':        return +(8 + Math.random() * 22).toFixed(1)
@@ -71,6 +89,7 @@ export function initParcellesScreen(screenEl, role) {
   let orgFilter = 'all'
 
   function getVal(plotId) {
+    if (metricId === 'irrigation') return irrigSum(plotId, aggLabel)
     const key = `${plotId}-${metricId}-${aggLabel}`
     if (!(key in valCache)) valCache[key] = mockVal(metricId)
     return valCache[key]
@@ -122,7 +141,7 @@ export function initParcellesScreen(screenEl, role) {
                 ${sub ? `<span class="m-plain-city">${sub}</span>` : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="m-plain-data${has ? '' : ' m-plain-na'}">${has ? `${getVal(p.id)} ${metric.unit}` : '—'}</span>
+                <span class="m-plain-data${has ? '' : ' m-plain-na'}">${has && !(metricId === 'irrigation' && !IRRIG_SEASON.some(i => i.plotId === p.id)) ? `${getVal(p.id)} ${metric.unit}` : '—'}</span>
                 <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:12px"></i>
               </div>
             </div>`}).join('')}</div>`
@@ -164,7 +183,8 @@ export function initParcellesScreen(screenEl, role) {
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(mapInstance)
       const bounds = []
       plots.forEach(p => {
-        const label = hasMetric(p, metricId) ? `${getVal(p.id)} ${metric.unit}` : '—'
+        const hasIrrig = metricId !== 'irrigation' || IRRIG_SEASON.some(i => i.plotId === p.id)
+        const label = hasMetric(p, metricId) && hasIrrig ? `${getVal(p.id)} ${metric.unit}` : '—'
         const linkedSensorIds = allSensors.filter(s => s.parcelIds.includes(p.id)).map(s => s.id)
         const openDetail = () => initParcelDetail(p, linkedSensorIds)
         const center = [p.lat, p.lng]
@@ -178,7 +198,7 @@ export function initParcellesScreen(screenEl, role) {
         }
 
         // Centroïde cliquable — tooltip uniquement si la parcelle a la métrique
-        const hasMet = hasMetric(p, metricId)
+        const hasMet = hasMetric(p, metricId) && hasIrrig
         const dot = L.circleMarker(center, {
           radius: hasMet ? 8 : 6,
           color: '#fff', weight: 2,

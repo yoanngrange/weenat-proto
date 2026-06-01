@@ -1,5 +1,5 @@
 import { pushDetail, popDetail } from '../nav.js'
-import { showToast, showSheet } from '../ui.js'
+import { showToast, showSheet, showConfirmSheet } from '../ui.js'
 import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
@@ -1008,7 +1008,15 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.action === 'edit-exploitation') pickExploitation()
-        else showToast('Fonctionnalité à venir')
+        else if (row.dataset.action === 'archive') {
+          showConfirmSheet({
+            title: 'Archiver la parcelle',
+            message: `Archiver <strong>${parcel.name}</strong> ? Elle ne sera plus visible dans votre exploitation.`,
+            confirmLabel: 'Archiver',
+            confirmColor: '#ff9f0a',
+            onConfirm: () => showToast('Parcelle archivée (fonctionnalité à venir)')
+          })
+        } else showToast('Fonctionnalité à venir')
       })
     })
     // Widget menus — retirer le widget

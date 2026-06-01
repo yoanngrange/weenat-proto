@@ -25,27 +25,29 @@ function initParamMap() {
 }
 
 
+// sharedTypes parmi : 'Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'
+// ~15% (3/20) n'ont aucun type partagé
 const NEARBY_NETWORKS = [
-  { name: "Breiz'Agri Conseil",   distance: 12,  adherents: 47, capteurs: 312, parcelles: 1840, ville: "Bruz",           telephone: "02 99 05 12 34" },
-  { name: "Armor Agri",           distance: 24,  adherents: 23, capteurs: 154, parcelles: 920,  ville: "Saint-Brieuc",   telephone: "02 96 33 45 67" },
-  { name: "Terres de Bretagne",   distance: 31,  adherents: 61, capteurs: 418, parcelles: 2310, ville: "Vitré",          telephone: "02 99 75 23 89" },
-  { name: "Coop Armorique",       distance: 38,  adherents: 18, capteurs: 97,  parcelles: 540,  ville: "Loudéac",        telephone: "02 96 28 14 56" },
-  { name: "Agri Trégor",          distance: 45,  adherents: 34, capteurs: 201, parcelles: 1120, ville: "Guingamp",       telephone: "02 96 44 89 12" },
-  { name: "Finistère AgriTech",   distance: 53,  adherents: 29, capteurs: 187, parcelles: 830,  ville: "Carhaix",        telephone: "02 98 93 56 78" },
-  { name: "Léon Nature",          distance: 61,  adherents: 12, capteurs: 68,  parcelles: 310,  ville: "Landivisiau",    telephone: "02 98 68 32 14" },
-  { name: "Pays de Morlaix Agri", distance: 67,  adherents: 41, capteurs: 267, parcelles: 1540, ville: "Morlaix",        telephone: "02 98 88 71 23" },
-  { name: "Réseau Manche Ouest",  distance: 72,  adherents: 56, capteurs: 389, parcelles: 2120, ville: "Saint-Lô",       telephone: "02 33 77 45 90" },
-  { name: "Granit Agri",          distance: 78,  adherents: 9,  capteurs: 44,  parcelles: 180,  ville: "Fougères",       telephone: "02 99 99 12 67" },
-  { name: "Côte d'Émeraude",      distance: 85,  adherents: 27, capteurs: 163, parcelles: 740,  ville: "Saint-Malo",     telephone: "02 99 40 78 34" },
-  { name: "Agri Ille-et-Vilaine", distance: 91,  adherents: 38, capteurs: 241, parcelles: 1380, ville: "Redon",          telephone: "02 99 71 56 89" },
-  { name: "Morbihan Agritech",    distance: 98,  adherents: 15, capteurs: 87,  parcelles: 420,  ville: "Vannes",         telephone: "02 97 47 23 45" },
-  { name: "Loire-Atlantique Net", distance: 104, adherents: 44, capteurs: 298, parcelles: 1690, ville: "Nantes",         telephone: "02 40 35 67 12" },
-  { name: "Maine Agri",           distance: 112, adherents: 31, capteurs: 196, parcelles: 1050, ville: "Laval",          telephone: "02 43 56 34 78" },
-  { name: "Cotentin Réseau",      distance: 119, adherents: 20, capteurs: 121, parcelles: 580,  ville: "Cherbourg",      telephone: "02 33 93 45 67" },
-  { name: "Agri Normandie",       distance: 126, adherents: 52, capteurs: 341, parcelles: 1960, ville: "Caen",           telephone: "02 31 44 89 23" },
-  { name: "Mayenne Connect",      distance: 133, adherents: 8,  capteurs: 39,  parcelles: 150,  ville: "Mayenne",        telephone: "02 43 04 56 78" },
-  { name: "Pays de la Loire",     distance: 141, adherents: 67, capteurs: 455, parcelles: 2680, ville: "Angers",         telephone: "02 41 88 12 34" },
-  { name: "Anjou Agri",           distance: 148, adherents: 24, capteurs: 142, parcelles: 630,  ville: "Saumur",         telephone: "02 41 51 78 90" },
+  { name: "Breiz'Agri Conseil",   distance: 12,  adherents: 47, capteurs: 312, parcelles: 1840, ville: "Bruz",           telephone: "02 99 05 12 34", sharedTypes: ['Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'] },
+  { name: "Armor Agri",           distance: 24,  adherents: 23, capteurs: 154, parcelles: 920,  ville: "Saint-Brieuc",   telephone: "02 96 33 45 67", sharedTypes: ['Capteurs météo'] },
+  { name: "Terres de Bretagne",   distance: 31,  adherents: 61, capteurs: 418, parcelles: 2310, ville: "Vitré",          telephone: "02 99 75 23 89", sharedTypes: ['Capteurs météo', 'Capteurs irrigation'] },
+  { name: "Coop Armorique",       distance: 38,  adherents: 18, capteurs: 97,  parcelles: 540,  ville: "Loudéac",        telephone: "02 96 28 14 56", sharedTypes: [] },
+  { name: "Agri Trégor",          distance: 45,  adherents: 34, capteurs: 201, parcelles: 1120, ville: "Guingamp",       telephone: "02 96 44 89 12", sharedTypes: ['Capteurs météo', 'Stations météo virtuelles'] },
+  { name: "Finistère AgriTech",   distance: 53,  adherents: 29, capteurs: 187, parcelles: 830,  ville: "Carhaix",        telephone: "02 98 93 56 78", sharedTypes: ['Capteurs météo', 'Capteurs irrigation'] },
+  { name: "Léon Nature",          distance: 61,  adherents: 12, capteurs: 68,  parcelles: 310,  ville: "Landivisiau",    telephone: "02 98 68 32 14", sharedTypes: [] },
+  { name: "Pays de Morlaix Agri", distance: 67,  adherents: 41, capteurs: 267, parcelles: 1540, ville: "Morlaix",        telephone: "02 98 88 71 23", sharedTypes: ['Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'] },
+  { name: "Réseau Manche Ouest",  distance: 72,  adherents: 56, capteurs: 389, parcelles: 2120, ville: "Saint-Lô",       telephone: "02 33 77 45 90", sharedTypes: ['Capteurs météo', 'Capteurs irrigation'] },
+  { name: "Granit Agri",          distance: 78,  adherents: 9,  capteurs: 44,  parcelles: 180,  ville: "Fougères",       telephone: "02 99 99 12 67", sharedTypes: ['Capteurs météo'] },
+  { name: "Côte d'Émeraude",      distance: 85,  adherents: 27, capteurs: 163, parcelles: 740,  ville: "Saint-Malo",     telephone: "02 99 40 78 34", sharedTypes: ['Capteurs météo', 'Stations météo virtuelles'] },
+  { name: "Agri Ille-et-Vilaine", distance: 91,  adherents: 38, capteurs: 241, parcelles: 1380, ville: "Redon",          telephone: "02 99 71 56 89", sharedTypes: ['Capteurs météo', 'Capteurs irrigation'] },
+  { name: "Morbihan Agritech",    distance: 98,  adherents: 15, capteurs: 87,  parcelles: 420,  ville: "Vannes",         telephone: "02 97 47 23 45", sharedTypes: [] },
+  { name: "Loire-Atlantique Net", distance: 104, adherents: 44, capteurs: 298, parcelles: 1690, ville: "Nantes",         telephone: "02 40 35 67 12", sharedTypes: ['Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'] },
+  { name: "Maine Agri",           distance: 112, adherents: 31, capteurs: 196, parcelles: 1050, ville: "Laval",          telephone: "02 43 56 34 78", sharedTypes: ['Capteurs météo'] },
+  { name: "Cotentin Réseau",      distance: 119, adherents: 20, capteurs: 121, parcelles: 580,  ville: "Cherbourg",      telephone: "02 33 93 45 67", sharedTypes: ['Capteurs météo', 'Stations météo virtuelles'] },
+  { name: "Agri Normandie",       distance: 126, adherents: 52, capteurs: 341, parcelles: 1960, ville: "Caen",           telephone: "02 31 44 89 23", sharedTypes: ['Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'] },
+  { name: "Mayenne Connect",      distance: 133, adherents: 8,  capteurs: 39,  parcelles: 150,  ville: "Mayenne",        telephone: "02 43 04 56 78", sharedTypes: ['Capteurs météo'] },
+  { name: "Pays de la Loire",     distance: 141, adherents: 67, capteurs: 455, parcelles: 2680, ville: "Angers",         telephone: "02 41 88 12 34", sharedTypes: ['Capteurs météo', 'Capteurs irrigation'] },
+  { name: "Anjou Agri",           distance: 148, adherents: 24, capteurs: 142, parcelles: 630,  ville: "Saumur",         telephone: "02 41 51 78 90", sharedTypes: ['Capteurs irrigation'] },
 ]
 
 function netInitials(name) {
@@ -56,16 +58,16 @@ const SUBSCRIPTION_PLANS = [
   {
     id: 'plus',
     name: 'Weenat Plus',
-    price: '14 €/mois',
-    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API'],
+    price: '16 €/mois',
+    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', '5 capteurs maximum', 'Parcelles illimitées'],
     color: '#00B093',
     current: true
   },
   {
     id: 'expert',
     name: 'Weenat Expert',
-    price: '25 €/mois',
-    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', 'Capteurs et fonctionnalités Irrigation'],
+    price: '30 €/mois',
+    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', '20 capteurs maximum', 'Parcelles illimitées', 'Capteurs irrigation', 'Fonctionnalités irrigation'],
     color: '#006798'
   }
 ]
@@ -195,18 +197,27 @@ function renderForm() {
         <div style="font-size:13px;color:var(--txt2);margin-bottom:14px">20 réseaux proches de votre exploitation</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px">
           ${NEARBY_NETWORKS.map((net, i) => `
-            <div style="display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;min-width:280px;flex:1">
-              <div style="display:flex;align-items:flex-start;gap:12px">
-                <div style="width:40px;height:40px;border-radius:8px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <span style="font-size:11px;font-weight:700;color:#0172A4">${netInitials(net.name)}</span>
+            <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;min-width:260px;flex:1">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:36px;height:36px;border-radius:8px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span style="font-size:10px;font-weight:700;color:#0172A4">${netInitials(net.name)}</span>
                 </div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-weight:600;font-size:14px">${net.name}</div>
-                  <div style="font-size:12px;color:var(--txt2);margin-top:3px">${net.distance} km <br> ${net.capteurs} capteurs <br> ${net.parcelles} parcelles <br> ${net.adherents} adhérents </div>
-                  <div style="font-size:12px;color:var(--txt3);margin-top:3px">${net.ville} <br> ${net.telephone}</div>
+                <div style="min-width:0">
+                  <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${net.name}</div>
+                  <div style="font-size:11px;color:var(--txt3)">${net.ville} · ${net.distance} km</div>
                 </div>
               </div>
-              <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="align-self:flex-start;font-size:12px">Demander à rejoindre</button>
+              <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--txt2)">
+                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Capteurs</span>${net.capteurs}</div>
+                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Parcelles</span>${net.parcelles}</div>
+                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Adhérents</span>${net.adherents}</div>
+              </div>
+              <div>
+                ${net.sharedTypes && net.sharedTypes.length
+                  ? `<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Données partagées</div><div style="display:flex;flex-wrap:wrap;gap:4px">${net.sharedTypes.map(t => `<span style="font-size:11px;font-weight:500;padding:2px 8px;background:var(--bg);border:1px solid var(--bdr);border-radius:4px;color:var(--txt2)">${t}</span>`).join('')}</div>`
+                  : `<span style="font-size:11px;color:var(--txt3);font-style:italic">Capteurs non partagés</span>`}
+              </div>
+              <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="font-size:12px">Demander à rejoindre</button>
             </div>`).join('')}
           <div style="min-width:280px;flex:1;height:0;padding:0;margin:0"></div>
           <div style="min-width:280px;flex:1;height:0;padding:0;margin:0"></div>
