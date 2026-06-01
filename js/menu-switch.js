@@ -198,7 +198,7 @@ function generateMenuContent(role, currentPage) {
   });
   html += '</div>';
 
-  html += '<div class="menu-switch"><button id="role-switch" class="role-switch-btn" onclick="switchMenuRole()"><small>Admin réseau ↔ Adhérent réseau</small></button></div>';
+  html += '<div class="menu-switch"><button id="role-switch" class="role-switch-btn" onclick="switchMenuRole()"><small>Admin ↔ Affiliate</small></button></div>';
   return html;
 }
 
@@ -273,6 +273,10 @@ function openAddModal() {
             <i class="bi bi-eyedropper"></i>
             <span>Traitement</span>
           </button>
+          <button class="add-item-btn" data-action="maintenance">
+            <i class="bi bi-tools"></i>
+            <span>Opération de maintenance</span>
+          </button>
         </div>
       </div>
 
@@ -313,6 +317,7 @@ function openAddModal() {
       if (action === 'irrigation')         { window.WebIrrig?.openSaisie(); return; }
       if (action === 'strategie-irrigation'){ window.WebIrrig?.openSaison(); return; }
 if (action === 'note' || action === 'traitement') { openJournalModal(action); return; }
+      if (action === 'maintenance') { openMaintenanceModal(); return; }
       console.log('[add]', action);
     });
   });
@@ -431,6 +436,53 @@ function openJournalModal(type) {
     modal.remove();
   });
 
+  document.body.appendChild(modal);
+}
+
+function openMaintenanceModal() {
+  const MAINT_TYPES = [
+    { id: 'installation',  label: 'Installation' },
+    { id: 'batterie',      label: 'Remplacement batterie' },
+    { id: 'antenne',       label: 'Remplacement antenne' },
+    { id: 'bocal',         label: 'Remplacement bocal' },
+    { id: 'lacet',         label: 'Remplacement lacet' },
+    { id: 'cuillere',      label: 'Remplacement cuillère' },
+    { id: 'nettoyage',     label: 'Nettoyage' },
+    { id: 'verification',  label: 'Vérification terrain' },
+    { id: 'note',          label: 'Note technique' },
+  ];
+  const today = new Date().toISOString().slice(0, 10);
+  const modal = document.createElement('div');
+  modal.className = 'modal add-modal';
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:440px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Ajouter une opération de maintenance</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div class="journal-form">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Type</label>
+          <select id="maint-f-type" class="journal-form-input">
+            ${MAINT_TYPES.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Date</label>
+          <input type="date" id="maint-f-date" class="journal-form-input" value="${today}">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Note</label>
+          <textarea id="maint-f-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
+        </div>
+        <button class="btn-primary btn-sm" id="maint-f-save" style="width:100%;justify-content:center">Enregistrer</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove());
+  modal.querySelector('#maint-f-save').addEventListener('click', () => {
+    modal.remove();
+  });
   document.body.appendChild(modal);
 }
 
