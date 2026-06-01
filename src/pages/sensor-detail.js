@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const _sidebar2 = document.getElementById('sidebar')
   if (_sidebar2) new MutationObserver(() => {
-    const p = plots.find(pl => pl.id === sensor.parcelId) || null
+    const p = plots.find(pl => sensor.parcelIds?.includes(pl.id)) || null
     renderPanelMembres(p)
   }).observe(_sidebar2, { attributes: true, attributeFilter: ['data-role'] })
 })
@@ -269,10 +269,13 @@ function makeSensorChartCard(m) {
     : ''
   const isTempMetric = m.id === 'temperature' || m.id === 'temperature_min'
   const tempExtraHtml = isTempMetric ? renderTempThresholdHtml(m.id) : ''
+  const stepVal = document.getElementById('time-step')?.value || '1h'
+  const expandHtml = `<a class="chart-card-expand" href="capteur-graphique.html?sensorId=${sensor.id}&metricId=${m.id}&period=${currentPeriod}&step=${stepVal}" title="Graphique plein écran"><i class="bi bi-fullscreen"></i></a>`
   card.innerHTML = `
     <div class="chart-card-header">
       <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
       <span class="chart-card-unit">${m.unit}</span>
+      ${expandHtml}
     </div>
     <svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
     ${cumulHtml}
@@ -992,7 +995,7 @@ function openCompareDropdown() {
 // ─── Right panel ──────────────────────────────────────────────────────────────
 
 function renderPanel() {
-  const parcel = plots.find(p => p.id === sensor.parcelId)
+  const parcel = plots.find(p => sensor.parcelIds?.includes(p.id))
   const org    = parcel
     ? orgs.find(o => o.id === parcel.orgId)
     : (sensor.orgId ? orgs.find(o => o.id === sensor.orgId) : null)
@@ -1198,7 +1201,7 @@ function showToastConfig() {
 
 // Collect all plots from the sensor's org that are linked to this sensor
 let linkedPlotIds = plots
-  .filter(p => p.orgId === sensor.orgId && p.id === sensor.parcelId)
+  .filter(p => p.orgId === sensor.orgId && sensor.parcelIds?.includes(p.id))
   .map(p => p.id)
 
 // Persist in sensor store
@@ -1215,7 +1218,7 @@ function renderLinkedPlots() {
   const el = document.getElementById('panel-plots')
   if (!el) return
 
-  const orgId = sensor.orgId || plots.find(p => p.id === sensor.parcelId)?.orgId
+  const orgId = sensor.orgId || plots.find(p => sensor.parcelIds?.includes(p.id))?.orgId
   const orgPlots = plots.filter(p => p.orgId === orgId)
   const linked   = orgPlots.filter(p => linkedPlotIds.includes(p.id))
   const available = orgPlots.filter(p => !linkedPlotIds.includes(p.id))
@@ -1226,7 +1229,7 @@ function renderLinkedPlots() {
   } else {
     html += linked.map(p => `
       <div class="sensor-linked-row">
-        <span class="sensor-link-model">${p.name}</span>
+        <a href="parcelle-detail.html?id=${p.id}" class="sensor-linked-link">${p.name}</a>
         <span class="sensor-link-serial" style="color:var(--txt3)">${p.area ? p.area + ' ha' : ''}</span>
         <button class="remove-plot-btn icon-btn" data-id="${p.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
       </div>
@@ -1307,11 +1310,21 @@ function renderActions() {
 }
 
 function renderMaintenance() {
+  const isAdherentSensor = sensor?.orgId === 1
+  const agentReseau = (() => {
+    const a = members.find(m => m.source === 'réseau' && m.role === 'agent' && m.orgIds.includes(sensor?.orgId))
+    if (a) return `${a.prenom} ${a.nom}`
+    const adm = members.find(m => m.source === 'réseau' && (m.role === 'admin' || m.role === 'propriétaire'))
+    return adm ? `${adm.prenom} ${adm.nom}` : 'Technicien réseau'
+  })()
+  const membreExploitation = isAdherentSensor
+    ? (() => { const m = members.find(mb => mb.source === 'adherent' && mb.orgIds.includes(1)); return m ? `${m.prenom} ${m.nom}` : agentReseau })()
+    : agentReseau
   const items = [
-    { type: 'installation', label: 'Installation initiale',       date: '15/01/2023', user: 'Technicien Weenat', icon: 'bi-box-arrow-in-down' },
-    { type: 'nettoyage',    label: 'Nettoyage pluviomètre',       date: '20/03/2023', user: 'Agriculteur',       icon: 'bi-droplet' },
-    { type: 'batterie',     label: 'Changement de batterie',      date: '10/06/2023', user: 'Technicien Weenat', icon: 'bi-battery-charging' },
-    { type: 'note',         label: 'Redressage capteur déplacé',  date: '02/11/2023', user: 'Agriculteur',       icon: 'bi-chat-text' },
+    { type: 'installation', label: 'Installation initiale',       date: '15/01/2023', user: agentReseau,          icon: 'bi-box-arrow-in-down' },
+    { type: 'nettoyage',    label: 'Nettoyage pluviomètre',       date: '20/03/2023', user: membreExploitation,   icon: 'bi-droplet' },
+    { type: 'batterie',     label: 'Changement de batterie',      date: '10/06/2023', user: agentReseau,          icon: 'bi-battery-charging' },
+    { type: 'note',         label: 'Redressage capteur déplacé',  date: '02/11/2023', user: membreExploitation,   icon: 'bi-chat-text' },
   ]
   document.getElementById('panel-maint').innerHTML = `
     <div class="maint-timeline">
@@ -1338,8 +1351,8 @@ function initLinkedMemberIds(parcel) {
   if (linkedOrgMemberIds !== null) return
   const orgId  = parcel?.orgId ?? sensor.orgId
   const stored = getStoredSensor(sensorId)
-  linkedOrgMemberIds  = stored.linkedOrgMemberIds  ?? members.filter(m => m.source === 'adherent' && m.orgIds?.includes(orgId) && (sensor.parcelId ? m.parcelIds?.includes(sensor.parcelId) : m.orgIds?.includes(orgId))).map(m => m.id)
-  linkedConseillerIds = stored.linkedConseillerIds ?? members.filter(m => m.source === 'réseau'   && (sensor.parcelId ? m.parcelIds?.includes(sensor.parcelId) : m.orgIds?.includes(orgId))).map(m => m.id)
+  linkedOrgMemberIds  = stored.linkedOrgMemberIds  ?? members.filter(m => m.source === 'adherent' && m.orgIds?.includes(orgId) && (sensor.parcelIds?.length ? sensor.parcelIds.some(pid => m.parcelIds?.includes(pid)) : m.orgIds?.includes(orgId))).map(m => m.id)
+  linkedConseillerIds = stored.linkedConseillerIds ?? members.filter(m => m.source === 'réseau'   && (sensor.parcelIds?.length ? sensor.parcelIds.some(pid => m.parcelIds?.includes(pid)) : m.orgIds?.includes(orgId))).map(m => m.id)
 }
 
 function memberRow(m, canRemove, showRole) {
@@ -1456,8 +1469,8 @@ function renderPanelMembres(parcel) {
 // ─── Mini map ─────────────────────────────────────────────────────────────────
 
 function initMiniMap() {
-  const parcel = plots.find(p => p.id === sensor.parcelId)
-  const org    = parcel ? orgs.find(o => o.id === parcel.orgId) : null
+  const parcel = plots.find(p => sensor.parcelIds?.includes(p.id))
+  const org    = parcel ? orgs.find(o => o.id === parcel.orgId) : (sensor.orgId ? orgs.find(o => o.id === sensor.orgId) : null)
   if (!org?.lat) return
 
   const map = L.map('sensor-mini-map', { zoomControl: false, attributionControl: false })
@@ -1524,16 +1537,40 @@ const MAINT_TYPES = [
   { id: 'note',          label: 'Note technique',          icon: 'bi-chat-text',         color: '#8e8e93' },
 ]
 
+function getDefaultSensorJournalUser() {
+  const isAdherentSensor = sensor?.orgId === 1
+  if (isAdherentSensor) {
+    const m = members.find(mb => mb.source === 'adherent' && mb.orgIds.includes(1))
+    if (m) return `${m.prenom} ${m.nom}`
+  }
+  const agent = members.find(m => m.source === 'réseau' && m.role === 'agent' && m.orgIds.includes(sensor?.orgId))
+  if (agent) return `${agent.prenom} ${agent.nom}`
+  const adm = members.find(m => m.source === 'réseau' && (m.role === 'admin' || m.role === 'propriétaire'))
+  return adm ? `${adm.prenom} ${adm.nom}` : ''
+}
+
 function getSensorJournal() {
   try {
     const raw = localStorage.getItem(SENSOR_JOURNAL_KEY)
     if (raw) return JSON.parse(raw)
   } catch (_) {}
+  // Technicien = réseau member assigned to sensor's org (or any admin)
+  // Utilisateur terrain = adherent member if org 1, else réseau agent
+  const isAdherentSensor = sensor?.orgId === 1
+  const technicien = (() => {
+    const agent = members.find(m => m.source === 'réseau' && m.role === 'agent' && m.orgIds.includes(sensor?.orgId))
+    if (agent) return `${agent.prenom} ${agent.nom}`
+    const admin = members.find(m => m.source === 'réseau' && (m.role === 'admin' || m.role === 'propriétaire'))
+    return admin ? `${admin.prenom} ${admin.nom}` : 'Technicien réseau'
+  })()
+  const utilisateur = isAdherentSensor
+    ? (() => { const m = members.find(mb => mb.source === 'adherent' && mb.orgIds.includes(1)); return m ? `${m.prenom} ${m.nom}` : technicien })()
+    : technicien
   return [
-    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', texte: '' },
-    { id: 2, type: 'nettoyage',    date: '2023-03-20', user: 'Agriculteur',       texte: 'Nettoyage pluviomètre après hiver' },
-    { id: 3, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', texte: '' },
-    { id: 4, type: 'note',         date: '2023-11-02', user: 'Agriculteur',       texte: 'Capteur légèrement déplacé après passage tracteur — redressé' },
+    { id: 1, type: 'installation', date: '2023-01-15', user: technicien,   texte: '' },
+    { id: 2, type: 'nettoyage',    date: '2023-03-20', user: utilisateur,  texte: 'Nettoyage pluviomètre après hiver' },
+    { id: 3, type: 'batterie',     date: '2023-06-10', user: technicien,   texte: '' },
+    { id: 4, type: 'note',         date: '2023-11-02', user: utilisateur,  texte: 'Capteur légèrement déplacé après passage tracteur — redressé' },
   ]
 }
 
@@ -1619,7 +1656,7 @@ function openSensorJournalForm() {
         </div>
         <div class="journal-form-row">
           <label class="journal-form-label">Intervenant</label>
-          <input type="text" id="sjrn-f-user" class="journal-form-input" value="Jean Dupont" placeholder="Nom de l'intervenant">
+          <input type="text" id="sjrn-f-user" class="journal-form-input" value="${getDefaultSensorJournalUser()}" placeholder="Nom de l'intervenant">
         </div>
         <div class="journal-form-row">
           <label class="journal-form-label">Note</label>
@@ -1636,7 +1673,7 @@ function openSensorJournalForm() {
   modal.querySelector('#sjrn-f-save').addEventListener('click', () => {
     const type  = modal.querySelector('#sjrn-f-type').value
     const date  = modal.querySelector('#sjrn-f-date').value || new Date().toISOString().slice(0,10)
-    const user  = modal.querySelector('#sjrn-f-user').value.trim() || 'Jean Dupont'
+    const user  = modal.querySelector('#sjrn-f-user').value.trim() || getDefaultSensorJournalUser()
     const texte = modal.querySelector('#sjrn-f-texte').value.trim()
     saveSensorJournal([{ id: Date.now(), type, date, user, texte }, ...getSensorJournal()])
     modal.remove()

@@ -1,4 +1,4 @@
-import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../data/irrigations.js'
+import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../data/irrigations.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
 import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
@@ -33,35 +33,69 @@ function fmtCol(iso) {
   const [, m, d] = iso.split('-'); return `${d}/${m}`
 }
 
-function getGroups() { return buildGroups(plots) }
-
-function resolveScope(val) {
-  if (!val || val === 'all') return null
-  const g = getGroups().find(g => g.label === val)
-  if (g) return { ids: g.ids, label: g.label }
-  const p = plots.find(p => String(p.id) === String(val))
-  return p ? { ids: [p.id], label: p.name } : null
+function plotLabel(p) {
+  return [p.name, p.crop, p.irrigation].filter(Boolean).join(' — ')
 }
 
-function getIrrigForScope(scope) {
-  if (!scope) return IRRIG_SEASON
-  const g = getGroups().find(g => g.label === scope.label)
-  if (g) return IRRIG_SEASON.filter(i => i.label === g.label)
-  const p = plots.find(p => p.name === scope.label)
-  if (p) {
-    const gl = new Set(getGroups().filter(grp => grp.ids.includes(p.id)).map(grp => grp.label))
-    return IRRIG_SEASON.filter(i => i.label === p.name || gl.has(i.label))
+function sortedPlotList() {
+  return [...plots].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+}
+
+// ─── Multi-select component ───────────────────────────────────────────────────
+
+function multiSelectHTML(id, opts = {}) {
+  const { allBtn = false } = opts
+  const items = sortedPlotList().map(p => `
+    <label class="irr-msel-item">
+      <input type="checkbox" class="irr-msel-cb" value="${p.id}" />
+      <span class="irr-msel-name">${plotLabel(p)}</span>
+    </label>`).join('')
+  return `<div class="irr-msel" id="${id}">
+    <input type="text" class="irr-msel-search" placeholder="Rechercher…" />
+    <div class="irr-msel-list">${items}</div>
+    <div class="irr-msel-footer">
+      <span class="irr-msel-count">0 sélectionnée(s)</span>
+      ${allBtn ? `<button class="irr-msel-all-btn" type="button">Tout sélectionner</button>` : ''}
+    </div>
+  </div>`
+}
+
+function bindMultiSelect(container, id) {
+  const wrap = container.querySelector(`#${id}`)
+  if (!wrap) return
+  const search = wrap.querySelector('.irr-msel-search')
+  const count  = wrap.querySelector('.irr-msel-count')
+  const allBtnEl = wrap.querySelector('.irr-msel-all-btn')
+
+  const update = () => {
+    const n = wrap.querySelectorAll('.irr-msel-cb:checked').length
+    count.textContent = `${n} sélectionnée${n !== 1 ? 's' : ''}`
   }
-  return IRRIG_SEASON
+
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase()
+    wrap.querySelectorAll('.irr-msel-item').forEach(item => {
+      item.style.display = item.querySelector('.irr-msel-name').textContent.toLowerCase().includes(q) ? '' : 'none'
+    })
+  })
+
+  wrap.querySelectorAll('.irr-msel-cb').forEach(cb => cb.addEventListener('change', update))
+
+  allBtnEl?.addEventListener('click', () => {
+    const visible = [...wrap.querySelectorAll('.irr-msel-cb')].filter(cb => cb.closest('.irr-msel-item').style.display !== 'none')
+    const anyUnchecked = visible.some(cb => !cb.checked)
+    visible.forEach(cb => { cb.checked = anyUnchecked })
+    update()
+  })
 }
 
-function plotIrrigLabels(p) {
-  const s = new Set([p.name])
-  for (const g of getGroups()) { if (g.ids.includes(p.id)) s.add(g.label) }
-  return s
+function getMultiSelectedIds(container, id) {
+  const wrap = container.querySelector(`#${id}`)
+  if (!wrap) return []
+  return [...wrap.querySelectorAll('.irr-msel-cb:checked')].map(cb => +cb.value)
 }
 
-// ─── Nested scope select HTML ─────────────────────────────────────────────────
+// ─── Modals ───────────────────────────────────────────────────────────────────
 
 function showSaveConfirmModal(title, lines) {
   document.querySelector('.irr-save-confirm')?.remove()
@@ -105,28 +139,6 @@ function showConflictModal(count, scopeLabel, onOverwrite) {
   ov.querySelector('#irr-cf-close').addEventListener('click', cancel)
   ov.querySelector('#irr-cf-cancel').addEventListener('click', cancel)
   ov.querySelector('#irr-cf-overwrite').addEventListener('click', () => { ov.remove(); onOverwrite() })
-}
-
-function scopeSelectHTML(id, currentVal = '') {
-  const groups = getGroups()
-  const standalones = plots.filter(p => !groups.some(g => g.ids.includes(p.id)))
-  const isAll = !currentVal || currentVal === 'all'
-  const groupOpts = groups.map(g => {
-    const childOpts = g.ids.map(gid => plots.find(p => p.id === gid)).filter(Boolean)
-      .map(p => `<option value="${p.id}"${String(currentVal) === String(p.id) ? ' selected' : ''}>${p.name}</option>`).join('')
-    return `<optgroup label="${g.label} (${g.ids.length} parcelles)">
-      <option value="${g.label}"${currentVal === g.label ? ' selected' : ''}>⬡ Groupe · ${g.label}</option>
-      ${childOpts}
-    </optgroup>`
-  }).join('')
-  const standalone = standalones.length
-    ? `<optgroup label="Autres parcelles">${standalones.map(p => `<option value="${p.id}"${String(currentVal) === String(p.id) ? ' selected' : ''}>${p.name}</option>`).join('')}</optgroup>`
-    : ''
-  return `<select class="irr-lc-select" id="${id}">
-    <option value="" disabled${!currentVal ? ' selected' : ''}>— Sélectionner —</option>
-    <option value="all"${currentVal === 'all' ? ' selected' : ''}>Toutes les parcelles</option>
-    ${groupOpts}${standalone}
-  </select>`
 }
 
 // ─── Timeline SVG ─────────────────────────────────────────────────────────────
@@ -185,13 +197,15 @@ function renderCumuls(irrig) {
 // ─── Irrigation list item ─────────────────────────────────────────────────────
 
 function irrigItem(ir) {
+  const p = plots.find(pl => pl.id === ir.plotId)
+  const name = p ? p.name : `Parcelle ${ir.plotId}`
   const idx = IRRIG_SEASON.indexOf(ir)
   const col = ir.real ? '#FF8500' : '#FFB705'
   const [, mm, dd] = ir.iso.split('-')
   return `<div class="irr-pr-item">
     <div class="irr-pr-stripe" style="background:${col}"></div>
     <div class="irr-pr-date" style="color:${col}"><span class="irr-pr-day">${dd}</span><span class="irr-pr-mon">/${mm}</span></div>
-    <div class="irr-pr-info"><div class="irr-pr-label">${ir.label}</div><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div></div>
+    <div class="irr-pr-info"><div class="irr-pr-label">${name}</div><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div></div>
     <div class="irr-pr-mm" style="color:${col}">${ir.mm} mm</div>
     <button class="irr-pr-del" data-idx="${idx}">🗑</button>
   </div>`
@@ -208,47 +222,10 @@ function bindDelBtns(container) {
 
 // ─── Right panel views ────────────────────────────────────────────────────────
 
-function showIrrigView(scope) {
-  const irrig = getIrrigForScope(scope)
-  const right = document.getElementById('irr-right')
-  const real = irrig.filter(i => i.real).sort((a,b) => a.iso > b.iso ? -1 : 1)
-  const plan = irrig.filter(i => !i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
-
-  let title = scope ? scope.label : 'Toutes les parcelles'
-
-  if (!scope) {
-    const byLabel = {}
-    for (const ir of irrig) { if (!byLabel[ir.label]) byLabel[ir.label] = []; byLabel[ir.label].push(ir) }
-    const sections = Object.entries(byLabel).map(([label, items]) => {
-      const r = items.filter(i => i.real).length, p = items.filter(i => !i.real).length
-      return `<div class="irr-pr-by-label">
-        <div class="irr-pr-group-lbl">${label}</div>
-        ${renderTimeline(items)}
-        <details class="irr-pr-details">
-          <summary class="irr-pr-details-sum">${items.length} irrigation${items.length>1?'s':''} <span class="irr-pr-details-sub">${r} effectuée${r>1?'s':''} · ${p} planifiée${p>1?'s':''}</span></summary>
-          <div>${items.sort((a,b) => a.iso<b.iso?-1:1).map(irrigItem).join('')}</div>
-        </details>
-      </div>`
-    }).join('')
-    right.innerHTML = `<div class="irr-rv-hd">Irrigations — Toutes les parcelles</div>${renderCumuls(irrig)}${sections || '<div class="irr-pr-empty"><i class="bi bi-calendar3"></i><p>Aucune irrigation enregistrée</p></div>'}`
-  } else {
-    right.innerHTML = `
-      <div class="irr-rv-hd">Irrigations — ${title}</div>
-      ${renderCumuls(irrig)}
-      ${renderTimeline(irrig)}
-      ${real.length ? `<div class="irr-pr-section-lbl">Effectuées</div>${real.map(irrigItem).join('')}` : ''}
-      ${plan.length ? `<div class="irr-pr-section-lbl">Planifiées</div>${plan.map(irrigItem).join('')}` : ''}
-      ${!irrig.length ? `<div class="irr-pr-empty"><i class="bi bi-calendar3"></i><p>Aucune irrigation pour cette sélection</p></div>` : ''}
-    `
-  }
-  bindDelBtns(right)
-}
-
 function showGlobaleView(resetScroll = false) {
   const right = document.getElementById('irr-right')
   const maxFuture = addDays(TODAY, 14)
 
-  // Collect boundary dates to determine range
   const boundaryDates = [
     ...IRRIG_SEASON.map(i => i.iso),
     ...RAIN_DATA.filter(r => r.iso <= maxFuture).map(r => r.iso),
@@ -260,20 +237,14 @@ function showGlobaleView(resetScroll = false) {
   }
 
   const rangeStart = [...boundaryDates].sort()[0]
-
-  // rangeEnd = last IRRIG_SEASON date (or today+14 if no irrigations) + extra months
-  const lastIrrigIso = IRRIG_SEASON.length
-    ? [...IRRIG_SEASON].map(i => i.iso).sort().at(-1)
-    : null
+  const lastIrrigIso = IRRIG_SEASON.length ? [...IRRIG_SEASON].map(i => i.iso).sort().at(-1) : null
   const baseEnd = lastIrrigIso && lastIrrigIso > maxFuture ? lastIrrigIso : maxFuture
   const extendedEnd = new Date(baseEnd)
   extendedEnd.setMonth(extendedEnd.getMonth() + globaleExtraMonths)
   const rangeEnd = extendedEnd.toISOString().split('T')[0]
 
-  // Preserve scroll position if table already exists (unless caller requests reset)
   const prevScroll = resetScroll ? null : (right.querySelector('#irr-gl-body')?.scrollLeft ?? null)
 
-  // Generate ALL dates in range
   const sortedDates = []
   let cur = new Date(rangeStart)
   const end = new Date(rangeEnd)
@@ -284,13 +255,12 @@ function showGlobaleView(resetScroll = false) {
   const rainMap = {}
   for (const r of RAIN_DATA) { rainMap[r.iso] = r.mm }
 
-  // Deterministic per-plot rain variation
   function plotRainMm(plotId, iso, baseMm) {
     if (!baseMm) return 0
     const [, m, d] = iso.split('-').map(Number)
     const seed = (plotId * 13 + m * 7 + d * 3) % 100
-    if (seed < 12) return 0  // ~12% chance this plot missed the rain
-    const factor = 0.75 + ((plotId * 11 + d * 5) % 50) / 100  // 0.75–1.25×
+    if (seed < 12) return 0
+    const factor = 0.75 + ((plotId * 11 + d * 5) % 50) / 100
     return Math.round(baseMm * factor)
   }
 
@@ -300,13 +270,12 @@ function showGlobaleView(resetScroll = false) {
   }).join('')
 
   function plotRow(p) {
-    const labels = plotIrrigLabels(p)
     const cells = sortedDates.map(d => {
       const isT    = d === TODAY
-      const irrigs = IRRIG_SEASON.filter(i => i.iso === d && labels.has(i.label))
+      const irrigs = IRRIG_SEASON.filter(i => i.iso === d && i.plotId === p.id)
       const total  = irrigs.reduce((s,i) => s+i.mm, 0)
       const isReal = irrigs.some(i => i.real)
-      const rainOffset  = (p.id * 7 + 3) % 3 - 1  // -1, 0 ou +1 jour par parcelle
+      const rainOffset  = (p.id * 7 + 3) % 3 - 1
       const rainSrcDate = addDays(d, rainOffset)
       const rainMm      = plotRainMm(p.id, d, rainMap[rainSrcDate] ?? 0)
       let content  = ''
@@ -322,20 +291,7 @@ function showGlobaleView(resetScroll = false) {
     return `<tr data-row-plot="${p.id}"><td class="irr-gl-plot"><span class="irr-gl-plot-link" data-plot-id="${p.id}">${p.name}</span></td>${cells}</tr>`
   }
 
-  const groups      = getGroups()
-  const standalones = plots.filter(p => !groups.some(g => g.ids.includes(p.id)))
-  const emptyCells  = sortedDates.map(d => `<td class="irr-gl-td${d===TODAY?' irr-gl-td--today':''}"></td>`).join('')
-
-  const rows = [
-    ...groups.map(g => {
-      const gPlots = g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)
-      const groupHeader = `<tr class="irr-gl-group-row" data-row-group="${g.label}"><td class="irr-gl-group-cell"><span class="irr-gl-group-link" data-group-label="${g.label}">⬡ ${g.label}</span></td>${emptyCells}</tr>`
-      return groupHeader + gPlots.map(plotRow).join('')
-    }),
-    standalones.length
-      ? `<tr class="irr-gl-group-row"><td class="irr-gl-group-cell irr-gl-group-cell--other">Autres parcelles</td>${emptyCells}</tr>` + standalones.map(plotRow).join('')
-      : ''
-  ].join('')
+  const rows = sortedPlotList().map(plotRow).join('')
 
   right.innerHTML = `
     <div class="irr-gl-outer">
@@ -352,7 +308,7 @@ function showGlobaleView(resetScroll = false) {
       </div>
       <div class="irr-gl-body" id="irr-gl-body">
         <table class="irr-gl-table" id="irr-gl-table">
-          <thead id="irr-gl-thead"><tr><th class="irr-gl-plot-hd">Parcelles & groupes</th>${headers}</tr></thead>
+          <thead id="irr-gl-thead"><tr><th class="irr-gl-plot-hd">Parcelles</th>${headers}</tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -363,7 +319,6 @@ function showGlobaleView(resetScroll = false) {
       </div>
     </div>`
 
-  // Sync top scrollbar with table + auto-scroll to column before today
   requestAnimationFrame(() => {
     const body  = right.querySelector('#irr-gl-body')
     const table = right.querySelector('#irr-gl-table')
@@ -372,7 +327,6 @@ function showGlobaleView(resetScroll = false) {
     if (!body || !table || !top || !inner) return
 
     inner.style.width = table.offsetWidth + 'px'
-
     top.addEventListener('scroll', () => { body.scrollLeft = top.scrollLeft })
     body.addEventListener('scroll', () => { top.scrollLeft = body.scrollLeft })
 
@@ -380,7 +334,6 @@ function showGlobaleView(resetScroll = false) {
       body.scrollLeft = prevScroll
       top.scrollLeft  = prevScroll
     } else {
-      // Initial render: scroll so yesterday is at left edge
       const todayTh = right.querySelector('.irr-gl-th--today')
       if (todayTh) {
         const prevTh = todayTh.previousElementSibling
@@ -393,7 +346,6 @@ function showGlobaleView(resetScroll = false) {
     }
   })
 
-  // Month navigation
   right.querySelector('#irr-gl-prev-month')?.addEventListener('click', () => {
     if (globaleExtraMonths > 0) { globaleExtraMonths--; showGlobaleView() }
   })
@@ -419,13 +371,6 @@ function showGlobaleView(resetScroll = false) {
       if (p) openDetailPanel(p)
     })
   })
-
-  right.querySelectorAll('.irr-gl-group-link').forEach(el => {
-    el.addEventListener('click', () => {
-      const g = getGroups().find(g => g.label === el.dataset.groupLabel)
-      if (g) openGroupDetailPanel(g)
-    })
-  })
 }
 
 function showEditIrrigModal(idxs, iso) {
@@ -440,13 +385,16 @@ function showEditIrrigModal(idxs, iso) {
         <button class="irr-edit-close" id="irr-edit-close">×</button>
       </div>
       <div class="irr-edit-body">
-        ${irrigs.map((ir, i) => `
-          <div class="irr-edit-row">
-            <span class="irr-edit-label">${ir.label}</span>
+        ${irrigs.map((ir, i) => {
+          const p = plots.find(pl => pl.id === ir.plotId)
+          const name = p ? p.name : `Parcelle ${ir.plotId}`
+          return `<div class="irr-edit-row">
+            <span class="irr-edit-label">${name}</span>
             <input type="number" class="irr-edit-qty" data-i="${i}" value="${ir.mm}" min="1" style="width:64px" />
             <span>mm</span>
             <button class="irr-edit-del" data-i="${i}">🗑</button>
-          </div>`).join('')}
+          </div>`
+        }).join('')}
       </div>
       <div class="irr-edit-ft">
         <button class="iw-btn iw-btn--sec" id="irr-edit-cancel">Annuler</button>
@@ -475,102 +423,11 @@ function showEditIrrigModal(idxs, iso) {
   })
 }
 
-function highlightTableRow(plotId, groupLabel) {
+function highlightTableRow(plotId) {
   const right = document.getElementById('irr-right')
   if (!right) return
-  right.querySelectorAll('[data-row-plot],[data-row-group]').forEach(tr => tr.classList.remove('irr-gl-row--active'))
-  if (plotId)     right.querySelector(`[data-row-plot="${plotId}"]`)?.classList.add('irr-gl-row--active')
-  if (groupLabel) right.querySelector(`[data-row-group="${CSS.escape(groupLabel)}"]`)?.classList.add('irr-gl-row--active')
-}
-
-function renderGroupDetailPanel(g) {
-  const panel = document.getElementById('irr-detail')
-  if (!panel) return
-
-  const irrig    = IRRIG_SEASON.filter(i => i.label === g.label)
-  const hasStrat = irrig.some(i => i.fromStrategy)
-  const stratIr  = irrig.filter(i => i.fromStrategy).sort((a,b) => a.iso < b.iso ? -1 : 1)
-  const debut    = stratIr[0]?.iso, fin = stratIr[stratIr.length-1]?.iso
-  const real     = irrig.filter(i => i.real).sort((a,b) => a.iso > b.iso ? -1 : 1)
-  const plan     = irrig.filter(i => !i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
-  const item = ir => {
-    const idx = IRRIG_SEASON.indexOf(ir), col = ir.real ? '#FF8500' : '#FFB705'
-    const [, mo, dd] = ir.iso.split('-')
-    return `<div class="irr-pr-item">
-      <div class="irr-pr-stripe" style="background:${col}"></div>
-      <div class="irr-pr-date" style="color:${col};min-width:52px;font-size:13px;font-weight:600">${parseInt(dd)} ${MONTHS_SHORT[parseInt(mo)-1]}</div>
-      <div class="irr-pr-info"><div class="irr-pr-status" style="color:${col}">${ir.real?'Réalisée':'Planifiée'}</div></div>
-      <div class="irr-pr-mm" style="color:${col}">${ir.mm} mm</div>
-      <button class="irr-pr-del" data-idx="${idx}">🗑</button>
-    </div>`
-  }
-  const stratBar = hasStrat ? `
-    <div class="irr-det-strat-bar">
-      <button class="irr-det-strat-btn" id="irr-det-strat-toggle">Modifier la saison ▾</button>
-      <div class="irr-det-strat-opts" id="irr-det-strat-opts" style="display:none">
-        <button class="irr-det-strat-opt" id="irr-det-stop">Arrêter la saison <span>supprime les irrigations futures du groupe</span></button>
-        <button class="irr-det-strat-opt irr-det-strat-opt--del" id="irr-det-del-all">Supprimer la saison <span>supprime toutes les irrigations du groupe</span></button>
-      </div>
-    </div>` : ''
-
-  panel.innerHTML = `
-    <div class="irr-det-sticky">
-      <div class="irr-det-hd">
-        <span class="irr-det-eyebrow">Groupe</span>
-        <span class="irr-det-name">⬡ ${g.label}</span>
-        <span style="font-size:12px;color:var(--txt3);flex-shrink:0">${g.ids.length} parcelles</span>
-        <button class="irr-det-close" id="irr-det-close">×</button>
-      </div>
-      <div class="irr-det-body">
-        <div class="irr-det-meta">
-          ${debut && fin ? `<div><strong>Saison :</strong> ${fmtDateShort(debut)} → ${fmtDateShort(fin)}</div>` : '<div style="color:var(--txt3)">Pas de saison enregistrée</div>'}
-        </div>
-        ${stratBar}
-        ${renderCumuls(irrig)}
-        ${renderTimeline(irrig)}
-      </div>
-    </div>
-    <div class="irr-det-scroll">
-      ${real.length ? `<details class="irr-pr-details"><summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Effectuées <span class="irr-pr-details-sub">${real.length}</span></summary><div>${real.map(item).join('')}</div></details>` : ''}
-      ${plan.length ? `<details class="irr-pr-details" open><summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Planifiées <span class="irr-pr-details-sub">${plan.length}</span></summary><div>${plan.map(item).join('')}</div></details>` : ''}
-      ${!irrig.length ? `<div class="irr-pr-empty" style="padding:24px"><i class="bi bi-calendar3"></i><p>Aucune irrigation pour ce groupe</p></div>` : ''}
-    </div>`
-
-  panel.querySelector('#irr-det-strat-toggle')?.addEventListener('click', () => {
-    const opts = panel.querySelector('#irr-det-strat-opts')
-    opts.style.display = opts.style.display === 'none' ? '' : 'none'
-  })
-  panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.label === g.label && !i.real && i.iso > TODAY)))
-    saveIrrig(); renderGroupDetailPanel(g); showGlobaleView(true)
-  })
-  panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.label !== g.label))
-    saveIrrig(); renderGroupDetailPanel(g); showGlobaleView(true)
-  })
-  panel.querySelectorAll('.irr-pr-del').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = +btn.dataset.idx
-      if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); saveIrrig(); renderGroupDetailPanel(g) }
-    })
-  })
-  panel.querySelector('#irr-det-close').addEventListener('click', () => {
-    document.getElementById('irr-page')?.classList.remove('irr-has-detail')
-    panel.style.display = 'none'; panel.dataset.plotId = ''
-  })
-}
-
-function openGroupDetailPanel(g) {
-  const page  = document.getElementById('irr-page')
-  const panel = document.getElementById('irr-detail')
-  if (!page || !panel) return
-  if (panel.dataset.plotId === `group:${g.label}` && page.classList.contains('irr-has-detail')) {
-    page.classList.remove('irr-has-detail'); panel.style.display = 'none'; panel.dataset.plotId = ''; return
-  }
-  panel.dataset.plotId = `group:${g.label}`
-  panel.style.display = ''; page.classList.add('irr-has-detail')
-  highlightTableRow(null, g.label)
-  renderGroupDetailPanel(g)
+  right.querySelectorAll('[data-row-plot]').forEach(tr => tr.classList.remove('irr-gl-row--active'))
+  if (plotId) right.querySelector(`[data-row-plot="${plotId}"]`)?.classList.add('irr-gl-row--active')
 }
 
 function openDetailPanel(p) {
@@ -578,7 +435,6 @@ function openDetailPanel(p) {
   const panel = document.getElementById('irr-detail')
   if (!page || !panel) return
 
-  // Toggle off if same plot
   if (panel.dataset.plotId === String(p.id) && page.classList.contains('irr-has-detail')) {
     page.classList.remove('irr-has-detail')
     panel.style.display = 'none'
@@ -588,7 +444,7 @@ function openDetailPanel(p) {
   panel.dataset.plotId = String(p.id)
   panel.style.display = ''
   page.classList.add('irr-has-detail')
-  highlightTableRow(String(p.id), null)
+  highlightTableRow(String(p.id))
   renderDetailPanel(p)
 }
 
@@ -596,19 +452,15 @@ const MONTHS_SHORT = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','o
 
 function renderDetailPanel(p) {
   const panel = document.getElementById('irr-detail')
-  const page  = document.getElementById('irr-page')
   if (!panel) return
 
-  const groups  = getGroups()
-  const group   = groups.find(g => g.ids.includes(p.id))
-  const scope   = { ids: [p.id], label: p.name }
-  const irrig   = getIrrigForScope(scope)
-  const hasStrat = irrig.some(i => i.fromStrategy)
-  const stratIr = irrig.filter(i => i.fromStrategy).sort((a,b) => a.iso < b.iso ? -1 : 1)
-  const debut   = stratIr[0]?.iso
-  const fin     = stratIr[stratIr.length - 1]?.iso
+  const irrig    = IRRIG_SEASON.filter(i => i.plotId === p.id)
+  const hasStrat = irrig.some(i => i.fromStrategy && i.seasonId)
+  const stratIr  = irrig.filter(i => i.fromStrategy).sort((a,b) => a.iso < b.iso ? -1 : 1)
+  const debut    = stratIr[0]?.iso
+  const fin      = stratIr[stratIr.length - 1]?.iso
+  const seasonIds = new Set(irrig.filter(i => i.fromStrategy && i.seasonId).map(i => i.seasonId))
 
-  const groupLine  = group ? `<div><strong>Groupe :</strong> ${group.label} — ${group.ids.length} parcelles</div>` : ''
   const seasonLine = debut && fin
     ? `<div><strong>Saison :</strong> ${fmtDateShort(debut)} → ${fmtDateShort(fin)}</div>`
     : '<div style="color:var(--txt3)">Pas de saison enregistrée</div>'
@@ -634,8 +486,8 @@ function renderDetailPanel(p) {
     <div class="irr-det-strat-bar">
       <button class="irr-det-strat-btn" id="irr-det-strat-toggle">Modifier la saison ▾</button>
       <div class="irr-det-strat-opts" id="irr-det-strat-opts" style="display:none">
-        <button class="irr-det-strat-opt" id="irr-det-stop">Arrêter la saison <span>supprime les irrigations futures</span></button>
-        <button class="irr-det-strat-opt irr-det-strat-opt--del" id="irr-det-del-all">Supprimer la saison <span>supprime toutes les irrigations</span></button>
+        <button class="irr-det-strat-opt" id="irr-det-stop">Arrêter la saison <span>supprime les irrigations futures de cette parcelle</span></button>
+        <button class="irr-det-strat-opt irr-det-strat-opt--del" id="irr-det-del-all">Supprimer la saison <span>supprime toutes les irrigations de cette parcelle</span></button>
       </div>
     </div>` : ''
 
@@ -648,7 +500,7 @@ function renderDetailPanel(p) {
         <button class="irr-det-close" id="irr-det-close">×</button>
       </div>
       <div class="irr-det-body">
-        <div class="irr-det-meta">${groupLine}${seasonLine}</div>
+        <div class="irr-det-meta">${seasonLine}</div>
         ${stratBar}
         ${renderCumuls(irrig)}
         ${renderTimeline(irrig)}
@@ -673,15 +525,13 @@ function renderDetailPanel(p) {
     opts.style.display = opts.style.display === 'none' ? '' : 'none'
   })
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
-    const labels = new Set([p.name])
-    getGroups().filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(labels.has(i.label) && !i.real && i.iso > TODAY)))
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+      ...IRRIG_SEASON.filter(i => !(i.plotId === p.id && seasonIds.has(i.seasonId) && !i.real && i.iso > TODAY)))
     saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
-    const labels = new Set([p.name])
-    getGroups().filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !labels.has(i.label)))
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+      ...IRRIG_SEASON.filter(i => !(i.plotId === p.id && seasonIds.has(i.seasonId))))
     saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
   })
 
@@ -696,7 +546,7 @@ function renderDetailPanel(p) {
     document.getElementById('irr-page')?.classList.remove('irr-has-detail')
     panel.style.display = 'none'
     panel.dataset.plotId = ''
-    highlightTableRow(null, null)
+    highlightTableRow(null)
   })
 }
 
@@ -728,80 +578,9 @@ function showQuickAddModal(plotId, plotName, iso) {
   ov.querySelector('#irr-qa-cancel').addEventListener('click', () => ov.remove())
   ov.querySelector('#irr-qa-save').addEventListener('click', () => {
     const qty = parseInt(ov.querySelector('#irr-qa-qty').value) || 10
-    const p   = plots.find(p => String(p.id) === String(plotId))
-    if (p) {
-      IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: p.name, fromStrategy: false })
-      saveIrrig()
-    }
+    IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId: +plotId, fromStrategy: false })
+    saveIrrig()
     ov.remove()
-  })
-}
-
-function showExportView() {
-  const right = document.getElementById('irr-right')
-  right.innerHTML = `
-    <div class="irr-rv-hd">Exporter les irrigations</div>
-    <div class="irr-export-form">
-      <div class="irr-ef-field">
-        <label class="irr-ef-lbl">Périmètre</label>
-        ${scopeSelectHTML('irr-exp-scope', 'all')}
-      </div>
-      <div class="irr-ef-row">
-        <div class="irr-ef-field">
-          <label class="irr-ef-lbl">Du</label>
-          <input type="date" class="irr-pm-input" id="irr-exp-start" value="${IRRIG_SEASON.length ? [...IRRIG_SEASON].sort((a,b)=>a.iso<b.iso?-1:1)[0].iso : TODAY}" />
-        </div>
-        <div class="irr-ef-field">
-          <label class="irr-ef-lbl">Au</label>
-          <input type="date" class="irr-pm-input" id="irr-exp-end" value="${IRRIG_SEASON.length ? [...IRRIG_SEASON].sort((a,b)=>a.iso>b.iso?-1:1)[0].iso : TODAY}" />
-        </div>
-      </div>
-      <div class="irr-ef-field">
-        <label class="irr-ef-lbl">Données à inclure</label>
-        <div class="irr-ef-checks">
-          <label><input type="checkbox" id="irr-exp-irrig" checked /> Irrigations</label>
-          <label><input type="checkbox" id="irr-exp-rain" checked /> Pluie</label>
-        </div>
-      </div>
-      <p class="irr-ef-hint">Une ligne par date · Une colonne par parcelle · Valeurs en mm</p>
-      <button class="irr-pm-btn irr-pm-btn--pri" id="irr-exp-dl"><i class="bi bi-download"></i> Télécharger CSV</button>
-    </div>`
-
-  right.querySelector('#irr-exp-dl').addEventListener('click', () => {
-    const scopeVal = right.querySelector('#irr-exp-scope').value
-    const start    = right.querySelector('#irr-exp-start').value
-    const end      = right.querySelector('#irr-exp-end').value
-    const inclIrr  = right.querySelector('#irr-exp-irrig').checked
-    const inclRain = right.querySelector('#irr-exp-rain').checked
-    const scope    = resolveScope(scopeVal)
-    const selPlots = scope ? plots.filter(p => scope.ids.includes(p.id)) : plots
-
-    const dates = new Set()
-    if (inclIrr) for (const ir of IRRIG_SEASON) { if (ir.iso >= start && ir.iso <= end) dates.add(ir.iso) }
-    if (inclRain) for (const r of RAIN_DATA) { if (r.iso >= start && r.iso <= end) dates.add(r.iso) }
-    const sortedDates = [...dates].sort()
-
-    const rainMap = {}
-    if (inclRain) for (const r of RAIN_DATA) rainMap[r.iso] = r.mm
-
-    const header = ['Date', ...selPlots.map(p => p.name + (inclRain ? ' (irrig.)' : ''))].join(';')
-    const rows = sortedDates.map(d => {
-      const cells = selPlots.map(p => {
-        const labels = plotIrrigLabels(p)
-        const irrigMm = inclIrr ? IRRIG_SEASON.filter(i => i.iso === d && labels.has(i.label)).reduce((s,i)=>s+i.mm,0) : 0
-        const rainMm  = inclRain ? (rainMap[d] ?? 0) : 0
-        const total   = irrigMm + rainMm
-        return total > 0 ? total : ''
-      })
-      return [d, ...cells].join(';')
-    })
-
-    const csv  = [header, ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url  = URL.createObjectURL(blob)
-    const a    = Object.assign(document.createElement('a'), { href: url, download: `irrigations_${start}_${end}.csv` })
-    document.body.appendChild(a); a.click()
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove() }, 100)
   })
 }
 
@@ -834,8 +613,8 @@ function renderLeft() {
     </button>
     <div class="irr-lc-form${activeAction==='saisie'?'':' irr-lc-form--hidden'}" id="irr-form-saisie">
       <div class="irr-lc-field">
-        <label class="irr-lc-lbl">Parcelle ou groupe</label>
-        ${scopeSelectHTML('irr-s-scope')}
+        <label class="irr-lc-lbl">Parcelles</label>
+        ${multiSelectHTML('irr-s-scope', { allBtn: true })}
       </div>
       <div class="irr-lc-field">
         <label class="irr-lc-lbl">Date</label>
@@ -845,7 +624,7 @@ function renderLeft() {
         <label class="irr-lc-lbl">Quantité <span class="irr-lc-unit">(mm par parcelle)</span></label>
         <input type="number" class="irr-lc-input" id="irr-s-qty" value="10" min="1" />
       </div>
-      <div class="irr-lc-err" id="irr-s-err" style="display:none">Veuillez renseigner tous les champs requis.</div>
+      <div class="irr-lc-err" id="irr-s-err" style="display:none">Veuillez sélectionner au moins une parcelle et renseigner tous les champs.</div>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-s-save">Enregistrer</button>
     </div>
 
@@ -855,8 +634,8 @@ function renderLeft() {
     </button>
     <div class="irr-lc-form${activeAction==='saison'?'':' irr-lc-form--hidden'}" id="irr-form-saison">
       <div class="irr-lc-field">
-        <label class="irr-lc-lbl">Parcelle ou groupe</label>
-        ${scopeSelectHTML('irr-sa-scope')}
+        <label class="irr-lc-lbl">Parcelles</label>
+        ${multiSelectHTML('irr-sa-scope', { allBtn: true })}
       </div>
       <div class="irr-lc-field">
         <label class="irr-lc-lbl">Début</label>
@@ -877,7 +656,7 @@ function renderLeft() {
         </div>
       </div>
       <div class="irr-lc-preview" id="irr-sa-preview">—</div>
-      <div class="irr-lc-err" id="irr-sa-err" style="display:none">Veuillez renseigner tous les champs requis.</div>
+      <div class="irr-lc-err" id="irr-sa-err" style="display:none">Veuillez sélectionner au moins une parcelle et renseigner tous les champs.</div>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-sa-save">Enregistrer</button>
     </div>
 
@@ -887,8 +666,8 @@ function renderLeft() {
     </button>
     <div class="irr-lc-form${activeAction==='export'?'':' irr-lc-form--hidden'}" id="irr-form-export">
       <div class="irr-lc-field">
-        <label class="irr-lc-lbl">Périmètre</label>
-        ${scopeSelectHTML('irr-ex-scope', 'all')}
+        <label class="irr-lc-lbl">Parcelles</label>
+        ${multiSelectHTML('irr-ex-scope', { allBtn: true })}
       </div>
       <div class="irr-lc-field">
         <label class="irr-lc-lbl">Du</label>
@@ -909,6 +688,11 @@ function renderLeft() {
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-ex-dl"><i class="bi bi-download"></i> Télécharger CSV</button>
     </div>
   `
+
+  // Bind multi-selects
+  if (activeAction === 'saisie')  bindMultiSelect(left, 'irr-s-scope')
+  if (activeAction === 'saison')  bindMultiSelect(left, 'irr-sa-scope')
+  if (activeAction === 'export')  bindMultiSelect(left, 'irr-ex-scope')
 
   // Org selector
   left.querySelector('#irr-org-select')?.addEventListener('change', e => {
@@ -955,13 +739,12 @@ function renderLeft() {
 
   // Export download
   left.querySelector('#irr-ex-dl')?.addEventListener('click', () => {
-    const scopeVal = left.querySelector('#irr-ex-scope').value
     const start    = left.querySelector('#irr-ex-start').value
     const end      = left.querySelector('#irr-ex-end').value
     const inclIrr  = left.querySelector('#irr-ex-irrig').checked
     const inclRain = left.querySelector('#irr-ex-rain').checked
-    const scope    = resolveScope(scopeVal)
-    const selPlots = scope ? plots.filter(p => scope.ids.includes(p.id)) : plots
+    const selIds   = getMultiSelectedIds(left, 'irr-ex-scope')
+    const selPlots = selIds.length > 0 ? plots.filter(p => selIds.includes(p.id)) : sortedPlotList()
 
     const dates = new Set()
     if (inclIrr) for (const ir of IRRIG_SEASON) { if (ir.iso >= start && ir.iso <= end) dates.add(ir.iso) }
@@ -974,8 +757,7 @@ function renderLeft() {
     const header = ['Date', ...selPlots.map(p => p.name + (inclRain ? ' (irrig.)' : ''))].join(';')
     const rows = sortedDates.map(d => {
       const cells = selPlots.map(p => {
-        const lbls    = plotIrrigLabels(p)
-        const irrigMm = inclIrr ? IRRIG_SEASON.filter(i => i.iso === d && lbls.has(i.label)).reduce((s,i)=>s+i.mm,0) : 0
+        const irrigMm = inclIrr ? IRRIG_SEASON.filter(i => i.iso === d && i.plotId === p.id).reduce((s,i)=>s+i.mm,0) : 0
         const rainMm  = inclRain ? (rainMap[d] ?? 0) : 0
         const total   = irrigMm + rainMm
         return total > 0 ? total : ''
@@ -993,31 +775,32 @@ function renderLeft() {
 
   // Saisie save
   left.querySelector('#irr-s-save')?.addEventListener('click', () => {
-    const scopeVal = left.querySelector('#irr-s-scope').value
-    const dateVal  = left.querySelector('#irr-s-date').value
-    const qtyVal   = parseInt(left.querySelector('#irr-s-qty').value) || 0
-    const errEl    = left.querySelector('#irr-s-err')
-    if (!scopeVal || !dateVal || !qtyVal) {
+    const selectedPlotIds = getMultiSelectedIds(left, 'irr-s-scope')
+    const dateVal         = left.querySelector('#irr-s-date').value
+    const qtyVal          = parseInt(left.querySelector('#irr-s-qty').value) || 0
+    const errEl           = left.querySelector('#irr-s-err')
+    if (!selectedPlotIds.length || !dateVal || !qtyVal) {
       if (errEl) errEl.style.display = ''
       return
     }
     if (errEl) errEl.style.display = 'none'
-    const scope    = resolveScope(scopeVal)
-    const isFut    = dateVal > TODAY
-    const labels   = scope ? [scope.label] : []
+    const isFut = dateVal > TODAY
     const doSaisie = () => {
-      labels.forEach(lbl => IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label: lbl, fromStrategy: false }))
+      selectedPlotIds.forEach(plotId => {
+        IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, plotId, fromStrategy: false })
+      })
       saveIrrig()
       showSaveConfirmModal('Irrigation enregistrée', [
         `Date : ${fmtDateFull(dateVal)}`,
         `Quantité : ${qtyVal} mm`,
-        `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
+        `Parcelles : ${selectedPlotIds.length} sélectionnée${selectedPlotIds.length > 1 ? 's' : ''}`,
       ])
     }
-    const conflicts = IRRIG_SEASON.filter(i => labels.includes(i.label))
+    const conflicts = IRRIG_SEASON.filter(i => selectedPlotIds.includes(i.plotId) && i.iso === dateVal)
     if (conflicts.length) {
-      showConflictModal(conflicts.length, scope?.label ?? 'Toutes les parcelles', () => {
-        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !labels.includes(i.label)))
+      showConflictModal(conflicts.length, `${selectedPlotIds.length} parcelle(s)`, () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(selectedPlotIds.includes(i.plotId) && i.iso === dateVal)))
         doSaisie()
       })
       return
@@ -1027,38 +810,40 @@ function renderLeft() {
 
   // Saison save
   left.querySelector('#irr-sa-save')?.addEventListener('click', () => {
-    const scopeVal = left.querySelector('#irr-sa-scope').value
+    const selectedPlotIds = getMultiSelectedIds(left, 'irr-sa-scope')
     const debut    = left.querySelector('#irr-sa-debut').value
     const fin      = left.querySelector('#irr-sa-fin').value
     const qty      = parseInt(left.querySelector('#irr-sa-qty').value) || 10
     const freq     = parseInt(left.querySelector('#irr-sa-freq').value) || 7
     const errEl    = left.querySelector('#irr-sa-err')
-    if (!scopeVal || !debut || !fin) {
+    if (!selectedPlotIds.length || !debut || !fin) {
       if (errEl) errEl.style.display = ''
       return
     }
     if (errEl) errEl.style.display = 'none'
-    const scope  = resolveScope(scopeVal)
-    const labels = scope ? [scope.label] : []
-    const occs   = []
+    const occs = []
     let cur = new Date(debut), end = new Date(fin)
     while (cur <= end && occs.length < 200) { occs.push(new Date(cur)); cur.setDate(cur.getDate() + freq) }
+    const seasonId = generateSeasonId()
     const doSaison = () => {
-      labels.forEach(lbl => occs.forEach(d => {
-        const iso = d.toISOString().slice(0, 10)
-        IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label: lbl, fromStrategy: true })
-      }))
+      selectedPlotIds.forEach(plotId => {
+        occs.forEach(d => {
+          const iso = d.toISOString().slice(0, 10)
+          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId })
+        })
+      })
       saveIrrig()
       showSaveConfirmModal('Saison enregistrée', [
         `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
         `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
-        `Périmètre : ${scope?.label ?? 'Toutes les parcelles'}`,
+        `Parcelles : ${selectedPlotIds.length} sélectionnée${selectedPlotIds.length > 1 ? 's' : ''}`,
       ])
     }
-    const conflicts = IRRIG_SEASON.filter(i => labels.includes(i.label) && i.iso >= debut && i.iso <= fin)
+    const conflicts = IRRIG_SEASON.filter(i => selectedPlotIds.includes(i.plotId) && i.iso >= debut && i.iso <= fin)
     if (conflicts.length) {
-      showConflictModal(conflicts.length, scope?.label ?? 'Toutes les parcelles', () => {
-        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(labels.includes(i.label) && i.iso >= debut && i.iso <= fin)))
+      showConflictModal(conflicts.length, `${selectedPlotIds.length} parcelle(s)`, () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(selectedPlotIds.includes(i.plotId) && i.iso >= debut && i.iso <= fin)))
         doSaison()
       })
       return
@@ -1097,14 +882,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const panel = document.getElementById('irr-detail')
     const plotId = panel?.dataset.plotId
     if (!plotId) return
-    if (plotId.startsWith('group:')) {
-      const label = plotId.slice(6)
-      const g = getGroups().find(g => g.label === label)
-      if (g) renderGroupDetailPanel(g)
-    } else {
-      const p = plots.find(pl => String(pl.id) === plotId)
-      if (p) renderDetailPanel(p)
-    }
+    const p = plots.find(pl => String(pl.id) === plotId)
+    if (p) renderDetailPanel(p)
   })
 
   const _urlParams = new URLSearchParams(window.location.search)

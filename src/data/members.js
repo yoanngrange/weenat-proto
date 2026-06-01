@@ -48,7 +48,7 @@ export const members = [
     id: 6, prenom: 'Alexandre', nom: 'Bernard',
     email: 'alexandre.bernard@breizagri-conseil.fr',
     role: 'agent', statut: 'actif', source: 'réseau',
-    orgIds: [1], parcelIds: [1, 2]
+    orgIds: [1], parcelIds: [1, 2, 3, 4, 7, 8]
   },
   {
     id: 7, prenom: 'Maxime', nom: 'Petit',
@@ -202,12 +202,12 @@ export const members = [
     id: 31, prenom: 'Marie', nom: 'Martin',
     email: 'marie.martin@fermedubocage.fr',
     role: 'membre', statut: 'actif', source: 'adherent',
-    orgIds: [1], parcelIds: [1, 2, 3]
+    orgIds: [1], parcelIds: [1, 2, 3, 5]
   },
   {
     id: 32, prenom: 'Jean-Michel', nom: 'Dutilleul',
     email: 'jean-michel.dutilleul@fermedubocage.fr',
     role: 'membre', statut: 'actif', source: 'adherent',
-    orgIds: [1], parcelIds: [1]
+    orgIds: [1], parcelIds: [1, 2, 4, 6]
   }
 ]

@@ -4,7 +4,7 @@
 
 export const sensors = [
   // ── Org 1 : Ferme du Bocage (parcelles 1–15) ────────────────────────────
-  { id: 1,   orgId: 1,  parcelIds: [1],  model: "P+",        serial: "WEE-00101", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 90,  event: null },
+  { id: 1,   orgId: 1,  parcelIds: [1, 2],  model: "P+",        serial: "WEE-00101", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 85, messages7d: 90,  event: null },
   { id: 2,   orgId: 1,  parcelIds: [1],  model: "CHP-15/30", serial: "WEE-00102", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 92, messages7d: 95,  event: "capteur couché", depth: 20 },
   { id: 3,   orgId: 1,  parcelIds: [2],  model: "P",         serial: "WEE-00103", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 78, messages7d: 88,  event: null },
   { id: 4,   orgId: 1,  parcelIds: [2],  model: "TH",        serial: "WEE-00104", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 80, messages7d: 85,  event: null },
@@ -13,12 +13,12 @@ export const sensors = [
   { id: 7,   orgId: 1,  parcelIds: [4],  model: "CAPA-30-3", serial: "WEE-00107", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 75, messages7d: 80,  event: null },
   { id: 8,   orgId: 1,  parcelIds: [5],  model: "EC",        serial: "WEE-00108", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 82, messages7d: 87,  event: null },
   { id: 9,   orgId: 1,  parcelIds: [6],  model: "T_MINI",    serial: "WEE-00109", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 88, messages7d: 91,  event: "capteur déplacé" },
-  { id: 10,  orgId: 1,  parcelIds: [7],  model: "P+",        serial: "WEE-00110", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 94,  event: null },
+  { id: 10,  orgId: 1,  parcelIds: [7, 8],  model: "P+",        serial: "WEE-00110", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 91, messages7d: 94,  event: null },
   { id: 11,  orgId: 1,  parcelIds: [8],  model: "CHP-15/30", serial: "WEE-00111", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 86, messages7d: 89,  event: null, depth: 30 },
   { id: 12,  orgId: 1,  parcelIds: [9],  model: "P",         serial: "WEE-00112", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 84,  event: "cuillère bloquée" },
   { id: 13,  orgId: 1,  parcelIds: [10], model: "PT",        serial: "WEE-00113", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 83, messages7d: 86,  event: null },
   { id: 14,  orgId: 1,  parcelIds: [11], model: "CHP-30/60", serial: "WEE-00114", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 92,  event: null, depth: 40 },
-  { id: 15,  orgId: 1,  parcelIds: [12], model: "P+",        serial: "WEE-00115", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 15,  orgId: 1,  parcelIds: [12, 13], model: "P+",        serial: "WEE-00115", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   { id: 16,  orgId: 1,  parcelIds: [13], model: "CAPA-30-3", serial: "WEE-00116", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 76, messages7d: 81,  event: null },
   { id: 17,  orgId: 1,  parcelIds: [14], model: "LWS",       serial: "WEE-00117", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 81, messages7d: 85,  event: null },
   { id: 18,  orgId: 1,  parcelIds: [15], model: "T_MINI",    serial: "WEE-00118", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 90,  event: null },

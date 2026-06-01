@@ -6,7 +6,7 @@ import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
 import { applyStoredPlotPatches } from './data/store.js'
 import { ADHERENT_ORG_ID, ADMIN_ORG_ID, IRRIG_TYPES, SOIL_TYPES } from './data/constants.js'
-import { IRRIG_SEASON, buildGroups } from './data/irrigations.js'
+import { IRRIG_SEASON } from './data/irrigations.js'
 applyStoredPlotPatches(plots)
 
 const _iconBase = import.meta.env.BASE_URL + 'icons/'
@@ -901,20 +901,20 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
       layer.addTo(map)
       markers.push(layer)
 
-      // Permanent value label at polygon centroid
-      const value = computeMetricValue(parcel, currentMetric, currentAggregate)
-      const unit  = getMetricUnit(currentMetric)
-      const color = getMetricColor(parcel, currentMetric)
+      // Permanent value label at polygon centroid — only when parcel has sensor for metric
       const labelLat = parcel.lat || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[0], 0) / parcel.latlngs.length : null)
       const labelLng = parcel.lng || (parcel.latlngs ? parcel.latlngs.reduce((s, p) => s + p[1], 0) / parcel.latlngs.length : null)
       if (labelLat && labelLng) {
+        const hasData = parcelHasMetric(parcel, currentMetric)
+        const badgeHtml = hasData
+          ? (() => {
+              const value = computeMetricValue(parcel, currentMetric, currentAggregate)
+              const color = getMetricColor(parcel, currentMetric)
+              return `<div class="map-value-badge" style="border-color:${color};color:${color}">${fmtMetricValue(value, currentMetric)}</div>`
+            })()
+          : `<div class="map-value-badge map-value-badge--na">—</div>`
         const label = L.marker([labelLat, labelLng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div class="map-value-badge" style="border-color:${color};color:${color}">${fmtMetricValue(value, currentMetric)}</div>`,
-            iconSize: [0, 0],
-            iconAnchor: [0, 0],
-          }),
+          icon: L.divIcon({ className: '', html: badgeHtml, iconSize: [0, 0], iconAnchor: [0, 0] }),
           interactive: false,
         }).addTo(map)
         markers.push(label)
@@ -1057,6 +1057,7 @@ function fmtMetricValue(value, metric) {
 }
 
 function getMetricTooltipValue(parcel) {
+  if (!parcelHasMetric(parcel, currentMetric)) return 'Donnée non disponible'
   const value = computeMetricValue(parcel, currentMetric, currentAggregate)
   return `${getAggregateLabel(currentAggregate)} : ${fmtMetricValue(value, currentMetric)}`
 }
@@ -1226,17 +1227,16 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'irrigations') {
-    const label = [parcel.crop, parcel.irrigation].filter(Boolean).join(' · ')
-    if (!label) return 0
+    const pid   = parcel.id
     const today = new Date().toISOString().split('T')[0]
     const ago = days => { const d = new Date(); d.setDate(d.getDate() - days); return d.toISOString().split('T')[0] }
     const ahead = days => { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().split('T')[0] }
     switch (aggregate) {
-      case '7jours':   return IRRIG_SEASON.filter(i =>  i.real && i.label === label && i.iso >= ago(7)).reduce((s, i) => s + i.mm, 0)
-      case '30jours':  return IRRIG_SEASON.filter(i =>  i.real && i.label === label && i.iso >= ago(30)).reduce((s, i) => s + i.mm, 0)
-      case 'saison':   return IRRIG_SEASON.filter(i =>  i.real && i.label === label).reduce((s, i) => s + i.mm, 0)
-      case 'planif7j': return IRRIG_SEASON.filter(i => !i.real && i.label === label && i.iso >= today && i.iso <= ahead(7)).reduce((s, i) => s + i.mm, 0)
-      default:         return IRRIG_SEASON.filter(i =>  i.real && i.label === label).reduce((s, i) => s + i.mm, 0)
+      case '7jours':   return IRRIG_SEASON.filter(i =>  i.real && i.plotId === pid && i.iso >= ago(7)).reduce((s, i) => s + i.mm, 0)
+      case '30jours':  return IRRIG_SEASON.filter(i =>  i.real && i.plotId === pid && i.iso >= ago(30)).reduce((s, i) => s + i.mm, 0)
+      case 'saison':   return IRRIG_SEASON.filter(i =>  i.real && i.plotId === pid).reduce((s, i) => s + i.mm, 0)
+      case 'planif7j': return IRRIG_SEASON.filter(i => !i.real && i.plotId === pid && i.iso >= today && i.iso <= ahead(7)).reduce((s, i) => s + i.mm, 0)
+      default:         return IRRIG_SEASON.filter(i =>  i.real && i.plotId === pid).reduce((s, i) => s + i.mm, 0)
     }
   }
 
@@ -1525,6 +1525,80 @@ const EVENT_ICONS = {
   'cuillère bloquée':      'bi-slash-circle',
 }
 
+function buildEventIconsHtml(event) {
+  if (!event) return '<span class="tag-none">—</span>'
+  const evs = Array.isArray(event) ? event : [event]
+  return `<div class="event-icons-stack">${evs.map(ev => `<i class="bi ${EVENT_ICONS[ev] || 'bi-exclamation-circle'}" title="${ev}" style="color:var(--warn);font-size:15px"></i>`).join('')}</div>`
+}
+
+function buildParcelLinksHtml(sensor, withRemoveBtn = false) {
+  const parcelList = plots.filter(p => sensor.parcelIds.includes(p.id))
+  if (!parcelList.length) return '<span class="tag-none">—</span>'
+  return parcelList.map(p => `
+    <div class="admin-item-row">
+      <a href="parcelle-detail.html?id=${p.id}" class="admin-link">${getPlotDisplayName(p)}</a>
+      ${withRemoveBtn ? `<button class="icon-btn remove-parcel-sensor-admin" data-sensor-id="${sensor.id}" data-parcel-id="${p.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
+    </div>`).join('')
+}
+
+function buildMembresHtmlAdherent(parcel) {
+  // Conseillers : membres réseau assignés à cette parcelle ET à cette org (évite les agents d'autres orgs)
+  const conseillers = members.filter(m =>
+    m.source === 'réseau' &&
+    m.parcelIds.includes(parcel.id) &&
+    m.orgIds.includes(parcel.orgId)
+  )
+  // Équipe : membres adhérents assignés à cette parcelle spécifiquement
+  const equipe = members.filter(m =>
+    m.source === 'adherent' &&
+    m.orgIds.includes(ADHERENT_ORG_ID) &&
+    m.parcelIds.includes(parcel.id)
+  )
+  if (!conseillers.length && !equipe.length) return '<span class="tag-none">—</span>'
+  let html = ''
+  conseillers.forEach(m => {
+    html += `<div class="admin-item-row"><span class="member-src-badge member-src-badge--reseau">Conseiller</span><a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a></div>`
+  })
+  equipe.forEach(m => {
+    html += `<div class="admin-item-row">
+      <span class="member-src-badge member-src-badge--adherent">Mon équipe</span>
+      <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+      <button class="icon-btn remove-member-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+    </div>`
+  })
+  return html
+}
+
+function buildSensorMembresHtmlAdherent(sensor) {
+  const pids = sensor.parcelIds || []
+  // Conseillers : membres réseau assignés à cette org ET à une parcelle liée
+  const conseillers = members.filter(m =>
+    m.source === 'réseau' &&
+    pids.some(pid => m.parcelIds.includes(pid)) &&
+    m.orgIds.includes(sensor.orgId)
+  )
+  // Équipe : membres adhérents assignés à une parcelle liée au capteur
+  const equipe = members.filter(m =>
+    m.source === 'adherent' &&
+    m.orgIds.includes(ADHERENT_ORG_ID) &&
+    pids.some(pid => m.parcelIds.includes(pid))
+  )
+  if (!conseillers.length && !equipe.length) return '<span class="tag-none">—</span>'
+  let html = ''
+  conseillers.forEach(m => {
+    html += `<div class="admin-item-row"><span class="member-src-badge member-src-badge--reseau">Conseiller</span><a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a></div>`
+  })
+  equipe.forEach(m => {
+    const linkedParcel = plots.find(p => pids.includes(p.id) && m.parcelIds.includes(p.id))
+    html += `<div class="admin-item-row">
+      <span class="member-src-badge member-src-badge--adherent">Mon équipe</span>
+      <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+      ${linkedParcel ? `<button class="icon-btn remove-member-sensor-admin" data-member-id="${m.id}" data-parcel-id="${linkedParcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>` : ''}
+    </div>`
+  })
+  return html
+}
+
 function computeSensorValue(sensor, metric, aggregate) {
   const n = (seed) => Math.round(Math.sin(sensor.id * 1.9 + seed) * 3)
 
@@ -1627,6 +1701,7 @@ function computeSensorValue(sensor, metric, aggregate) {
 function createSensorTable(sensors) {
   const metricLabel = METRIC_LABELS[currentMetric] || 'Mesure'
   const aggLabel = getAggregateLabel(currentAggregate)
+  const isAdherent = currentRole === 'adherent'
 
   let html = '<table id="sensor-table"><thead><tr>'
   html += '<th data-column="brand">Marque</th>'
@@ -1635,8 +1710,9 @@ function createSensorTable(sensors) {
   html += '<th data-column="nom">Nom</th>'
   html += '<th data-column="city">Ville</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
-  html += '<th data-column="org">Organisation</th>'
-  html += '<th data-column="event">Événement</th>'
+  if (!isAdherent) html += '<th data-column="org">Organisation</th>'
+  html += '<th data-column="anomalies">Anomalies</th>'
+  if (isAdherent) html += '<th data-column="membres">Membres</th>'
   html += `<th data-column="mesure" class="col-active-header">${metricLabel}<br><small style="font-weight:400">${aggLabel}</small></th>`
   html += '</tr></thead><tbody>'
 
@@ -1650,7 +1726,6 @@ function createSensorTable(sensors) {
     const mesureHtml = sensorVal
       ? `${sensorVal[0]} ${sensorVal[1]}`
       : '<span class="tag-none">—</span>'
-    const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
     const sensorCustomName = getSensorDisplayName(sensor)
     const nomHtml = sensorCustomName !== sensor.serial ? `<span style="font-weight:500">${sensorCustomName}</span>` : '<span class="tag-none">—</span>'
     html += `<tr class="clickable-row" data-href="capteur-detail.html?id=${sensor.id}">
@@ -1660,8 +1735,9 @@ function createSensorTable(sensors) {
       <td>${nomHtml}</td>
       <td>${city}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
-      <td>${org ? org.name : '—'}</td>
-      <td>${eventIcon}${sensor.event || ''}</td>
+      ${!isAdherent ? `<td>${org ? org.name : '—'}</td>` : ''}
+      <td>${buildEventIconsHtml(sensor.event)}</td>
+      ${isAdherent ? `<td class="admin-links-cell">${buildSensorMembresHtmlAdherent(sensor)}</td>` : ''}
       <td class="col-active num">${mesureHtml}</td>
     </tr>`
   })
@@ -1849,6 +1925,11 @@ function updateFilterChips() {
 }
 
 function createAdminTable(sensorList) {
+  sensorList = [...sensorList].sort((a, b) =>
+    `${a.model} ${a.serial}`.localeCompare(`${b.model} ${b.serial}`, 'fr')
+  )
+  const isAdherent = currentRole === 'adherent'
+
   let html = `
     <div id="sensor-bulk-bar" class="bulk-bar hidden">
       <span id="sensor-bulk-count"></span>
@@ -1887,38 +1968,33 @@ function createAdminTable(sensorList) {
   html += '<th data-column="telecom">Télécom</th>'
   html += '<th data-column="lastMessage">Dernier message</th>'
   html += '<th data-column="networkQuality">Qualité réseau</th>'
-  html += '<th data-column="event">Événement</th>'
-  html += '<th data-column="parcelle">Parcelle</th>'
+  html += '<th data-column="anomalies">Anomalies</th>'
+  html += '<th data-column="parcelles">Parcelles</th>'
   html += '<th data-column="membres">Membres</th>'
-  html += '<th data-column="organisation">Organisation</th>'
+  if (!isAdherent) html += '<th data-column="organisation">Organisation</th>'
   html += '</tr></thead><tbody>'
 
   sensorList.forEach(sensor => {
-    const parcel = plots.find(p => sensor.parcelIds.includes(p.id))
+    const parcelLinksHtml = buildParcelLinksHtml(sensor, !isAdherent)
 
-    const parcelHtml = parcel
-      ? `<div class="admin-item-row">
-           <a href="parcelle-detail.html?id=${parcel.id}" class="admin-link">${getPlotDisplayName(parcel)}</a>
-           <button class="icon-btn remove-parcel-sensor-admin" data-sensor-id="${sensor.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
-         </div>`
-      : '<span class="tag-none">—</span>'
+    const membresHtml = isAdherent
+      ? buildSensorMembresHtmlAdherent(sensor)
+      : (() => {
+          const parcel = plots.find(p => sensor.parcelIds.includes(p.id))
+          const allParcelMembers = parcel ? members.filter(m => m.parcelIds.includes(parcel.id) && m.role !== 'propriétaire') : []
+          const displayMembers = allParcelMembers.slice(0, (sensor.id % 3 === 0) ? 0 : Math.min(2, allParcelMembers.length))
+          return displayMembers.length
+            ? displayMembers.map(m => `<div class="admin-item-row">
+                 <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+                 <button class="icon-btn remove-member-sensor-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+               </div>`).join('')
+            : '<span class="tag-none">—</span>'
+        })()
 
-    const allParcelMembers = parcel ? members.filter(m => m.parcelIds.includes(parcel.id) && m.role !== 'propriétaire') : []
-    const memberLimit = (sensor.id % 3 === 0) ? 0 : Math.min(2, allParcelMembers.length)
-    const displayMembers = allParcelMembers.slice(0, memberLimit)
-    const membresHtml = displayMembers.length
-      ? displayMembers.map(m => `<div class="admin-item-row">
-           <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
-           <button class="icon-btn remove-member-sensor-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
-         </div>`).join('')
-      : '<span class="tag-none">—</span>'
-
-    const currentOrgId = sensor.orgId ?? parcel?.orgId
+    const currentOrgId = sensor.orgId ?? plots.find(p => sensor.parcelIds.includes(p.id))?.orgId
     const orgSelectHtml = `<select class="inline-edit" data-field="orgId" data-sensor-id="${sensor.id}">
       ${orgs.map(o => `<option value="${o.id}"${o.id === currentOrgId ? ' selected' : ''}>${o.name}</option>`).join('')}
     </select>`
-
-    const eventIcon = sensor.event ? `<i class="bi ${EVENT_ICONS[sensor.event] || 'bi-exclamation-circle'}" title="${sensor.event}" style="color:var(--warn)"></i> ` : ''
 
     const adminCustomName = getSensorDisplayName(sensor)
     const adminNomCell = `<input type="text" class="inline-edit sensor-name-edit" data-sensor-id="${sensor.id}" value="${adminCustomName !== sensor.serial ? adminCustomName : ''}" placeholder="${sensor.serial}" style="min-width:100px">`
@@ -1930,10 +2006,10 @@ function createAdminTable(sensorList) {
       <td>${sensor.telecom}</td>
       <td style="white-space:nowrap">${getSensorAge(sensor)}</td>
       <td>${sensor.networkQuality}%</td>
-      <td>${eventIcon}${sensor.event || ''}</td>
-      <td class="admin-links-cell">${parcelHtml}</td>
+      <td>${buildEventIconsHtml(sensor.event)}</td>
+      <td class="admin-links-cell">${parcelLinksHtml}</td>
       <td class="admin-links-cell">${membresHtml}</td>
-      <td>${orgSelectHtml}</td>
+      ${!isAdherent ? `<td>${orgSelectHtml}</td>` : ''}
     </tr>`
   })
 
@@ -2021,8 +2097,15 @@ function initSensorAdminTable(container) {
     btn.addEventListener('click', e => {
       e.stopPropagation()
       const sensorId = parseInt(btn.dataset.sensorId)
+      const parcelId = parseInt(btn.dataset.parcelId)
       const sensor = sensors.find(s => s.id === sensorId)
-      if (sensor) sensor.parcelIds = []
+      if (sensor) {
+        if (parcelId) {
+          sensor.parcelIds = sensor.parcelIds.filter(id => id !== parcelId)
+        } else {
+          sensor.parcelIds = []
+        }
+      }
       updateContent()
     })
   })
@@ -2049,6 +2132,7 @@ function createParcelMetricTable(parcels) {
   const aggregates = metricAggregates[currentMetric] || []
   const unit = getMetricUnit(currentMetric)
   const metricLabel = METRIC_LABELS[currentMetric] || currentMetric
+  const isAdherent = currentRole === 'adherent'
 
   let html = '<table id="parcel-table"><thead><tr>'
   html += '<th data-column="name">Parcelle</th>'
@@ -2059,6 +2143,7 @@ function createParcelMetricTable(parcels) {
   html += '<th data-column="irrigation">Irrigation</th>'
   html += '<th data-column="sensors">Capteurs</th>'
   html += '<th data-column="integrations">Intégrations</th>'
+  if (isAdherent) html += '<th data-column="membres">Membres</th>'
   // Colonnes métriques — une par agrégat, celle active en surbrillance
   aggregates.forEach(agg => {
     const isActive = agg.value === currentAggregate
@@ -2084,10 +2169,14 @@ function createParcelMetricTable(parcels) {
     html += `<td><span class="${irrigationClass}">${irrigation}</span></td>`
     html += `<td class="num">${sensorCount > 0 ? sensorCount : '<span class="warn-text">0</span>'}</td>`
     html += `<td class="integrations-cell">${integHtml}</td>`
+    if (isAdherent) html += `<td class="admin-links-cell">${buildMembresHtmlAdherent(parcel)}</td>`
+    const hasData = parcelHasMetric(parcel, currentMetric)
     aggregates.forEach(agg => {
-      const val = computeMetricValue(parcel, currentMetric, agg.value)
       const isActive = agg.value === currentAggregate
-      html += `<td class="num${isActive ? ' col-active' : ''}">${fmtMetricValue(val, currentMetric)}</td>`
+      const display = hasData
+        ? fmtMetricValue(computeMetricValue(parcel, currentMetric, agg.value), currentMetric)
+        : '<span class="tdb-missing">—</span>'
+      html += `<td class="num${isActive ? ' col-active' : ''}">${display}</td>`
     })
     html += '</tr>'
   })
@@ -2138,6 +2227,7 @@ function initAdminMinimaps(container) {
 }
 
 function createParcelAdminTable(parcels) {
+  parcels = [...parcels].sort((a, b) => getPlotDisplayName(a).localeCompare(getPlotDisplayName(b), 'fr'))
   const crops = [...new Set(plots.map(p => p.crop).filter(Boolean))].sort()
   const textures = SOIL_TYPES
   const irrigationTypes = IRRIG_TYPES
@@ -2162,12 +2252,13 @@ function createParcelAdminTable(parcels) {
     </div>
   `
 
+  const isAdherent = currentRole === 'adherent'
+
   html += '<table id="parcel-admin-table"><thead><tr>'
   html += '<th><input type="checkbox" id="check-all-admin"></th>'
   html += '<th data-column="name">Parcelle</th>'
-  html += '<th data-column="org">Organisation</th>'
+  if (!isAdherent) html += '<th data-column="org">Organisation</th>'
   html += '<th class="col-minimap">Contour</th>'
-  html += '<th data-column="area">Surface (ha)</th>'
   html += '<th data-column="crop">Culture</th>'
   html += '<th data-column="env" title="Environnement">Env.</th>'
   html += '<th data-column="texture">Texture de Sol</th>'
@@ -2186,7 +2277,7 @@ function createParcelAdminTable(parcels) {
     const sensorsHtml = parcelSensors.length
       ? parcelSensors.map(s => `
           <div class="admin-item-row">
-            <a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial}</a>
+            <a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial}${s.model ? ` — ${s.model}` : ''}</a>
             <button class="icon-btn remove-sensor-admin" data-sensor-id="${s.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
           </div>`).join('')
       : '<span class="tag-none">—</span>'
@@ -2202,16 +2293,19 @@ function createParcelAdminTable(parcels) {
         }).join('')
       : '<span class="tag-none">—</span>'
 
-    const parcelMembers = members.filter(m => m.parcelIds.includes(parcel.id))
-    const membreHtml = parcelMembers.length
-      ? parcelMembers.map(m => `
-          <div class="admin-item-row">
-            <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
-            <button class="icon-btn remove-member-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
-          </div>`).join('')
-      : '<span class="tag-none">—</span>'
+    const membreHtml = isAdherent
+      ? buildMembresHtmlAdherent(parcel)
+      : (() => {
+          const parcelMembers = members.filter(m => m.parcelIds.includes(parcel.id))
+          return parcelMembers.length
+            ? parcelMembers.map(m => `
+                <div class="admin-item-row">
+                  <a href="membres.html" class="admin-link">${m.prenom} ${m.nom}</a>
+                  <button class="icon-btn remove-member-admin" data-member-id="${m.id}" data-parcel-id="${parcel.id}" title="Retirer"><i class="bi bi-x-lg"></i></button>
+                </div>`).join('')
+            : '<span class="tag-none">—</span>'
+        })()
 
-    const parcelOrg = orgs.find(o => o.id === parcel.orgId)
     const orgSelectHtml = `<select class="inline-edit" data-field="orgId" data-id="${parcel.id}" data-type="number">
       ${orgs.map(o => `<option value="${o.id}"${o.id === parcel.orgId ? ' selected' : ''}>${o.name}</option>`).join('')}
     </select>`
@@ -2221,20 +2315,25 @@ function createParcelAdminTable(parcels) {
       <td>
         <a href="parcelle-detail.html?id=${parcel.id}" class="admin-link admin-link--name">${getPlotDisplayName(parcel)}</a>
         ${cityName ? `<div class="admin-city-name">${cityName}</div>` : ''}
+        ${parcel.area ? `<div class="admin-city-name" style="color:var(--txt3)">${parcel.area} ha</div>` : ''}
       </td>
-      <td>${orgSelectHtml}</td>
+      ${!isAdherent ? `<td>${orgSelectHtml}</td>` : ''}
       <td class="col-minimap">${(!parcel.latlngs && parcel.id % 14 === 0)
         ? `<div class="point-parcel-cell"><i class="bi bi-geo-alt-fill"></i><span>Point GPS</span></div>`
         : `<div class="admin-minimap" data-parcel-id="${parcel.id}" data-latlngs="${encodeURIComponent(JSON.stringify(parcel.latlngs || []))}" data-lat="${parcel.lat}" data-lng="${parcel.lng}"></div>`
       }</td>
-      <td class="num">${parcel.area}</td>
       <td>
         <select class="inline-edit" data-field="crop" data-id="${parcel.id}">
           <option value=""${!parcel.crop ? ' selected' : ''}>—</option>
           ${crops.map(c => `<option value="${c}"${c === parcel.crop ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </td>
-      <td style="text-align:center">${envIcon(parcel.env)}</td>
+      <td>
+        <select class="inline-edit" data-field="env" data-id="${parcel.id}">
+          <option value="plein champ"${parcel.env === 'plein champ' ? ' selected' : ''}>Plein champ</option>
+          <option value="serre"${parcel.env === 'serre' ? ' selected' : ''}>Serre</option>
+        </select>
+      </td>
       <td>
         <select class="inline-edit" data-field="texture" data-id="${parcel.id}">
           ${textures.map(t => `<option value="${t}"${t === parcel.texture ? ' selected' : ''}>${t}</option>`).join('')}

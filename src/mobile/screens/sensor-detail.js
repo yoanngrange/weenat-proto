@@ -240,11 +240,15 @@ function donneesView(sensor, period = '7d', step = '1h') {
   const metrics = MODEL_METRICS_MAP[sensor.model] || []
   if (!metrics.length) return `<div class="m-empty-state"><i class="bi bi-broadcast"></i><p>Aucune donnée disponible</p></div>`
 
+  // sensor-detail uses 'temp','tseche','thumide'; chart-fullscreen uses 'temperature','temp_seche','temp_humide'
+  const FS_METRIC_ID = { temp: 'temperature', tseche: 'temp_seche', thumide: 'temp_humide' }
   const cards = metrics.map(m => {
+    const fsId = FS_METRIC_ID[m.id] || m.id
     return `
       <div class="m-chart-card">
         <div class="m-chart-card-hd">
           <span class="m-chart-label" style="color:${m.color}">${m.label}</span>
+          <button class="m-chart-expand-btn" data-metric-id="${fsId}" style="border:none;background:none;color:#007AFF;font-size:11px;padding:2px 4px;cursor:pointer;display:flex;align-items:center;margin-left:auto"><i class="bi bi-fullscreen"></i></button>
         </div>
         ${svgChart(m.id, m.color, m.cumul, period)}
         ${computeCumuls(m.id, period, m.cumulsType)}
@@ -452,6 +456,16 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
       currentStep = e.target.value; renderView()
     })
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
+    // Expand chart → fullscreen chart layer
+    layer.querySelectorAll('.m-chart-expand-btn[data-metric-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
+          sensor,
+          metricId: btn.dataset.metricId,
+          backLabel: sensor.serial,
+        }))
+      })
+    })
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
         const action = row.dataset.action

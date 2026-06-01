@@ -3,7 +3,7 @@ import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs as allOrgs }       from '../../data/orgs.js'
 import { network }               from '../../data/network.js'
 import { pushDetail, popDetail } from '../nav.js'
-import { IRRIG_SEASON, buildGroups } from '../../data/irrigations.js'
+import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { flexLayer, checkIcon, buildSelectionHTML } from './irrigation.js'
 import { applyStoredPlotPatches } from '../../data/store.js'
 
@@ -293,6 +293,10 @@ function msrCardHtml(m, idx) {
     </svg>`
   }
 
+  const sensorIdForLink = m.subjectKey?.startsWith('s-') ? m.subjectKey.slice(2) : null
+  const viewDataBtn = sensorIdForLink
+    ? `<button class="m-wf-view-data" data-sensor-id="${sensorIdForLink}" data-period="${m.period}" data-step="${m.step}" style="display:flex;align-items:center;gap:4px;margin-top:8px;padding:6px 10px;border:none;background:rgba(0,122,255,.08);border-radius:8px;color:#007AFF;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center">Voir les données <i class="bi bi-fullscreen" style="font-size:11px"></i></button>`
+    : ''
   return `
     <div class="m-wf-card">
       <div class="m-wf-card-hd">
@@ -307,6 +311,7 @@ function msrCardHtml(m, idx) {
         ${chartEl}
         <div class="m-tr-tooltip" style="display:none;position:absolute;top:2px;pointer-events:none;background:rgba(28,28,30,.85);color:#fff;border-radius:6px;padding:3px 7px;font-size:11px;font-weight:600;white-space:nowrap">—</div>
       </div>
+      ${viewDataBtn}
     </div>`
 }
 
@@ -360,10 +365,8 @@ function makePlanif7j(plot, plotList) {
   const today = new Date().toISOString().split('T')[0]
   const end7  = new Date(); end7.setDate(end7.getDate() + 7)
   const end7s = end7.toISOString().split('T')[0]
-  const labels = new Set([plot.name])
-  buildGroups(plotList).filter(g => g.ids.includes(plot.id)).forEach(g => labels.add(g.label))
   return IRRIG_SEASON
-    .filter(i => !i.real && i.iso >= today && i.iso <= end7s && labels.has(i.label))
+    .filter(i => !i.real && i.iso >= today && i.iso <= end7s && i.plotId === plot.id)
     .reduce((s, i) => s + i.mm, 0)
 }
 
@@ -374,9 +377,9 @@ function buildBilanHydrique(plots, expanded = false, sensorlessEnabled = (_loadD
     return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucune parcelle</p></div>`
   }
 
-  const groups     = buildGroups(plots)
-  const groupedIds = new Set(groups.flatMap(g => g.ids))
-  const standalones = plots.filter(p => !groupedIds.has(p.id))
+  const groups     = []
+  const groupedIds = new Set()
+  const standalones = plots.slice()
 
   const sortByBilanDesc = (a, b) => makeBilan(b).bilan - makeBilan(a).bilan
 
@@ -712,7 +715,7 @@ function _saveTraitements(list) { localStorage.setItem(TRAIT_KEY, JSON.stringify
 
 function openTraitementSaisie(plots, showToastFn) {
   let selectedIds = new Set()
-  const groups    = buildGroups(plots)
+  const groups    = []
   const today     = new Date().toISOString().split('T')[0]
 
   function selHTML() { return buildSelectionHTML(groups, plots, selectedIds) }
@@ -1422,7 +1425,10 @@ export function initDashboardScreen(screenEl, role) {
     content.querySelectorAll('.m-trait-card').forEach(card => {
       card.addEventListener('click', () => {
         const plot = allPlots.find(p => p.id === +card.dataset.plotId)
-        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Tableau de bord'))
+        if (plot) {
+          const linked = allSensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
+          import('./parcel-detail.js').then(m => m.initParcelDetail(plot, linked, 'widgets', 'Tableau de bord'))
+        }
       })
     })
 
@@ -1435,7 +1441,10 @@ export function initDashboardScreen(screenEl, role) {
     content.querySelectorAll('[data-widget="cultures"] [data-plot-id]').forEach(row => {
       row.addEventListener('click', () => {
         const plot = allPlots.find(p => p.id === +row.dataset.plotId)
-        if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'params', 'Tableau de bord'))
+        if (plot) {
+          const linked = allSensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
+          import('./parcel-detail.js').then(m => m.initParcelDetail(plot, linked, 'params', 'Tableau de bord'))
+        }
       })
     })
 
@@ -1444,7 +1453,10 @@ export function initDashboardScreen(screenEl, role) {
       content.querySelectorAll('.m-bh-plot-link').forEach(btn => {
         btn.addEventListener('click', () => {
           const plot = allPlots.find(p => p.id === +btn.dataset.plotId)
-          if (plot) import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Tableau de bord'))
+          if (plot) {
+            const linked = allSensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
+            import('./parcel-detail.js').then(m => m.initParcelDetail(plot, linked, 'widgets', 'Tableau de bord'))
+          }
         })
       })
     }
@@ -1928,6 +1940,13 @@ export function initDashboardScreen(screenEl, role) {
       content.querySelectorAll('.m-wf-del[data-widget="temps_reel"]').forEach(btn => {
         btn.addEventListener('click', () => {
           mesuresList.splice(+btn.dataset.idx, 1); persist(); rebuildMesuresWidget()
+        })
+      })
+      content.querySelectorAll('.m-wf-view-data[data-sensor-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sid = +btn.dataset.sensorId
+          const s = allSensors.find(x => x.id === sid)
+          if (s) import('./sensor-detail.js').then(m => m.initSensorDetail(s, 'donnees', role))
         })
       })
       bindChartTooltips()

@@ -296,6 +296,7 @@ class PlotsPage {
             <th>ID</th>
             <th>Nom</th>
             <th>Culture</th>
+            <th>Environnement</th>
             <th>Organisation</th>
             <th>Actions</th>
           </tr>
@@ -307,7 +308,13 @@ class PlotsPage {
               <tr>
                 <td>${plot.id}</td>
                 <td>${plot.name}</td>
-                <td>${plot.crop}</td>
+                <td>${plot.crop || '—'}</td>
+                <td>
+                  <select class="env-select" data-plot-id="${plot.id}">
+                    <option value="plein champ"${plot.env === 'plein champ' ? ' selected' : ''}>Plein champ</option>
+                    <option value="serre"${plot.env === 'serre' ? ' selected' : ''}>Serre</option>
+                  </select>
+                </td>
                 <td>${org ? org.name : 'N/A'}</td>
                 <td>
                   <button onclick="window.plotsPage.editPlot(${plot.id})">Modifier</button>
@@ -322,6 +329,14 @@ class PlotsPage {
 
     // Add event listeners for admin actions
     document.getElementById('add-plot-btn').addEventListener('click', () => this.addPlot());
+
+    adminTable.querySelectorAll('.env-select').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const plotId = +e.target.dataset.plotId;
+        const plot = plots.find(p => p.id === plotId);
+        if (plot) plot.env = e.target.value;
+      });
+    });
   }
 
   getMetricColor(plot) {

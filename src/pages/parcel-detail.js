@@ -5,7 +5,7 @@ import { orgs } from '../data/orgs.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getParcel, patchParcel } from '../data/store.js'
-import { IRRIG_SEASON, buildGroups } from '../data/irrigations.js'
+import { IRRIG_SEASON } from '../data/irrigations.js'
 import { IRRIG_TYPES, SOIL_TYPES } from '../data/constants.js'
 
 const urlParams = new URLSearchParams(window.location.search)
@@ -362,23 +362,31 @@ const NOTE_CATEGORIES = [
   'Irrigation manuelle', 'Autre',
 ]
 
+function getJournalAuthors() {
+  const isAdherentParcel = parcelBase.orgId === 1 // Ferme du Bocage
+  const reseauMembers = members.filter(m => m.source === 'réseau')
+  const adherentMembers = isAdherentParcel
+    ? members.filter(m => m.source === 'adherent' && m.orgIds.includes(1))
+    : []
+  return [...adherentMembers, ...reseauMembers]
+}
+
 function autoEvents() {
   const p = parcelBase
   const evts = []
   const addEvt = (date, texte, auteur = 'Système') => evts.push({ id: 'auto-' + date + texte.slice(0, 8), type: 'modification', date, texte, auteur })
-  // Creation
-  addEvt('2024-01-01', 'Création de la parcelle', 'Jean Dupont')
-  // Culture
-  if (p.crop) addEvt('2024-03-15', `Culture définie : ${p.crop}`, 'Jean Dupont')
-  // Texture
-  if (p.texture) addEvt('2024-03-15', `Texture de sol définie : ${p.texture}`, 'Jean Dupont')
-  // Irrigation type
-  if (p.irrigation) addEvt('2024-04-01', `Type d'irrigation : ${p.irrigation}`, 'Jean Dupont')
-  // Linked sensors
+
+  const isAdherentParcel = p.orgId === 1
+  const mainAuthor = isAdherentParcel ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
+  const secondAuthor = isAdherentParcel ? 'Alexandre Bernard' : 'Sophie Dubois'
+
+  addEvt('2024-01-01', 'Création de la parcelle', mainAuthor)
+  if (p.crop) addEvt('2024-03-15', `Culture définie : ${p.crop}`, mainAuthor)
+  if (p.texture) addEvt('2024-03-15', `Texture de sol définie : ${p.texture}`, mainAuthor)
+  if (p.irrigation) addEvt('2024-04-01', `Type d'irrigation : ${p.irrigation}`, mainAuthor)
   const linked = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-  linked.forEach(s => addEvt('2024-06-10', `Liaison capteur : ${MODEL_NAMES[s.model] || s.model} · ${s.serial}`, 'Sophie Martin'))
-  // Season start
-  addEvt('2026-03-01', 'Début de cycle cultural 2026', 'Jean Dupont')
+  linked.forEach(s => addEvt('2024-06-10', `Liaison capteur : ${MODEL_NAMES[s.model] || s.model} · ${s.serial}`, secondAuthor))
+  addEvt('2026-03-01', 'Début de cycle cultural 2026', mainAuthor)
   return evts
 }
 
@@ -387,21 +395,24 @@ function getJournal() {
     const raw = localStorage.getItem(JOURNAL_KEY)
     if (raw) return JSON.parse(raw)
   } catch (_) {}
+  const isAdherentParcel = parcelBase.orgId === 1
+  const author1 = isAdherentParcel ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
+  const author2 = isAdherentParcel ? 'Marie Martin' : 'Sophie Dubois'
   const demo = [
     {
       id: 1746921600000, type: 'note', category: 'Observation générale',
-      date: '2026-05-11', auteur: 'Jean Dupont',
+      date: '2026-05-11', auteur: author1,
       texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',
     },
     {
       id: 1747353600000, type: 'traitement',
-      date: '2026-05-16', auteur: 'Sophie Martin',
+      date: '2026-05-16', auteur: author2,
       texte: 'Application conforme aux conditions météo. Vent < 2 m/s.',
       produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons',
     },
     {
       id: 1747785600000, type: 'note', category: 'Stade phénologique',
-      date: '2026-05-21', auteur: 'Jean Dupont',
+      date: '2026-05-21', auteur: author1,
       texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.',
     },
   ]
@@ -457,6 +468,7 @@ function renderJournalTab() {
               <span class="journal-type-badge journal-type-badge--${c.badgeCls}">
                 ${c.label}
               </span>
+              ${e.auteur ? `<span class="jrn-entry-auteur">${e.auteur}</span>` : ''}
               ${!isAuto ? `<button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>` : ''}
             </div>
             ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
@@ -581,7 +593,8 @@ function openJournalForm(type) {
   modal.querySelector('#jrn-f-save').addEventListener('click', async () => {
     const date  = modal.querySelector('#jrn-f-date').value || TODAY_STR
     const texte = modal.querySelector('#jrn-f-texte').value.trim()
-    const entry = { id: Date.now(), type, date, texte, auteur: 'Jean Dupont' }
+    const defaultAuteur = parcelBase.orgId === 1 ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
+    const entry = { id: Date.now(), type, date, texte, auteur: defaultAuteur }
     if (isTraitement) {
       entry.produit = modal.querySelector('#jrn-f-produit').value.trim()
       entry.dose    = modal.querySelector('#jrn-f-dose').value.trim()
@@ -741,7 +754,7 @@ function renderChartsContent(container, linkedSensorIds) {
         allCards.push({ key: `wind-${s.id}`, type: 'wind', sensor: s, source, emissionMins })
         return
       }
-      allCards.push({ key: `s${s.id}-${m.id}`, type: 'metric', metric: m, source, emissionMins })
+      allCards.push({ key: `s${s.id}-${m.id}`, type: 'metric', metric: m, source, emissionMins, sensorId: s.id })
     })
   })
 
@@ -768,7 +781,7 @@ function renderChartsContent(container, linkedSensorIds) {
   // Render cards
   allCards.forEach(card => {
     if (card.type === 'metric') {
-      appendChartCard(container, card.metric, card.source, card.emissionMins, card.key, card.unavailable)
+      appendChartCard(container, card.metric, card.source, card.emissionMins, card.key, card.unavailable, card.sensorId)
     } else if (card.type === 'wind') {
       renderWindCompositeChart(container, card.source, card.emissionMins, card.key)
     } else if (card.type === 'tensio') {
@@ -920,7 +933,7 @@ function appendTensioCard(container, metricId, tensioSensors, source = null, emi
   container.appendChild(card)
 }
 
-function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false) {
+function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false, sensorId = null) {
   const base = m.base()
   const card = document.createElement('div')
   card.className = 'chart-card'
@@ -939,6 +952,12 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
   const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
 
+  let expandHtml = ''
+  if (sensorId) {
+    const stepVal = document.getElementById('time-step')?.value || '1h'
+    expandHtml = `<a class="chart-card-expand" href="capteur-graphique.html?sensorId=${sensorId}&metricId=${m.id}&parcelId=${parcelId}&period=${currentPeriod}&step=${stepVal}" title="Graphique plein écran"><i class="bi bi-fullscreen"></i></a>`
+  }
+
   const chartContent = unavailable
     ? `<div class="chart-unavailable">Données indisponibles pour ce pas de temps</div>`
     : `<svg class="chart-svg" width="100%" height="180" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>`
@@ -947,7 +966,7 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
     <div class="chart-card-header">
       <span class="chart-card-name" style="color:${m.color}">${m.name}</span>
       <span class="chart-card-unit">${m.unit}</span>
-      ${sourceHtml}${emHtml}
+      ${sourceHtml}${emHtml}${expandHtml}
     </div>
     ${chartContent}
     ${cumulHtml}
@@ -2085,7 +2104,7 @@ function renderLinkedSensors() {
     html += others.map(s => `
       <div class="sensor-linked-row">
         <div class="sensor-linked-info">
-          <span class="sensor-linked-name">${MODEL_NAMES[s.model] || s.model}</span>
+          <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
           <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
           ${sensorMetricBadges(s.model)}
         </div>
@@ -2112,7 +2131,7 @@ function renderLinkedSensors() {
         html += sensors.map(s => `
           <div class="sensor-linked-row" style="padding-left:12px">
             <div class="sensor-linked-info">
-              <span class="sensor-linked-name">${MODEL_NAMES[s.model] || s.model}</span>
+              <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
               <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
             </div>
             <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
@@ -2549,12 +2568,14 @@ function renderActions() {
 // ─── Mini map (Géolocalisation) ───────────────────────────────────────────────
 
 function initMiniMap() {
+  if (_miniMapInstance) { _miniMapInstance.invalidateSize(); return }
   const org = orgs.find(o => o.id === parcelBase.orgId)
   if (!org?.lat) return
 
   const latlngs = parcelState.latlngs || parcelBase.latlngs
 
   const map = L.map('parcel-mini-map', { zoomControl: false, attributionControl: false })
+  _miniMapInstance = map
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Esri'
@@ -2589,7 +2610,7 @@ function initPanelToggle() {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-let _miniMapInitialized = false
+let _miniMapInstance = null
 
 function initTabs() {
   const btns = document.querySelectorAll('.detail-tab-btn')
@@ -2741,14 +2762,7 @@ function initDashGrid() {
 }
 
 function getParcelIrrigations() {
-  const p = plots.find(pl => pl.id === parcelId)
-  if (!p) return []
-  const groups = buildGroups(plots.filter(pl => pl.orgId === p.orgId))
-  const labels = new Set([p.name])
-  groups.filter(g => g.ids.includes(p.id)).forEach(g => labels.add(g.label))
-  const ck = [p.crop, p.irrigation].filter(Boolean).join(' · ')
-  if (ck) labels.add(ck)
-  return IRRIG_SEASON.filter(i => labels.has(i.label))
+  return IRRIG_SEASON.filter(i => i.plotId === parcelId)
 }
 
 // ── Chart & gauge helpers ──────────────────────────────────────────────────────
@@ -3234,6 +3248,13 @@ function renderWSensor(type) {
           <span class="w-sensor-lbl">${r.label}</span>
         </div>`).join('')}</div>
       <div class="w-sensor-src">${MODEL_NAMES[sensor.model]||sensor.model} · ${sensor.serial}</div>`
+    // Update footer link to point to fullscreen chart page
+    const ftLink = el.closest('.dash-block')?.querySelector('.dash-block-ft-link')
+    if (ftLink) {
+      const stepVal = document.getElementById('time-step')?.value || '1h'
+      ftLink.href = `capteur-graphique.html?sensorId=${sensor.id}&parcelId=${parcelId}&period=${currentPeriod}&step=${stepVal}`
+      ftLink.removeAttribute('data-tab')
+    }
   }
 }
 
@@ -3314,13 +3335,7 @@ function renderWBilan(el) {
 }
 
 function renderWIrrigations(el) {
-  const groups = buildGroups(plots.filter(p => p.orgId === parcelBase.orgId))
-  const labels = new Set([parcelState.name || parcelBase.name])
-  groups.filter(g => g.ids.includes(parcelBase.id)).forEach(g => labels.add(g.label))
-  const ck = [parcelBase.crop || parcelState.crop, parcelBase.irrigation || parcelState.irrigation]
-    .filter(Boolean).join(' · ')
-  if (ck) labels.add(ck)
-  const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
+  const irrigs  = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id)
   const TODAY_M = new Date().toISOString().split('T')[0]
   const real    = irrigs.filter(i => i.real)
   const plan    = irrigs.filter(i => !i.real)

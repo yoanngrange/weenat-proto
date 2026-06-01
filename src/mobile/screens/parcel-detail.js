@@ -2,7 +2,7 @@ import { pushDetail, popDetail } from '../nav.js'
 import { showToast, showSheet } from '../ui.js'
 import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
-import { IRRIG_SEASON, buildGroups } from '../../data/irrigations.js'
+import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { plots as allPlots }    from '../../data/plots.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
@@ -349,12 +349,16 @@ function computeCumuls(metricId, period, type) {
     </div>`).join('')}</div>`
 }
 
-function chartCard(metricId, period) {
+function chartCard(metricId, period, sensorId = null) {
   const m = CHART_METRICS[metricId]; if (!m) return ''
+  const expandBtn = sensorId
+    ? `<button class="m-chart-expand-btn" data-sensor-id="${sensorId}" data-metric-id="${metricId}" style="border:none;background:none;color:#007AFF;font-size:11px;padding:2px 4px;cursor:pointer;display:flex;align-items:center;gap:3px;margin-left:auto;font-family:inherit"><i class="bi bi-fullscreen"></i> Voir les données</button>`
+    : ''
   return `
     <div class="m-chart-card">
       <div class="m-chart-card-hd">
         <span class="m-chart-label" style="color:${m.color}">${m.label}</span>
+        ${expandBtn}
       </div>
       ${svgChart(metricId, m.color, m.cumul, period)}
       ${computeCumuls(metricId, period, m.cumulsType)}
@@ -391,12 +395,7 @@ function bindChartTooltip(wrap) {
 
 // ─── Views ────────────────────────────────────────────────────────────────────
 function irrigationWidget(parcel) {
-  const groups = buildGroups(allPlots.filter(p => p.orgId === parcel.orgId))
-  const labels = new Set([parcel.name])
-  groups.filter(g => g.ids.includes(parcel.id)).forEach(g => labels.add(g.label))
-  const ck = [parcel.crop, parcel.irrigation].filter(Boolean).join(' · ')
-  if (ck) labels.add(ck)
-  const irrigs  = IRRIG_SEASON.filter(i => labels.has(i.label))
+  const irrigs  = IRRIG_SEASON.filter(i => i.plotId === parcel.id)
   const TODAY_M = new Date().toISOString().split('T')[0]
   const real    = irrigs.filter(i => i.real)
   const plan    = irrigs.filter(i => !i.real)
@@ -677,7 +676,10 @@ function mWidgetSensorCards(sensors, wid = '') {
           </div>`
         }).join('')}
       </div>
-      <div class="m-widget-footer">${sensor.serial}</div>`
+      <div class="m-widget-footer" style="display:flex;align-items:center;justify-content:space-between">
+        <span>${sensor.serial}</span>
+        <button class="m-wsensor-voir-donnees" data-sensor-id="${sensor.id}" data-metric-id="${primaryMetricId}" style="border:none;background:none;color:#007AFF;font-size:12px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;gap:3px">Voir les données <i class="bi bi-arrow-right-short"></i></button>
+      </div>`
 
     return mWidgetCard(name, icon, color, body, wid)
   }).join('')
@@ -713,9 +715,13 @@ function exportCsvParcel(parcel, linkedSensorIds, period) {
 
 function donneesView(linkedSensorIds, period = '7d', step = '1h') {
   const sensorMetrics = new Set()
+  const metricToSensorId = {}
   linkedSensorIds.forEach(id => {
     const s = allSensors.find(x => x.id === id)
-    if (s) (SENSOR_MODEL_METRICS[s.model] || []).forEach(m => sensorMetrics.add(m))
+    if (s) (SENSOR_MODEL_METRICS[s.model] || []).forEach(m => {
+      sensorMetrics.add(m)
+      if (!metricToSensorId[m]) metricToSensorId[m] = id
+    })
   })
   const unique = [...new Set(['etp', 'rayonnement', 'temp_rosee', ...sensorMetrics])]
 
@@ -747,7 +753,7 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h') {
       </div>` : ''}
     </div>
     <div class="m-detail-section">
-      ${unique.map(id => chartCard(id, period)).join('')}
+      ${unique.map(id => chartCard(id, period, metricToSensorId[id] ?? null)).join('')}
     </div>`
 }
 
@@ -970,6 +976,34 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     layer.querySelector('.m-export-btn')?.addEventListener('click', () => exportCsvParcel(parcel, linkedSensorIds, currentPeriod))
     // Chart tooltip on hover/touch
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
+    // Sensor widget → "Voir les données"
+    layer.querySelectorAll('.m-wsensor-voir-donnees[data-sensor-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = +btn.dataset.sensorId
+        const s = allSensors.find(x => x.id === sid)
+        if (!s) return
+        import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
+          sensor: s,
+          linkedSensorIds,
+          metricId: btn.dataset.metricId || null,
+          backLabel: parcel.name,
+        }))
+      })
+    })
+    // Expand chart → open fullscreen chart
+    layer.querySelectorAll('.m-chart-expand-btn[data-sensor-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sid = +btn.dataset.sensorId
+        const s = allSensors.find(x => x.id === sid)
+        if (!s) return
+        import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
+          sensor: s,
+          linkedSensorIds,
+          metricId: btn.dataset.metricId || null,
+          backLabel: parcel.name,
+        }))
+      })
+    })
     // Param rows
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {

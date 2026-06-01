@@ -178,6 +178,7 @@ function renderBillingPage() {
               <th>N° facture</th>
               <th>Date d'émission</th>
               <th style="text-align:right">Montant HT</th>
+              <th>Détail</th>
               <th>Date de règlement</th>
               <th>Statut</th>
               <th>Actions</th>
@@ -189,6 +190,7 @@ function renderBillingPage() {
                 <td class="billing-invoice-num">${inv.numero}</td>
                 <td>${formatDate(inv.dateEmission)}</td>
                 <td class="billing-amount">${inv.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</td>
+                <td><button class="billing-detail-csv-btn" data-id="${inv.numero}" style="border:none;background:none;color:var(--pri);cursor:pointer;font-size:13px;padding:2px 4px;font-family:inherit;white-space:nowrap">Fichier &darr;</button></td>
                 <td>${inv.dateReglement ? formatDate(inv.dateReglement) : '<span style="color:var(--txt3)">—</span>'}</td>
                 <td>${invoiceStatusBadge(inv.statut)}</td>
                 <td class="billing-actions-cell">
@@ -267,6 +269,19 @@ function bindEvents() {
 
   document.querySelectorAll('.billing-pdf-btn').forEach(btn => {
     btn.addEventListener('click', () => showToast(`PDF facture ${btn.dataset.id} téléchargé.`))
+  })
+  document.querySelectorAll('.billing-detail-csv-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id
+      const csv = 'Adhérent;Licences;Options;Montant HT\n'
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+      const a = Object.assign(document.createElement('a'), {
+        href: URL.createObjectURL(blob),
+        download: `detail-facture-${id}.csv`,
+      })
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(a.href), 100)
+    })
   })
   document.querySelectorAll('.billing-detail-btn').forEach(btn => {
     btn.addEventListener('click', () => showToast(`Détail facture ${btn.dataset.id}.`))

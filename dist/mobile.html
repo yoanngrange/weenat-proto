@@ -2182,17 +2182,42 @@
     .img-lightbox { position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center }
     .img-lightbox-img { max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px }
     .img-lightbox-close { position:absolute;top:16px;right:20px;background:none;border:none;color:#fff;font-size:36px;cursor:pointer;line-height:1;padding:4px;opacity:.8 }
+
+    /* ── Chart fullscreen layer ── */
+    .m-fs-layer { overflow:hidden; display:flex; flex-direction:column; background:#f2f2f7; }
+    .m-fs-topbar { height:50px; display:flex; align-items:center; padding:0 12px; gap:8px; background:#fff; border-bottom:1px solid rgba(0,0,0,.1); flex-shrink:0; }
+    .m-fs-back { display:flex;align-items:center;gap:4px;background:none;border:none;color:#007AFF;font-size:14px;cursor:pointer;padding:4px;flex-shrink:0;font-family:inherit; }
+    .m-fs-metric-center { flex:1; display:flex; align-items:center; justify-content:center; gap:4px; overflow:hidden; }
+    .m-fs-metric-sel { border:none; background:transparent; font-size:14px; font-weight:600; color:#1c1c1e; font-family:inherit; max-width:170px; text-overflow:ellipsis; }
+    .m-fs-metric-unit { font-size:12px; color:#8e8e93; flex-shrink:0; }
+    .m-fs-cfg-btn { display:flex;align-items:center;gap:4px;background:none;border:none;color:#007AFF;font-size:13px;cursor:pointer;padding:4px;flex-shrink:0;font-family:inherit; }
+    .m-fs-period-bar { flex-shrink:0; background:#fff; border-bottom:1px solid rgba(0,0,0,.08); padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
+    .m-fs-presets { display:flex; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; }
+    .m-fs-presets::-webkit-scrollbar { display:none; }
+    .m-fs-preset { flex-shrink:0; padding:4px 10px; border-radius:14px; border:1.5px solid rgba(0,0,0,.15); background:#fff; font-size:12px; font-family:inherit; color:#1c1c1e; cursor:pointer; }
+    .m-fs-preset.active { background:#007AFF; border-color:#007AFF; color:#fff; }
+    .m-fs-period-row2 { display:flex; gap:6px; align-items:center; }
+    .m-fs-step-sel { flex:1; font-size:12px; font-family:inherit; border:1px solid rgba(0,0,0,.15); border-radius:8px; padding:4px 8px; background:#fff; color:#1c1c1e; }
+    .m-fs-custom-row { display:flex; gap:6px; align-items:center; flex:1; }
+    .m-fs-custom-row input[type=date] { flex:1; font-size:11px; padding:4px 6px; border:1px solid rgba(0,0,0,.15); border-radius:6px; font-family:inherit; background:#fff; }
+    .m-fs-chart-wrap { flex:1; position:relative; overflow:hidden; background:#f2f2f7; }
+    .m-fs-chart-svg { position:absolute; inset:0; width:100%; height:100%; }
+    .m-fs-tooltip { position:absolute; display:none; background:rgba(28,28,30,.88); color:#fff; border-radius:8px; padding:6px 10px; font-size:11px; pointer-events:none; white-space:nowrap; z-index:10; }
+    .m-fs-tip-name { font-size:10px; color:rgba(255,255,255,.65); display:block; margin-bottom:2px; }
+    .m-fs-tip-val { font-size:14px; font-weight:600; }
+    .m-fs-tip-unit { font-size:11px; color:rgba(255,255,255,.75); margin-left:2px; }
+    .m-fs-tip-ts { display:block; font-size:10px; color:rgba(255,255,255,.5); margin-top:2px; }
   </style>
-  <script type="module" crossorigin src="/weenat-proto/assets/mobile-D0Qm-PSj.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/mobile-DQSzYSAC.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-BFmvZ9cD.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-InOgbptE.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-Bk1sI8WC.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-wI07SRZE.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-Cx4wNzLL.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/network-YzWdS0n_.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-WiYYdaCC.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-C22Dtsoo.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/constants-C2D4LmLD.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-C_ssoUx1.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-CuDabgg3.js">
 </head>
 <body>
 

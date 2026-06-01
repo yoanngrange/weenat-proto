@@ -202,8 +202,8 @@ function renderForm() {
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="font-weight:600;font-size:14px">${net.name}</div>
-                  <div style="font-size:12px;color:var(--txt2);margin-top:3px">${net.distance} km · ${net.adherents} adhérents · ${net.capteurs} capteurs · ${net.parcelles} parcelles</div>
-                  <div style="font-size:12px;color:var(--txt3);margin-top:3px">${net.ville} · ${net.telephone}</div>
+                  <div style="font-size:12px;color:var(--txt2);margin-top:3px">${net.distance} km <br> ${net.capteurs} capteurs <br> ${net.parcelles} parcelles <br> ${net.adherents} adhérents </div>
+                  <div style="font-size:12px;color:var(--txt3);margin-top:3px">${net.ville} <br> ${net.telephone}</div>
                 </div>
               </div>
               <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="align-self:flex-start;font-size:12px">Demander à rejoindre</button>

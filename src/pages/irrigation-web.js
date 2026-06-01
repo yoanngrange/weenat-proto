@@ -1,4 +1,4 @@
-import { IRRIG_SEASON, RAIN_DATA, saveIrrig, buildGroups } from '../data/irrigations.js'
+import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../data/irrigations.js'
 import { patchParcel, applyStoredPlotPatches } from '../data/store.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
 import { IRRIG_TYPES } from '../data/constants.js'
@@ -37,55 +37,8 @@ function plotInfoHtml(p) {
   return `<span class="iw-plot-info">${parts.join(' · ')}</span>`
 }
 
-function decomposeSaveLabels(selectedIds, groups) {
-  const labels    = []
-  const remaining = new Set(selectedIds)
-  for (const g of groups) {
-    const sel = g.ids.filter(id => selectedIds.has(id))
-    if (!sel.length) continue
-    if (sel.length === g.ids.length) {
-      labels.push(g.label)
-      g.ids.forEach(id => remaining.delete(id))
-    } else {
-      sel.forEach(id => {
-        const p = plots.find(p => p.id === id)
-        if (p) { labels.push(p.name); remaining.delete(id) }
-      })
-    }
-  }
-  for (const id of remaining) {
-    const p = plots.find(p => p.id === id)
-    if (p) labels.push(p.name)
-  }
-  return labels
-}
-
-function makeSubjectLabel(selectedIds, groups) {
-  const n = selectedIds.size
-  if (n === 1) {
-    const p = plots.find(p => p.id === [...selectedIds][0])
-    return { text: p?.name ?? 'Parcelle', count: null }
-  }
-  const matchedGroup = groups.find(g => g.ids.length === n && g.ids.every(id => selectedIds.has(id)))
-  if (matchedGroup) return { text: matchedGroup.label, count: matchedGroup.ids.length }
-  return { text: `${n} parcelles`, count: null }
-}
-
-function buildParcelSections(selectedIds, groups) {
-  const remaining = new Set(selectedIds)
-  const sections  = []
-  for (const g of groups) {
-    if (g.ids.length >= 2 && g.ids.every(id => selectedIds.has(id))) {
-      const names = g.ids.map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
-      sections.push({ title: `Groupe "${g.label}"`, names })
-      g.ids.forEach(id => remaining.delete(id))
-    }
-  }
-  if (remaining.size > 0) {
-    const names = [...remaining].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
-    sections.push({ title: sections.length > 0 ? 'Autres parcelles' : null, names })
-  }
-  return sections
+function sortedPlots() {
+  return [...plots].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
 }
 
 // ─── Timeline SVG ─────────────────────────────────────────────────────────────
@@ -176,7 +129,7 @@ function renderCumuls(irrig) {
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
-function openWebConfirmation({ title, params, labels, addedCount, filterLabel }) {
+function openWebConfirmation({ title, params, plotNames, addedCount, filterPlotId }) {
   const { ov, close } = createOverlay()
 
   const paramsHtml = params.map(p => `
@@ -186,8 +139,8 @@ function openWebConfirmation({ title, params, labels, addedCount, filterLabel })
     </div>`).join('')
 
   const MAX_P = 5
-  const shownL  = labels.slice(0, MAX_P)
-  const hiddenL = labels.slice(MAX_P)
+  const shownL  = plotNames.slice(0, MAX_P)
+  const hiddenL = plotNames.slice(MAX_P)
   const labelsHtml = shownL.map(l => `<span class="iw-apercu-plot-tag">${l}</span>`).join('') +
     (hiddenL.length ? `<span class="iw-apercu-plot-more">+ ${hiddenL.length} autre${hiddenL.length > 1 ? 's' : ''}</span>` : '')
 
@@ -229,13 +182,7 @@ function openWebConfirmation({ title, params, labels, addedCount, filterLabel })
   })
   ov.querySelector('#iw-conf-voir').addEventListener('click', () => {
     close()
-    const ps = filterLabel ? (() => {
-      const g = buildGroups(plots).find(g => g.label === filterLabel)
-      if (g) return { ids: g.ids, label: g.label }
-      const p = plots.find(p => p.name === filterLabel)
-      return p ? { ids: [p.id], label: p.name } : null
-    })() : null
-    openVoirIrrigations(ps)
+    openVoirIrrigations(filterPlotId ?? null)
   })
   ov.querySelector('#iw-conf-close').addEventListener('click', close)
 }
@@ -312,44 +259,17 @@ function createOverlay() {
 
 // ─── Selection panel helpers ──────────────────────────────────────────────────
 
-function buildSelectionListHTML(groups, selectedIds) {
-  const standalones = plots.filter(p => !groups.some(g => g.ids.includes(p.id)))
-
-  const groupSections = groups.map(g => {
-    const all  = g.ids.every(id => selectedIds.has(id))
-    const some = g.ids.some(id  => selectedIds.has(id))
-    const children = g.ids
-      .map(id => plots.find(p => p.id === id)).filter(Boolean)
-      .map(p => {
-        const sel = selectedIds.has(p.id)
-        return `<div class="iw-plot-row iw-plot-row--child${sel ? ' iw-plot-row--sel' : ''}" data-pid="${p.id}">
-          ${checkIcon(sel, false)}
-          <div class="iw-plot-name">${p.name}</div>
-        </div>`
-      }).join('')
-    return `<div class="iw-group-card${all ? ' iw-group-card--sel' : ''}" data-gids="${g.ids.join(',')}">
-      ${checkIcon(all, some)}
-      <div class="iw-group-info">
-        <div class="iw-group-name">${g.label}</div>
-        <div class="iw-group-meta">${g.ids.length} parcelles</div>
-      </div>
-    </div>${children}`
-  }).join('')
-
-  const standaloneRows = standalones.map(p => {
+function buildFlatPlotListHTML(selectedIds) {
+  return sortedPlots().map(p => {
     const sel = selectedIds.has(p.id)
     return `<div class="iw-plot-row${sel ? ' iw-plot-row--sel' : ''}" data-pid="${p.id}">
       ${checkIcon(sel, false)}
       <div><div class="iw-plot-name">${p.name}</div>${plotInfoHtml(p)}</div>
     </div>`
   }).join('')
-
-  return groupSections + (standalones.length
-    ? `${groups.length ? `<div class="iw-section-lbl" style="margin-top:10px">Autres parcelles</div>` : ''}${standaloneRows}`
-    : '')
 }
 
-function selectionPanelHTML(groups, selectedIds, preselect) {
+function selectionPanelHTML(selectedIds, preselect) {
   if (preselect) {
     const preselectPlots = plots.filter(p => preselect.ids.includes(p.id))
     return `<div class="iw-panel iw-panel--fixed">
@@ -361,52 +281,49 @@ function selectionPanelHTML(groups, selectedIds, preselect) {
     </div>`
   }
   return `<div class="iw-panel iw-panel--scroll">
-    <div id="iw-sel-list">${buildSelectionListHTML(groups, selectedIds)}</div>
+    <div class="iw-sel-toolbar">
+      <button class="iw-sel-all-btn" id="iw-sel-all" type="button">Tout sélectionner</button>
+    </div>
+    <div id="iw-sel-list">${buildFlatPlotListHTML(selectedIds)}</div>
   </div>`
 }
 
-function selSummaryHTML(selectedIds, groups) {
+function selSummaryHTML(selectedIds) {
   const n = selectedIds.size
   if (n === 0) return `<div class="iw-sel-empty">Aucune parcelle sélectionnée</div>`
-  const subj = makeSubjectLabel(selectedIds, groups)
-  const secs = buildParcelSections(selectedIds, groups)
+  const names = [...selectedIds].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
   return `<div class="iw-sel-summary">
-    <div class="iw-sel-title">${subj.text}</div>
-    ${secs.map(s => `
-      ${s.title ? `<div class="iw-sel-sec-hd">${s.title}</div>` : ''}
-      ${s.names.map(n => `<div class="iw-sel-name">· ${n}</div>`).join('')}
-    `).join('')}
+    <div class="iw-sel-title">${n === 1 ? names[0] : `${n} parcelles`}</div>
+    ${names.map(n => `<div class="iw-sel-name">· ${n}</div>`).join('')}
   </div>`
 }
 
-function bindSelectionCards(ov, groups, selectedIds, onUpdate) {
-  ov.querySelectorAll('.iw-group-card').forEach(el => {
-    el.addEventListener('click', () => {
-      const ids = el.dataset.gids.split(',').map(Number)
-      const all = ids.every(id => selectedIds.has(id))
-      ids.forEach(id => all ? selectedIds.delete(id) : selectedIds.add(id))
-      const list = ov.querySelector('#iw-sel-list')
-      if (list) list.innerHTML = buildSelectionListHTML(groups, selectedIds)
-      bindSelectionCards(ov, groups, selectedIds, onUpdate)
-      onUpdate()
-    })
-  })
+function bindSelectionCards(ov, selectedIds, onUpdate) {
   ov.querySelectorAll('.iw-plot-row').forEach(el => {
     el.addEventListener('click', () => {
       const id = +el.dataset.pid
       selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id)
       const list = ov.querySelector('#iw-sel-list')
-      if (list) list.innerHTML = buildSelectionListHTML(groups, selectedIds)
-      bindSelectionCards(ov, groups, selectedIds, onUpdate)
+      if (list) list.innerHTML = buildFlatPlotListHTML(selectedIds)
+      bindSelectionCards(ov, selectedIds, onUpdate)
       onUpdate()
     })
+  })
+  ov.querySelector('#iw-sel-all')?.addEventListener('click', () => {
+    const all = sortedPlots()
+    const anyUnchecked = all.some(p => !selectedIds.has(p.id))
+    all.forEach(p => anyUnchecked ? selectedIds.add(p.id) : selectedIds.delete(p.id))
+    const list = ov.querySelector('#iw-sel-list')
+    if (list) list.innerHTML = buildFlatPlotListHTML(selectedIds)
+    ov.querySelector('#iw-sel-all').textContent = anyUnchecked ? 'Tout désélectionner' : 'Tout sélectionner'
+    bindSelectionCards(ov, selectedIds, onUpdate)
+    onUpdate()
   })
 }
 
 // ─── Saisie d'irrigation ─────────────────────────────────────────────────────
 
 function openSaisie(preselect = null) {
-  const groups = buildGroups(plots)
   const selectedIds = new Set(preselect?.ids ?? [])
   let dateVal = TODAY
   let qtyVal  = 10
@@ -433,9 +350,9 @@ function openSaisie(preselect = null) {
             </div>
             <div class="iw-divider"></div>
             <div class="iw-section-lbl">Sélection</div>
-            <div id="iw-sel-sum">${preselect ? '' : selSummaryHTML(selectedIds, groups)}</div>
+            <div id="iw-sel-sum">${preselect ? '' : selSummaryHTML(selectedIds)}</div>
           </div>
-          ${selectionPanelHTML(groups, selectedIds, preselect)}
+          ${selectionPanelHTML(selectedIds, preselect)}
         </div>
       </div>
       <div class="iw-modal-ft">
@@ -452,32 +369,30 @@ function openSaisie(preselect = null) {
   function updateSave() {
     ov.querySelector('#iw-save').disabled = !preselect && selectedIds.size === 0
     const sum = ov.querySelector('#iw-sel-sum')
-    if (sum) sum.innerHTML = selSummaryHTML(selectedIds, groups)
+    if (sum) sum.innerHTML = selSummaryHTML(selectedIds)
   }
 
-  if (!preselect) bindSelectionCards(ov, groups, selectedIds, updateSave)
+  if (!preselect) bindSelectionCards(ov, selectedIds, updateSave)
 
   ov.querySelector('#iw-save').addEventListener('click', () => {
     const ids = preselect ? new Set(preselect.ids) : selectedIds
     askIrrigTypeIfNeeded(ids, () => {
-      const isFut  = dateVal > TODAY
-      const labels = preselect
-        ? [preselect.label]
-        : decomposeSaveLabels(ids, groups)
-      labels.forEach(label => {
-        IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, label, fromStrategy: false })
+      const isFut = dateVal > TODAY
+      ids.forEach(plotId => {
+        IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, plotId, fromStrategy: false })
       })
+      const plotNames = [...ids].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
       saveIrrig()
       close()
       openWebConfirmation({
-        title: labels.length > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
+        title: ids.size > 1 ? 'Irrigations enregistrées' : 'Irrigation enregistrée',
         params: [
           { label: 'Date',     value: fmtDateFull(dateVal) },
           { label: 'Quantité', value: `${qtyVal} mm` },
         ],
-        labels,
-        addedCount: labels.length,
-        filterLabel: labels.length === 1 ? labels[0] : null,
+        plotNames,
+        addedCount: ids.size,
+        filterPlotId: ids.size === 1 ? [...ids][0] : null,
       })
     })
   })
@@ -486,7 +401,6 @@ function openSaisie(preselect = null) {
 // ─── Saison d'irrigation ─────────────────────────────────────────────────────
 
 function openSaison(preselect = null) {
-  const groups = buildGroups(plots)
   const selectedIds = new Set(preselect?.ids ?? [])
   let debut  = TODAY
   let fin    = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
@@ -540,7 +454,7 @@ function openSaison(preselect = null) {
           </div>
           ${preview}
         </div>
-        ${selectionPanelHTML(groups, selectedIds, preselect)}
+        ${selectionPanelHTML(selectedIds, preselect)}
       </div>`
   }
 
@@ -601,7 +515,7 @@ function openSaison(preselect = null) {
   }
 
   function bindFormEvents() {
-    if (!preselect) bindSelectionCards(ov, groups, selectedIds, updateNextBtn)
+    if (!preselect) bindSelectionCards(ov, selectedIds, updateNextBtn)
 
     const refresh = () => {
       const occs = computeOccs()
@@ -656,15 +570,14 @@ function openSaison(preselect = null) {
     const occs = computeOccs()
     const ids  = preselect ? new Set(preselect.ids) : selectedIds
     askIrrigTypeIfNeeded(ids, () => {
-      const labels = preselect
-        ? [preselect.label]
-        : decomposeSaveLabels(ids, groups)
+      const seasonId = generateSeasonId()
       occs.forEach(d => {
         const iso = d.toISOString().slice(0, 10)
-        labels.forEach(label => {
-          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, label, fromStrategy: true })
+        ids.forEach(plotId => {
+          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId })
         })
       })
+      const plotNames = [...ids].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
       saveIrrig()
       close()
       openWebConfirmation({
@@ -674,11 +587,11 @@ function openSaison(preselect = null) {
           { label: 'Fin',                  value: fmtDateFull(occs[occs.length-1]?.toISOString().slice(0,10) ?? '') },
           { label: 'Quantité',             value: `${qty} mm/irrig.` },
           { label: 'Fréquence',            value: `tous les ${freq} jours` },
-          { label: 'Irrigations générées', value: `${occs.length * labels.length}` },
+          { label: 'Irrigations générées', value: `${occs.length * ids.size}` },
         ],
-        labels,
-        addedCount: occs.length * labels.length,
-        filterLabel: labels.length === 1 ? labels[0] : null,
+        plotNames,
+        addedCount: occs.length * ids.size,
+        filterPlotId: ids.size === 1 ? [...ids][0] : null,
       })
     })
   })
@@ -689,11 +602,8 @@ function openSaison(preselect = null) {
 // ─── Edit irrigation modal ────────────────────────────────────────────────────
 
 function openEditIrrigModal(ir, onDone) {
-  const groups2 = buildGroups(plots)
-  const g       = groups2.find(grp => grp.label === ir.label)
-  let editDate  = ir.iso
-  let editMm    = ir.mm
-  let editScope = 'single'
+  let editDate = ir.iso
+  let editMm   = ir.mm
 
   const { ov, close } = createOverlay()
 
@@ -712,14 +622,6 @@ function openEditIrrigModal(ir, onDone) {
           <label class="iw-label">Quantité (mm)</label>
           <input type="number" class="iw-input" id="iw-edit-qty" value="${ir.mm}" min="1" style="width:80px" />
         </div>
-        ${g && g.ids.length > 1 ? `
-        <div class="iw-scope-box">
-          <div class="iw-scope-lbl">Appliquer à…</div>
-          <div class="iw-scope-btns">
-            <button class="iw-scope-btn iw-scope-btn--on" id="scope-single">Cette occurrence</button>
-            <button class="iw-scope-btn" id="scope-group">Tout le groupe (${g.ids.length})</button>
-          </div>
-        </div>` : ''}
       </div>
       <div class="iw-modal-ft iw-modal-ft--spread">
         <button class="iw-btn iw-btn--danger" id="iw-delete">Supprimer</button>
@@ -735,19 +637,6 @@ function openEditIrrigModal(ir, onDone) {
   ov.querySelector('#iw-edit-date').addEventListener('change', e => { editDate = e.target.value })
   ov.querySelector('#iw-edit-qty').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) editMm = v })
 
-  if (g) {
-    ov.querySelector('#scope-single')?.addEventListener('click', e => {
-      editScope = 'single'
-      ov.querySelectorAll('.iw-scope-btn').forEach(b => b.classList.remove('iw-scope-btn--on'))
-      e.target.classList.add('iw-scope-btn--on')
-    })
-    ov.querySelector('#scope-group')?.addEventListener('click', e => {
-      editScope = 'group'
-      ov.querySelectorAll('.iw-scope-btn').forEach(b => b.classList.remove('iw-scope-btn--on'))
-      e.target.classList.add('iw-scope-btn--on')
-    })
-  }
-
   ov.querySelector('#iw-delete').addEventListener('click', () => {
     const idx = IRRIG_SEASON.indexOf(ir)
     if (idx > -1) IRRIG_SEASON.splice(idx, 1)
@@ -758,26 +647,22 @@ function openEditIrrigModal(ir, onDone) {
     ir.iso  = editDate
     ir.mm   = editMm
     ir.real = editDate <= TODAY
-    if (editScope === 'group' && g) {
-      IRRIG_SEASON.filter(i => i.label === ir.label).forEach(i => { i.mm = editMm })
-    }
     saveIrrig(); close(); onDone()
   })
 }
 
 // ─── Edit strategy modal ──────────────────────────────────────────────────────
 
-function openEditStratModal(label, onDone) {
+function openEditStratModal(plotId, onDone) {
   let showStop   = false
   let showDelete = false
 
   const { ov, close } = createOverlay()
 
-  function resolveStratPreselect(lbl) {
-    const g = buildGroups(plots).find(g => g.label === lbl)
-    if (g) return { ids: g.ids, label: g.label }
-    const p = plots.find(p => p.name === lbl)
-    return p ? { ids: [p.id], label: p.name } : null
+  function getSeasonIds() {
+    return new Set(
+      IRRIG_SEASON.filter(i => i.plotId === plotId && i.fromStrategy && i.seasonId).map(i => i.seasonId)
+    )
   }
 
   function renderBody() {
@@ -794,14 +679,14 @@ function openEditStratModal(label, onDone) {
         <div class="iw-strat-opt-icon" style="background:#FDECEC">✕</div>
         <div>
           <div class="iw-strat-opt-title" style="color:#8B1A1A">Arrêter la saison</div>
-          <div class="iw-strat-opt-sub" style="color:#C05050">Supprime les irrigations futures planifiées</div>
+          <div class="iw-strat-opt-sub" style="color:#C05050">Supprime les irrigations futures de cette parcelle</div>
         </div>
       </div>
       <div class="iw-strat-opt iw-strat-opt--danger" id="strat-delete">
         <div class="iw-strat-opt-icon" style="background:#FDECEC">🗑</div>
         <div>
           <div class="iw-strat-opt-title" style="color:#8B1A1A">Supprimer la saison</div>
-          <div class="iw-strat-opt-sub" style="color:#C05050">Supprime toutes les irrigations de la saison</div>
+          <div class="iw-strat-opt-sub" style="color:#C05050">Supprime toutes les irrigations de cette parcelle</div>
         </div>
       </div>
       ${showStop ? `
@@ -821,19 +706,24 @@ function openEditStratModal(label, onDone) {
         </div>
       </div>` : ''}`
 
+    const p = plots.find(pl => pl.id === plotId)
+    const preselect = p ? { ids: [p.id], label: p.name } : null
+
     body.querySelector('#strat-modify')?.addEventListener('click', () => {
-      close(); openSaison(resolveStratPreselect(label))
+      close(); openSaison(preselect)
     })
     body.querySelector('#strat-stop')?.addEventListener('click', () => { showStop = true; showDelete = false; renderBody() })
     body.querySelector('#strat-delete')?.addEventListener('click', () => { showDelete = true; showStop = false; renderBody() })
     body.querySelector('#stop-cancel')?.addEventListener('click', () => { showStop = false; renderBody() })
     body.querySelector('#stop-confirm')?.addEventListener('click', () => {
-      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.label === label && !i.real)))
+      const seasonIds = getSeasonIds()
+      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId) && !i.real)))
       saveIrrig(); close(); onDone()
     })
     body.querySelector('#del-cancel')?.addEventListener('click', () => { showDelete = false; renderBody() })
     body.querySelector('#del-confirm')?.addEventListener('click', () => {
-      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.label !== label))
+      const seasonIds = getSeasonIds()
+      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId))))
       saveIrrig(); close(); onDone()
     })
   }
@@ -858,7 +748,6 @@ function openEditStratModal(label, onDone) {
 // ─── Export CSV ───────────────────────────────────────────────────────────────
 
 function openExportCSV() {
-  const groups2 = buildGroups(plots)
   const selIds  = new Set(plots.map(p => p.id))
   const sorted  = [...IRRIG_SEASON].sort((a, b) => a.iso < b.iso ? -1 : 1)
   let startDate = sorted[0]?.iso ?? TODAY
@@ -867,7 +756,7 @@ function openExportCSV() {
   const { ov, close } = createOverlay()
 
   function plotsHTML2() {
-    return plots.map(p => {
+    return sortedPlots().map(p => {
       const sel = selIds.has(p.id)
       return `<div class="iw-plot-row${sel ? ' iw-plot-row--sel' : ''}" data-pid="${p.id}">
         ${checkIcon(sel, false)}
@@ -927,7 +816,7 @@ function openExportCSV() {
   bindExportPlots()
 
   ov.querySelector('#iw-do-export').addEventListener('click', () => {
-    const selPlots = plots.filter(p => selIds.has(p.id))
+    const selPlots = sortedPlots().filter(p => selIds.has(p.id))
     if (!selPlots.length) { showWebToast('Sélectionnez au moins une parcelle'); return }
 
     const dates = new Set()
@@ -940,7 +829,7 @@ function openExportCSV() {
     const rows = sortedDates.map(date => {
       const cells = selPlots.map(p => {
         const total = IRRIG_SEASON
-          .filter(ir => ir.iso === date && (ir.label === p.name || groups2.some(g => g.ids.includes(p.id) && g.label === ir.label)))
+          .filter(ir => ir.iso === date && ir.plotId === p.id)
           .reduce((s, ir) => s + ir.mm, 0)
         return total > 0 ? total : ''
       })
@@ -960,46 +849,25 @@ function openExportCSV() {
 
 // ─── Voir les irrigations ─────────────────────────────────────────────────────
 
-function openVoirIrrigations(preselect = null) {
-  const groups = buildGroups(plots)
-  let filter   = preselect
-    ? (preselect.ids.length > 1 ? preselect.label : String(preselect.ids[0]))
-    : 'all'
+function openVoirIrrigations(plotId = null) {
+  let filter = plotId ? String(plotId) : 'all'
 
   const { ov, close } = createOverlay()
 
   function getIrrig() {
-    if (!filter || filter === 'all') return IRRIG_SEASON
-    const g = groups.find(g => g.label === filter)
-    if (g) return IRRIG_SEASON.filter(i => i.label === g.label)
-    const p = plots.find(p => String(p.id) === String(filter))
-    if (p) {
-      const groupLabels = new Set(groups.filter(grp => grp.ids.includes(p.id)).map(grp => grp.label))
-      return IRRIG_SEASON.filter(i => i.label === p.name || groupLabels.has(i.label))
-    }
-    return IRRIG_SEASON
+    if (filter === 'all') return IRRIG_SEASON
+    return IRRIG_SEASON.filter(i => i.plotId === +filter)
   }
 
-  function resolvePreselect(f) {
-    if (!f || f === 'all') return null
-    const g = groups.find(g => g.label === f)
-    if (g) return { ids: g.ids, label: g.label }
-    const p = plots.find(p => String(p.id) === String(f))
+  function resolvePreselect() {
+    if (filter === 'all') return null
+    const p = plots.find(p => String(p.id) === filter)
     return p ? { ids: [p.id], label: p.name } : null
   }
 
-  const standalones2   = plots.filter(p => !groups.some(g => g.ids.includes(p.id)))
-  const hierarchOpts   = groups.map(g => {
-    const childOpts = g.ids.map(id => plots.find(p => p.id === id)).filter(Boolean)
-      .map(p => `<option value="${p.id}"${String(p.id) === String(filter) ? ' selected' : ''}>-${p.name}</option>`).join('')
-    return `<optgroup label="${g.label} (${g.ids.length} parcelles)">
-      <option value="${g.label}"${g.label === filter ? ' selected' : ''}>GROUPE : ${g.label}</option>
-      ${childOpts}
-    </optgroup>`
-  }).join('')
-  const standaloneOpts2 = standalones2.length
-    ? `<optgroup label="Autres parcelles">${standalones2.map(p => `<option value="${p.id}"${String(p.id) === String(filter) ? ' selected' : ''}>${p.name}</option>`).join('')}</optgroup>`
-    : ''
+  const plotOpts = sortedPlots().map(p =>
+    `<option value="${p.id}"${String(p.id) === filter ? ' selected' : ''}>${p.name}</option>`
+  ).join('')
 
   ov.innerHTML = `
     <div class="iw-modal iw-modal--full">
@@ -1009,11 +877,10 @@ function openVoirIrrigations(preselect = null) {
       </div>
       <div class="iw-full-toolbar">
         <div class="iw-filter-wrap">
-          <label class="iw-label" style="margin:0 8px 0 0;white-space:nowrap">Parcelle ou groupe</label>
+          <label class="iw-label" style="margin:0 8px 0 0;white-space:nowrap">Parcelle</label>
           <select class="iw-select" id="iw-filter">
             <option value="all"${filter === 'all' ? ' selected' : ''}>Toutes les parcelles</option>
-            ${hierarchOpts}
-            ${standaloneOpts2}
+            ${plotOpts}
           </select>
         </div>
         <div class="iw-toolbar-actions">
@@ -1034,7 +901,7 @@ function openVoirIrrigations(preselect = null) {
     const hasStrat  = irrig.some(i => i.fromStrategy)
     const stratBtn  = ov.querySelector('#iw-strat-btn')
     stratBtn.style.display = hasStrat && filter !== 'all' ? '' : 'none'
-    stratBtn.onclick = () => openEditStratModal(filter, renderContent)
+    stratBtn.onclick = () => openEditStratModal(+filter, renderContent)
 
     if (!irrig.length) {
       body.innerHTML = `
@@ -1046,8 +913,8 @@ function openVoirIrrigations(preselect = null) {
             <button class="iw-btn iw-btn--sec" id="iw-add-saison"><i class="bi bi-arrow-repeat"></i> Saisir une saison</button>
           </div>
         </div>`
-      body.querySelector('#iw-add-saisie').addEventListener('click', () => { close(); openSaisie(resolvePreselect(filter)) })
-      body.querySelector('#iw-add-saison').addEventListener('click', () => { close(); openSaison(resolvePreselect(filter)) })
+      body.querySelector('#iw-add-saisie').addEventListener('click', () => { close(); openSaisie(resolvePreselect()) })
+      body.querySelector('#iw-add-saison').addEventListener('click', () => { close(); openSaison(resolvePreselect()) })
       return
     }
 
@@ -1058,14 +925,15 @@ function openVoirIrrigations(preselect = null) {
     const past   = [...irrig].filter(i =>  i.real).sort((a, b) => a.iso > b.iso ? -1 : 1)
 
     function item(ir) {
-      const idx = IRRIG_SEASON.indexOf(ir)
-      const col = ir.real ? '#FF8500' : '#FFB705'
+      const idx      = IRRIG_SEASON.indexOf(ir)
+      const col      = ir.real ? '#FF8500' : '#FFB705'
       const [, mm, dd] = ir.iso.split('-')
+      const plotName = plots.find(p => p.id === ir.plotId)?.name ?? '—'
       return `<div class="iw-list-item">
         <div class="iw-list-stripe" style="background:${col}"></div>
         <div class="iw-list-date"><span style="font-size:15px;font-weight:700;color:${col}">${dd}</span><span style="font-size:10px;color:${col}">/${mm}</span></div>
         <div style="flex:1">
-          <div class="iw-list-label">${ir.label}</div>
+          <div class="iw-list-label">${plotName}</div>
           <div class="iw-list-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div>
         </div>
         <div class="iw-list-mm" style="color:${col}">${ir.mm} mm</div>
@@ -1116,15 +984,13 @@ function openVoirIrrigations(preselect = null) {
         if (idx >= 0) { IRRIG_SEASON.splice(idx, 1); saveIrrig(); renderContent() }
       })
     })
-    body.querySelector('#iw-add-saisie')?.addEventListener('click', () => { close(); openSaisie(resolvePreselect(filter)) })
-    body.querySelector('#iw-add-saison')?.addEventListener('click', () => { close(); openSaison(resolvePreselect(filter)) })
-    body.querySelector('#iw-strat-inline')?.addEventListener('click', () => openEditStratModal(filter, renderContent))
+    body.querySelector('#iw-add-saisie')?.addEventListener('click', () => { close(); openSaisie(resolvePreselect()) })
+    body.querySelector('#iw-add-saison')?.addEventListener('click', () => { close(); openSaison(resolvePreselect()) })
+    body.querySelector('#iw-strat-inline')?.addEventListener('click', () => openEditStratModal(+filter, renderContent))
   }
 
   renderContent()
 }
-
-// ─── Expose globally ──────────────────────────────────────────────────────────
 
 // ─── Data-tip tooltip ─────────────────────────────────────────────────────────
 
