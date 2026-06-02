@@ -112,7 +112,6 @@ const menuData = {
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
-      { href: 'irrigation.html', icon: 'bi-droplet', text: 'Irrigation' },
       { href: 'integrations.html', icon: 'bi-plug', text: 'Intégrations' },
       { href: 'membres.html', icon: 'bi-people', text: 'Membres' },
       { href: 'facturation.html', icon: 'bi-receipt', text: 'Facturation' },
@@ -121,8 +120,8 @@ const menuData = {
     reseau: [
       { href: 'parcelles-reseau.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs-reseau.html', icon: 'bi-broadcast', text: 'Capteurs' },
-      { href: 'adherents.html', icon: 'bi-person-plus', text: 'Adhérents' },
       { href: 'irrigation.html', icon: 'bi-droplet', text: 'Irrigation' },
+      { href: 'adherents.html', icon: 'bi-person-plus', text: 'Adhérents' },
       { href: 'parametres-reseau.html', icon: 'bi-info-circle', text: 'Informations' }
     ]
   },

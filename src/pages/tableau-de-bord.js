@@ -144,23 +144,9 @@ function plotIrrigationData(plot) {
   return { planned: true, mm: upcoming[0].mm, daysAhead }
 }
 
-const CROP_PRODUCTS = {
-  'Blé tendre':        ['Prosaro', 'Aviator Xpro', 'Input Xpro'],
-  'Maïs':              ['Mercantor Gold', 'Callisto', 'Milagro'],
-  'Orge':              ['Comet Pro', 'Siltra Xpro', 'Variano Xpro'],
-  'Colza':             ['Karate Zeon', 'Plenum', 'Caryx'],
-  'Prairie permanente':['Duplosan KV', 'Starane Premium', '—'],
-  'Tournesol':         ['Adengo', 'Merlin Flexx', 'Pulsar Plus'],
-  'Betterave':         ['Betanal Expert', 'Debut', 'Safari'],
-}
-
 function plotTreatmentData(plot) {
   const s = plot.id
   const now = new Date()
-  const products = CROP_PRODUCTS[plot.crop] || ['—']
-  const product = products[s % products.length]
-  const daysAgo = (s * 3 + 3) % 23 + 3
-  const pluie7past = +((s * 1.9 + 5) % 28).toFixed(1)
   let daysAhead, winHour
   if (s % 5 === 3) {
     daysAhead = 0
@@ -177,7 +163,7 @@ function plotTreatmentData(plot) {
     : winDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
   const minutesFromNow = daysAhead * 1440 + winHour * 60 - (now.getHours() * 60 + now.getMinutes())
   const isUrgent = minutesFromNow >= 0 && minutesFromNow <= 600
-  return { pluie7past, daysAgo, product, winDateStr, winHour, winDur, isUrgent }
+  return { winDateStr, winHour, winDur, isUrgent, minutesFromNow }
 }
 
 const PHENOLOGY = {
@@ -308,7 +294,7 @@ function buildIrrigSummaryHTML(visiblePlots) {
       </div>
       ${miniBars}
     </div>
-    <button class="tdb-show-detail tdb-detail-btn"><i class="bi bi-table"></i> Tableau </button>`
+    <button class="tdb-show-detail tdb-detail-btn">Voir détails</button>`
 }
 
 function buildIrrigDetailHTML(isAdherent, selectedOrgId = null) {
@@ -444,7 +430,7 @@ function buildForecastSummaryHTML(myPlots) {
   }).join('')
 
   return `<div class="tdb-fc-strip">${dayCards}</div>
-    <button class="tdb-show-detail tdb-detail-btn"><i class="bi bi-table"></i> Tableau </button>`
+    <button class="tdb-show-detail tdb-detail-btn">Voir détails</button>`
 }
 
 function buildForecastDetailHTML(myPlots) {
@@ -511,44 +497,29 @@ function renderForecastWidget() {
 function buildTreatmentSummaryHTML(myPlots) {
   const treated = myPlots.map(p => ({ plot: p, data: plotTreatmentData(p) }))
   const urgentToday = treated.filter(t => t.data.isUrgent)
-  const highRisk = treated.filter(t => t.data.daysAgo > 21)
 
-  const urgentItems = urgentToday.slice(0, 3).map(t => {
-    const risk = t.data.daysAgo > 21 ? { cls: 'tdb-risk-high', label: 'Élevé' }
-               : t.data.daysAgo > 16 ? { cls: 'tdb-risk-medium', label: 'Modéré' }
-               : { cls: 'tdb-risk-low', label: 'Faible' }
-    return `<div class="tdb-alert-item">
-      <span class="tdb-risk-badge ${risk.cls}">${risk.label}</span>
+  const urgentItems = urgentToday.slice(0, 3).map(t => `
+    <div class="tdb-alert-item">
       <span class="tdb-alert-plot">${t.plot.name}</span>
       <span class="tdb-alert-window">${t.data.winDateStr} — ${t.data.winHour}:00 → ${(t.data.winHour + t.data.winDur) % 24}:00</span>
-    </div>`
-  }).join('')
+    </div>`).join('')
 
   return `<div class="tdb-kpi-row">
     <div class="tdb-kpi${urgentToday.length > 0 ? ' tdb-kpi--danger' : ''}">
       <span class="tdb-kpi-value">${urgentToday.length}</span>
       <span class="tdb-kpi-label">fenêtre${urgentToday.length !== 1 ? 's' : ''} urgente${urgentToday.length !== 1 ? 's' : ''} aujourd'hui</span>
     </div>
-    <div class="tdb-kpi${highRisk.length > 0 ? ' tdb-kpi--warn' : ''}">
-      <span class="tdb-kpi-value">${highRisk.length}</span>
-      <span class="tdb-kpi-label">risque${highRisk.length !== 1 ? 's' : ''} élevé${highRisk.length !== 1 ? 's' : ''}</span>
-    </div>
   </div>
   ${urgentItems ? `<div class="tdb-alert-list">${urgentItems}</div>` : ''}
-  <button class="tdb-show-detail tdb-detail-btn"><i class="bi bi-table"></i> Tableau </button>`
+  <button class="tdb-show-detail tdb-detail-btn">Voir détails</button>`
 }
 
 function buildTreatmentDetailHTML(myPlots) {
   const rows = myPlots.map(p => {
     const d = plotTreatmentData(p)
-    const risk = d.daysAgo > 21 ? { cls: 'tdb-risk-high',   label: 'Élevé' }
-               : d.daysAgo > 16 ? { cls: 'tdb-risk-medium', label: 'Modéré' }
-               : { cls: 'tdb-risk-low', label: 'Faible' }
     return `<tr>
       <td><a href="parcelle-detail.html?id=${p.id}" class="tdb-plot-link">${p.name}</a></td>
       <td>${p.crop || '—'}</td>
-      <td>${d.product}</td>
-      <td><span class="tdb-risk-badge ${risk.cls}">${risk.label}</span></td>
       <td class="${d.isUrgent ? 'tdb-win-urgent' : ''}">${d.isUrgent ? '<i class="bi bi-alarm-fill"></i> ' : ''}${d.winDateStr} — ${d.winHour}:00 → ${(d.winHour + d.winDur) % 24}:00</td>
     </tr>`
   }).join('')
@@ -556,8 +527,7 @@ function buildTreatmentDetailHTML(myPlots) {
   return `<table class="tdb-parcels-table">
     <thead>
       <tr>
-        <th>Parcelle</th><th>Culture</th><th>Dernier produit</th>
-        <th>Risque maladie</th><th>Prochaine fenêtre favorable</th>
+        <th>Parcelle</th><th>Culture</th><th>Prochaine fenêtre favorable</th>
       </tr>
     </thead>
     <tbody>${rows}</tbody>
@@ -593,7 +563,7 @@ function buildSensorSummaryHTML(mySensors) {
     return `<div class="tdb-widget-ok">
       <i class="bi bi-check-circle-fill"></i> Aucune anomalie capteur
     </div>
-    <button class="tdb-show-detail tdb-detail-btn" style="margin-top:0"><i class="bi bi-table"></i> Voir les capteurs</button>`
+    <button class="tdb-show-detail tdb-detail-btn" style="margin-top:0">Voir détails</button>`
   }
 
   const evTypes = {}
@@ -614,7 +584,7 @@ function buildSensorSummaryHTML(mySensors) {
     </div>
   </div>
   <div style="padding:0 16px 12px;display:flex;flex-wrap:wrap;gap:6px">${evBadges}</div>
-  <button class="tdb-show-detail tdb-detail-btn"><i class="bi bi-table"></i> Tableau</button>`
+  <button class="tdb-show-detail tdb-detail-btn">Voir détails</button>`
 }
 
 function buildSensorDetailHTML(mySensors) {
@@ -691,7 +661,7 @@ function buildPhenologySummaryHTML(myPlots) {
     </div>
   </div>
   ${items ? `<div class="tdb-stage-list">${items}</div>` : ''}
-  <button class="tdb-show-detail tdb-detail-btn"><i class="bi bi-table"></i> Tableau </button>`
+  <button class="tdb-show-detail tdb-detail-btn">Voir détails</button>`
 }
 
 function buildPhenologyDetailHTML(myPlots) {

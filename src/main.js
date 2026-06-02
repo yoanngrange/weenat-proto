@@ -984,7 +984,7 @@ function updateMap(filteredParcels = plots, filteredSensors = sensors) {
         const valLine = sensorVal ? `<br>${sensorVal[0]} ${sensorVal[1]}` : ''
 
         const circle = L.circleMarker([parcel.lat, parcel.lng], {
-          radius: 6, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
+          radius: 9, color: '#666', fillColor: '#fff', fillOpacity: 1, weight: 1.5
         }).addTo(map)
         const displayName = getSensorDisplayName(sensor)
         const nameStr = displayName !== sensor.serial ? `${displayName}<br><span style="font-weight:400;color:#636366">${sensor.serial} · ${sensor.model}</span>` : `<strong>${sensor.serial} · ${sensor.model}</strong>`
@@ -1045,7 +1045,7 @@ function createParcelLayer(parcel) {
   // ~7% shown as simple point markers (no polygon shape)
   if (!parcel.shape && parcel.id % 14 === 0) {
     return L.circleMarker([parcel.lat, parcel.lng], {
-      radius: 6, color: '#ffffff', fillColor: '#0172A4', fillOpacity: 0.85, weight: 2
+      radius: 9, color: '#ffffff', fillColor: '#0172A4', fillOpacity: 0.85, weight: 2
     })
   }
 

@@ -641,22 +641,9 @@ function buildCumuls(plots, sensors) {
 
 // ─── Traitements phytosanitaires ─────────────────────────────────────────────
 
-const CROP_PRODUCTS = {
-  'Blé tendre':        ['Prosaro', 'Aviator Xpro', 'Input Xpro'],
-  'Maïs':              ['Mercantor Gold', 'Callisto', 'Milagro'],
-  'Orge':              ['Comet Pro', 'Siltra Xpro', 'Variano Xpro'],
-  'Colza':             ['Karate Zeon', 'Plenum', 'Caryx'],
-  'Prairie permanente':['Duplosan KV', 'Starane Premium', '—'],
-  'Tournesol':         ['Adengo', 'Merlin Flexx', 'Pulsar Plus'],
-  'Betterave':         ['Betanal Expert', 'Debut', 'Safari'],
-}
-
 function plotTreatmentData(plot) {
-  const s    = plot.id
-  const now  = new Date()
-  const products = CROP_PRODUCTS[plot.crop] || ['—']
-  const product  = products[s % products.length]
-  const daysAgo  = (s * 3 + 3) % 23 + 3
+  const s   = plot.id
+  const now = new Date()
   let daysAhead, winHour
   if (s % 5 === 3) { daysAhead = 0; winHour = (now.getHours() + 2 + (s % 3) * 3) % 24 }
   else             { daysAhead = (s * 2 + 1) % 6 + 1; winHour = 6 + (s % 5) * 2 }
@@ -665,8 +652,7 @@ function plotTreatmentData(plot) {
   const winDateStr = daysAhead === 0 ? "Aujourd'hui"
     : winDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
   const minutesFromNow = daysAhead * 1440 + winHour * 60 - (now.getHours() * 60 + now.getMinutes())
-  const isUrgent = minutesFromNow >= 0 && minutesFromNow <= 600
-  return { product, winDateStr, winHour, winDur, isUrgent, minutesFromNow }
+  return { winDateStr, winHour, winDur, minutesFromNow }
 }
 
 const TRAIT_GREEN = '#1a9e40'

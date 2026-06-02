@@ -333,6 +333,15 @@ color: grey;
   height: 100%;
 }
 
+/* ── Leaflet tooltip overrides ── */
+.leaflet-tooltip {
+  font-size: 14px;
+  padding: 8px 12px;
+  line-height: 1.55;
+  border-radius: 7px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18);
+}
+
 .map-value-badge {
   background: var(--bg);
   border: 1.5px solid;
@@ -6595,8 +6604,9 @@ tr.row-selected td {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
 }
+.tdb-section { height: 100%; box-sizing: border-box; }
 
 /* ── Forecast table ── */
 .tdb-fc-table { min-width: 600px; }
