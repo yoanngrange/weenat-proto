@@ -150,11 +150,11 @@ function getDisplayCount() {
 
 const SENSOR_MODEL_NAMES = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
-  'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermomètre-hygromètre', 'T_MINI': 'Thermomètre de sol',
   'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
-  'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'LWS': "Capteur d'humectation foliaire", 'T_GEL': 'Capteur de gel',
   'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
-  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde fertirrigation',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde de fertirrigation',
 }
 
 function initNavSelect() {
@@ -1628,7 +1628,12 @@ const MAINT_TYPES = [
   { id: 'nettoyage',     label: 'Nettoyage',               icon: 'bi-droplet',           color: '#4ecdc4' },
   { id: 'verification',  label: 'Vérification terrain',    icon: 'bi-check2-circle',     color: '#3a7a38' },
   { id: 'note',          label: 'Note technique',          icon: 'bi-chat-text',         color: '#8e8e93' },
+  { id: 'culture',      label: 'Culture parcelle',        icon: 'bi-flower1',           color: '#24B066' },
+  { id: 'stade',        label: 'Stade phénologique',      icon: 'bi-calendar2-check',   color: '#6B21A8' },
+  { id: 'irrigation',   label: 'Irrigation',              icon: 'bi-droplet-half',      color: '#2E75B6' },
+  { id: 'cycle',        label: 'Cycle cultural',          icon: 'bi-arrow-repeat',      color: '#c47d1a' },
 ]
+const SENSOR_AGRI_TYPES = new Set(['culture', 'stade', 'irrigation', 'cycle'])
 
 function getDefaultSensorJournalUser() {
   const isAdherentSensor = sensor?.orgId === 1
@@ -1659,12 +1664,19 @@ function getSensorJournal() {
   const utilisateur = isAdherentSensor
     ? (() => { const m = members.find(mb => mb.source === 'adherent' && mb.orgIds.includes(1)); return m ? `${m.prenom} ${m.nom}` : technicien })()
     : technicien
-  return [
+  const demo = [
     { id: 1, type: 'installation', date: '2023-01-15', user: technicien,   texte: '' },
     { id: 2, type: 'nettoyage',    date: '2023-03-20', user: utilisateur,  texte: 'Nettoyage pluviomètre après hiver' },
     { id: 3, type: 'batterie',     date: '2023-06-10', user: technicien,   texte: '' },
     { id: 4, type: 'note',         date: '2023-11-02', user: utilisateur,  texte: 'Capteur légèrement déplacé après passage tracteur — redressé' },
+    { id: 5, type: 'cycle',        date: '2026-03-01', user: utilisateur,  texte: 'Début de saison 2026',            action: 'début', annee: '2026' },
+    { id: 6, type: 'culture',      date: '2026-03-10', user: utilisateur,  texte: 'Culture confirmée pour la saison', action: 'modification', culture: 'Blé tendre' },
+    { id: 7, type: 'stade',        date: '2026-04-11', user: utilisateur,  texte: '',                                stade: 'BBCH 21 — Tallage actif', culture: 'Blé tendre' },
+    { id: 8, type: 'irrigation',   date: '2026-04-20', user: utilisateur,  texte: 'Détecté via potentiel hydrique',  volume: 25, unite: 'mm', methode: 'Aspersion' },
+    { id: 9, type: 'stade',        date: '2026-05-02', user: utilisateur,  texte: '',                                stade: 'BBCH 30 — Début montaison', culture: 'Blé tendre' },
   ]
+  localStorage.setItem(SENSOR_JOURNAL_KEY, JSON.stringify(demo))
+  return demo
 }
 
 function saveSensorJournal(entries) {
@@ -1707,6 +1719,22 @@ function renderSensorJournal() {
               <button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>
             </div>
             ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
+            ${e.type === 'culture' ? `<div class="jrn-entry-meta">
+                <span class="jrn-entry-meta-chip"><i class="bi bi-tag"></i>${e.action === 'ajout' ? 'Ajout' : e.action === 'retrait' ? 'Retrait' : 'Modification'}</span>
+                ${e.culture ? `<span class="jrn-entry-meta-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'stade' ? `<div class="jrn-entry-meta">
+                ${e.stade   ? `<span class="jrn-entry-meta-chip"><i class="bi bi-diagram-3"></i>${e.stade}</span>` : ''}
+                ${e.culture ? `<span class="jrn-entry-meta-chip">${e.culture}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'irrigation' ? `<div class="jrn-entry-meta">
+                ${e.volume  ? `<span class="jrn-entry-meta-chip"><i class="bi bi-droplet-fill"></i>${e.volume} ${e.unite || 'mm'}</span>` : ''}
+                ${e.methode ? `<span class="jrn-entry-meta-chip"><i class="bi bi-water"></i>${e.methode}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'cycle' ? `<div class="jrn-entry-meta">
+                <span class="jrn-entry-meta-chip"><i class="bi bi-arrow-right-circle"></i>${e.action === 'fin' ? 'Fin de cycle' : 'Début de cycle'}</span>
+                ${e.annee ? `<span class="jrn-entry-meta-chip"><i class="bi bi-calendar3"></i>${e.annee}</span>` : ''}
+              </div>` : ''}
             ${e.user ? `<div style="font-size:11px;color:var(--txt3);margin-top:2px">${e.user}</div>` : ''}
           </div>
         </div>
@@ -1727,26 +1755,36 @@ function renderSensorJournal() {
   })
 }
 
+const SENSOR_TYPE_GROUPS = [
+  { label: 'Maintenance', types: MAINT_TYPES.filter(t => !SENSOR_AGRI_TYPES.has(t.id)) },
+  { label: 'Agricole',    types: MAINT_TYPES.filter(t =>  SENSOR_AGRI_TYPES.has(t.id)) },
+]
+
 function openSensorJournalForm() {
+  const TODAY = new Date().toISOString().slice(0,10)
   const modal = document.createElement('div')
   modal.className = 'modal add-modal'
   modal.innerHTML = `
     <div class="add-modal-content" style="max-width:440px">
       <div class="add-modal-header">
-        <span class="add-modal-title">Ajouter une entrée maintenance</span>
+        <span class="add-modal-title">Ajouter une entrée</span>
         <button class="add-modal-close" aria-label="Fermer">×</button>
       </div>
       <div class="journal-form">
         <div class="journal-form-row">
           <label class="journal-form-label">Type</label>
           <select id="sjrn-f-type" class="journal-form-input">
-            ${MAINT_TYPES.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+            ${SENSOR_TYPE_GROUPS.map(g => `
+              <optgroup label="${g.label}">
+                ${g.types.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
+              </optgroup>`).join('')}
           </select>
         </div>
         <div class="journal-form-row">
           <label class="journal-form-label">Date</label>
-          <input type="date" id="sjrn-f-date" class="journal-form-input" value="${new Date().toISOString().slice(0,10)}">
+          <input type="date" id="sjrn-f-date" class="journal-form-input" value="${TODAY}">
         </div>
+        <div id="sjrn-f-extra"></div>
         <div class="journal-form-row">
           <label class="journal-form-label">Note</label>
           <textarea id="sjrn-f-texte" class="journal-form-textarea" placeholder="Observations éventuelles…"></textarea>
@@ -1759,12 +1797,98 @@ function openSensorJournalForm() {
   `
   modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+
+  const typeSel = modal.querySelector('#sjrn-f-type')
+  const extraEl = modal.querySelector('#sjrn-f-extra')
+  const updateExtra = () => {
+    const t = typeSel.value
+    if (t === 'culture') {
+      extraEl.innerHTML = `
+        <div class="journal-form-row">
+          <label class="journal-form-label">Action</label>
+          <select id="sjrn-f-action" class="journal-form-input">
+            <option value="ajout">Ajout</option>
+            <option value="modification" selected>Modification</option>
+            <option value="retrait">Retrait</option>
+          </select>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Culture</label>
+          <input type="text" id="sjrn-f-culture" class="journal-form-input" placeholder="Ex : Blé tendre">
+        </div>`
+    } else if (t === 'stade') {
+      extraEl.innerHTML = `
+        <div class="journal-form-row">
+          <label class="journal-form-label">Stade (BBCH)</label>
+          <input type="text" id="sjrn-f-stade" class="journal-form-input" placeholder="Ex : BBCH 30 — Montaison">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Culture</label>
+          <input type="text" id="sjrn-f-culture" class="journal-form-input" placeholder="Culture concernée">
+        </div>`
+    } else if (t === 'irrigation') {
+      extraEl.innerHTML = `
+        <div class="journal-form-grid">
+          <div class="journal-form-row">
+            <label class="journal-form-label">Volume</label>
+            <input type="number" id="sjrn-f-volume" class="journal-form-input" min="0" step="0.5" placeholder="0">
+          </div>
+          <div class="journal-form-row">
+            <label class="journal-form-label">Unité</label>
+            <select id="sjrn-f-unite" class="journal-form-input">
+              <option value="mm" selected>mm</option>
+              <option value="m³/ha">m³/ha</option>
+              <option value="m³">m³</option>
+            </select>
+          </div>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Méthode</label>
+          <select id="sjrn-f-methode" class="journal-form-input">
+            <option value="">— Non précisé —</option>
+            <option>Aspersion</option><option>Goutte à goutte</option>
+            <option>Gravitaire</option><option>Pivot</option><option>Autre</option>
+          </select>
+        </div>`
+    } else if (t === 'cycle') {
+      extraEl.innerHTML = `
+        <div class="journal-form-row">
+          <label class="journal-form-label">Événement</label>
+          <select id="sjrn-f-action" class="journal-form-input">
+            <option value="début">Début de cycle</option>
+            <option value="fin">Fin de cycle</option>
+          </select>
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Année</label>
+          <input type="text" id="sjrn-f-annee" class="journal-form-input" value="${new Date().getFullYear()}">
+        </div>`
+    } else { extraEl.innerHTML = '' }
+  }
+  typeSel.addEventListener('change', updateExtra)
+
   modal.querySelector('#sjrn-f-save').addEventListener('click', () => {
-    const type  = modal.querySelector('#sjrn-f-type').value
-    const date  = modal.querySelector('#sjrn-f-date').value || new Date().toISOString().slice(0,10)
+    const type  = typeSel.value
+    const date  = modal.querySelector('#sjrn-f-date').value || TODAY
     const user  = getDefaultSensorJournalUser()
     const texte = modal.querySelector('#sjrn-f-texte').value.trim()
-    saveSensorJournal([{ id: Date.now(), type, date, user, texte }, ...getSensorJournal()])
+    const entry = { id: Date.now(), type, date, user, texte }
+    if (type === 'culture') {
+      entry.action  = modal.querySelector('#sjrn-f-action')?.value
+      entry.culture = modal.querySelector('#sjrn-f-culture')?.value.trim()
+    } else if (type === 'stade') {
+      entry.stade   = modal.querySelector('#sjrn-f-stade')?.value.trim()
+      entry.culture = modal.querySelector('#sjrn-f-culture')?.value.trim()
+    } else if (type === 'irrigation') {
+      const vol = parseFloat(modal.querySelector('#sjrn-f-volume')?.value)
+      entry.volume  = isNaN(vol) ? 0 : vol
+      entry.unite   = modal.querySelector('#sjrn-f-unite')?.value
+      entry.methode = modal.querySelector('#sjrn-f-methode')?.value
+    } else if (type === 'cycle') {
+      entry.action = modal.querySelector('#sjrn-f-action')?.value
+      entry.annee  = modal.querySelector('#sjrn-f-annee')?.value.trim()
+    }
+    saveSensorJournal([entry, ...getSensorJournal()])
     modal.remove()
     renderSensorJournal()
   })

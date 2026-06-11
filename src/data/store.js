@@ -86,3 +86,15 @@ export function saveOrgs(list) {
   store['orgs'] = list
   save(store)
 }
+
+// ─── Per-org settings ─────────────────────────────────────────────────────────
+
+export function getOrgData(id) {
+  return load()[`org_${id}`] || {}
+}
+
+export function patchOrgData(id, patch) {
+  const store = load()
+  store[`org_${id}`] = { ...(store[`org_${id}`] || {}), ...patch }
+  save(store)
+}

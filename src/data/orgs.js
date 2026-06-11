@@ -22,6 +22,7 @@ export const orgs = [
     siret: "41234567800015",
     plan: "Plus", statut: "actif",
     codeAdherent: "ADZ-001-2023", dateAdhesion: "2023-03-15",
+    volumeMax: 150000,
     nbMembres: 5
   },
   {
@@ -454,5 +455,32 @@ export const orgs = [
     plan: "Expert", statut: "actif",
     codeAdherent: "ADZ-040-2023", dateAdhesion: "2023-06-10",
     nbMembres: 6
+  },
+
+  // ── Org 41 : GAEC Jourdain — nouvel utilisateur (role=new) ───────────────────
+  {
+    id: 41, name: "GAEC Jourdain",
+    proprietaire: "Pierre Jourdain", prenomProprietaire: "Pierre", nomProprietaire: "Jourdain",
+    email: "pierre@gaec-jourdain.fr", telephone: "04 70 12 34 56",
+    lat: 46.3021, lng: 3.2938, departement: "Allier", ville: "Saint-Pourçain-sur-Sioule",
+    adresse: "Lieu-dit La Croix Blanche, 03500 Saint-Pourçain-sur-Sioule",
+    siret: "98765432100041",
+    plan: "Expert", statut: "actif",
+    metiers: ["Polyculture-élevage"],
+    codeAdherent: null, dateAdhesion: "2026-06-05",
+    nbMembres: 1
+  },
+
+  // ── Org 42 : Exploitation Dupont — standalone Essential (sans réseau) ────────
+  {
+    id: 42, name: "Exploitation Dupont",
+    proprietaire: "Mathieu Dupont", prenomProprietaire: "Mathieu", nomProprietaire: "Dupont",
+    email: "mathieu@exploitation-dupont.fr", telephone: "02 99 67 45 23",
+    lat: 48.0598, lng: -1.5891, departement: "Ille-et-Vilaine", ville: "Vitré",
+    adresse: "18 Route des Champs, 35500 Vitré",
+    siret: "51234678900042",
+    plan: "Essential", statut: "actif",
+    codeAdherent: null, dateAdhesion: "2025-03-10",
+    nbMembres: 0
   }
 ]

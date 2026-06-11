@@ -66,7 +66,7 @@ function fmtDateShort(iso) {
 function dateHint(iso) {
   if (!iso || iso === TODAY) return ''
   return iso < TODAY
-    ? `<span class="irr-pill irr-pill--past">Passée · Réalisée</span>`
+    ? `<span class="irr-pill irr-pill--past">Passée · Effectuée</span>`
     : `<span class="irr-pill irr-pill--future">Future · Planifiée</span>`
 }
 
@@ -140,7 +140,7 @@ function askIrrigTypeIfNeeded(ids, plots, callback) {
         ? `<strong>${missing[0].name}</strong> n'a pas de type d'irrigation renseigné.`
         : `${missing.length} parcelles n'ont pas de type d'irrigation renseigné.`}
     </p>
-    <select id="irr-type-ask" style="width:100%;padding:12px;border-radius:10px;border:1px solid #E0DED8;font-size:15px;font-family:inherit;background:#fff;color:#1c1c1e">
+    <select id="irr-type-ask" class="m-prev-select" style="margin-bottom:0">
       <option value="">— Choisir un type —</option>
       ${IRRIG_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
     </select>`
@@ -176,7 +176,7 @@ function plotInfo(p) {
 
 // ─── Saisie d'une irrigation ──────────────────────────────────────────────────
 
-export function openIrrigationSaisie(plots, showToast, preselect = null) {
+export function openIrrigationSaisie(plots, showToast, preselect = null, backToParcel = false) {
   let selectedIds = new Set(preselect?.ids ?? [])
   let dateVal     = TODAY
   let qtyVal      = 10
@@ -222,14 +222,11 @@ export function openIrrigationSaisie(plots, showToast, preselect = null) {
     })
   }
 
-  const preselectPlots = preselect ? plots.filter(p => preselect.ids.includes(p.id)) : []
-
   const selectionZone = preselect
     ? `<div class="irr-presel-banner">
          <i class="bi bi-geo-alt-fill" style="color:#185FA5;flex-shrink:0"></i>
-         <span>${preselect.label} <span style="color:#9E9D98;font-weight:400">· ${preselect.ids.length} parcelle${preselect.ids.length > 1 ? 's' : ''}</span></span>
-       </div>
-       ${preselectPlots.map(p => `<div style="font-size:13px;color:#636366;padding:2px 4px">· ${p.name}</div>`).join('')}`
+         <span>${preselect.ids.length > 1 ? 'Parcelles concernées' : 'Parcelle concernée'} : ${preselect.label}</span>
+       </div>`
     : `<div id="irr-sel-list">${selectionHTML()}</div>`
 
   const layer = flexLayer(pushDetail(`
@@ -294,7 +291,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null) {
           { label: 'Date',     value: fmtDateFull(dateVal) },
           { label: 'Quantité', value: `${qtyVal} mm` },
         ],
-        parcelSections, isFut, plots, calFilter, addedCount: ids.size, stackDepth: 1,
+        parcelSections, isFut, plots, calFilter, addedCount: ids.size, stackDepth: 1, backToParcel,
       })
     })
   })
@@ -302,7 +299,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null) {
 
 // ─── Stratégie d'irrigation ───────────────────────────────────────────────────
 
-export function openIrrigationStrategie(plots, showToast, preselect = null, replaceSeasonIds = null) {
+export function openIrrigationStrategie(plots, showToast, preselect = null, replaceSeasonIds = null, backToParcel = false) {
   let selectedIds = new Set(preselect?.ids ?? [])
   let debut = TODAY
   let fin   = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
@@ -364,7 +361,7 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
       <div class="irr-preview-box" id="strat-preview">${preview}</div>
       ${preselect
         ? `<div class="irr-presel-banner"><i class="bi bi-geo-alt-fill" style="color:#185FA5;flex-shrink:0"></i>
-             <span>${preselect.label} <span style="color:#9E9D98;font-weight:400">· ${preselect.ids.length} parcelle${preselect.ids.length > 1 ? 's' : ''}</span></span>
+             <span>${preselect.ids.length > 1 ? 'Parcelles concernées' : 'Parcelle concernée'} : ${preselect.label}</span>
            </div>`
         : buildSelectionHTML([], plots, selectedIds)}
       <div class="irr-bottom-spacer"></div>
@@ -440,13 +437,13 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
     const occs = computeOccs()
-    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds)
+    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds, backToParcel)
   })
 }
 
 // ─── Aperçu stratégie ─────────────────────────────────────────────────────────
 
-function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds = null) {
+function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds = null, backToParcel = false) {
   const n = selectedIds.size
 
   const MAX_VISIBLE = 5
@@ -548,7 +545,7 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
           { label: 'Fréquence',            value: `tous les ${freq} jours` },
           { label: 'Irrigations générées', value: `${occs.length * ids.size}` },
         ],
-        parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * ids.size, stackDepth: 2,
+        parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * ids.size, stackDepth: 2, backToParcel,
       })
     })
   })
@@ -640,7 +637,7 @@ function openTourDEau(enrPlots, freq, onConfirm) {
 
 // ─── Confirmation ─────────────────────────────────────────────────────────────
 
-function openConfirmation({ title, params, parcelSections = [], isFut, plots, calFilter, addedCount = 0, stackDepth = 3 }) {
+function openConfirmation({ title, params, parcelSections = [], isFut, plots, calFilter, addedCount = 0, stackDepth = 3, backToParcel = false }) {
   const paramsHtml = (params || []).map(p => `
     <div class="irr-confirm-param">
       <span class="irr-confirm-param-lbl">${p.label}</span>
@@ -709,7 +706,7 @@ function openConfirmation({ title, params, parcelSections = [], isFut, plots, ca
         <div class="irr-confirm-opt" id="conf-back">
           <div class="irr-confirm-opt-icon" style="background:#F5F4F0">↩</div>
           <div>
-            <div class="irr-confirm-opt-title">Retour au tableau de bord</div>
+            <div class="irr-confirm-opt-title">${backToParcel ? 'Retour à la parcelle' : 'Retour au tableau de bord'}</div>
             <div class="irr-confirm-opt-sub">Continuer la navigation</div>
           </div>
         </div>
@@ -905,7 +902,7 @@ export function openCalendar(plots, initialFilter) {
       </svg>
       <div class="irr-graph-legend">
         <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#7BBFEA"></div>Pluie</div>
-        <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#E07820"></div>Irrig. réalisée</div>
+        <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#E07820"></div>Irrig. effectuée</div>
         <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#FBBF7A"></div>Irrig. planifiée</div>
         <div class="irr-leg-item"><svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#185FA5" stroke-width="2"/></svg>Réservoir</div>
       </div>
@@ -957,7 +954,7 @@ export function openCalendar(plots, initialFilter) {
       </div>
       <div class="irr-cal-grid">${grid}</div>
       <div class="irr-graph-legend" style="margin-top:10px;padding-top:10px;border-top:.5px solid #E0DED8">
-        <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#E07820"></div>Réalisée</div>
+        <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#E07820"></div>Effectuée</div>
         <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#FBBF7A"></div>Planifiée</div>
         <div class="irr-leg-item"><div class="irr-leg-dot" style="background:#7BBFEA"></div>Pluie</div>
       </div>
@@ -993,7 +990,7 @@ export function openCalendar(plots, initialFilter) {
     })
 
     showIrrigSheet({
-      title: ir.real ? "Modifier l'irrigation réalisée" : "Modifier l'irrigation planifiée",
+      title: ir.real ? "Modifier l'irrigation effectuée" : "Modifier l'irrigation planifiée",
       body: bodyEl,
       saveLabel: 'Enregistrer',
       onSave: () => {
@@ -1121,7 +1118,7 @@ export function openCalendar(plots, initialFilter) {
       const [, m, d] = ir.iso.split('-').map(Number)
       const col  = ir.real ? '#C05000' : '#185FA5'
       const bg   = ir.real ? '#FEF0E6' : '#E6F1FB'
-      const lbl  = ir.real ? 'Réalisée' : 'Planifiée'
+      const lbl  = ir.real ? 'Effectuée' : 'Planifiée'
       const name = plots.find(p => p.id === ir.plotId)?.name ?? '—'
       return `<div class="irr-list-item" data-iidx="${IRRIG_SEASON.indexOf(ir)}">
         <div class="irr-list-stripe" style="background:${col}"></div>

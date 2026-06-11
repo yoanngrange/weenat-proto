@@ -1,6 +1,7 @@
 import { pushDetail, popDetail }    from '../nav.js'
 import { showSheet }                from '../ui.js'
 import { sensors as allSensors }   from '../../data/sensors.js'
+import { IRRIG_SEASON }             from '../../data/irrigations.js'
 
 // ─── Metric definitions (mobile IDs) ─────────────────────────────────────────
 const METRIC_DEFS = {
@@ -18,6 +19,33 @@ const METRIC_DEFS = {
   par:         { label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#4CBB17' },
   temp_seche:  { label: 'Température sèche',   unit: '°C',         color: '#23B19B' },
   temp_humide: { label: 'Température humide',  unit: '°C',         color: '#5E88EC' },
+  irrigation:  { label: 'Irrigation',           unit: 'mm',         color: '#FF8C00', isCumul: true },
+}
+
+// Métriques disposant de prévisions et leur horizon (en jours)
+const FORECAST_DAYS = {
+  pluie: 14, temperature: 14, humidite: 14, vent: 14, etp: 14, temp_rosee: 14, rayonnement: 14,
+  pothydr: 7,
+}
+
+const MODEL_LABELS = {
+  'P+':         'Station météo',
+  'PT':         'Station météo',
+  'P':          'Pluviomètre',
+  'SMV':        'Station météo virtuelle',
+  'TH':         'Thermomètre-hygromètre',
+  'T_MINI':     'Thermomètre de sol',
+  'W':          'Anémomètre',
+  'PYRANO':     'Pyranomètre',
+  'PAR':        'Capteur PAR',
+  'LWS':        "Capteur d'humectation foliaire",
+  'T_GEL':      'Capteur de gel',
+  'CHP-15/30':  'Tensiomètre',
+  'CHP-30/60':  'Tensiomètre',
+  'CHP-60/90':  'Tensiomètre',
+  'CAPA-30-3':  'Sonde capacitive',
+  'CAPA-60-6':  'Sonde capacitive',
+  'EC':         'Sonde de fertirrigation',
 }
 
 const METRICS_BY_MODEL = {
@@ -80,6 +108,9 @@ const MOCK_TRAITEMENTS = [
 
 // ─── Data generation ──────────────────────────────────────────────────────────
 function mockSeries(metricId, count) {
+  const ms = [...metricId].reduce((a, c) => a + c.charCodeAt(0), metricId.length * 17)
+  const sr = (i, o = 0) => { const x = Math.sin(ms * 0.07 + i * 0.5 + o * 1.3) * 10000; return x - Math.floor(x) }
+
   const cfgs = {
     pluie:       { base: 2,   amp: 5,   min: 0,   sparse: true },
     temperature: { base: 15,  amp: 8,   min: -5,  max: 40 },
@@ -99,10 +130,24 @@ function mockSeries(metricId, count) {
   const cfg = cfgs[metricId] || { base: 50, amp: 20, min: 0, max: 100 }
   return Array.from({ length: count }, (_, i) => {
     const t = i / count * Math.PI * 4
-    if (cfg.sparse && Math.random() > 0.2) return 0
-    const v = cfg.base + cfg.amp * Math.sin(t - 1) + (Math.random() - 0.5) * cfg.amp * 0.4
+    if (cfg.sparse && count >= 10 && sr(i) > 0.25) return 0
+    const v = cfg.base + cfg.amp * Math.sin(t - 1) + (sr(i, 1) - 0.5) * cfg.amp * 0.4
     return Math.max(cfg.min, Math.min(cfg.max ?? 9999, v))
   })
+}
+
+function irrigationSeries(plotId, count, stepMins) {
+  const now = Date.now()
+  const bucketMs = stepMins * 60000
+  const startMs = now - count * bucketMs
+  const vals = new Array(count).fill(0)
+  IRRIG_SEASON.filter(i => i.plotId === plotId).forEach(i => {
+    const t = new Date(i.iso).getTime()
+    if (t < startMs || t > now) return
+    const idx = Math.min(count - 1, Math.floor((t - startMs) / bucketMs))
+    vals[idx] += i.mm
+  })
+  return vals
 }
 
 // ─── Chart draw helpers ───────────────────────────────────────────────────────
@@ -131,17 +176,33 @@ function smoothPath(pts) {
 
 function xLabel(agoMins) {
   const d = new Date(Date.now() - agoMins * 60000)
-  if (agoMins < 1440) return `${String(d.getHours()).padStart(2,'0')}h`
-  if (agoMins >= 43200) { const M=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc']; return M[d.getMonth()] }
-  return `${d.getDate()}/${d.getMonth()+1}`
+  const abs = Math.abs(agoMins)
+  if (abs < 1440) return `${String(d.getHours()).padStart(2,'0')}h`
+  if (abs >= 43200) { const M=['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc']; return M[d.getMonth()] }
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+}
+
+function tipLabel(agoMins, stepMins) {
+  const d = new Date(Date.now() - agoMins * 60000)
+  const hh = String(d.getHours()).padStart(2,'0')
+  const mm = String(d.getMinutes()).padStart(2,'0')
+  const hStr = mm === '00' ? `${hh}h` : `${hh}h${mm}`
+  if (stepMins <= 60) {
+    const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+    return `${dateStr} ${hStr}`
+  }
+  if (stepMins < 10080) return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`
+  const M = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc']
+  return `sem. ${M[d.getMonth()]} ${d.getDate()}`
 }
 
 function fmtV(v) { return Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2) }
 
-function xAtMinsAgo(minsAgo, count, stepMins, PAD, innerW) {
+function xAtMinsAgo(minsAgo, count, stepMins, PAD, innerW, totalCount = count) {
   const total = count * stepMins
   if (minsAgo > total) return null
-  return PAD.l + (1 - minsAgo / total) * innerW
+  const nowX = PAD.l + (count - 1) / Math.max(totalCount - 1, 1) * innerW
+  return nowX - (minsAgo / total) * (nowX - PAD.l)
 }
 
 // ─── Overlay renderers (same as web) ─────────────────────────────────────────
@@ -161,9 +222,9 @@ function renderSeuils(metricId, yOf, PAD, W) {
   }).join('')
 }
 
-function renderStades(count, stepMins, PAD, innerW, innerH) {
+function renderStades(count, stepMins, PAD, innerW, innerH, totalCount = count) {
   return PHENO_STAGES.map(s => {
-    const x = xAtMinsAgo(s.daysAgo * 1440, count, stepMins, PAD, innerW)
+    const x = xAtMinsAgo(s.daysAgo * 1440, count, stepMins, PAD, innerW, totalCount)
     if (x === null) return ''
     const xf = x.toFixed(1), tx = (x+4).toFixed(0), ty = (PAD.t+innerH-4).toFixed(0)
     return `<line x1="${xf}" y1="${PAD.t}" x2="${xf}" y2="${PAD.t+innerH}" stroke="${s.color}" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/>
@@ -171,10 +232,10 @@ function renderStades(count, stepMins, PAD, innerW, innerH) {
   }).join('')
 }
 
-function renderNotes(count, stepMins, PAD, innerH, innerW) {
+function renderNotes(count, stepMins, PAD, innerH, innerW, totalCount = count) {
   const cy = PAD.t + innerH + 9
   return MOCK_NOTES.map(n => {
-    const x = xAtMinsAgo(n.daysAgo * 1440, count, stepMins, PAD, innerW)
+    const x = xAtMinsAgo(n.daysAgo * 1440, count, stepMins, PAD, innerW, totalCount)
     if (x === null) return ''
     const xf = x.toFixed(1)
     return `<circle cx="${xf}" cy="${cy}" r="5" fill="${n.color}" opacity="0.85"><title>${n.label}</title></circle>
@@ -182,9 +243,9 @@ function renderNotes(count, stepMins, PAD, innerH, innerW) {
   }).join('')
 }
 
-function renderTraitements(count, stepMins, PAD, innerH, innerW) {
+function renderTraitements(count, stepMins, PAD, innerH, innerW, totalCount = count) {
   return MOCK_TRAITEMENTS.map(t => {
-    const x = xAtMinsAgo(t.daysAgo * 1440, count, stepMins, PAD, innerW)
+    const x = xAtMinsAgo(t.daysAgo * 1440, count, stepMins, PAD, innerW, totalCount)
     if (x === null) return ''
     const xf = x.toFixed(1), tipY = PAD.t - 1
     return `<polygon points="${xf},${tipY} ${(x-4).toFixed(1)},${tipY-9} ${(x+4).toFixed(1)},${tipY-9}" fill="${t.color}" opacity="0.85"><title>${t.label}</title></polygon>
@@ -193,7 +254,7 @@ function renderTraitements(count, stepMins, PAD, innerH, innerW) {
 }
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
-export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metricId = null, backLabel = 'Retour' }) {
+export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metricId = null, backLabel = 'Retour', parcel = null }) {
   // Build metric → sensor map
   const metricToSensor = {}
   if (linkedSensorIds.length > 0) {
@@ -206,54 +267,76 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
   }
 
   const metricIds = Object.keys(metricToSensor)
+  if (parcel && IRRIG_SEASON.some(i => i.plotId === parcel.id)) metricIds.push('irrigation')
   if (!metricIds.length) return
 
   // State
-  let currentMetricId = (metricId && metricToSensor[metricId]) ? metricId : metricIds[0]
+  let currentMetricId = (metricId && metricIds.includes(metricId)) ? metricId : metricIds[0]
   let currentPeriod   = '7d'
   let currentStep     = '1h'
   let yScaleMode      = 'auto'
   let yScaleMin = null, yScaleMax = null
+  let customFromDate = null, customToDate = null
   const overlays = { seuils: false, plages: false, stades: false, notes: false, traitements: false }
   let _vals = null
 
   // Period helpers
-  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, '30d': 43200, '365d': 525600 }
+  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, '30d': 43200, '365d': 525600, 'custom': 10080 }
   const STEP_MINS   = { '1h': 60, '1d': 1440, '1w': 10080 }
-  const getCount = () => Math.max(2, Math.min(200, Math.floor((PERIOD_MINS[currentPeriod] || 10080) / (STEP_MINS[currentStep] || 60))))
+  const getCount = () => {
+    let mins = PERIOD_MINS[currentPeriod] || 10080
+    if (currentPeriod === 'custom' && customFromDate && customToDate) {
+      const ms = new Date(customToDate) - new Date(customFromDate)
+      if (ms > 0) mins = Math.max(60, ms / 60000)
+    }
+    return Math.max(2, Math.min(200, Math.floor(mins / (STEP_MINS[currentStep] || 60))))
+  }
   const getStepMins = () => STEP_MINS[currentStep] || 60
   const getDefaultStep = p => p === '365d' ? '1d' : p === '30d' ? '1d' : '1h'
 
   const showModel = new Set(Object.values(metricToSensor).map(s => s.model)).size > 1
 
+  const infoText = parcel
+    ? `${parcel.name}${parcel.crop ? ' - ' + parcel.crop : ''}`
+    : sensor ? `${MODEL_LABELS[sensor.model] || sensor.model} ${sensor.model} ${sensor.serial}` : ''
+
   // Build the layer HTML
   const layer = pushDetail(`
     <div class="m-fs-topbar">
       <button class="m-fs-back"><i class="bi bi-chevron-left"></i>${backLabel}</button>
-      <div class="m-fs-metric-center">
-        <select class="m-fs-metric-sel" id="m-metric-sel">
-          ${metricIds.map(id => {
-            const def = METRIC_DEFS[id]; if (!def) return ''
-            const s = metricToSensor[id]
-            const label = (showModel && s) ? `${def.label} (${s.model})` : def.label
-            return `<option value="${id}"${id === currentMetricId ? ' selected' : ''}>${label}</option>`
-          }).join('')}
-        </select>
-        <span class="m-fs-metric-unit" id="m-metric-unit">${METRIC_DEFS[currentMetricId]?.unit || ''}</span>
-      </div>
-      <button class="m-fs-cfg-btn" id="m-cfg-btn"><i class="bi bi-sliders"></i></button>
+      <span class="m-fs-info-text">${infoText}</span>
+      <button class="m-fs-cfg-btn" id="m-cfg-btn"><i class="bi bi-gear"></i></button>
     </div>
     <div class="m-fs-period-bar">
-      <div class="m-fs-presets" id="m-period-presets">
-        ${[['1d',"Auj."],['hier',"Hier"],['3d',"3j"],['7d',"7j"],['30d',"30j"],['365d',"365j"]].map(([p,l]) =>
-          `<button class="m-fs-preset${p === currentPeriod ? ' active' : ''}" data-period="${p}">${l}</button>`
-        ).join('')}
-      </div>
-      <select class="m-fs-step-sel" id="m-step-sel">
-        <option value="1h" selected>Horaire</option>
-        <option value="1d">Journalier</option>
-        <option value="1w">Hebdo</option>
+      <select class="m-period-sel" id="m-metric-sel">
+        ${metricIds.map(id => {
+          const def = METRIC_DEFS[id]; if (!def) return ''
+          const s = metricToSensor[id]
+          const label = (showModel && s) ? `${def.label} (${s.model})` : def.label
+          return `<option value="${id}"${id === currentMetricId ? ' selected' : ''}>${label}</option>`
+        }).join('')}
       </select>
+      <div style="display:flex;gap:6px">
+        <select class="m-period-sel" id="m-period-sel">
+          <option value="1d">Aujourd'hui</option>
+          <option value="hier">Hier</option>
+          <option value="3d">3 jours</option>
+          <option value="7d" selected>7 jours</option>
+          <option value="30d">30 jours</option>
+          <option value="365d">365 jours</option>
+          <option value="custom">Personnalisée</option>
+        </select>
+        <select class="m-step-sel" id="m-step-sel">
+          <option value="1h" selected>Horaire</option>
+          <option value="1d">Journalier</option>
+          <option value="1w">Hebdo</option>
+        </select>
+      </div>
+      <div class="m-fs-custom-row" id="m-custom-row" style="display:none">
+        <input type="date" id="m-custom-from" class="m-custom-date">
+        <span style="color:#8e8e93;font-size:12px;flex-shrink:0">→</span>
+        <input type="date" id="m-custom-to" class="m-custom-date">
+      </div>
     </div>
     <div class="m-fs-chart-wrap" id="m-chart-wrap">
       <svg id="m-main-chart" width="100%" height="100%"></svg>
@@ -288,15 +371,24 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     const def = METRIC_DEFS[currentMetricId]; if (!def) return
     const count = getCount(), stepMins = getStepMinutes()
 
+    const periodDays = (count * stepMins) / 1440
+    const fcDays = FORECAST_DAYS[currentMetricId] || 0
+    const fcCount = (fcDays > 0 && currentMetricId !== 'irrigation')
+      ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count))
+      : 0
+    const totalCount = count + fcCount
+
     const PAD = { t: 28, r: 18, b: 36, l: 46 }
     const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b
 
-    const vals = mockSeries(currentMetricId, count)
+    const vals = currentMetricId === 'irrigation' && parcel
+      ? irrigationSeries(parcel.id, count, stepMins)
+      : mockSeries(currentMetricId, totalCount)
     _vals = vals
     const { minV, maxV } = computeYRange(vals, currentMetricId)
     const range = maxV - minV || 1
 
-    const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+    const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
     const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
 
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
@@ -311,8 +403,21 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
       <clipPath id="${cid}"><rect x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}"/></clipPath>
     </defs>`
 
+    // Zone striée représentant la portion "prévisions" du graphique
+    if (fcCount > 0) {
+      const nowX = xOf(count - 1)
+      const stripeId = `${cid}_stripe`
+      out += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+          <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+        </pattern></defs>
+        <rect x="${nowX.toFixed(1)}" y="${PAD.t}" width="${(W-PAD.r-nowX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})" clip-path="url(#${cid})"/>
+        <line x1="${nowX.toFixed(1)}" y1="${PAD.t}" x2="${nowX.toFixed(1)}" y2="${PAD.t+innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+        <text x="${(W-PAD.r-4).toFixed(1)}" y="${(PAD.t+12).toFixed(1)}" text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#8e8e93" font-style="italic">Prévisions</text>`
+    }
+
     if (overlays.plages) out += renderPlages(currentMetricId, yOf, PAD, innerW, cid)
-    if (overlays.stades) out += renderStades(count, stepMins, PAD, innerW, innerH)
+    if (overlays.stades) out += renderStades(count, stepMins, PAD, innerW, innerH, totalCount)
 
     // Grid + labels
     for (let i = 0; i <= 4; i++) {
@@ -321,8 +426,8 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
       out += `<text x="${PAD.l-5}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#8e8e93">${fmtV(v)}</text>`
     }
     out += `<line x1="${PAD.l}" y1="${PAD.t+innerH}" x2="${W-PAD.r}" y2="${PAD.t+innerH}" stroke="rgba(0,0,0,.1)" stroke-width="1"/>`
-    const lStep = Math.max(1, Math.floor(count / 6))
-    for (let i = 0; i < count; i += lStep) {
+    const lStep = Math.max(1, Math.floor(totalCount / 6))
+    for (let i = 0; i < totalCount; i += lStep) {
       const x = xOf(i).toFixed(1)
       out += `<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t+innerH}" stroke="rgba(0,0,0,.06)" stroke-width="1" stroke-dasharray="3,3"/>`
       out += `<text x="${x}" y="${PAD.t+innerH+16}" text-anchor="middle" font-size="10" font-family="-apple-system,sans-serif" fill="#8e8e93">${xLabel((count-i)*stepMins)}</text>`
@@ -332,34 +437,40 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
 
     // Data
     if (def.isCumul) {
-      const bw = Math.max(2, (innerW / count) * 0.65)
+      const bw = Math.max(2, (innerW / totalCount) * 0.65)
       vals.forEach((v, i) => {
         if (v <= 0) return
+        const isFc = i >= count
         const bx = xOf(i), by = yOf(v), bh = (PAD.t + innerH) - by
-        out += `<rect x="${(bx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="url(#${gid})" opacity="0.9" rx="1"/>`
+        out += `<rect x="${(bx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${isFc ? '#C7C7CC' : `url(#${gid})`}" opacity="${isFc ? '0.5' : '0.9'}" rx="1"/>`
       })
     } else {
-      const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
-      const lp = smoothPath(pts)
+      const histPts = vals.slice(0, count).map((v, i) => ({ x: xOf(i), y: yOf(v) }))
+      const fcPts   = vals.slice(count - 1).map((v, i) => ({ x: xOf(count - 1 + i), y: yOf(v) }))
+      const lp = smoothPath(histPts)
       out += `<path d="${lp} L${xOf(count-1).toFixed(1)},${PAD.t+innerH} L${PAD.l},${PAD.t+innerH} Z" fill="${hi}" opacity="0.06" clip-path="url(#${cid})"/>`
       out += `<path d="${lp}" fill="none" stroke="url(#${gid})" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#${cid})"/>`
+      if (fcCount > 0) {
+        const fcLp = smoothPath(fcPts)
+        out += `<path d="${fcLp}" fill="none" stroke="url(#${gid})" stroke-width="2.5" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round" opacity="0.5" clip-path="url(#${cid})"/>`
+      }
     }
 
-    if (overlays.notes)       out += renderNotes(count, stepMins, PAD, innerH, innerW)
-    if (overlays.traitements) out += renderTraitements(count, stepMins, PAD, innerH, innerW)
+    if (overlays.notes)       out += renderNotes(count, stepMins, PAD, innerH, innerW, totalCount)
+    if (overlays.traitements) out += renderTraitements(count, stepMins, PAD, innerH, innerW, totalCount)
 
     out += `<rect class="m-fs-hover" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="touch-action:none"/>`
     out += `<line class="m-fs-cross" x1="0" y1="${PAD.t}" x2="0" y2="${PAD.t+innerH}" stroke="${hi}" stroke-width="1" opacity="0.6" style="display:none" pointer-events="none"/>`
     out += `<circle class="m-fs-dot" r="5" fill="${hi}" stroke="#fff" stroke-width="2" style="display:none" pointer-events="none"/>`
 
     svg.innerHTML = out
-    bindInteraction(svg, def, hi, vals, xOf, yOf, count, stepMins, PAD, innerW, W, minV, maxV)
+    bindInteraction(svg, def, hi, vals, xOf, yOf, count, stepMins, PAD, innerW, W, H, minV, maxV, totalCount)
   }
 
   function getStepMinutes() { return STEP_MINS[currentStep] || 60 }
 
   // ─── Interaction ─────────────────────────────────────────────────────────────
-  function bindInteraction(svg, def, hi, vals, xOf, yOf, count, stepMins, PAD, innerW, W, minV, maxV) {
+  function bindInteraction(svg, def, hi, vals, xOf, yOf, count, stepMins, PAD, innerW, W, H, minV, maxV, totalCount = count) {
     const hRect = svg.querySelector('.m-fs-hover')
     const cross  = svg.querySelector('.m-fs-cross')
     const dot    = svg.querySelector('.m-fs-dot')
@@ -369,21 +480,24 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     function onPos(clientX, clientY) {
       const svgR = svg.getBoundingClientRect()
       const frac = Math.max(0, Math.min(1, (clientX - svgR.left) * (W / svgR.width) - PAD.l) / innerW)
-      const idx  = Math.round(frac * (count - 1))
+      const idx  = Math.round(frac * (totalCount - 1))
       if (idx < 0 || idx >= vals.length) return
       const v = vals[idx], cx = xOf(idx), cy = yOf(v)
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.display = ''
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.style.display = ''
       const wR = layer.querySelector('#m-chart-wrap').getBoundingClientRect()
-      tip.innerHTML = `<div class="m-fs-tip-name">${def.label}</div><div class="m-fs-tip-val" style="color:${hi}">${fmtV(v)} <span class="m-fs-tip-unit">${def.unit}</span></div><div class="m-fs-tip-ts">${xLabel((count-idx)*stepMins)}</div>`
-      tip.style.cssText = `display:block;left:${Math.min(clientX-wR.left+12,wR.width-130)}px;top:${Math.max(clientY-wR.top-10,8)}px`
+      const tipLeft = Math.min(clientX - wR.left + 12, wR.width - 130)
+      const tipTop  = Math.max(clientY - wR.top - 76, 8)
+      tip.innerHTML = `<div class="m-fs-tip-name">${def.label}</div><div class="m-fs-tip-val" style="color:${hi}">${fmtV(v)} <span class="m-fs-tip-unit">${def.unit}</span></div><div class="m-fs-tip-ts">${tipLabel((count-idx)*stepMins, stepMins)}</div>`
+      tip.style.cssText = `display:block;left:${tipLeft}px;top:${tipTop}px`
     }
     function onEnd() { cross.style.display='none'; dot.style.display='none'; tip.style.display='none' }
 
     hRect.addEventListener('pointermove',  e => { e.preventDefault(); onPos(e.clientX, e.clientY) }, { passive: false })
-    hRect.addEventListener('pointerdown',  e => onPos(e.clientX, e.clientY))
-    hRect.addEventListener('pointerup',    onEnd)
-    hRect.addEventListener('pointerleave', onEnd)
+    hRect.addEventListener('pointerdown',  e => { e.currentTarget.setPointerCapture(e.pointerId); onPos(e.clientX, e.clientY) })
+    hRect.addEventListener('pointerup',    e => { if (e.pointerType === 'mouse') onEnd() })
+    hRect.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') onEnd() })
+    hRect.addEventListener('pointercancel', onEnd)
   }
 
   // ─── Wire controls ────────────────────────────────────────────────────────────
@@ -391,18 +505,18 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
 
   layer.querySelector('#m-metric-sel').addEventListener('change', e => {
     currentMetricId = e.target.value
-    layer.querySelector('#m-metric-unit').textContent = METRIC_DEFS[currentMetricId]?.unit || ''
     drawChart()
   })
 
-  layer.querySelector('#m-period-presets').addEventListener('click', e => {
-    const btn = e.target.closest('.m-fs-preset'); if (!btn) return
-    layer.querySelectorAll('.m-fs-preset').forEach(b => b.classList.remove('active'))
-    btn.classList.add('active')
-    currentPeriod = btn.dataset.period
-    const stepSel = layer.querySelector('#m-step-sel')
-    stepSel.value = getDefaultStep(currentPeriod)
-    currentStep = stepSel.value
+  layer.querySelector('#m-period-sel').addEventListener('change', e => {
+    currentPeriod = e.target.value
+    const customRow = layer.querySelector('#m-custom-row')
+    customRow.style.display = currentPeriod === 'custom' ? 'flex' : 'none'
+    if (currentPeriod !== 'custom') {
+      const stepSel = layer.querySelector('#m-step-sel')
+      stepSel.value = getDefaultStep(currentPeriod)
+      currentStep = stepSel.value
+    }
     drawChart()
   })
 
@@ -410,14 +524,29 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     currentStep = e.target.value; drawChart()
   })
 
+  layer.querySelector('#m-custom-from').addEventListener('change', e => { customFromDate = e.target.value; drawChart() })
+  layer.querySelector('#m-custom-to').addEventListener('change', e => { customToDate = e.target.value; drawChart() })
+
   // Config button → bottom sheet
   layer.querySelector('#m-cfg-btn').addEventListener('click', () => {
+    const isPothydr = currentMetricId === 'pothydr'
+    const hasPlages = currentMetricId === 'temp_sol' || currentMetricId === 'teneur'
+
+    const yscaleOpts = [['auto', 'Auto-scale'], ...( isPothydr ? [['seuils', 'Échelle seuils']] : []), ['personnalisee', 'Échelle personnalisée']]
+    const ovOpts = [
+      ...(isPothydr  ? [['seuils', 'Seuils']]                          : []),
+      ...(hasPlages  ? [['plages', 'Plages']]                          : []),
+      ['stades',      'Stades phénologiques'],
+      ['notes',       'Notes'],
+      ['traitements', 'Traitements'],
+    ]
+
     const body = document.createElement('div')
     body.innerHTML = `
       <div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.08)">
         <div style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Échelle Y</div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          ${[['auto','Auto-scale'],['seuils','Échelle seuils'],['personnalisee','Échelle personnalisée']].map(([v,l]) =>
+          ${yscaleOpts.map(([v,l]) =>
             `<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="radio" name="m-yscale" value="${v}"${v===yScaleMode?' checked':''}> ${l}</label>`
           ).join('')}
         </div>
@@ -430,7 +559,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
       <div style="padding:14px 16px">
         <div style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Affichage</div>
         <div style="display:flex;flex-direction:column;gap:10px">
-          ${[['seuils','Seuils'],['plages','Plages'],['stades','Stades phénologiques'],['notes','Notes'],['traitements','Traitements']].map(([k,l]) =>
+          ${ovOpts.map(([k,l]) =>
             `<label style="display:flex;align-items:center;justify-content:space-between;font-size:14px">
               ${l}
               <input type="checkbox" data-ov="${k}"${overlays[k]?' checked':''} style="width:18px;height:18px">

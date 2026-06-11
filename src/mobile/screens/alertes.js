@@ -3,29 +3,17 @@ import { plots }   from '../../data/plots.js'
 import { showToast, showSheet } from '../ui.js'
 
 function generateAlertHistory(alertId) {
-  const scenarios = [
-    { label: 'Seuil dépassé',  desc: 'Conditions déclenchantes vérifiées', duration: '2h34',  resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Notification SMS envoyée',            duration: '45min', resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Valeur mesurée hors plage',           duration: '1h20',  resolved: true  },
-    { label: 'Fausse alerte',  desc: 'Pic transitoire — durée < seuil',     duration: null,    resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Conditions toujours vérifiées',       duration: '3h05',  resolved: true  },
-    { label: 'Alerte en cours',desc: 'Conditions vérifiées depuis ce matin', duration: null,   resolved: false },
-  ]
   const count = 3 + (alertId % 5)
   const now = Date.now()
   return Array.from({ length: count }, (_, i) => {
     const seed = alertId * 17 + i * 7
     const daysAgo = 1 + i * (2 + seed % 6)
-    const ts = new Date(now - daysAgo * 86400000)
-    const s = scenarios[seed % scenarios.length]
-    const d = ts.getDate(), m = ts.getMonth() + 1
+    const startMs = now - daysAgo * 86400000 - (seed % 8) * 3600000
+    const durationMs = (1 + seed % 5) * 3600000 + (seed % 60) * 60000
+    const ongoing = i === 0 && (seed % 7 === 0)
     return {
-      date:   `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}`,
-      heure:  `${String(6 + seed % 14).padStart(2,'0')}h${String(seed % 60).padStart(2,'0')}`,
-      label:  s.label,
-      desc:   s.desc,
-      duration: s.duration,
-      resolved: i > 0 ? true : s.resolved,
+      start: new Date(startMs),
+      end: ongoing ? null : new Date(startMs + durationMs),
     }
   })
 }
@@ -194,14 +182,13 @@ export function initAlertesScreen(screenEl, role) {
           rows.appendChild(perimRow)
           body.appendChild(rows)
 
+          const fmt = d => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
           const histDiv = document.createElement('div')
           histDiv.innerHTML = `<div class="m-history-title">Déclenchements</div>
             ${history.map(h => `<div class="m-history-row">
-              <div class="m-history-dot" style="background:${h.resolved ? '#30d158' : '#ff9f0a'}"></div>
+              <div class="m-history-dot" style="background:${h.end ? '#30d158' : '#ff9f0a'}"></div>
               <div class="m-history-info">
-                <div class="m-history-when">${h.date} à ${h.heure}${h.duration ? ` · ${h.duration}` : ''}</div>
-                <div class="m-history-label">${h.label}</div>
-                <div class="m-history-desc">${h.desc}</div>
+                <div class="m-history-when">${fmt(h.start)} → <span style="color:${h.end ? 'inherit' : '#ff9f0a'}">${h.end ? fmt(h.end) : 'En cours'}</span></div>
               </div></div>`).join('')}`
           body.appendChild(histDiv)
 

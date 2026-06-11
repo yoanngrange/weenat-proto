@@ -162,7 +162,7 @@ function render() {
   tbody.innerHTML = ''
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
     updateActionBar()
     return
   }
@@ -213,8 +213,7 @@ function render() {
         ` : ''}
       </td>
       <td class="member-email">${formatDate(org.dateAdhesion)}</td>
-      <td class="member-email">${org.ville}</td>
-      <td class="member-email">${org.departement}</td>
+      <td class="member-email">${[org.ville, org.departement].filter(Boolean).join(' · ')}</td>
       <td class="admin-links-cell">${membresHtml}</td>
       <td class="num">${orgSensors.length}</td>
       <td class="num">${orgParcels.length}</td>
@@ -358,8 +357,7 @@ function sortKey(o, col) {
   if (col === 'plan')        return o.plan
   if (col === 'statut')      return o.statut
   if (col === 'date')        return o.dateAdhesion || ''
-  if (col === 'ville')       return o.ville.toLowerCase()
-  if (col === 'dept')        return o.departement.toLowerCase()
+  if (col === 'ville')       return `${o.ville} ${o.departement}`.toLowerCase()
   if (col === 'capteurs')    return String(sensors.filter(s => s.orgId === o.id).length).padStart(6, '0')
   if (col === 'parcelles')   return String(plots.filter(p => p.orgId === o.id).length).padStart(6, '0')
   if (col === 'membres')     return String(members.filter(m => m.orgIds.includes(o.id)).length).padStart(6, '0')

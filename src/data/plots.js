@@ -61,19 +61,19 @@ export const plots = [
   // ── Ferme du Bocage (orgId:1) — contours RPG réels, Morbihan ────────────────
   {
     id: 1, env: "plein champ", orgId: 1, name: "Le Grand Pré", ville: "Pleugriffet", lat: 48.0970, lng: -2.4885,
-    area: 8.4, reserveHydrique: 72, degresJour: 1210, texture: "Limon argileux", integrations: ["IRRÉ-LIS Mono-Culture"],
+    area: 8.4, reserveHydrique: 72, degresJour: 1210, texture: "Limon argileux", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.098485,-2.491716],[48.094864,-2.489461],[48.095270,-2.485384],[48.099325,-2.487466]]
   },
   {
     id: 2, env: "plein champ", orgId: 1, name: "Les Trois Arpents", ville: "Réguiny", lat: 48.1014, lng: -2.4809,
     area: 5.2, crop: "Maïs", reserveHydrique: 58, degresJour: 1140, texture: "Limon argilo-sableux",
-    irrigation: "Pivot", integrations: ["IRRÉ-LIS Mono-Culture"],
+    irrigation: "Pivot", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.100716,-2.483735],[48.099760,-2.478227],[48.101643,-2.477836],[48.102367,-2.481090],[48.101701,-2.481133],[48.102106,-2.483562]]
   },
   {
     id: 3, orgId: 1, name: "La Petite Lande", ville: "Réguiny", lat: 48.0930, lng: -2.4674,
     area: 3.9, crop: "Fraise", reserveHydrique: 64, degresJour: 1080, texture: "Argile sableux",
-    irrigation: "Micro aspersion", integrations: ["IRRÉ-LIS Mono-Culture"],
+    irrigation: "Micro aspersion", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.091107,-2.471167],[48.089614,-2.469996],[48.090574,-2.468027],[48.091426,-2.465101],[48.092813,-2.462121],[48.094447,-2.463718],[48.094660,-2.465793],[48.095229,-2.467070],[48.095122,-2.469358],[48.094092,-2.470102],[48.094056,-2.469251]]
   },
   {
@@ -89,12 +89,12 @@ export const plots = [
   },
   {
     id: 6, env: "plein champ", orgId: 1, name: "Le Champ du Moulin", ville: "Guégon", lat: 48.1183, lng: -2.5873,
-    area: 6.3, reserveHydrique: 88, degresJour: 1050, texture: null, integrations: ["IRRÉ-LIS Mono-Culture"],
+    area: 6.3, reserveHydrique: 88, degresJour: 1050, texture: null, integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.118758,-2.592324],[48.116395,-2.591008],[48.116800,-2.586810],[48.118387,-2.582511],[48.119434,-2.584028],[48.119805,-2.587215]]
   },
   {
     id: 7, env: "plein champ", orgId: 1, name: "La Croix", ville: "La Chapelle-Caro", lat: 48.1285, lng: -2.5837,
-    area: 4.1, reserveHydrique: 55, degresJour: 1010, texture: "Sable", integrations: ["IRRÉ-LIS Mono-Culture"],
+    area: 4.1, reserveHydrique: 55, degresJour: 1010, texture: "Sable", integrations: ["IRRÉ-LIS Multi-Cultures"],
     latlngs: [[48.130063,-2.587041],[48.127025,-2.585169],[48.125978,-2.583298],[48.126451,-2.582893],[48.127194,-2.583551],[48.129388,-2.578847],[48.130435,-2.583703],[48.131076,-2.585220]]
   },
   {
@@ -394,7 +394,10 @@ export const plots = [
   { id: 251, env: "serre", orgId: 1, name: "Le Bois Taillis",   ville: "Saint-Congard",    lat: 48.162, lng: -2.528, area: 4.8,  crop: "Pomme de terre",    reserveHydrique: 65, degresJour: 1050, texture: "Limon sableux",        irrigation: "Couverture intégrale",    integrations: [], shape: { type: "rectangle", width: 160, height: 112 } },
   { id: 252, env: "plein champ", orgId: 1, name: "La Vigne Neuve",    ville: "Sérent",           lat: 48.216, lng: -2.452, area: 5.3,  crop: "Tournesol",         reserveHydrique: 55, degresJour: 1265, texture: "Sable limoneux",       irrigation: "Goutte à goutte enterré", integrations: [], shape: { type: "rectangle", width: 168, height: 118 } },
   { id: 253, env: "serre", orgId: 1, name: "Le Moulin Neuf",    ville: "Bignan",           lat: 48.031, lng: -2.795, area: 8.4,  crop: "Blé tendre",        reserveHydrique: 80, degresJour: 1180, texture: "Limon argileux",               integrations: [], shape: { type: "rectangle", width: 210, height: 150 } },
-  { id: 254, env: "plein champ", orgId: 1, name: "La Fontaine",       ville: "Pleugriffet",      lat: 48.101, lng: -2.502, area: 6.4,              reserveHydrique: 61, degresJour: 1142, texture: "Limon argilo-sableux", irrigation: "Pivot",                   integrations: [], shape: { type: "rectangle", width: 185, height: 132 } }
+  { id: 254, env: "plein champ", orgId: 1, name: "La Fontaine",       ville: "Pleugriffet",      lat: 48.101, lng: -2.502, area: 6.4,              reserveHydrique: 61, degresJour: 1142, texture: "Limon argilo-sableux", irrigation: "Pivot",                   integrations: [], shape: { type: "rectangle", width: 185, height: 132 } },
+
+  // ── GAEC Jourdain (orgId:41) — Allier ────────────────────────────────────────
+  { id: 255, env: "plein champ", orgId: 41, name: "Le Grand Champ", ville: "Saint-Pourçain-sur-Sioule", lat: 46.3021, lng: 3.2938, area: 12.5, crop: "Blé tendre", reserveHydrique: 70, degresJour: 1100, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 230, height: 200 } }
 ]
 
 plots.forEach(p => {

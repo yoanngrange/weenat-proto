@@ -34,6 +34,28 @@ const METRICS = [
   { id: 'humectation', label: 'Humectation foliaire',  unit: '%',          aggs: ['Actuel', 'Heures du jour'],           defaultAgg: 'Actuel'           },
 ]
 
+function contrastColor(hex) {
+  const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16)
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.5 ? '#000000' : '#ffffff'
+}
+
+function getMetricColor(id, v) {
+  switch (id) {
+    case 'pluie':       return v < 8 ? '#C1E1FF' : v < 18 ? '#2E75B6' : '#0B3A64'
+    case 'irrigation':  return v === 0 ? '#c7c7cc' : v < 30 ? '#FFDFB8' : '#FF8C00'
+    case 'etp':         return v < 2 ? '#D6EDF9' : v < 5 ? '#2E75B6' : '#0B3A64'
+    case 'temp':        return v < 12 ? '#FEE7B4' : v < 18 ? '#FBAF05' : '#7D5702'
+    case 'temp_rosee':  return v < 5 ? '#D2DEFA' : v < 12 ? '#5E88EC' : '#1B56E4'
+    case 'rayonnement': return v < 200 ? '#FBFBB6' : v < 400 ? '#CBCB0B' : '#838307'
+    case 'rfu':         return v < 30 ? '#E05252' : v < 60 ? '#FBAF05' : '#24B066'
+    case 'hum':         return v < 40 ? '#E3C7FF' : v < 70 ? '#5B12A4' : '#29084A'
+    case 'vent':        return v < 15 ? '#E1E1E1' : v < 30 ? '#616161' : '#343232'
+    case 'par':         return v < 500 ? '#F9EED2' : v < 1200 ? '#E8B44C' : '#9B6E00'
+    case 'humectation': return v < 30 ? '#B2FFF9' : v < 70 ? '#00887E' : '#003D39'
+    default:            return '#0172A4'
+  }
+}
+
 function irrigSum(plotId, agg) {
   const today = new Date().toISOString().split('T')[0]
   const ago = d => { const dt = new Date(); dt.setDate(dt.getDate() - d); return dt.toISOString().split('T')[0] }
@@ -116,7 +138,7 @@ export function initParcellesScreen(screenEl, role) {
     const plots  = getPlots()
 
     const orgOpts = isAdmin ? `
-      <select class="m-filter-select" id="org-filter">
+      <select class="m-filter-select" id="org-filter" style="flex:0 0 44px;height:44px">
         <option value="all">Toutes les organisations</option>
         <option value="${ADMIN_ORG_ID}"${orgFilter === String(ADMIN_ORG_ID) ? ' selected' : ''}>Breiz'Agri Conseil (réseau)</option>
         ${adherentOrgs.map(o => `<option value="${o.id}"${orgFilter === String(o.id) ? ' selected' : ''}>${o.name}</option>`).join('')}
@@ -134,14 +156,15 @@ export function initParcellesScreen(screenEl, role) {
       ? `<div class="m-plain-list">${sorted.map(p => {
           const sub  = [p.crop, p.irrigation].filter(Boolean).join(' · ')
           const has  = hasMetric(p, metricId)
+          const parcelAnomaly = allSensors.filter(s => s.parcelIds.includes(p.id)).some(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
           return `
             <div class="m-plain-row m-tappable" data-plot-id="${p.id}">
               <div class="m-plain-info">
-                <span class="m-plain-name">${p.name}</span>
+                <span class="m-plain-name">${p.name}${parcelAnomaly ? ' <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff3b30;vertical-align:middle;margin-left:3px"></span>' : ''}</span>
                 ${sub ? `<span class="m-plain-city">${sub}</span>` : ''}
               </div>
               <div style="display:flex;align-items:center;gap:6px">
-                <span class="m-plain-data${has ? '' : ' m-plain-na'}">${has && !(metricId === 'irrigation' && !IRRIG_SEASON.some(i => i.plotId === p.id)) ? `${getVal(p.id)} ${metric.unit}` : '—'}</span>
+                ${(() => { const hasV = has && !(metricId === 'irrigation' && !IRRIG_SEASON.some(i => i.plotId === p.id)); const v = hasV ? getVal(p.id) : null; return `<span class="m-plain-data${hasV ? '' : ' m-plain-na'}"${hasV ? ` style="color:${getMetricColor(metricId, v)}"` : ''}>${hasV ? `${v} ${metric.unit}` : '—'}</span>` })()}
                 <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:12px"></i>
               </div>
             </div>`}).join('')}</div>`
@@ -189,8 +212,11 @@ export function initParcellesScreen(screenEl, role) {
         const openDetail = () => initParcelDetail(p, linkedSensorIds)
         const center = [p.lat, p.lng]
 
+        const hasMet = hasMetric(p, metricId) && hasIrrig
+        const dotColor = hasMet ? getMetricColor(metricId, getVal(p.id)) : '#0172A4'
+
         if (p.latlngs && p.latlngs.length >= 3) {
-          const poly = L.polygon(p.latlngs, { color: '#fff', weight: 2, fillColor: '#0172A4', fillOpacity: 0.35 }).addTo(mapInstance)
+          const poly = L.polygon(p.latlngs, { color: '#fff', weight: 2, fillColor: dotColor, fillOpacity: 0.35 }).addTo(mapInstance)
           poly.on('click', openDetail)
           bounds.push(...p.latlngs)
         } else {
@@ -198,15 +224,32 @@ export function initParcellesScreen(screenEl, role) {
         }
 
         // Centroïde cliquable — tooltip uniquement si la parcelle a la métrique
-        const hasMet = hasMetric(p, metricId) && hasIrrig
         const dot = L.circleMarker(center, {
           radius: hasMet ? 8 : 6,
           color: '#fff', weight: 2,
-          fillColor: '#0172A4',
+          fillColor: dotColor,
           fillOpacity: hasMet ? 0.95 : 0.4,
         }).addTo(mapInstance)
+        const linkedAnomaly = linkedSensorIds.some(id => { const s = allSensors.find(x => x.id === id); return s?.event && (Array.isArray(s.event) ? s.event.length > 0 : true) })
+        if (linkedAnomaly) {
+          L.marker(center, {
+            icon: L.divIcon({ className: '', html: '<div style="width:10px;height:10px;border-radius:50%;background:#ff3b30;border:2px solid #fff;transform:translate(3px,5px)"></div>', iconSize: [0,0], iconAnchor: [0,0] }),
+            interactive: false, zIndexOffset: 500,
+          }).addTo(mapInstance)
+        }
         if (hasMet) {
           dot.bindTooltip(label, { permanent: true, direction: 'top', className: 'm-map-tip', interactive: true })
+          const applyTipStyle = el => {
+            if (!el) return
+            const tc = contrastColor(dotColor)
+            el.style.setProperty('background', dotColor, 'important')
+            el.style.setProperty('color', tc, 'important')
+            el.style.setProperty('border-color', tc, 'important')
+            el.style.setProperty('box-shadow', 'none', 'important')
+          }
+          const ttEl = dot.getTooltip()?.getElement()
+          if (ttEl) applyTipStyle(ttEl)
+          dot.on('tooltipopen', e => applyTipStyle(e.tooltip.getElement()))
         }
         dot.on('click', openDetail)
       })

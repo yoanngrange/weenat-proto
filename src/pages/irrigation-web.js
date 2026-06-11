@@ -486,6 +486,9 @@ function openSaison(preselect = null) {
         ${shownP.map(p => `<span class="iw-apercu-plot-tag">${p.name}</span>`).join('')}${hiddenP.length ? `<span class="iw-apercu-plot-more">+ ${hiddenP.length} autre${hiddenP.length > 1 ? 's' : ''}</span>` : ''}
       </div>`
 
+    const totalArea = affectedPlots.reduce((s, p) => s + (p.area ?? 0), 0)
+    const totalM3ap = totalArea > 0 ? Math.round(occs.length * qty * totalArea * 10) : 0
+
     return `
       <div class="iw-apercu-summary">
         <div>
@@ -494,7 +497,7 @@ function openSaison(preselect = null) {
         </div>
         <div style="text-align:right">
           <div class="iw-apercu-big">${occs.length * qty} mm</div>
-          <div class="iw-apercu-sub">${n} parcelle${n > 1 ? 's' : ''} · ${qty} mm/irrig.</div>
+          <div class="iw-apercu-sub">${n} parcelle${n > 1 ? 's' : ''} · ${qty} mm/irrig.${totalM3ap > 0 ? ` · ${totalM3ap.toLocaleString('fr-FR')} m³` : ''}</div>
         </div>
       </div>
       ${plotsRecap}
@@ -611,7 +614,7 @@ function openEditIrrigModal(ir, onDone) {
   ov.innerHTML = `
     <div class="iw-modal" style="max-width:420px;width:95%">
       <div class="iw-modal-hd">
-        <span class="iw-modal-title">${ir.real ? "Modifier l'irrigation réalisée" : "Modifier l'irrigation planifiée"}</span>
+        <span class="iw-modal-title">${ir.real ? "Modifier l'irrigation effectuée" : "Modifier l'irrigation planifiée"}</span>
         <button class="iw-modal-close" id="iw-close">×</button>
       </div>
       <div class="iw-modal-body">
@@ -935,7 +938,7 @@ function openVoirIrrigations(plotId = null) {
         <div class="iw-list-date"><span style="font-size:15px;font-weight:700;color:${col}">${dd}</span><span style="font-size:10px;color:${col}">/${mm}</span></div>
         <div style="flex:1">
           <div class="iw-list-label">${plotName}</div>
-          <div class="iw-list-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div>
+          <div class="iw-list-status" style="color:${col}">${ir.real ? 'Effectuée' : 'Planifiée'}</div>
         </div>
         <div class="iw-list-mm" style="color:${col}">${ir.mm} mm</div>
         <button class="iw-edit-btn" data-iidx="${idx}">✎</button>

@@ -199,16 +199,24 @@ function renderNotifPrefs() {
   const cats = [
     { key: 'orgs',     label: 'Organisations', icon: 'bi-building' },
     { key: 'capteurs', label: 'Capteurs',       icon: 'bi-broadcast' },
+    { key: 'alertes',  label: 'Alertes',        icon: 'bi-bell' },
   ]
   const channels = [
     { key: 'email', label: 'Email',             icon: 'bi-envelope' },
     { key: 'sms',   label: 'SMS',               icon: 'bi-phone' },
     { key: 'push',  label: 'Notification push', icon: 'bi-bell' },
   ]
+  const perimeterOpts = [
+    { value: 'reseau',        label: 'Mon réseau' },
+    { value: 'organisation',  label: 'Mon organisation' },
+    { value: 'secteur',       label: 'Mon secteur' },
+  ]
+  const defaultPerimeters = { orgs: 'organisation', capteurs: 'reseau', alertes: 'secteur' }
 
-  return `<div class="notif-prefs-grid">
+  return `<div class="notif-prefs-grid" style="grid-template-columns: 1fr repeat(3, auto) auto">
     <div></div>
     ${channels.map(c => `<div class="notif-prefs-channel"><i class="bi ${c.icon}"></i> ${c.label}</div>`).join('')}
+    <div class="notif-prefs-channel" title="Périmètre de déclenchement"><i class="bi bi-geo-alt"></i> Périmètre</div>
     ${cats.map(cat => `
       <div class="notif-prefs-cat"><i class="bi ${cat.icon}"></i> ${cat.label}</div>
       ${channels.map(ch => `
@@ -219,6 +227,11 @@ function renderNotifPrefs() {
           </label>
         </div>
       `).join('')}
+      <div class="notif-prefs-cell">
+        <select class="notif-peri-sel" data-cat="${cat.key}">
+          ${perimeterOpts.map(o => `<option value="${o.value}"${o.value === defaultPerimeters[cat.key] ? ' selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+      </div>
     `).join('')}
   </div>`
 }

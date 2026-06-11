@@ -13,10 +13,13 @@ import { initParcellesScreen }    from './screens/parcelles.js'
 import { initCapteursScreen }     from './screens/capteurs.js'
 import { initExploitationScreen } from './screens/exploitation.js'
 import { initReseauScreen }       from './screens/reseau.js'
+import { showOnboarding }         from './screens/onboarding.js'
 
 // ─── Role (URL param: ?role=admin | ?role=adherent, défaut: admin) ─────────────
 const urlParams = new URLSearchParams(window.location.search)
-export const role = urlParams.get('role') === 'adherent' ? 'adherent' : 'admin'
+const _roleParam = urlParams.get('role')
+const _onboardingRoles = new Set(['new', 'new-adherent', 'new-member-admin', 'new-member-agent', 'new-member-reader'])
+export const role = _roleParam === 'adherent' ? 'adherent' : _onboardingRoles.has(_roleParam) ? _roleParam : 'admin'
 
 // ─── Live clock ───────────────────────────────────────────────────────────────
 
@@ -31,9 +34,9 @@ setInterval(updateClock, 10000)
 
 // ─── Tab router ───────────────────────────────────────────────────────────────
 
-const TAB_ORDER = ['dashboard', 'parcelles', 'capteurs', 'alertes', 'parametres']
+const TAB_ORDER = ['parcelles', 'capteurs', 'dashboard', 'alertes', 'parametres']
 
-let activeTab = 'dashboard'
+let activeTab = 'parcelles'
 
 function navigateTo(tab) {
   if (!TAB_ORDER.includes(tab) || tab === activeTab) return
@@ -181,6 +184,9 @@ function initParamSegment() {
 initParamSegment()
 
 // ─── Screens init ─────────────────────────────────────────────────────────────
+if (_onboardingRoles.has(role)) showOnboarding(role, () => {
+  if (role === 'new' || role === 'new-adherent') navigateTo('dashboard')
+})
 initDashboardScreen(document.getElementById('screen-dashboard'), role)
 initParcellesScreen(document.getElementById('screen-parcelles'), role)
 initCapteursScreen(document.getElementById('screen-capteurs'), role)

@@ -2,6 +2,7 @@ export const ADHERENT_ORG_ID = 1
 export const ADMIN_ORG_ID    = 100
 
 export const IRRIG_TYPES = [
+  'Non renseigné',
   'Enrouleur', 'Pivot', 'Rampe', 'Couverture intégrale', 'Gravitaire',
   'Goutte à goutte', 'Goutte à goutte enterré', 'Micro aspersion', 'Non irrigué',
 ]
@@ -15,7 +16,6 @@ export const SOIL_TYPES = [
 
 export const METIERS = [
   'Arboriculture', 'Viticulture', 'Maraîchage', 'Grandes cultures', 'Polyculture-Élevage',
-  'Pépiniériste', 'Floriculture', 'Trufficulture', 'Compostage',
-  'Organismes publics / semi-publics', 'Coopérative', 'Négoce', 'Concessionnaire',
-  'Semencier', 'Laboratoire / Institut / Recherche', 'Collectivité territoriale', 'Syndicat', 'Autre',
+  'Pépiniériste', 'Floriculture', 'Trufficulture',
+  'Coopérative', 'Autre',
 ]

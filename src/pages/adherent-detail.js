@@ -80,7 +80,7 @@ function renderStats() {
     { label: 'Surface',    value: `${surface.toFixed(1)} ha` },
     { label: 'Capteurs',   value: orgSensors.length },
     { label: 'Évènements', value: withEvents, warn: withEvents > 0 },
-    { label: 'Membres',    value: orgMembers }
+    ...(org.plan !== 'Essential' ? [{ label: 'Membres', value: orgMembers }] : [])
   ]
 
   document.getElementById('org-stats-cards').innerHTML = cards.map(c => `
@@ -166,18 +166,23 @@ function renderSensors() {
 function renderPanel() {
   renderPanelIdent()
   renderPanelLoc()
-  renderPanelMembres()
+  if (org.plan !== 'Essential') {
+    renderPanelMembres()
+  } else {
+    document.getElementById('panel-membres').closest('.panel-section').style.display = 'none'
+  }
 }
 
 function renderPanelIdent() {
   const rows = [
-    ['Code adhérent',    org.codeAdherent],
-    ['Propriétaire',     `${org.prenomProprietaire} ${org.nomProprietaire}`],
-    ['Plan',             org.plan],
-    ['Date adhésion',    formatDate(org.dateAdhesion)],
-    ['Email',            `<a href="mailto:${org.email}" class="admin-link">${org.email}</a>`],
-    ['Téléphone',        org.telephone || '—'],
-    ['SIRET',            org.siret ? `<span style="font-family:var(--mono);font-size:11px">${org.siret}</span>` : '—'],
+    ...(org.codeAdherent ? [['Code adhérent', org.codeAdherent]] : []),
+    ['Propriétaire',  `${org.prenomProprietaire} ${org.nomProprietaire}`],
+    ...(org.metiers && org.metiers.length ? [['Métier', org.metiers.join(', ')]] : []),
+    ['Plan',          org.plan],
+    ['Date adhésion', formatDate(org.dateAdhesion)],
+    ['Email',         `<a href="mailto:${org.email}" class="admin-link">${org.email}</a>`],
+    ['Téléphone',     org.telephone || '—'],
+    ['SIRET',         org.siret ? `<span style="font-family:var(--mono);font-size:11px">${org.siret}</span>` : '—'],
   ]
   document.getElementById('panel-ident').innerHTML = rows.map(([k, v]) =>
     `<div class="panel-row"><span class="panel-key">${k}</span><span class="panel-val">${v}</span></div>`

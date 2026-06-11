@@ -4,7 +4,7 @@ import { sensors as allSensors } from '../data/sensors.js'
 import { orgs } from '../data/orgs.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
-import { getParcel, patchParcel } from '../data/store.js'
+import { getParcel, patchParcel, getOrgData } from '../data/store.js'
 import { IRRIG_SEASON } from '../data/irrigations.js'
 import { IRRIG_TYPES, SOIL_TYPES } from '../data/constants.js'
 
@@ -137,11 +137,11 @@ const CAPA_MODELS = ['CAPA-30-3', 'CAPA-60-6']
 
 const MODEL_NAMES = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
-  'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre', 'T_MINI': 'Thermomètre de sol',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermomètre-hygromètre', 'T_MINI': 'Thermomètre de sol',
   'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
-  'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'LWS': "Capteur d'humectation foliaire", 'T_GEL': 'Capteur de gel',
   'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
-  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde fertirrigation',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde de fertirrigation',
 }
 
 function renderWindCompositeChart(container, source = null, emissionMins = null, cardKey = null) {
@@ -435,31 +435,45 @@ function autoEvents() {
   return evts
 }
 
+const NEW_JOURNAL_TYPES = new Set(['culture', 'stade', 'irrigation', 'cycle'])
+
+function buildNewTypeDemo(author1, author2) {
+  const crop = parcelBase.crop || 'Blé tendre'
+  return [
+    { id: 1743465600000, type: 'cycle',     date: '2026-03-01', auteur: author1, action: 'début', annee: '2026', texte: 'Mise en place de la saison 2026' },
+    { id: 1743897600000, type: 'culture',   date: '2026-03-06', auteur: author1, action: 'modification', culture: crop, texte: 'Culture confirmée pour la saison 2026' },
+    { id: 1744329600000, type: 'stade',     date: '2026-04-11', auteur: author1, stade: 'BBCH 21 — Tallage actif', culture: crop, texte: '' },
+    { id: 1744761600000, type: 'irrigation',date: '2026-04-16', auteur: author1, volume: 25, unite: 'mm', methode: 'Aspersion', texte: 'Déclenchement suite alerte potentiel hydrique' },
+    { id: 1745366400000, type: 'stade',     date: '2026-04-23', auteur: author2, stade: 'BBCH 30 — Début montaison', culture: crop, texte: '' },
+    { id: 1745798400000, type: 'irrigation',date: '2026-04-28', auteur: author1, volume: 30, unite: 'mm', methode: 'Aspersion', texte: '' },
+    { id: 1746057600000, type: 'stade',     date: '2026-05-01', auteur: author2, stade: 'BBCH 45 — Gonflement épis', culture: crop, texte: 'Développement homogène sur la parcelle' },
+  ]
+}
+
 function getJournal() {
-  try {
-    const raw = localStorage.getItem(JOURNAL_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch (_) {}
   const isAdherentParcel = parcelBase.orgId === 1
   const author1 = isAdherentParcel ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
   const author2 = isAdherentParcel ? 'Marie Martin' : 'Sophie Dubois'
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const hasNew = parsed.some(e => NEW_JOURNAL_TYPES.has(e.type))
+        if (!hasNew) {
+          const merged = [...buildNewTypeDemo(author1, author2), ...parsed]
+          localStorage.setItem(JOURNAL_KEY, JSON.stringify(merged))
+          return merged
+        }
+        return parsed
+      }
+    }
+  } catch (_) {}
   const demo = [
-    {
-      id: 1746921600000, type: 'note', category: 'Observation générale',
-      date: '2026-05-11', auteur: author1,
-      texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',
-    },
-    {
-      id: 1747353600000, type: 'traitement',
-      date: '2026-05-16', auteur: author2,
-      texte: 'Application conforme aux conditions météo. Vent < 2 m/s.',
-      produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons',
-    },
-    {
-      id: 1747785600000, type: 'note', category: 'Stade phénologique',
-      date: '2026-05-21', auteur: author1,
-      texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.',
-    },
+    { id: 1746921600000, type: 'note',      category: 'Observation générale', date: '2026-05-11', auteur: author1, texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.' },
+    { id: 1747353600000, type: 'traitement',date: '2026-05-16', auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons' },
+    { id: 1747785600000, type: 'note',      category: 'Observation générale', date: '2026-05-21', auteur: author1, texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.' },
+    ...buildNewTypeDemo(author1, author2),
   ]
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(demo))
   return demo
@@ -478,19 +492,39 @@ function renderJournalTab() {
 
   const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
   const CONFIG = {
-    note:         { label: 'Note',         icon: 'bi-pencil',        dotCls: 'note',         badgeCls: 'note'         },
-    traitement:   { label: 'Traitement',   icon: 'bi-eyedropper',    dotCls: 'traitement',   badgeCls: 'traitement'   },
-    modification: { label: 'Modification', icon: 'bi-pencil-square', dotCls: 'modification', badgeCls: 'modification' },
+    note:         { label: 'Note',             icon: 'bi-pencil',          dotCls: 'note',         badgeCls: 'note'         },
+    traitement:   { label: 'Traitement',        icon: 'bi-eyedropper',      dotCls: 'traitement',   badgeCls: 'traitement'   },
+    modification: { label: 'Modification',      icon: 'bi-pencil-square',   dotCls: 'modification', badgeCls: 'modification' },
+    culture:      { label: 'Culture',           icon: 'bi-flower1',         dotCls: 'culture',      badgeCls: 'culture'      },
+    cycle:        { label: 'Cycle cultural',    icon: 'bi-arrow-repeat',    dotCls: 'cycle',        badgeCls: 'cycle'        },
+    stade:        { label: 'Stade phéno.',      icon: 'bi-calendar2-check', dotCls: 'stade',        badgeCls: 'stade'        },
+    irrigation:   { label: 'Irrigation',        icon: 'bi-droplet-half',    dotCls: 'irrigation',   badgeCls: 'irrigation'   },
   }
+  const ADD_ITEMS = [
+    { type: 'note',       label: 'Note',                       icon: 'bi-pencil-square' },
+    { type: 'traitement', label: 'Traitement phytosanitaire',  icon: 'bi-eyedropper' },
+    null,
+    { type: 'culture',    label: 'Culture',                    icon: 'bi-flower1' },
+    { type: 'stade',      label: 'Stade phénologique',         icon: 'bi-calendar2-check' },
+    { type: 'irrigation', label: 'Irrigation',                 icon: 'bi-droplet-half' },
+    { type: 'cycle',      label: 'Cycle cultural',             icon: 'bi-arrow-repeat' },
+  ]
 
   let html = `
     <div class="journal-add-bar">
-      <button class="btn-secondary btn-sm" id="jrn-add-note" style="gap:6px">
-        <i class="bi bi-pencil-square"></i> Ajouter une Note
-      </button>
-      <button class="btn-secondary btn-sm" id="jrn-add-traitement" style="gap:6px">
-        <i class="bi bi-eyedropper"></i> Ajouter un Traitement
-      </button>
+      <div class="jrn-add-wrap" id="jrn-add-wrap">
+        <button class="btn-primary btn-sm" id="jrn-add-btn" style="gap:6px">
+          <i class="bi bi-plus-lg"></i> Ajouter
+          <i class="bi bi-chevron-down" style="font-size:10px;margin-left:1px"></i>
+        </button>
+        <div class="jrn-add-menu" id="jrn-add-menu">
+          ${ADD_ITEMS.map(item => item === null
+            ? `<div class="jrn-add-sep"></div>`
+            : `<button class="jrn-add-item" data-type="${item.type}">
+                <i class="bi ${item.icon}"></i> ${item.label}
+               </button>`).join('')}
+        </div>
+      </div>
     </div>
     <div class="journal-timeline">
   `
@@ -523,6 +557,22 @@ function renderJournalTab() {
                 ${e.dose    ? `<span class="jrn-entry-meta-chip"><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
                 ${e.cible   ? `<span class="jrn-entry-meta-chip"><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
               </div>` : ''}
+            ${e.type === 'culture' ? `<div class="jrn-entry-meta">
+                <span class="jrn-entry-meta-chip"><i class="bi bi-tag"></i>${e.action === 'ajout' ? 'Ajout' : e.action === 'retrait' ? 'Retrait' : 'Modification'}</span>
+                ${e.culture ? `<span class="jrn-entry-meta-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'stade' ? `<div class="jrn-entry-meta">
+                ${e.stade   ? `<span class="jrn-entry-meta-chip"><i class="bi bi-diagram-3"></i>${e.stade}</span>` : ''}
+                ${e.culture ? `<span class="jrn-entry-meta-chip">${e.culture}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'irrigation' ? `<div class="jrn-entry-meta">
+                ${e.volume  ? `<span class="jrn-entry-meta-chip"><i class="bi bi-droplet-fill"></i>${e.volume} ${e.unite || 'mm'}</span>` : ''}
+                ${e.methode ? `<span class="jrn-entry-meta-chip"><i class="bi bi-water"></i>${e.methode}</span>` : ''}
+              </div>` : ''}
+            ${e.type === 'cycle' ? `<div class="jrn-entry-meta">
+                <span class="jrn-entry-meta-chip"><i class="bi bi-arrow-right-circle"></i>${e.action === 'fin' ? 'Fin de cycle' : 'Début de cycle'}</span>
+                ${e.annee ? `<span class="jrn-entry-meta-chip"><i class="bi bi-calendar3"></i>${e.annee}</span>` : ''}
+              </div>` : ''}
             ${e.imageIds?.length ? `<div class="jrn-entry-photos-row" data-entry-id="${e.id}"></div>` : ''}
           </div>
         </div>
@@ -533,8 +583,13 @@ function renderJournalTab() {
   html += `</div>`
   el.innerHTML = html
 
-  el.querySelector('#jrn-add-note').addEventListener('click', () => openJournalForm('note'))
-  el.querySelector('#jrn-add-traitement').addEventListener('click', () => openJournalForm('traitement'))
+  const addBtn  = el.querySelector('#jrn-add-btn')
+  const addMenu = el.querySelector('#jrn-add-menu')
+  addBtn?.addEventListener('click', e => { e.stopPropagation(); addMenu.classList.toggle('open') })
+  document.addEventListener('click', () => addMenu?.classList.remove('open'))
+  el.querySelectorAll('.jrn-add-item').forEach(item => {
+    item.addEventListener('click', () => { addMenu.classList.remove('open'); openJournalForm(item.dataset.type) })
+  })
 
   el.querySelectorAll('.jrn-entry-delete').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -568,13 +623,129 @@ function renderJournalTab() {
 }
 
 function openJournalForm(type) {
-  const isTraitement = type === 'traitement'
+  const TITLES = {
+    note: 'Ajouter une note', traitement: 'Ajouter un traitement',
+    culture: 'Culture — événement', stade: 'Stade phénologique',
+    irrigation: 'Irrigation', cycle: 'Cycle cultural',
+  }
+  const crop = parcelBase.crop || ''
+  const EXTRA = {
+    note: `
+      <div class="journal-form-row">
+        <label class="journal-form-label">Catégorie</label>
+        <select id="jrn-f-category" class="journal-form-input">
+          ${NOTE_CATEGORIES.map(c => `<option>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Texte</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Votre note…"></textarea>
+      </div>`,
+    traitement: `
+      <div class="journal-form-row">
+        <label class="journal-form-label">Observations</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Conditions météo, observations…"></textarea>
+      </div>
+      <div class="journal-form-grid">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Produit</label>
+          <input type="text" id="jrn-f-produit" class="journal-form-input" placeholder="Ex : Bordeaux mixture">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Dose</label>
+          <input type="text" id="jrn-f-dose" class="journal-form-input" placeholder="Ex : 2 kg/ha">
+        </div>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Cible (maladie / ravageur)</label>
+        <input type="text" id="jrn-f-cible" class="journal-form-input" placeholder="Ex : Mildiou">
+      </div>`,
+    culture: `
+      <div class="journal-form-row">
+        <label class="journal-form-label">Action</label>
+        <select id="jrn-f-action" class="journal-form-input">
+          <option value="ajout">Ajout de culture</option>
+          <option value="modification" selected>Modification de culture</option>
+          <option value="retrait">Retrait de culture</option>
+        </select>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Culture</label>
+        <input type="text" id="jrn-f-culture" class="journal-form-input" value="${crop}" placeholder="Ex : Blé tendre">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Note</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Précisions…"></textarea>
+      </div>`,
+    stade: `
+      <div class="journal-form-row">
+        <label class="journal-form-label">Stade (BBCH)</label>
+        <input type="text" id="jrn-f-stade" class="journal-form-input" placeholder="Ex : BBCH 30 — Début montaison">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Culture</label>
+        <input type="text" id="jrn-f-culture" class="journal-form-input" value="${crop}" placeholder="Culture concernée">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Observations</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Observations…"></textarea>
+      </div>`,
+    irrigation: `
+      <div class="journal-form-grid">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Volume</label>
+          <input type="number" id="jrn-f-volume" class="journal-form-input" min="0" step="0.5" placeholder="0">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Unité</label>
+          <select id="jrn-f-unite" class="journal-form-input">
+            <option value="mm" selected>mm</option>
+            <option value="m³/ha">m³/ha</option>
+            <option value="m³">m³</option>
+          </select>
+        </div>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Méthode</label>
+        <select id="jrn-f-methode" class="journal-form-input">
+          <option value="">— Non précisé —</option>
+          <option>Aspersion</option>
+          <option>Goutte à goutte</option>
+          <option>Gravitaire</option>
+          <option>Pivot</option>
+          <option>Enrouleur</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Observations</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Observations…"></textarea>
+      </div>`,
+    cycle: `
+      <div class="journal-form-row">
+        <label class="journal-form-label">Événement</label>
+        <select id="jrn-f-action" class="journal-form-input">
+          <option value="début">Début de cycle cultural</option>
+          <option value="fin">Fin de cycle cultural</option>
+        </select>
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Année</label>
+        <input type="text" id="jrn-f-annee" class="journal-form-input" value="${new Date().getFullYear()}">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Note</label>
+        <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="Précisions…"></textarea>
+      </div>`,
+  }
+  const hasPhotos = type === 'note' || type === 'traitement'
+
   const modal = document.createElement('div')
   modal.className = 'modal add-modal'
   modal.innerHTML = `
     <div class="add-modal-content" style="max-width:480px">
       <div class="add-modal-header">
-        <span class="add-modal-title">${isTraitement ? 'Ajouter un traitement' : 'Ajouter une note'}</span>
+        <span class="add-modal-title">${TITLES[type] || 'Ajouter une entrée'}</span>
         <button class="add-modal-close" aria-label="Fermer">×</button>
       </div>
       <div class="journal-form">
@@ -582,25 +753,8 @@ function openJournalForm(type) {
           <label class="journal-form-label">Date</label>
           <input type="date" id="jrn-f-date" class="journal-form-input" value="${TODAY_STR}">
         </div>
-        <div class="journal-form-row">
-          <label class="journal-form-label">${isTraitement ? 'Observations' : 'Texte'}</label>
-          <textarea id="jrn-f-texte" class="journal-form-textarea" placeholder="${isTraitement ? 'Conditions météo, observations…' : 'Votre note…'}"></textarea>
-        </div>
-        ${isTraitement ? `
-        <div class="journal-form-grid">
-          <div class="journal-form-row">
-            <label class="journal-form-label">Produit</label>
-            <input type="text" id="jrn-f-produit" class="journal-form-input" placeholder="Ex : Bordeaux mixture">
-          </div>
-          <div class="journal-form-row">
-            <label class="journal-form-label">Dose</label>
-            <input type="text" id="jrn-f-dose" class="journal-form-input" placeholder="Ex : 2 kg/ha">
-          </div>
-        </div>
-        <div class="journal-form-row">
-          <label class="journal-form-label">Cible (maladie / ravageur)</label>
-          <input type="text" id="jrn-f-cible" class="journal-form-input" placeholder="Ex : Mildiou">
-        </div>` : ''}
+        ${EXTRA[type] || EXTRA.note}
+        ${hasPhotos ? `
         <div class="journal-form-row">
           <label class="journal-form-label">Photos</label>
           <div class="jrn-img-zone">
@@ -611,21 +765,18 @@ function openJournalForm(type) {
             <input type="file" id="jrn-f-img-input" accept="image/jpeg,image/png,image/webp,image/avif,image/bmp" multiple style="display:none">
             <div class="jrn-img-error" id="jrn-f-img-err"></div>
           </div>
-        </div>
+        </div>` : ''}
         <button class="btn-primary btn-sm" id="jrn-f-save" style="width:100%;justify-content:center">
           Enregistrer
         </button>
       </div>
-    </div>
-  `
+    </div>`
 
   modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
 
   const pendingImages = []
-  const IS = window.ImageStore
-  if (IS) {
-    IS._addThumb = IS._addThumb || window.addThumbToPreview
+  if (hasPhotos && window.ImageStore) {
     window.setupImgUpload(
       modal.querySelector('#jrn-f-img-input'),
       modal.querySelector('#jrn-f-img-btn'),
@@ -637,20 +788,40 @@ function openJournalForm(type) {
 
   modal.querySelector('#jrn-f-save').addEventListener('click', async () => {
     const date  = modal.querySelector('#jrn-f-date').value || TODAY_STR
-    const texte = modal.querySelector('#jrn-f-texte').value.trim()
-    const defaultAuteur = parcelBase.orgId === 1 ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
-    const entry = { id: Date.now(), type, date, texte, auteur: defaultAuteur }
-    if (isTraitement) {
+    const texte = modal.querySelector('#jrn-f-texte')?.value.trim() || ''
+    const auteur = parcelBase.orgId === 1 ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
+    const entry = { id: Date.now(), type, date, texte, auteur }
+
+    if (type === 'note') {
+      entry.category = modal.querySelector('#jrn-f-category')?.value || ''
+    } else if (type === 'traitement') {
       entry.produit = modal.querySelector('#jrn-f-produit').value.trim()
       entry.dose    = modal.querySelector('#jrn-f-dose').value.trim()
       entry.cible   = modal.querySelector('#jrn-f-cible').value.trim()
+    } else if (type === 'culture') {
+      entry.action  = modal.querySelector('#jrn-f-action').value
+      entry.culture = modal.querySelector('#jrn-f-culture').value.trim()
+    } else if (type === 'stade') {
+      entry.stade   = modal.querySelector('#jrn-f-stade').value.trim()
+      entry.culture = modal.querySelector('#jrn-f-culture').value.trim()
+    } else if (type === 'irrigation') {
+      const vol = parseFloat(modal.querySelector('#jrn-f-volume').value)
+      entry.volume  = isNaN(vol) ? 0 : vol
+      entry.unite   = modal.querySelector('#jrn-f-unite').value
+      entry.methode = modal.querySelector('#jrn-f-methode').value
+    } else if (type === 'cycle') {
+      entry.action = modal.querySelector('#jrn-f-action').value
+      entry.annee  = modal.querySelector('#jrn-f-annee').value.trim()
     }
-    if (!texte && !entry.produit && !pendingImages.length) return
-    if (IS && pendingImages.length) {
+
+    const hasData = texte || entry.produit || entry.culture || entry.stade || entry.volume || entry.annee || pendingImages.length
+    if (!hasData) return
+
+    if (window.ImageStore && pendingImages.length) {
       entry.imageIds = []
       for (const dataURL of pendingImages) {
         const imgId = `img_${entry.id}_${entry.imageIds.length}`
-        await IS.store(imgId, dataURL)
+        await window.ImageStore.store(imgId, dataURL)
         entry.imageIds.push(imgId)
       }
     }
@@ -724,6 +895,20 @@ document.addEventListener('DOMContentLoaded', () => {
   initDashGrid()
   document.getElementById('parcel-add-widget-btn')?.addEventListener('click', openWebWidgetCatalog)
   document.getElementById('btn-export-csv')?.addEventListener('click', exportCsv)
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.chart-cumul-add-btn')
+    if (!btn) return
+    e.stopPropagation()
+    const label = btn.dataset.cumulLabel, val = btn.dataset.cumulVal
+    if (!confirm(`Ajouter "${label} : ${val}" au tableau de bord ?`)) return
+    // TODO: persist to dashboard layout
+    const toast = document.createElement('div')
+    toast.textContent = 'Cumul ajouté au tableau de bord'
+    Object.assign(toast.style, { position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', background:'rgba(28,28,30,.9)', color:'#fff', padding:'8px 16px', borderRadius:'8px', fontSize:'13px', zIndex:'9999', pointerEvents:'none' })
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 2500)
+  })
 
   const _sidebar = document.getElementById('sidebar')
   if (_sidebar) new MutationObserver(() => renderPanelMembres()).observe(_sidebar, { attributes: true, attributeFilter: ['data-role'] })
@@ -1041,7 +1226,7 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
-    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label}</span><span class="chart-cumul-value">${genCumulValue(m)} ${m.cumul.unit}</span></div>`
+    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${genCumulValue(m)} ${m.cumul.unit}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${genCumulValue(m)} ${m.cumul.unit}" title="Ajouter au tableau de bord"><i class="bi bi-house"></i></button></div>`
     : ''
   const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
   const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
@@ -2137,12 +2322,14 @@ function editableSelect(label, value, field, options) {
 }
 
 function editableSelectNullable(label, value, field, options, blankLabel = '—') {
+  const blankInOptions = options.includes(blankLabel)
+  const blankOpt = blankInOptions ? '' : `<option value=""${!value ? ' selected' : ''}>${blankLabel}</option>`
   return `
     <div class="panel-row" data-field="${field}">
       <span class="panel-row-key">${label}</span>
       <select class="panel-field-input" data-val>
-        <option value=""${!value ? ' selected' : ''}>${blankLabel}</option>
-        ${options.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('')}
+        ${blankOpt}
+        ${options.map(o => `<option${o === (value || blankLabel) ? ' selected' : ''}>${o}</option>`).join('')}
       </select>
     </div>`
 }
@@ -2262,18 +2449,25 @@ function renderLinkedSensors() {
     const chps = linked.filter(s => TENSIO_MODELS.includes(s.model))
     const others = linked.filter(s => !TENSIO_MODELS.includes(s.model))
 
-    html += others.map(s => `
+    html += others.map(s => {
+      const hasEv = s.event && (Array.isArray(s.event) ? s.event.length > 0 : true)
+      const evLabel = hasEv ? (Array.isArray(s.event) ? s.event[0] : s.event) : null
+      return `
       <div class="sensor-linked-row">
         <div class="sensor-linked-info">
-          <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
+          <div style="display:flex;align-items:center;gap:6px">
+            <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
+            ${hasEv ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff3b30;flex-shrink:0"></span>' : ''}
+          </div>
           <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
+          ${hasEv ? `<span style="font-size:11px;color:#ff3b30;display:flex;align-items:center;gap:4px"><i class="bi bi-exclamation-triangle-fill"></i>${evLabel}</span>` : ''}
           ${sensorMetricBadges(s.model)}
         </div>
         <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
           <i class="bi bi-x-lg"></i>
         </button>
-      </div>
-    `).join('')
+      </div>`
+    }).join('')
 
     if (chps.length > 0) {
       // Group by depth
@@ -2289,17 +2483,24 @@ function renderLinkedSensors() {
       </div>`
       Object.entries(byDepth).forEach(([depth, sensors]) => {
         html += `<div style="font-size:11px;color:var(--txt2);margin:4px 0 2px">— ${depth}</div>`
-        html += sensors.map(s => `
+        html += sensors.map(s => {
+          const hasEv = s.event && (Array.isArray(s.event) ? s.event.length > 0 : true)
+          const evLabel = hasEv ? (Array.isArray(s.event) ? s.event[0] : s.event) : null
+          return `
           <div class="sensor-linked-row" style="padding-left:12px">
             <div class="sensor-linked-info">
-              <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
+              <div style="display:flex;align-items:center;gap:6px">
+                <a href="capteur-detail.html?id=${s.id}" class="sensor-linked-link">${MODEL_NAMES[s.model] || s.model}</a>
+                ${hasEv ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#ff3b30;flex-shrink:0"></span>' : ''}
+              </div>
               <span class="sensor-linked-detail">${s.model} · ${s.serial}</span>
+              ${hasEv ? `<span style="font-size:11px;color:#ff3b30;display:flex;align-items:center;gap:4px"><i class="bi bi-exclamation-triangle-fill"></i>${evLabel}</span>` : ''}
             </div>
             <button class="remove-sensor-btn icon-btn" data-id="${s.id}" title="Retirer">
               <i class="bi bi-x-lg"></i>
             </button>
-          </div>
-        `).join('')
+          </div>`
+        }).join('')
       })
     }
   }
@@ -2469,8 +2670,15 @@ function renderIntegrations() {
   el.querySelectorAll('.remove-integ-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const name = decodeURIComponent(btn.dataset.name)
-      saveState({ integrations: parcelState.integrations.filter(i => i !== name) })
-      renderIntegrations()
+      showConfirmModal({
+        title: 'Retirer l\'intégration',
+        message: `Retirer <strong>${name}</strong> de cette parcelle ?`,
+        confirmLabel: 'Retirer',
+        onConfirm: () => {
+          saveState({ integrations: parcelState.integrations.filter(i => i !== name) })
+          renderIntegrations()
+        }
+      })
     })
   })
 
@@ -2525,9 +2733,18 @@ function renderPanelMembres() {
 
     elOrg.querySelectorAll('.remove-membre-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        linkedOrgMemberIds = linkedOrgMemberIds.filter(x => x !== parseInt(btn.dataset.id))
-        patchParcel(parcelId, { linkedOrgMemberIds })
-        renderPanelMembres()
+        const id = parseInt(btn.dataset.id)
+        const m = members.find(x => x.id === id)
+        showConfirmModal({
+          title: 'Retirer le membre',
+          message: `Retirer <strong>${m ? `${m.prenom} ${m.nom}` : `membre #${id}`}</strong> de cette parcelle ?`,
+          confirmLabel: 'Retirer',
+          onConfirm: () => {
+            linkedOrgMemberIds = linkedOrgMemberIds.filter(x => x !== id)
+            patchParcel(parcelId, { linkedOrgMemberIds })
+            renderPanelMembres()
+          }
+        })
       })
     })
   }
@@ -2568,9 +2785,18 @@ function renderPanelMembres() {
     if (!isAdherent) {
       elCons.querySelectorAll('.remove-membre-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          linkedConseillerIds = linkedConseillerIds.filter(x => x !== parseInt(btn.dataset.id))
-          patchParcel(parcelId, { linkedConseillerIds })
-          renderPanelMembres()
+          const id = parseInt(btn.dataset.id)
+          const m = members.find(x => x.id === id)
+          showConfirmModal({
+            title: 'Retirer le conseiller',
+            message: `Retirer <strong>${m ? `${m.prenom} ${m.nom}` : `conseiller #${id}`}</strong> de cette parcelle ?`,
+            confirmLabel: 'Retirer',
+            onConfirm: () => {
+              linkedConseillerIds = linkedConseillerIds.filter(x => x !== id)
+              patchParcel(parcelId, { linkedConseillerIds })
+              renderPanelMembres()
+            }
+          })
         })
       })
     }
@@ -2762,6 +2988,7 @@ function exportCsv() {
 function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfirm }) {
   const modal = document.createElement('div')
   modal.className = 'modal add-modal'
+  modal.style.zIndex = '9999'
   modal.innerHTML = `
     <div class="add-modal-content" style="max-width:400px">
       <div class="add-modal-header">
@@ -2871,7 +3098,7 @@ const WIDGET_DEFS = {
   'weephyt':         { size:'1x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
   'cumuls':          { size:'1x1', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#2E75B6', render: renderWCumuls },
   'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:"Voir l'irrigation", href:'#' } },
+  'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:"Voir les irrigations", href:`irrigation.html?plot=${parcelId}` } },
   'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
   'dpv':             { size:'1x1', title:'DPV',                        icon:'bi-droplet-half',          color:'#5E88EC', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'thi':             { size:'1x1', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
@@ -2885,15 +3112,15 @@ const WIDGET_DEFS = {
   'previsions-jour': { size:'1x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
   'previsions-tensio':{ size:'1x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#A6C157', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
   'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#FBAF05', render: renderWSensor('w-station'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-thygro':        { size:'1x1', title:'Thermo-hygromètre',          icon:'bi-thermometer-half',      color:'#FBAF05', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-thygro':        { size:'1x1', title:'Thermomètre-hygromètre',          icon:'bi-thermometer-half',      color:'#FBAF05', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#795548', render: renderWSensor('w-tsol'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#616161', render: renderWSensor('w-anem'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#CBCB0B', render: renderWSensor('w-pyrano'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-lws':           { size:'1x1', title:'Humectation foliaire',       icon:'bi-droplet',               color:'#00887E', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-lws':           { size:'1x1', title:"Capteur d'humectation foliaire",       icon:'bi-droplet',               color:'#00887E', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#4CBB17', render: renderWSensor('w-par'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#ED9A2C', render: renderWSensor('w-capa'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#A6C157', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-ec':            { size:'1x1', title:'Sonde fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'w-ec':            { size:'1x1', title:'Sonde de fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'profil-capteurs': { size:'1x1', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
   'niveau-reservoir':{ size:'1x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
   'profil-reservoir':{ size:'1x1', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
@@ -2934,7 +3161,8 @@ function pruneWidgetsAfterRemoval(remainingLinkedIds) {
   if (hasTensio)            valid.add('w-tensio')
   if (models.has('EC'))     valid.add('w-ec')
   if (hasTensio || hasCapa) valid.add('bilan')
-  const hasIrrig = !!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué'
+  const hasIrrig = (!!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué')
+    || IRRIG_SEASON.some(i => i.plotId === parcelBase.id)
   if (hasIrrig) valid.add('irrigations')
   const saved = getActiveWidgetIds()
   const pruned = saved.filter(id => valid.has(id))
@@ -2978,7 +3206,8 @@ function computeDefaultWidgetIds() {
   if (hasTensio) ids.push('w-tensio')
   if (models.has('EC'))     ids.push('w-ec')
   if (hasTensio || hasCapa) ids.push('bilan')
-  const hasIrrig = !!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué'
+  const hasIrrig = (!!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué')
+    || IRRIG_SEASON.some(i => i.plotId === parcelBase.id)
   if (hasIrrig) ids.push('irrigations')
   return ids
 }
@@ -2989,6 +3218,10 @@ function initDashGrid() {
 
   let order
   const ids = getActiveWidgetIds()
+  if (!ids.includes('irrigations') && IRRIG_SEASON.some(i => i.plotId === parcelBase.id)) {
+    ids.push('irrigations')
+    saveWidgetIds(ids)
+  }
   grid.innerHTML = ''
   ids.forEach(id => {
     const def = WIDGET_DEFS[id]
@@ -3014,21 +3247,32 @@ function initDashGrid() {
     btn.addEventListener('click', e => {
       e.stopPropagation()
       document.querySelector('.dash-dropdown')?.remove()
+      const wid = btn.dataset.wid
       const dd = document.createElement('div')
       dd.className = 'dash-dropdown'
-      dd.innerHTML = `
-        <button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${btn.dataset.wid}">Retirer le widget</button>`
+      const irrigItems = wid === 'irrigations' ? `
+        <button class="dash-dd-item" data-action="set-vol">Définir le volume limité de la parcelle</button>
+        <button class="dash-dd-item" data-action="set-irrig-type">Modifier le type d'irrigation</button>` : ''
+      dd.innerHTML = `${irrigItems}<button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${wid}">Retirer le widget</button>`
       const rect = btn.getBoundingClientRect()
       const gridRect = grid.getBoundingClientRect()
       dd.style.top  = `${rect.bottom - gridRect.top + 4}px`
       dd.style.right = `${gridRect.right - rect.right}px`
       grid.style.position = 'relative'
       grid.appendChild(dd)
-      dd.querySelector('[data-action="remove"]').addEventListener('click', () => {
+      dd.querySelector('[data-action="remove"]')?.addEventListener('click', () => {
         dd.remove()
-        const cur = getActiveWidgetIds().filter(id => id !== btn.dataset.wid)
+        const cur = getActiveWidgetIds().filter(id => id !== wid)
         saveWidgetIds(cur)
         initDashGrid()
+      })
+      dd.querySelector('[data-action="set-vol"]')?.addEventListener('click', () => {
+        dd.remove()
+        openIrrigWidgetAction('vol')
+      })
+      dd.querySelector('[data-action="set-irrig-type"]')?.addEventListener('click', () => {
+        dd.remove()
+        openIrrigWidgetAction('type')
       })
       setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
     })
@@ -3616,48 +3860,192 @@ function renderWBilan(el) {
     </div>`
 }
 
-function renderWIrrigations(el) {
-  const irrigs  = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id)
-  const TODAY_M = new Date().toISOString().split('T')[0]
-  const real    = irrigs.filter(i => i.real)
-  const plan    = irrigs.filter(i => !i.real)
-  const tReal   = real.reduce((s, i) => s + i.mm, 0)
-  const tPlan   = plan.reduce((s, i) => s + i.mm, 0)
-  const next    = plan.filter(i => i.iso >= TODAY_M).sort((a, b) => a.iso < b.iso ? -1 : 1)[0]
-  const last    = real.filter(i => i.iso <= TODAY_M).sort((a, b) => a.iso > b.iso ? -1 : 1)[0]
-  const irrType = parcelState.irrigation || parcelBase.irrigation
-  const MN      = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
-  const fmtD    = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
+function openIrrigWidgetAction(action) {
+  const ov = document.createElement('div')
+  ov.className = 'journal-form-overlay'
+  if (action === 'vol') {
+    const cur = getParcel(parcelId).volumeMaxM3 ?? ''
+    ov.innerHTML = `
+      <div class="journal-form-modal">
+        <div class="journal-form-title">Volume limité de la parcelle</div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Volume limité (m³)</label>
+          <input id="iwa-vol-inp" class="journal-form-input" type="number" min="0" placeholder="—" value="${cur}" style="width:120px">
+        </div>
+        <div class="journal-form-actions">
+          <button class="btn-secondary" id="iwa-cancel">Annuler</button>
+          <button id="iwa-save">Enregistrer</button>
+        </div>
+      </div>`
+    document.body.appendChild(ov)
+    ov.querySelector('#iwa-cancel').onclick = () => ov.remove()
+    ov.querySelector('#iwa-save').onclick = () => {
+      const v = ov.querySelector('#iwa-vol-inp').value
+      patchParcel(parcelId, { volumeMaxM3: v !== '' ? parseInt(v) : null })
+      ov.remove()
+      document.querySelector('#dblock-irrigations') && renderWIrrigations(document.querySelector('#dblock-irrigations'))
+    }
+  } else {
+    const cur = parcelState.irrigation || ''
+    ov.innerHTML = `
+      <div class="journal-form-modal">
+        <div class="journal-form-title">Type d'irrigation</div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Type</label>
+          <select id="iwa-type-sel" class="journal-form-input">
+            ${IRRIG_TYPES.map(t => `<option${t === (cur || 'Non renseigné') ? ' selected' : ''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="journal-form-actions">
+          <button class="btn-secondary" id="iwa-cancel">Annuler</button>
+          <button id="iwa-save">Enregistrer</button>
+        </div>
+      </div>`
+    document.body.appendChild(ov)
+    ov.querySelector('#iwa-cancel').onclick = () => ov.remove()
+    ov.querySelector('#iwa-save').onclick = () => {
+      const v = ov.querySelector('#iwa-type-sel').value
+      saveState({ irrigation: v })
+      ov.remove()
+      document.querySelector('#dblock-irrigations') && renderWIrrigations(document.querySelector('#dblock-irrigations'))
+    }
+  }
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+}
 
-  // Build mini timeline: bar per month (Apr–Oct)
-  const MONTHS = [4,5,6,7,8,9,10]
-  const byMonth = {}
-  MONTHS.forEach(m => { byMonth[m] = { real: 0, plan: 0 } })
-  irrigs.forEach(i => {
-    const m = +i.iso.split('-')[1]
-    if (byMonth[m]) byMonth[m][i.real ? 'real' : 'plan'] += i.mm
-  })
-  const maxMm = Math.max(1, ...MONTHS.map(m => byMonth[m].real + byMonth[m].plan))
+function renderWIrrigations(el) {
+  const irrigs   = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id)
+  const TODAY_M  = new Date().toISOString().split('T')[0]
+  const real     = irrigs.filter(i => i.real)
+  const plan     = irrigs.filter(i => !i.real)
+  const tReal    = real.reduce((s, i) => s + i.mm, 0)
+  const tPlan    = plan.reduce((s, i) => s + i.mm, 0)
+  const tTotal   = tReal + tPlan
+  const next     = plan.filter(i => i.iso >= TODAY_M).sort((a, b) => a.iso < b.iso ? -1 : 1)[0]
+  const last     = real.filter(i => i.iso <= TODAY_M).sort((a, b) => a.iso > b.iso ? -1 : 1)[0]
+  const irrType  = parcelState.irrigation || parcelBase.irrigation
+  const MN       = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const fmtD     = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
+  const fmtM3w   = m3 => m3.toLocaleString('fr-FR') + ' m³'
+
+  const areaHa   = parcelBase.area ?? 0
+  const realM3w  = Math.round(tReal * areaHa * 10)
+  const planM3w  = Math.round(tPlan * areaHa * 10)
+  const totalM3w = realM3w + planM3w
+
+  const plotVolMax = getParcel(parcelBase.id).volumeMaxM3 ?? null
+  const parcelOrg  = orgs.find(o => o.id === parcelBase.orgId)
+  const orgVolMax  = getOrgData(parcelBase.orgId).volumeMax ?? parcelOrg?.volumeMax ?? null
+
+  // Org-level consumption for this parcel's org
+  const orgPlotIds = new Set(plots.filter(p => p.orgId === parcelBase.orgId).map(p => p.id))
+  const plotsById  = new Map(plots.map(p => [p.id, p]))
+  const orgRealM3  = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && i.real)
+    .reduce((s, i) => s + Math.round(i.mm * (plotsById.get(i.plotId)?.area ?? 0) * 10), 0)
+  const orgPlanM3  = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && !i.real)
+    .reduce((s, i) => s + Math.round(i.mm * (plotsById.get(i.plotId)?.area ?? 0) * 10), 0)
+
+  const pctPlotR = plotVolMax && areaHa ? Math.min(100, Math.round(realM3w / plotVolMax * 100)) : 0
+  const pctPlotP = plotVolMax && areaHa ? Math.min(100 - pctPlotR, Math.round(planM3w / plotVolMax * 100)) : 0
+  const pctPlot  = pctPlotR + pctPlotP
+  const pctOrgR  = orgVolMax ? Math.min(100, Math.round(orgRealM3 / orgVolMax * 100)) : 0
+  const pctOrgP  = orgVolMax ? Math.min(100 - pctOrgR, Math.round(orgPlanM3 / orgVolMax * 100)) : 0
+
+  // ── Timeline horizontale positionnelle ──
+  const sortedIsos = irrigs.map(i => i.iso).sort()
+  const trackStart = sortedIsos[0] || `${new Date().getFullYear()}-04-01`
+  const trackEnd   = sortedIsos[sortedIsos.length - 1] || `${new Date().getFullYear()}-10-10`
+  const startMs    = new Date(trackStart).getTime()
+  const endMs      = new Date(trackEnd).getTime()
+  const rangeMs    = Math.max(endMs - startMs, 1)
+  const toPct      = iso => ((new Date(iso).getTime() - startMs) / rangeMs * 100).toFixed(1)
+  const fmtDs      = iso => { const [,m,d] = iso.split('-'); return `${+d}/${+m}` }
+
+  const startMo    = new Date(trackStart).getMonth() + 1
+  const endMo      = new Date(trackEnd).getMonth() + 1
+  const yr         = new Date(trackStart).getFullYear()
+  const moLabelsHtml = Array.from({ length: endMo - startMo + 1 }, (_, i) => startMo + i)
+    .map(m => {
+      const pct = toPct(`${yr}-${String(m).padStart(2,'0')}-01`)
+      return `<span class="w-irrig-track-mlbl" style="left:${pct}%">${MN[m-1]}</span>`
+    }).join('')
+
+  const dotsHtml = irrigs.map(i =>
+    `<div class="w-irrig-dot-track" style="left:${toPct(i.iso)}%;background:${i.real ? '#E07820' : '#FFB705'}" data-tip="${fmtD(i.iso)} · ${i.mm} mm"></div>`
+  ).join('')
+
   const timelineHtml = `
-    <div class="w-irrig-timeline">
-      ${MONTHS.map(m => {
-        const r = byMonth[m].real, p = byMonth[m].plan
-        const rH = Math.round((r / maxMm) * 52), pH = Math.round((p / maxMm) * 52)
-        return `<div class="w-irrig-col">
-          <div class="w-irrig-bar-wrap">
-            ${p > 0 ? `<div class="w-irrig-bar w-irrig-bar--plan" style="height:${pH}px" title="${MN[m-1]} planifié: ${p} mm"></div>` : ''}
-            ${r > 0 ? `<div class="w-irrig-bar w-irrig-bar--real" style="height:${rH}px" title="${MN[m-1]} réalisé: ${r} mm"></div>` : ''}
-          </div>
-          <div class="w-irrig-col-lbl">${MN[m-1]}</div>
-        </div>`
-      }).join('')}
+    <div class="w-irrig-track-wrap">
+      <div class="w-irrig-track-months">${moLabelsHtml}</div>
+      <div class="w-irrig-track">
+        <div class="w-irrig-track-line"></div>
+        ${dotsHtml}
+      </div>
+      <div class="w-irrig-track-range">
+        <span>${fmtDs(trackStart)}</span><span>${fmtDs(trackEnd)}</span>
+      </div>
+      <div class="w-irrig-track-legend">
+        <span><span class="w-irrig-dot-sml" style="background:#E07820"></span> Effectuée</span>
+        <span><span class="w-irrig-dot-sml" style="background:#FFB705"></span> Planifiée</span>
+      </div>
     </div>`
+
+  const progHtml = plotVolMax && areaHa ? `
+    <div class="w-irrig-progress">
+      <div class="w-irrig-prog-row">
+        <div class="w-irrig-prog-lbl">
+          <span>Volume limité de la parcelle :</span>
+          <span style="${totalM3w > plotVolMax ? 'color:#E05252;font-weight:600' : 'font-weight:600;color:var(--txt)'}">${fmtM3w(totalM3w)} / ${fmtM3w(plotVolMax)}</span>
+        </div>
+        <div class="w-irrig-prog-bg"><div class="w-irrig-prog-real" style="width:${pctPlotR}%"></div><div class="w-irrig-prog-plan" style="width:${pctPlotP}%"></div></div>
+      </div>
+    </div>` : ''
+
+  const actionsHtml = `
+    <div class="w-irrig-actions">
+      <div class="w-irrig-act-row">
+        <a class="w-irrig-act-btn w-irrig-act-btn--pri" href="irrigation.html?plot=${parcelBase.id}&action=saisie">+ Saisir une irrigation</a>
+        <a class="w-irrig-act-btn w-irrig-act-btn--sec" href="irrigation.html?plot=${parcelBase.id}&action=saison">↺ Saisir une saison d'irrigation</a>
+      </div>
+    </div>`
+
+  const NO_IRRIG_TYPES = new Set(['Non irrigué', 'Non renseigné', ''])
+  const hasIrrigType = irrType && !NO_IRRIG_TYPES.has(irrType)
+
+  const updateFooterLabel = () => {
+    const ft = el.closest('.dash-block')?.querySelector('.dash-block-ft-link')
+    if (ft) ft.textContent = hasIrrigType ? 'Voir les irrigations →' : 'Gérer les irrigations →'
+  }
+
+  if (!hasIrrigType) {
+    const disabledActions = `
+      <div class="w-irrig-actions">
+        <div class="w-irrig-act-row">
+          <a class="w-irrig-act-btn w-irrig-act-btn--pri w-irrig-act-btn--disabled" aria-disabled="true" tabindex="-1">+ Saisir une irrigation</a>
+          <a class="w-irrig-act-btn w-irrig-act-btn--sec w-irrig-act-btn--disabled" aria-disabled="true" tabindex="-1">↺ Saisir une saison d'irrigation</a>
+        </div>
+      </div>`
+    el.innerHTML = `
+      <div class="w-irrig-layout">
+        <div class="w-irrig-empty-state">
+          <i class="bi bi-droplet" style="font-size:22px;color:var(--txt3)"></i>
+          <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez préciser un type d'irrigation.</p>
+        </div>
+        ${disabledActions}
+      </div>`
+    updateFooterLabel()
+    return
+  }
 
   if (!irrigs.length) {
-    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--txt3)">
-      <i class="bi bi-droplet" style="font-size:24px"></i>
-      <div style="font-size:13px">Aucune irrigation enregistrée cette saison</div>
-    </div>`
+    el.innerHTML = `
+      <div class="w-irrig-layout">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:8px;color:var(--txt3)">
+          <i class="bi bi-droplet" style="font-size:24px"></i>
+          <div style="font-size:13px">Aucune irrigation enregistrée</div>
+        </div>
+        ${actionsHtml}
+      </div>`
     return
   }
 
@@ -3665,26 +4053,22 @@ function renderWIrrigations(el) {
     <div class="w-irrig-layout">
       <div class="w-irrig-kpis">
         <div class="w-irrig-kpi">
-          <div class="w-irrig-kpi-lbl">Réalisées</div>
+          <div class="w-irrig-kpi-lbl">Effectuées</div>
           <div class="w-irrig-kpi-val" style="color:#E07820">${tReal} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub">${real.length} apport${real.length > 1 ? 's' : ''}</div>
+          <div class="w-irrig-kpi-sub">${real.length} apport${real.length > 1 ? 's' : ''}${areaHa ? ` · ${fmtM3w(realM3w)}` : ''}</div>
         </div>
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Planifiées</div>
           <div class="w-irrig-kpi-val" style="color:#FFB705">${tPlan} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub">${plan.length} apport${plan.length > 1 ? 's' : ''}</div>
+          <div class="w-irrig-kpi-sub">${plan.length} apport${plan.length > 1 ? 's' : ''}${areaHa ? ` · ${fmtM3w(planM3w)}` : ''}</div>
         </div>
-        ${irrType ? `
-        <div class="w-irrig-type-pill">
-          <i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${irrType}
-        </div>` : ''}
+        ${irrType ? `<div class="w-irrig-type-pill"><i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${irrType}</div>` : ''}
       </div>
+      ${progHtml}
       ${timelineHtml}
-      <div class="w-irrig-footer">
-        ${last  ? `<span><i class="bi bi-check-circle" style="color:var(--ok)"></i> Dernier : <strong>${fmtD(last.iso)}</strong> · ${last.mm} mm</span>` : ''}
-        ${next  ? `<span><i class="bi bi-arrow-right-circle" style="color:#0172A4"></i> Prochain : <strong>${fmtD(next.iso)}</strong> · ${next.mm} mm</span>` : ''}
-      </div>
+      ${actionsHtml}
     </div>`
+  updateFooterLabel()
 }
 
 // unused — kept as empty stub so any lingering references don't break

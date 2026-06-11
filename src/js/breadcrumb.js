@@ -14,6 +14,7 @@ export const PAGE_TITLES = {
   'parametres.html': { title: 'Paramètres', section: 'exploitation' },
   'parametres-reseau.html': { title: 'Paramètres', section: 'reseau' },
   'informations.html': { title: 'Informations', section: 'reseau' },
+  'irrigation.html': { title: 'Irrigation', section: 'exploitation' },
   'alertes.html': { title: 'Mes alertes', section: null },
   'notifications.html': { title: 'Mes notifications', section: null },
   'mon-compte.html': { title: 'Mon compte', section: null },

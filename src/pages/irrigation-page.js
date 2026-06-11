@@ -1,7 +1,9 @@
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../data/irrigations.js'
+import { IRRIG_TYPES } from '../data/constants.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
 import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+import { getParcel, patchParcel, getOrgData, patchOrgData } from '../data/store.js'
 
 const ADHERENT_ORG_ID = 1
 const IS_ADMIN = (localStorage.getItem('menuRole') || 'admin-reseau') === 'admin-reseau'
@@ -11,7 +13,19 @@ let plots = IS_ADMIN ? ALL_PLOTS : ALL_PLOTS.filter(p => p.orgId === ADHERENT_OR
 const TODAY = new Date().toISOString().split('T')[0]
 
 let activeAction = null // 'saisie' | 'saison' | 'export'
+let leftCollapsed = false
 let globaleExtraMonths = 0
+let advisorEnabled   = false
+let reservoirEnabled = false
+let detectorEnabled  = false
+const rainEdits = {}
+
+let filterRealIrrig = true
+let filterPlanIrrig = true
+let filterRain      = true
+let filterDetected  = true
+let filterConfirmed = true
+let filterReservoir = true
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,13 +46,83 @@ function fmtDateShort(iso) {
 function fmtCol(iso) {
   const [, m, d] = iso.split('-'); return `${d}/${m}`
 }
+const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+function dayOfWeek(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+function isoWeek(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  const dn = dt.getUTCDay() || 7
+  dt.setUTCDate(dt.getUTCDate() + 4 - dn)
+  const y1 = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1))
+  return Math.ceil((((dt - y1) / 86400000) + 1) / 7)
+}
 
 function plotLabel(p) {
-  return [p.name, p.crop, p.irrigation].filter(Boolean).join(' — ')
+  const name = p.name + (p.area ? ` (${p.area} ha)` : '')
+  return [name, p.crop, p.irrigation].filter(Boolean).join(' — ')
+}
+
+const NO_IRRIG_TYPES = new Set(['Non irrigué', 'Non renseigné', ''])
+function hasIrrigType(p) { return !!p.irrigation && !NO_IRRIG_TYPES.has(p.irrigation) }
+
+// ─── Volume helpers ────────────────────────────────────────────────────────────
+
+function mmToM3(mm, areaHa) { return Math.round(mm * (areaHa ?? 0) * 10) }
+function fmtM3(m3) { return m3.toLocaleString('fr-FR') + ' m³' }
+
+function getOrgVolMax(orgId) {
+  const stored = getOrgData(orgId).volumeMax
+  if (stored !== undefined) return stored
+  return orgs.find(o => o.id === orgId)?.volumeMax ?? null
+}
+
+function getPlotVolMax(plotId) { return getParcel(plotId).volumeMaxM3 ?? null }
+
+function orgPlotM3(orgId) {
+  const orgPlots = plots.filter(p => p.orgId === orgId || (!IS_ADMIN && selectedOrgId === null))
+  const orgPlotsMap = new Map(orgPlots.map(p => [p.id, p]))
+  const real = IRRIG_SEASON.filter(i => orgPlotsMap.has(i.plotId) && i.real)
+    .reduce((s, i) => s + mmToM3(i.mm, orgPlotsMap.get(i.plotId)?.area ?? 0), 0)
+  const plan = IRRIG_SEASON.filter(i => orgPlotsMap.has(i.plotId) && !i.real)
+    .reduce((s, i) => s + mmToM3(i.mm, orgPlotsMap.get(i.plotId)?.area ?? 0), 0)
+  return { real, plan }
 }
 
 function sortedPlotList() {
   return [...plots].sort((a, b) => a.name.localeCompare(b.name, 'fr'))
+}
+
+// ─── Feature helpers ──────────────────────────────────────────────────────────
+
+function isAdvisorPlot(p)   { return p.id % 3 === 2 }
+function advisorMm(p)       { return 25 + ((p.id * 7) % 20) }
+function isReservoirPlot(p) { return p.id % 9 === 2 }
+function reservoirMmAt(p, iso) {
+  const [, m, d] = iso.split('-').map(Number)
+  return Math.min(65, Math.max(5, 30 + ((p.id * 7 + m * 3 + d * 2) % 30)))
+}
+function isDetectorPlot(p) {
+  const irr = (p.irrigation || '').toLowerCase()
+  return ['rampe', 'pivot', 'enrouleur'].some(t => irr.includes(t))
+}
+function getDetectorIrrig(p) {
+  if (!isDetectorPlot(p)) return []
+  const result = []
+  let seed = p.id * 17
+  let cur = new Date(addDays(TODAY, -45))
+  const endD = new Date(addDays(TODAY, -1))
+  while (cur <= endD) {
+    const iso = cur.toISOString().split('T')[0]
+    const noise = (seed % 7) - 3
+    seed = (seed * 31 + 17) % 1000
+    result.push({ iso, mm: Math.max(8, 15 + noise), real: true, plotId: p.id, fromDetector: true })
+    cur.setDate(cur.getDate() + 5 + (seed % 3))
+    seed = (seed * 31 + 17) % 1000
+  }
+  return result
 }
 
 // ─── Multi-select component ───────────────────────────────────────────────────
@@ -141,6 +225,80 @@ function showConflictModal(count, scopeLabel, onOverwrite) {
   ov.querySelector('#irr-cf-overwrite').addEventListener('click', () => { ov.remove(); onOverwrite() })
 }
 
+function showDeleteConfirmModal(title, message, onConfirm) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>${title}</span>
+        <button class="irr-edit-close" id="irr-dc-close">×</button>
+      </div>
+      <div class="irr-edit-body" style="font-size:13px;color:var(--txt);line-height:1.5">
+        <p style="margin:0;color:var(--txt2)">${message}</p>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-dc-cancel">Annuler</button>
+        <button class="iw-btn iw-btn--danger" id="irr-dc-ok">Supprimer</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-dc-close').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-dc-cancel').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-dc-ok').addEventListener('click', () => { ov.remove(); onConfirm() })
+}
+
+// ─── Reservoir SVG chart ──────────────────────────────────────────────────────
+
+function renderReservoirChart(p, irrig) {
+  const pastIrrig = irrig.filter(i => i.iso < TODAY)
+  if (!pastIrrig.length) return ''
+  const sorted = [...pastIrrig].sort((a, b) => a.iso < b.iso ? -1 : 1)
+  const first = new Date(sorted[0].iso)
+  const last  = new Date(sorted[sorted.length - 1].iso)
+  const tot   = Math.max(last - first, 1)
+  const W = 500, H = 80, PAD = 7, PY = 8, PH = 50
+  const xOf = d => Math.round(PAD + (d - first) / tot * (W - 2 * PAD))
+  const yOf = mm => Math.round(PY + PH - (mm / 65) * PH)
+  const y0 = PY + PH, y15 = yOf(15), y53 = yOf(53)
+  const points = []
+  let cur = new Date(first)
+  while (cur <= last) {
+    points.push({ x: xOf(cur), y: yOf(reservoirMmAt(p, cur.toISOString().split('T')[0])) })
+    cur.setDate(cur.getDate() + 1)
+  }
+  const path = points.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt.x},${pt.y}`).join(' ')
+  const MN = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+  const ticksMonths = []
+  const tc = new Date(first); tc.setDate(1); tc.setMonth(tc.getMonth() + 1)
+  while (tc <= last) { ticksMonths.push(tc.getMonth()); tc.setMonth(tc.getMonth() + 1) }
+  const tickElems = ticksMonths.map(m => {
+    const d = new Date(first.getFullYear(), m, 1)
+    const x = xOf(d)
+    return `<line x1="${x}" y1="${PY}" x2="${x}" y2="${y0}" stroke="#D0CEC8" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${x}" y="${H - 2}" font-size="9" fill="#B0AEA8" text-anchor="middle">${MN[m]}</text>`
+  }).join('')
+  const firstLabel = `<text x="${PAD}" y="${H - 2}" font-size="9" fill="#B0AEA8">${fmtCol(sorted[0].iso)}</text>`
+  const lastLabel  = `<text x="${W - PAD}" y="${H - 2}" font-size="9" fill="#3A7FC1" text-anchor="end">${fmtDateShort(sorted[sorted.length - 1].iso)}</text>`
+  return `<div style="margin:16px 0 0;padding:0 24px">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--txt2);margin-bottom:4px">Réservoir en eau facilement utilisable</div>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="width:100%;display:block">
+      <rect x="${PAD}" y="${PY}" width="${W-2*PAD}" height="${y53-PY}" fill="#e8f5e9" opacity=".5"/>
+      <rect x="${PAD}" y="${y53}" width="${W-2*PAD}" height="${y15-y53}" fill="#fff9e6" opacity=".5"/>
+      <rect x="${PAD}" y="${y15}" width="${W-2*PAD}" height="${y0-y15}" fill="#ffebee" opacity=".5"/>
+      <line x1="${PAD}" y1="${y53}" x2="${W-PAD}" y2="${y53}" stroke="#4CAF50" stroke-width="1" stroke-dasharray="3,2"/>
+      <line x1="${PAD}" y1="${y15}" x2="${W-PAD}" y2="${y15}" stroke="#FF9800" stroke-width="1" stroke-dasharray="3,2"/>
+      ${tickElems}
+      <path d="${path}" fill="none" stroke="#3A7FC1" stroke-width="2" stroke-linejoin="round"/>
+      <text x="${W-PAD}" y="${y53-3}" font-size="9" fill="#4CAF50" text-anchor="end">réservoir facilement utilisable</text>
+      <text x="${W-PAD}" y="${y15-3}" font-size="9" fill="#FF9800" text-anchor="end">réservoir de survie</text>
+      ${firstLabel}${lastLabel}
+    </svg>
+  </div>`
+}
+
 // ─── Timeline SVG ─────────────────────────────────────────────────────────────
 
 function renderTimeline(irrig) {
@@ -206,7 +364,7 @@ function irrigItem(ir) {
   return `<div class="irr-pr-item">
     <div class="irr-pr-stripe" style="background:${col}"></div>
     <div class="irr-pr-date" style="color:${col}"><span class="irr-pr-day">${dd}</span><span class="irr-pr-mon">/${mm}</span></div>
-    <div class="irr-pr-info"><div class="irr-pr-label">${name}</div><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div></div>
+    <div class="irr-pr-info"><div class="irr-pr-label">${name}</div><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Effectuée' : 'Planifiée'}</div></div>
     <div class="irr-pr-mm" style="color:${col}">${ir.mm} mm</div>
     <button class="irr-pr-del" data-idx="${idx}">🗑</button>
   </div>`
@@ -223,17 +381,99 @@ function bindDelBtns(container) {
 
 // ─── Right panel views ────────────────────────────────────────────────────────
 
+// ─── Volume banner ────────────────────────────────────────────────────────────
+
+function renderVolBanner() {
+  const wrap = document.getElementById('irr-vol-banner-wrap')
+  if (!wrap) return
+  const targetOrgId = IS_ADMIN ? selectedOrgId : ADHERENT_ORG_ID
+  if (!targetOrgId) { wrap.innerHTML = ''; return }
+
+  const orgPlotIds = new Set(plots.filter(p => p.orgId === targetOrgId).map(p => p.id))
+  if (!IS_ADMIN) plots.forEach(p => orgPlotIds.add(p.id))
+  const plotsMap = new Map(plots.map(p => [p.id, p]))
+
+  const realM3 = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && i.real)
+    .reduce((s, i) => s + mmToM3(i.mm, plotsMap.get(i.plotId)?.area ?? 0), 0)
+  const planM3 = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && !i.real)
+    .reduce((s, i) => s + mmToM3(i.mm, plotsMap.get(i.plotId)?.area ?? 0), 0)
+  const totalM3 = realM3 + planM3
+
+  const volMax = getOrgVolMax(targetOrgId)
+  const pctReal = volMax ? Math.min(100, Math.round(realM3 / volMax * 100)) : 0
+  const pctPlan = volMax ? Math.min(100 - pctReal, Math.round(planM3 / volMax * 100)) : 0
+  const pctUsed = pctReal + pctPlan
+
+  const _rawPrice   = getOrgData(targetOrgId).pricePerM3
+  const storedPrice = (_rawPrice != null && !isNaN(_rawPrice)) ? _rawPrice : 0.37
+  const cost = totalM3
+    ? (totalM3 * storedPrice).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'
+    : ''
+  const fmtNum = n => n !== null && n !== undefined ? n.toLocaleString('fr-FR') : ''
+
+  wrap.innerHTML = `
+    <div class="irr-vol-banner">
+      <div class="irr-vol-main">
+        <div class="irr-vol-title">Volume irrigation</div>
+        <div class="irr-vol-total">${fmtM3(totalM3)}${volMax ? ` <span style="font-size:11px;font-weight:400;color:var(--txt3)">/ ${fmtM3(volMax)}</span>` : ''}</div>
+        <div class="irr-vol-sub"><span style="color:#FF8500">▪ ${fmtM3(realM3)}</span> effectués · <span style="color:#FFB705">▪ ${fmtM3(planM3)}</span> planifiés</div>
+      </div>
+      <div class="irr-vol-bar-wrap">
+        <div class="irr-vol-bar-label">Consommation d'eau sur mon exploitation</div>
+        ${!volMax ? '<div class="irr-vol-bar-nomax">Définissez un volume limité →</div>' : ''}
+        <div class="irr-vol-bar-bg">
+          <div class="irr-vol-bar-real" style="width:${pctReal}%"></div>
+          <div class="irr-vol-bar-plan" style="width:${pctPlan}%"></div>
+        </div>
+        ${volMax ? (() => {
+          const deficit = totalM3 - volMax
+          return deficit > 0
+            ? `<div class="irr-vol-bar-pct" style="color:#E05252">Dépassement ${fmtM3(deficit)}</div>`
+            : `<div class="irr-vol-bar-pct">${pctUsed}% consommé${pctUsed >= 90 ? ' ⚠' : ''}</div>`
+        })() : ''}
+      </div>
+      <div class="irr-vol-controls">
+        <div class="irr-vol-ctrl-row">
+          <span class="irr-vol-ctrl-lbl">Volume limité :</span>
+          <input class="irr-vol-input" id="irr-vol-max-inp" type="text" inputmode="numeric" placeholder="—" value="${fmtNum(volMax)}" />
+          <span class="irr-vol-ctrl-lbl">m³</span>
+        </div>
+        <div class="irr-vol-ctrl-row">
+          <span class="irr-vol-ctrl-lbl" title="Coût eau + énergie + amortissement">Coût/m³ :</span>
+          <input class="irr-vol-input" id="irr-vol-price-inp" type="number" min="0" step="0.001" value="${storedPrice}" style="width:65px" />
+          <span class="irr-vol-ctrl-lbl">€${cost ? `<span class="irr-vol-cost"> → ${cost}</span>` : ''}</span>
+        </div>
+      </div>
+    </div>`
+
+  wrap.querySelector('#irr-vol-max-inp')?.addEventListener('change', e => {
+    const raw = e.target.value.replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '')
+    const v   = raw !== '' ? parseInt(raw) : null
+    if (v !== null) e.target.value = v.toLocaleString('fr-FR')
+    patchOrgData(targetOrgId, { volumeMax: v })
+    renderVolBanner()
+  })
+  wrap.querySelector('#irr-vol-price-inp')?.addEventListener('change', e => {
+    const v = e.target.value !== '' ? parseFloat(e.target.value) : 0.37
+    patchOrgData(targetOrgId, { pricePerM3: v })
+    renderVolBanner()
+  })
+}
+
 function showGlobaleView(resetScroll = false) {
+  renderVolBanner()
   const right = document.getElementById('irr-right')
-  const maxFuture = addDays(TODAY, 14)
+  const maxFuture = addDays(TODAY, 60)
 
   const boundaryDates = [
     ...IRRIG_SEASON.map(i => i.iso),
     ...RAIN_DATA.filter(r => r.iso <= maxFuture).map(r => r.iso),
+    ...(detectorEnabled ? [addDays(TODAY, -45)] : []),
+    addDays(TODAY, -1),
     maxFuture,
   ]
   if (!IRRIG_SEASON.length && !RAIN_DATA.length) {
-    right.innerHTML = `<div class="irr-rv-hd">Vue globale</div><div class="irr-pr-empty"><i class="bi bi-table"></i><p>Il manque des données de pluie ou d'irrigations sur au moins une parcelle pour afficher cette vue</p></div>`
+    right.innerHTML = `<div class="irr-pr-empty" style="padding-top:60px"><i class="bi bi-table"></i><p>Il manque des données de pluie ou d'irrigations sur au moins une parcelle pour afficher cette vue</p></div>`
     return
   }
 
@@ -256,7 +496,16 @@ function showGlobaleView(resetScroll = false) {
   const rainMap = {}
   for (const r of RAIN_DATA) { rainMap[r.iso] = r.mm }
 
+  function forecastBase(iso) {
+    if (iso <= TODAY || iso > addDays(TODAY, 13)) return 0
+    const [, m, d] = iso.split('-').map(Number)
+    const h = (m * 17 + d * 13) % 100
+    return h < 65 ? 0 : 3 + (h % 9)
+  }
+
   function plotRainMm(plotId, iso, baseMm) {
+    const key = `${plotId}_${iso}`
+    if (rainEdits[key] !== undefined) return rainEdits[key]
     if (!baseMm) return 0
     const [, m, d] = iso.split('-').map(Number)
     const seed = (plotId * 13 + m * 7 + d * 3) % 100
@@ -265,31 +514,117 @@ function showGlobaleView(resetScroll = false) {
     return Math.round(baseMm * factor)
   }
 
-  const headers = sortedDates.map(d => {
-    const isT = d === TODAY
-    return `<th class="irr-gl-th${isT ? ' irr-gl-th--today' : ''}">${fmtCol(d)}</th>`
-  }).join('')
+  const J7 = addDays(TODAY, 7)
+  let headers = ''
+  let weekRow = ''
+  let weekSpan = 0, weekNum = null
+  for (const d of sortedDates) {
+    const isT  = d === TODAY
+    const dow  = dayOfWeek(d)
+    const isSun = dow === 0
+    const wkEnd = isSun ? ' irr-gl-th--week-end' : ''
+    if (weekNum === null) weekNum = isoWeek(d)
+    weekSpan++
+    const isAdvRange = advisorEnabled && d > TODAY && d <= J7
+    headers += `<th class="irr-gl-th${isT ? ' irr-gl-th--today' : ''}${wkEnd}${isAdvRange ? ' irr-gl-th--advisor-range' : ''}"><span class="irr-gl-day-name">${DAY_NAMES[dow]}</span>${fmtCol(d)}</th>`
+    const isLast = d === sortedDates[sortedDates.length - 1]
+    if (isSun || isLast) {
+      weekRow += `<th class="irr-gl-week-hd${isSun ? ' irr-gl-th--week-end' : ''}" colspan="${weekSpan}">S${weekNum}</th>`
+      weekSpan = 0; weekNum = null
+    }
+    if (advisorEnabled && d === J7) {
+      headers += `<th class="irr-gl-th irr-gl-th--advisor">Reco J+7</th>`
+      weekRow += `<th class="irr-gl-week-hd"></th>`
+    }
+  }
 
   function plotRow(p) {
-    const cells = sortedDates.map(d => {
+    const detIrrig   = detectorEnabled ? getDetectorIrrig(p) : []
+    const showAdv    = advisorEnabled && isAdvisorPlot(p)
+    const showRes    = reservoirEnabled && isReservoirPlot(p)
+    const isDetector = isDetectorPlot(p)
+    let cells = ''
+    for (const d of sortedDates) {
       const isT    = d === TODAY
-      const irrigs = IRRIG_SEASON.filter(i => i.iso === d && i.plotId === p.id)
-      const total  = irrigs.reduce((s,i) => s+i.mm, 0)
-      const isReal = irrigs.some(i => i.real)
+      const irrigs    = IRRIG_SEASON.filter(i => i.iso === d && i.plotId === p.id)
+      // Suppress auto-detection once user has interacted (confirmed or dismissed)
+      const detDay    = irrigs.length === 0 ? detIrrig.filter(i => i.iso === d) : []
+      const visIrrigs = irrigs.filter(i => !i.detectorDismissed).filter(i =>
+        i.detectorConfirmed ? (detectorEnabled && filterConfirmed) : (i.real ? filterRealIrrig : filterPlanIrrig))
+      const visDetDay = filterDetected ? detDay : []
+      const allIrr    = [...visIrrigs, ...visDetDay]
+      const total     = allIrr.reduce((s,i) => s+i.mm, 0)
+      const isReal    = allIrr.some(i => i.real)
       const rainOffset  = (p.id * 7 + 3) % 3 - 1
       const rainSrcDate = addDays(d, rainOffset)
-      const rainMm      = plotRainMm(p.id, d, rainMap[rainSrcDate] ?? 0)
-      let content  = ''
-      if (total) {
-        const col  = isReal ? '#E07820' : '#FFB705'
-        const idxs = irrigs.map(i => IRRIG_SEASON.indexOf(i)).join(',')
-        content += `<span class="irr-gl-val irr-gl-irrig" data-idxs="${idxs}" data-iso="${d}" style="color:${col};cursor:pointer">${total} mm</span>`
+      const rainMm      = plotRainMm(p.id, d, rainMap[rainSrcDate] ?? forecastBase(rainSrcDate))
+      // Build fixed slots so rain/irrig/reservoir always sit at the same vertical position
+      let rainHtml = ''
+      if (rainMm && filterRain) {
+        rainHtml = detectorEnabled && isDetector
+          ? `<span class="irr-gl-rain irr-gl-rain--edit" data-rain-plotid="${p.id}" data-rain-iso="${d}" data-rain-mm="${rainMm}">${rainMm} mm</span>`
+          : `<span class="irr-gl-rain">${rainMm} mm</span>`
       }
-      if (rainMm) content += `<span class="irr-gl-rain">${rainMm} mm</span>`
-      if (!total) content += `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
-      return `<td class="irr-gl-td${isT ? ' irr-gl-td--today' : ''}">${content}</td>`
-    }).join('')
-    return `<tr data-row-plot="${p.id}"><td class="irr-gl-plot"><span class="irr-gl-plot-link" data-plot-id="${p.id}">${p.name}</span></td>${cells}</tr>`
+
+      let irrigHtml = ''
+      if (total) {
+        const col    = isReal ? '#E07820' : '#FFB705'
+        const idxs   = visIrrigs.map(i => IRRIG_SEASON.indexOf(i)).filter(i => i >= 0).join(',')
+        const dBadge = visDetDay.length ? `<span class="irr-gl-det-badge" title="Détecté automatiquement">D</span>`
+          : visIrrigs.some(i => i.detectorConfirmed) ? `<span class="irr-gl-conf-badge" title="Irrigation confirmée">C</span>`
+          : ''
+        const detMm  = visDetDay.reduce((s,i) => s+i.mm, 0)
+        irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer"${
+          idxs ? ` data-idxs="${idxs}" data-iso="${d}"` : ` data-det-plotid="${p.id}" data-det-plotname="${p.name}" data-det-iso="${d}" data-det-mm="${detMm}"`
+        }>${total} mm${dBadge}</span>`
+      } else {
+        irrigHtml = `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
+      }
+
+      let resHtml = ''
+      if (showRes && filterReservoir && d < TODAY) resHtml = `<span class="irr-gl-res">${reservoirMmAt(p, d)} mm</span>`
+
+      let content = ''
+      if (filterRain)                content += `<div class="irr-gl-slot">${rainHtml}</div>`
+      content                                 += `<div class="irr-gl-slot">${irrigHtml}</div>`
+      if (showRes && filterReservoir) content += `<div class="irr-gl-slot">${resHtml}</div>`
+      const isSunTd    = dayOfWeek(d) === 0
+      const isAdvRange = showAdv && d > TODAY && d <= J7
+      cells += `<td class="irr-gl-td${isT ? ' irr-gl-td--today' : ''}${isSunTd ? ' irr-gl-td--week-end' : ''}${isAdvRange ? ' irr-gl-td--advisor-range' : ''}">${content}</td>`
+      if (advisorEnabled && d === J7) {
+        let advCell = ''
+        if (showAdv) {
+          const recMm  = advisorMm(p)
+          const planMm = IRRIG_SEASON.filter(i => i.plotId === p.id && i.iso > TODAY && i.iso <= J7).reduce((s,i) => s+i.mm, 0)
+          const planCol = planMm >= recMm ? '#24B066' : '#E05252'
+          advCell = `<span class="irr-gl-advisor">${recMm} mm</span><span style="display:block;font-size:10px;font-weight:600;color:${planCol}">${planMm} mm planifié</span>`
+        }
+        cells += `<td class="irr-gl-td irr-gl-td--advisor">${advCell}</td>`
+      }
+    }
+    const plotSub = [p.crop, p.irrigation].filter(Boolean).join(' · ')
+    const areaTag = p.area ? `<span class="irr-gl-plot-area">(${p.area} ha)</span>` : ''
+
+    let plotBarHtml = ''
+    const plotVolMax = getPlotVolMax(p.id)
+    if (plotVolMax) {
+      const _areaHa = p.area ?? 0
+      const _realM3 = IRRIG_SEASON.filter(i => i.plotId === p.id && i.real).reduce((s, i) => s + mmToM3(i.mm, _areaHa), 0)
+      const _planM3 = IRRIG_SEASON.filter(i => i.plotId === p.id && !i.real).reduce((s, i) => s + mmToM3(i.mm, _areaHa), 0)
+      const _totM3 = _realM3 + _planM3
+      if (_totM3 > 0) {
+        if (_totM3 > plotVolMax) {
+          const def = fmtM3(_totM3 - plotVolMax)
+          plotBarHtml = `<span class="irr-gl-plot-deficit">Dépassement ${def}</span>`
+        } else {
+          const pR = Math.round(_realM3 / plotVolMax * 100)
+          const pP = Math.min(100 - pR, Math.round(_planM3 / plotVolMax * 100))
+          plotBarHtml = `<span class="irr-gl-plot-mini-bar"><span class="irr-gl-plot-mini-r" style="width:${pR}%"></span><span class="irr-gl-plot-mini-p" style="width:${pP}%"></span></span>`
+        }
+      }
+    }
+
+    return `<tr data-row-plot="${p.id}"><td class="irr-gl-plot"><span class="irr-gl-plot-link" data-plot-id="${p.id}">${p.name}</span>${areaTag}${plotSub ? `<span class="irr-gl-plot-sub">${plotSub}</span>` : ''}${plotBarHtml}</td>${cells}</tr>`
   }
 
   const rows = sortedPlotList().map(plotRow).join('')
@@ -297,11 +632,12 @@ function showGlobaleView(resetScroll = false) {
   right.innerHTML = `
     <div class="irr-gl-outer">
       <div class="irr-gl-sticky-hd" id="irr-gl-sticky-hd">
-        <div class="irr-rv-hd" style="position:static">Vue globale</div>
         <div class="irr-gl-legend">
-          <span><span class="irr-gl-dot" style="background:#E07820"></span>Irrig. réalisée</span>
-          <span><span class="irr-gl-dot" style="background:#FFB705"></span>Irrig. planifiée</span>
-          <span><span class="irr-gl-dot" style="background:#3A7FC1"></span>Pluie</span>
+          <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="real-irrig" ${filterRealIrrig ? 'checked' : ''}><span class="irr-gl-dot" style="background:#E07820"></span>Irrig. effectuée</label>
+          <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="plan-irrig" ${filterPlanIrrig ? 'checked' : ''}><span class="irr-gl-dot" style="background:#FFB705"></span>Irrig. planifiée</label>
+          ${detectorEnabled ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="detected" ${filterDetected ? 'checked' : ''}><span class="irr-gl-det-badge">D</span>&nbsp;Irrig. détectée</label><label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="confirmed" ${filterConfirmed ? 'checked' : ''}><span class="irr-gl-conf-badge">C</span>&nbsp;Irrig. corrigée</label>` : ''}
+          <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="rain" ${filterRain ? 'checked' : ''}><span class="irr-gl-dot" style="background:#3A7FC1"></span>Pluie</label>
+          ${reservoirEnabled ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="reservoir" ${filterReservoir ? 'checked' : ''}><span class="irr-gl-dot" style="background:#9E9E9E"></span>Réservoir</label>` : ''}
         </div>
         <div class="irr-gl-scroll-top" id="irr-gl-scroll-top">
           <div class="irr-gl-scroll-inner" id="irr-gl-scroll-inner"></div>
@@ -309,7 +645,10 @@ function showGlobaleView(resetScroll = false) {
       </div>
       <div class="irr-gl-body" id="irr-gl-body">
         <table class="irr-gl-table" id="irr-gl-table">
-          <thead id="irr-gl-thead"><tr><th class="irr-gl-plot-hd">Parcelles</th>${headers}</tr></thead>
+          <thead id="irr-gl-thead">
+            <tr><th class="irr-gl-plot-hd irr-gl-week-corner"></th>${weekRow}</tr>
+            <tr><th class="irr-gl-plot-hd">Parcelles</th>${headers}</tr>
+          </thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -354,9 +693,32 @@ function showGlobaleView(resetScroll = false) {
     globaleExtraMonths++; showGlobaleView()
   })
 
+  right.querySelectorAll('.irr-gl-filter').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const f = cb.dataset.filter
+      if (f === 'real-irrig') filterRealIrrig = cb.checked
+      else if (f === 'plan-irrig') filterPlanIrrig = cb.checked
+      else if (f === 'rain') filterRain = cb.checked
+      else if (f === 'detected') filterDetected = cb.checked
+      else if (f === 'confirmed') filterConfirmed = cb.checked
+      else if (f === 'reservoir') filterReservoir = cb.checked
+      showGlobaleView()
+    })
+  })
+
   right.querySelectorAll('.irr-gl-irrig').forEach(el => {
     el.addEventListener('click', () => {
-      showEditIrrigModal(el.dataset.idxs.split(',').map(Number), el.dataset.iso)
+      if (el.dataset.idxs) {
+        showEditIrrigModal(el.dataset.idxs.split(',').map(Number), el.dataset.iso)
+      } else if (el.dataset.detPlotid) {
+        showDetectorEditModal(+el.dataset.detPlotid, el.dataset.detPlotname, el.dataset.detIso, +el.dataset.detMm)
+      }
+    })
+  })
+
+  right.querySelectorAll('.irr-gl-rain--edit').forEach(el => {
+    el.addEventListener('click', () => {
+      showEditRainModal(+el.dataset.rainPlotid, el.dataset.rainIso, +el.dataset.rainMm)
     })
   })
 
@@ -424,6 +786,85 @@ function showEditIrrigModal(idxs, iso) {
   })
 }
 
+function showEditRainModal(plotId, iso, currentMm) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  const p = plots.find(pl => pl.id === plotId)
+  const plotName = p ? p.name : `Parcelle ${plotId}`
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>Modifier la pluie — ${fmtDateFull(iso)}</span>
+        <button class="irr-edit-close" id="irr-rain-close">×</button>
+      </div>
+      <div class="irr-edit-body">
+        <div class="irr-edit-row">
+          <span class="irr-edit-label">${plotName}</span>
+          <input type="number" id="irr-rain-qty" value="${currentMm}" min="0" style="width:64px" />
+          <span>mm</span>
+        </div>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-rain-cancel">Annuler</button>
+        <button class="iw-btn iw-btn--pri" id="irr-rain-save">Enregistrer</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-rain-close').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-rain-cancel').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-rain-save').addEventListener('click', () => {
+    const v = parseInt(ov.querySelector('#irr-rain-qty').value)
+    if (!isNaN(v) && v >= 0) rainEdits[`${plotId}_${iso}`] = v
+    ov.remove()
+    showGlobaleView()
+  })
+}
+
+function showDetectorEditModal(plotId, plotName, iso, detectedMm) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  let editMm = detectedMm
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>Irrigation détectée — ${fmtDateFull(iso)}</span>
+        <button class="irr-edit-close" id="irr-det-ed-close">×</button>
+      </div>
+      <div class="irr-edit-body">
+        <div class="irr-edit-row">
+          <span class="irr-edit-label">${plotName}</span>
+          <input type="number" id="irr-det-ed-qty" value="${detectedMm}" min="1" style="width:64px" />
+          <span>mm</span>
+        </div>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--danger" id="irr-det-ed-del">Supprimer</button>
+        <div style="display:flex;gap:8px">
+          <button class="iw-btn iw-btn--sec" id="irr-det-ed-cancel">Annuler</button>
+          <button class="iw-btn iw-btn--pri" id="irr-det-ed-save">Confirmer</button>
+        </div>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  ov.querySelector('#irr-det-ed-qty').addEventListener('input', e => {
+    const v = parseInt(e.target.value); if (v > 0) editMm = v
+  })
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-det-ed-close').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-det-ed-cancel').addEventListener('click', () => ov.remove())
+  ov.querySelector('#irr-det-ed-del').addEventListener('click', () => {
+    IRRIG_SEASON.push({ iso, mm: 0, real: true, plotId, detectorDismissed: true })
+    saveIrrig(); ov.remove(); showGlobaleView()
+  })
+  ov.querySelector('#irr-det-ed-save').addEventListener('click', () => {
+    IRRIG_SEASON.push({ iso, mm: editMm, real: iso <= TODAY, plotId, detectorConfirmed: true })
+    saveIrrig(); ov.remove(); showGlobaleView()
+  })
+}
+
 function openDetailItemEdit(ir, onDone) {
   document.querySelector('.irr-edit-overlay')?.remove()
   let editDate = ir.iso, editMm = ir.mm
@@ -432,7 +873,7 @@ function openDetailItemEdit(ir, onDone) {
   ov.innerHTML = `
     <div class="irr-edit-modal">
       <div class="irr-edit-hd">
-        <span>${ir.real ? "Modifier l'irrigation réalisée" : "Modifier l'irrigation planifiée"}</span>
+        <span>${ir.real ? "Modifier l'irrigation effectuée" : "Modifier l'irrigation planifiée"}</span>
         <button class="irr-edit-close" id="irr-di-close">×</button>
       </div>
       <div class="irr-edit-body">
@@ -535,7 +976,7 @@ function openModifierSaison(plotId, onDone) {
         </div>
         <div id="irr-ms-preview" style="margin-top:12px;font-size:12px;color:var(--txt3)"></div>
         <div style="margin-top:10px;font-size:11px;color:var(--txt3);line-height:1.4">
-          Les irrigations déjà réalisées sont conservées. Les irrigations futures sont recalculées.
+          Les irrigations déjà effectuées sont conservées. Les irrigations futures sont recalculées.
         </div>
       </div>
       <div class="irr-edit-ft">
@@ -557,14 +998,18 @@ function openModifierSaison(plotId, onDone) {
   ov.querySelector('#irr-ms-freq').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { freq = v; updatePreview() } })
 
   ov.querySelector('#irr-ms-save').addEventListener('click', () => {
-    // Remove all strategy irrigations for this season (past and future) then fully regenerate
     const kept = IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId)))
     IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...kept)
     const newId = generateSeasonId()
-    for (const iso of computeOccs()) {
+    const occs = computeOccs()
+    for (const iso of occs) {
       IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId: newId })
     }
-    saveIrrig(); ov.remove(); onDone()
+    saveIrrig(); ov.remove()
+    showSaveConfirmModal('Saison modifiée', [
+      `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
+      `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
+    ])
   })
 }
 
@@ -599,6 +1044,42 @@ function renderDetailPanel(p) {
   const panel = document.getElementById('irr-detail')
   if (!panel) return
 
+  if (!hasIrrigType(p)) {
+    panel.style.display = ''
+    panel.dataset.plotId = String(p.id)
+    panel.innerHTML = `
+      <div class="irr-det-sticky">
+        <div class="irr-det-hd">
+          <div style="flex:1;min-width:0">
+            <div class="irr-det-name">${p.name}</div>
+            <a class="irr-det-link" href="parcelle-detail.html?id=${p.id}">Voir la parcelle →</a>
+          </div>
+          <button class="irr-det-close" id="irr-det-close">×</button>
+        </div>
+        <div class="irr-det-body" style="padding:16px">
+          <p style="font-size:13px;color:var(--txt2);margin:0 0 12px">Précisez le type d'irrigation sur cette parcelle</p>
+          <select id="irr-det-type-sel" style="width:100%;padding:6px;border:1px solid var(--bdr);border-radius:6px;font-size:13px">
+            ${IRRIG_TYPES.map(t => `<option value="${t}"${t === (p.irrigation || 'Non renseigné') ? ' selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <button id="irr-det-type-save" class="btn-primary" style="margin-top:10px;width:100%;justify-content:center">Enregistrer</button>
+        </div>
+      </div>`
+    panel.querySelector('#irr-det-close')?.addEventListener('click', () => {
+      document.getElementById('irr-page')?.classList.remove('irr-has-detail')
+      panel.style.display = 'none'
+      panel.dataset.plotId = ''
+      highlightTableRow(null)
+    })
+    panel.querySelector('#irr-det-type-save')?.addEventListener('click', () => {
+      const val = panel.querySelector('#irr-det-type-sel').value
+      patchParcel(p.id, { irrigation: val })
+      p.irrigation = val
+      renderDetailPanel(p)
+      showGlobaleView(true)
+    })
+    return
+  }
+
   const irrig    = IRRIG_SEASON.filter(i => i.plotId === p.id)
   const hasStrat = irrig.some(i => i.fromStrategy && i.seasonId)
   const stratIr  = irrig.filter(i => i.fromStrategy).sort((a,b) => a.iso < b.iso ? -1 : 1)
@@ -613,15 +1094,58 @@ function renderDetailPanel(p) {
   const real = irrig.filter(i => i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
   const plan = irrig.filter(i => !i.real).sort((a,b) => a.iso < b.iso ? -1 : 1)
 
+  const plotArea   = p.area ?? 0
+  const realM3det  = real.reduce((s, i) => s + mmToM3(i.mm, plotArea), 0)
+  const planM3det  = plan.reduce((s, i) => s + mmToM3(i.mm, plotArea), 0)
+  const totalM3det = realM3det + planM3det
+  const plotVolMax  = getPlotVolMax(p.id)
+  const pctRealDet  = plotVolMax && plotArea ? Math.min(100, Math.round(realM3det  / plotVolMax * 100)) : 0
+  const pctPlanDet  = plotVolMax && plotArea ? Math.min(100 - pctRealDet, Math.round(planM3det / plotVolMax * 100)) : 0
+  const pctUsedDet  = pctRealDet + pctPlanDet
+  const volSectionHtml = `
+    <div class="irr-det-vol">
+      <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--bdr2)">
+        <div class="irr-det-vol-row">
+          <span class="irr-det-vol-lbl">Volume saison :</span>
+          <strong style="font-size:13px">${fmtM3(totalM3det)}</strong>
+        </div>
+        ${plotArea ? `<div class="irr-det-vol-row" style="gap:8px;margin-top:3px">
+          <span style="color:#FF8500;font-size:11px">▪ ${fmtM3(realM3det)} effectués</span>
+          <span style="color:#FFB705;font-size:11px">▪ ${fmtM3(planM3det)} planifiés</span>
+        </div>` : '<div class="irr-det-vol-lbl" style="color:var(--txt3);margin-top:3px">surface non renseignée</div>'}
+      </div>
+      <div class="irr-det-vol-row">
+        <span class="irr-det-vol-lbl">Volume limité :</span>
+        <input class="irr-det-vol-input" id="irr-det-vol-input" type="number" min="0" placeholder="—" value="${plotVolMax ?? ''}" />
+        <span class="irr-det-vol-lbl">m³</span>
+      </div>
+      ${plotVolMax && plotArea ? `
+      <div class="irr-det-vol-bar">
+        <div style="width:${pctRealDet}%;background:#FF8500;height:100%"></div>
+        <div style="width:${pctPlanDet}%;background:#FFB705;height:100%"></div>
+      </div>
+      ${totalM3det > plotVolMax
+        ? `<div class="irr-det-vol-note" style="color:#E05252">Dépassement ${fmtM3(totalM3det - plotVolMax)}</div>`
+        : `<div class="irr-det-vol-note">${pctUsedDet}% · ${fmtM3(plotVolMax - totalM3det)} restants</div>`
+      }` : ''}
+    </div>`
+
   const item = ir => {
     const idx = IRRIG_SEASON.indexOf(ir)
     const col = ir.real ? '#FF8500' : '#FFB705'
     const [, mo, dd] = ir.iso.split('-')
     const dateStr = `${parseInt(dd)} ${MONTHS_SHORT[parseInt(mo)-1]}`
+    const statusLabel = ir.real ? 'Effectuée' : 'Planifiée'
+    const detBadge = ir.detectorConfirmed
+      ? `<span class="irr-pr-det-tag">Détectée &amp; corrigée</span>`
+      : ''
     return `<div class="irr-pr-item">
       <div class="irr-pr-stripe" style="background:${col}"></div>
       <div class="irr-pr-date" style="color:${col};min-width:52px;font-size:13px;font-weight:600">${dateStr}</div>
-      <div class="irr-pr-info"><div class="irr-pr-status" style="color:${col}">${ir.real ? 'Réalisée' : 'Planifiée'}</div></div>
+      <div class="irr-pr-info">
+        <div class="irr-pr-status" style="color:${col}">${statusLabel}</div>
+        ${detBadge}
+      </div>
       <div class="irr-pr-mm" style="color:${col}">${ir.mm} mm</div>
       <button class="irr-pr-edit" data-idx="${idx}" title="Modifier">✎</button>
       <button class="irr-pr-del"  data-idx="${idx}" title="Supprimer">🗑</button>
@@ -638,12 +1162,20 @@ function renderDetailPanel(p) {
       </div>
     </div>` : ''
 
+  const advisorBlock = advisorEnabled && isAdvisorPlot(p)
+    ? `<div style="margin:16px 16px 16px;padding:12px;background:#FFF4E6;border-radius:8px;border-left:3px solid #E07820">
+         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#E07820;margin-bottom:4px">Recommandations d'irrigation sur les 7 prochains jours</div>
+         <div style="font-size:22px;font-weight:700;color:#E07820">${advisorMm(p)} mm</div>
+       </div>`
+    : ''
+
   panel.innerHTML = `
     <div class="irr-det-sticky">
       <div class="irr-det-hd">
-        <span class="irr-det-eyebrow">Vue détail</span>
-        <span class="irr-det-name">${p.name}</span>
-        <a class="irr-det-link" href="parcelle-detail.html?id=${p.id}">Voir la parcelle →</a>
+        <div style="flex:1;min-width:0">
+          <div class="irr-det-name">${p.name}</div>
+          <a class="irr-det-link" href="parcelle-detail.html?id=${p.id}">Voir la parcelle →</a>
+        </div>
         <button class="irr-det-close" id="irr-det-close">×</button>
       </div>
       <div class="irr-det-body">
@@ -651,6 +1183,7 @@ function renderDetailPanel(p) {
         ${stratBar}
         ${renderCumuls(irrig)}
         ${renderTimeline(irrig)}
+        ${volSectionHtml}
       </div>
     </div>
     <div class="irr-det-scroll">
@@ -659,6 +1192,7 @@ function renderDetailPanel(p) {
           <summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Effectuées <span class="irr-pr-details-sub">${real.length}</span></summary>
           <div>${real.map(item).join('')}</div>
         </details>` : ''}
+      ${advisorBlock}
       ${plan.length ? `
         <details class="irr-pr-details" open>
           <summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Planifiées <span class="irr-pr-details-sub">${plan.length}</span></summary>
@@ -676,14 +1210,31 @@ function renderDetailPanel(p) {
     openModifierSaison(p.id, () => { renderDetailPanel(p); showGlobaleView(true) })
   })
   panel.querySelector('#irr-det-stop')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
-      ...IRRIG_SEASON.filter(i => !(i.plotId === p.id && seasonIds.has(i.seasonId) && !i.real && i.iso > TODAY)))
-    saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
+    panel.querySelector('#irr-det-strat-opts').style.display = 'none'
+    const removed = IRRIG_SEASON.filter(i => i.plotId === p.id && seasonIds.has(i.seasonId) && !i.real && i.iso > TODAY)
+    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !removed.includes(i)))
+    saveIrrig()
+    showSaveConfirmModal('Saison arrêtée', [
+      `${removed.length} irrigation${removed.length !== 1 ? 's' : ''} future${removed.length !== 1 ? 's' : ''} supprimée${removed.length !== 1 ? 's' : ''}`,
+      `Parcelle : ${p.name}`,
+    ])
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
-      ...IRRIG_SEASON.filter(i => !(i.plotId === p.id && seasonIds.has(i.seasonId))))
-    saveIrrig(); renderDetailPanel(p); showGlobaleView(true)
+    panel.querySelector('#irr-det-strat-opts').style.display = 'none'
+    const toRemove = IRRIG_SEASON.filter(i => i.plotId === p.id && seasonIds.has(i.seasonId))
+    if (!toRemove.length) return
+    showDeleteConfirmModal(
+      `Supprimer toutes les irrigations de "${p.name}" ?`,
+      `${toRemove.length} irrigation${toRemove.length !== 1 ? 's' : ''} seront supprimées (passées et futures).`,
+      () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !toRemove.includes(i)))
+        saveIrrig()
+        showSaveConfirmModal('Saison supprimée', [
+          `${toRemove.length} irrigation${toRemove.length !== 1 ? 's' : ''} supprimée${toRemove.length !== 1 ? 's' : ''}`,
+          `Parcelle : ${p.name}`,
+        ])
+      }
+    )
   })
 
   panel.querySelectorAll('.irr-pr-edit').forEach(btn => {
@@ -699,6 +1250,13 @@ function renderDetailPanel(p) {
     })
   })
 
+  panel.querySelector('#irr-det-vol-input')?.addEventListener('change', e => {
+    const val = e.target.value !== '' ? parseInt(e.target.value) : null
+    patchParcel(p.id, { volumeMaxM3: val })
+    renderDetailPanel(p)
+    renderVolBanner()
+  })
+
   panel.querySelector('#irr-det-close').addEventListener('click', () => {
     document.getElementById('irr-page')?.classList.remove('irr-has-detail')
     panel.style.display = 'none'
@@ -707,8 +1265,19 @@ function renderDetailPanel(p) {
   })
 }
 
-function showQuickAddModal(plotId, plotName, iso) {
+function showQuickAddModal(plotId, plotName, iso, defaultMm = 10) {
   document.querySelector('.irr-edit-overlay')?.remove()
+  const p = plots.find(pl => pl.id === +plotId)
+  const needsType = p && !hasIrrigType(p)
+
+  const typeFieldHtml = needsType ? `
+    <div class="irr-edit-row">
+      <span class="irr-edit-label">Type d'irrigation</span>
+      <select id="irr-qa-type-sel" style="flex:1;padding:6px;border:1px solid var(--bdr);border-radius:6px;font-size:13px">
+        ${IRRIG_TYPES.map(t => `<option value="${t}"${t === (p.irrigation || 'Non renseigné') ? ' selected' : ''}>${t}</option>`).join('')}
+      </select>
+    </div>` : ''
+
   const ov = document.createElement('div')
   ov.className = 'irr-edit-overlay'
   ov.innerHTML = `
@@ -718,26 +1287,44 @@ function showQuickAddModal(plotId, plotName, iso) {
         <button class="irr-edit-close" id="irr-qa-close">×</button>
       </div>
       <div class="irr-edit-body">
+        ${needsType ? `<p style="font-size:12px;color:var(--txt2);margin:0 0 10px">Précisez le type d'irrigation de cette parcelle pour pouvoir saisir une irrigation.</p>` : ''}
+        ${typeFieldHtml}
         <div class="irr-edit-row">
           <span class="irr-edit-label">${plotName}</span>
-          <input type="number" class="irr-edit-qty" id="irr-qa-qty" value="10" min="1" style="width:64px" />
+          <input type="number" class="irr-edit-qty" id="irr-qa-qty" value="${defaultMm}" min="1" style="width:64px" />
           <span>mm</span>
         </div>
       </div>
       <div class="irr-edit-ft">
         <button class="iw-btn iw-btn--sec" id="irr-qa-cancel">Annuler</button>
-        <button class="iw-btn iw-btn--pri" id="irr-qa-save">Enregistrer</button>
+        <button class="iw-btn iw-btn--pri" id="irr-qa-save"${needsType ? ' disabled' : ''}>Enregistrer</button>
       </div>
     </div>`
   document.body.appendChild(ov)
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
   ov.querySelector('#irr-qa-close').addEventListener('click', () => ov.remove())
   ov.querySelector('#irr-qa-cancel').addEventListener('click', () => ov.remove())
-  ov.querySelector('#irr-qa-save').addEventListener('click', () => {
+
+  const saveBtn = ov.querySelector('#irr-qa-save')
+  const typeSel = ov.querySelector('#irr-qa-type-sel')
+  if (typeSel) {
+    const syncSaveState = () => { saveBtn.disabled = NO_IRRIG_TYPES.has(typeSel.value) }
+    syncSaveState()
+    typeSel.addEventListener('change', syncSaveState)
+  }
+
+  saveBtn.addEventListener('click', () => {
+    if (typeSel) {
+      const type = typeSel.value
+      if (NO_IRRIG_TYPES.has(type)) return
+      patchParcel(p.id, { irrigation: type })
+      p.irrigation = type
+    }
     const qty = parseInt(ov.querySelector('#irr-qa-qty').value) || 10
     IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId: +plotId, fromStrategy: false })
     saveIrrig()
     ov.remove()
+    showGlobaleView(true)
   })
 }
 
@@ -760,8 +1347,23 @@ function renderLeft() {
       </select>
     </div>` : ''
 
+  const page = document.getElementById('irr-page')
+  if (leftCollapsed) {
+    page?.classList.add('irr-left-collapsed')
+    left.innerHTML = `
+      <button class="irr-lc-collapse-btn" id="irr-left-toggle" title="Déplier le panneau">›</button>`
+    left.querySelector('#irr-left-toggle').addEventListener('click', () => {
+      leftCollapsed = false; renderLeft()
+    })
+    return
+  }
+  page?.classList.remove('irr-left-collapsed')
+
   left.innerHTML = `
-    <div class="irr-lc-hd">Irrigation</div>
+    <div class="irr-lc-collapse-bar">
+      <button class="irr-lc-collapse-btn" id="irr-left-toggle" title="Réduire le panneau">‹</button>
+    </div>
+    <div class="irr-lc-scroll">
     ${orgSelector}
 
     <button class="irr-lc-btn${activeAction==='saisie'?' irr-lc-btn--active':''}" data-action="saisie">
@@ -841,10 +1443,31 @@ function renderLeft() {
           <label><input type="checkbox" id="irr-ex-rain" checked /> Pluie</label>
         </div>
       </div>
-      <p class="irr-ef-hint">Une ligne par date · Valeurs en mm</p>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-ex-dl"><i class="bi bi-download"></i> Télécharger CSV</button>
     </div>
+    </div>
+    </div>
+
+    <div class="irr-lc-features">
+      <div class="irr-lc-features-title">Fonctionnalités</div>
+      <label class="irr-lc-cb-row">
+        <input type="checkbox" id="irr-feat-advisor" ${advisorEnabled ? 'checked' : ''} />
+        <span>Irrigation Advisor</span>
+      </label>
+      <label class="irr-lc-cb-row">
+        <input type="checkbox" id="irr-feat-reservoir" ${reservoirEnabled ? 'checked' : ''} />
+        <span>Reservoir Sensorless</span>
+      </label>
+      <label class="irr-lc-cb-row">
+        <input type="checkbox" id="irr-feat-detector" ${detectorEnabled ? 'checked' : ''} />
+        <span>Irrigation Detector</span>
+      </label>
+    </div>
   `
+
+  left.querySelector('#irr-left-toggle')?.addEventListener('click', () => {
+    leftCollapsed = true; renderLeft()
+  })
 
   // Bind multi-selects
   if (activeAction === 'saisie')  bindMultiSelect(left, 'irr-s-scope')
@@ -881,9 +1504,15 @@ function renderLeft() {
     if (!debut || !fin || freq <= 0) { prev.textContent = '—'; return }
     let n = 0, cur = new Date(debut), end = new Date(fin)
     while (cur <= end && n < 200) { n++; cur.setDate(cur.getDate() + freq) }
-    prev.innerHTML = n > 0
-      ? `<span style="color:var(--pri);font-weight:600">↗ ${n} irrigations · ${n * qty} mm au total</span>`
-      : `<span style="color:var(--txt3)">Ajustez les paramètres</span>`
+    if (n > 0) {
+      const selIds    = getMultiSelectedIds(left, 'irr-sa-scope')
+      const totalArea = selIds.reduce((s, id) => { const pl = sortedPlotList().find(p => p.id === id); return s + (pl?.area ?? 0) }, 0)
+      const m3        = totalArea > 0 ? Math.round(n * qty * totalArea * 10) : 0
+      const m3Str     = m3 > 0 ? ` · ${m3.toLocaleString('fr-FR')} m³` : ''
+      prev.innerHTML  = `<span style="color:var(--pri);font-weight:600">↗ ${n} irrigations · ${n * qty} mm${m3Str}</span>`
+    } else {
+      prev.innerHTML = `<span style="color:var(--txt3)">Ajustez les paramètres</span>`
+    }
   }
 
   if (activeAction === 'saison') {
@@ -965,6 +1594,17 @@ function renderLeft() {
     doSaisie()
   })
 
+  // Feature checkboxes
+  const refreshAll = () => {
+    showGlobaleView()
+    const panel = document.getElementById('irr-detail')
+    const plotId = panel?.dataset.plotId
+    if (plotId) { const p = plots.find(pl => String(pl.id) === plotId); if (p) renderDetailPanel(p) }
+  }
+  left.querySelector('#irr-feat-advisor')?.addEventListener('change', e => { advisorEnabled = e.target.checked; refreshAll() })
+  left.querySelector('#irr-feat-reservoir')?.addEventListener('change', e => { reservoirEnabled = e.target.checked; refreshAll() })
+  left.querySelector('#irr-feat-detector')?.addEventListener('change', e => { detectorEnabled = e.target.checked; refreshAll() })
+
   // Saison save
   left.querySelector('#irr-sa-save')?.addEventListener('click', () => {
     const selectedPlotIds = getMultiSelectedIds(left, 'irr-sa-scope')
@@ -1030,6 +1670,11 @@ function setupDataTip() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  const _urlParams = new URLSearchParams(window.location.search)
+  const _plotId    = _urlParams.get('plot')
+  const _action    = _urlParams.get('action')
+  if (_action === 'saisie' || _action === 'saison') activeAction = _action
+
   updateBreadcrumb()
   setupDataTip()
   renderLeft()
@@ -1043,10 +1688,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (p) renderDetailPanel(p)
   })
 
-  const _urlParams = new URLSearchParams(window.location.search)
-  const _plotId = _urlParams.get('plot')
   if (_plotId) {
     const _p = plots.find(pl => pl.id === +_plotId)
-    if (_p) openDetailPanel(_p)
+    if (_p) {
+      openDetailPanel(_p)
+      if (_action === 'saisie' || _action === 'saison') {
+        setTimeout(() => {
+          const msId = _action === 'saisie' ? 'irr-s-scope' : 'irr-sa-scope'
+          const cb = document.querySelector(`#${msId} input[value="${_plotId}"]`)
+          if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change')) }
+        }, 50)
+      }
+    }
   }
 })

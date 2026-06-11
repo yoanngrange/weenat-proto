@@ -3,25 +3,17 @@ import { sensors } from '../data/sensors.js'
 import { plots } from '../data/plots.js'
 
 function generateAlertHistory(alertId) {
-  const scenarios = [
-    { label: 'Seuil dépassé',  desc: 'Conditions déclenchantes vérifiées', duration: '2h34',  resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Notification SMS envoyée',            duration: '45min', resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Valeur mesurée hors plage',           duration: '1h20',  resolved: true  },
-    { label: 'Fausse alerte',  desc: 'Pic transitoire — durée < seuil',     duration: null,    resolved: true  },
-    { label: 'Seuil dépassé',  desc: 'Conditions vérifiées sur 3 capteurs', duration: '3h05',  resolved: true  },
-    { label: 'Alerte en cours',desc: 'Conditions vérifiées depuis ce matin', duration: null,   resolved: false },
-  ]
   const count = 4 + (alertId % 5)
   const now = Date.now()
   return Array.from({ length: count }, (_, i) => {
     const seed = alertId * 17 + i * 7
     const daysAgo = 1 + i * (2 + seed % 6)
-    const ts = new Date(now - daysAgo * 86400000)
-    const s = scenarios[seed % scenarios.length]
+    const startMs = now - daysAgo * 86400000 - (seed % 8) * 3600000
+    const durationMs = (1 + seed % 5) * 3600000 + (seed % 60) * 60000
+    const ongoing = i === 0 && (seed % 7 === 0)
     return {
-      ts,
-      label: s.label, desc: s.desc, duration: s.duration,
-      resolved: i > 0 ? true : s.resolved,
+      start: new Date(startMs),
+      end: ongoing ? null : new Date(startMs + durationMs),
     }
   })
 }
@@ -44,17 +36,16 @@ function showHistoryModal(alert) {
         <button id="close-history" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--txt2);padding:4px"><i class="bi bi-x-lg"></i></button>
       </div>
       <div style="overflow-y:auto;padding:8px 20px 16px">
-        ${history.length ? history.map(h => `
-          <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--bdr2)">
-            <div style="width:8px;height:8px;border-radius:50%;background:${h.resolved ? 'var(--ok)' : '#ff9f0a'};flex-shrink:0;margin-top:5px"></div>
-            <div style="flex:1">
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-                <span style="font-weight:600;font-size:13px">${h.label}</span>
-                <span style="font-size:12px;color:var(--txt3)">${h.ts.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})} ${h.ts.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>
-              </div>
-              <div style="font-size:12px;color:var(--txt2);margin-top:2px">${h.desc}${h.duration ? ` · Durée : ${h.duration}` : ''}</div>
-            </div>
-          </div>`).join('') : '<p style="color:var(--txt3);padding:16px 0;font-size:13px">Aucun déclenchement enregistré.</p>'}
+        ${history.length ? history.map(h => {
+          const fmt = d => d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})
+          return `
+          <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--bdr2);font-size:13px">
+            <div style="width:6px;height:6px;border-radius:50%;background:${h.end ? 'var(--ok)' : '#ff9f0a'};flex-shrink:0"></div>
+            <span style="color:var(--txt1)">${fmt(h.start)}</span>
+            <span style="color:var(--txt3)">→</span>
+            <span style="color:${h.end ? 'var(--txt2)' : '#ff9f0a'}">${h.end ? fmt(h.end) : 'En cours'}</span>
+          </div>`
+        }).join('') : '<p style="color:var(--txt3);padding:16px 0;font-size:13px">Aucun déclenchement enregistré.</p>'}
       </div>
     </div>`
 
@@ -64,21 +55,22 @@ function showHistoryModal(alert) {
 }
 
 const ALERTS_ADMIN = [
-  { id: 1, name: 'Pluie forte > 10 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
-  { id: 2, name: 'Gel précoce < 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [3] },
-  { id: 3, name: 'Teneur en eau critique', statut: 'inactif', metric: 'teneur-eau', created: '2026-02-20', lastTriggered: null, sensorIds: [5], parcelIds: [4, 5] },
-  { id: 4, name: 'Vent violent > 80 km/h', statut: 'actif', metric: 'vent', created: '2025-09-01', lastTriggered: '2026-02-28', sensorIds: [1, 4], parcelIds: [] },
-  { id: 5, name: 'Rayonnement faible', statut: 'inactif', metric: 'rayonnement', created: '2026-03-01', lastTriggered: null, sensorIds: [], parcelIds: [1] },
-  { id: 6, name: 'DPV élevé > 2 kPa', statut: 'actif', metric: 'temperature', created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2], parcelIds: [2, 3] },
-  { id: 7, name: 'Potentiel hydrique > 100 kPa', statut: 'actif', metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6], parcelIds: [6] },
-  { id: 8, name: 'Température humide < 0°C', statut: 'actif', metric: 'temp-humide', created: '2026-01-10', lastTriggered: '2026-03-05', sensorIds: [3], parcelIds: [1], phones: ['+33 6 12 34 56 78', '+33 7 52 18 93 46'] },
-  { id: 9, name: 'Température sèche > 35°C', statut: 'actif', metric: 'temp-seche', created: '2026-02-15', lastTriggered: '2026-04-18', sensorIds: [4], parcelIds: [3], phones: ['+33 6 12 34 56 78'] },
+  { id: 1, name: 'Pluie forte > 10 mm/h', params: 'cumul > 10 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
+  { id: 2, name: 'Gel précoce < 2°C', params: '< 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [3] },
+  { id: 3, name: 'Teneur en eau critique', params: '< 20%', statut: 'inactif', metric: 'teneur-eau', created: '2026-02-20', lastTriggered: null, sensorIds: [5], parcelIds: [4, 5] },
+  { id: 4, name: 'Vent violent > 80 km/h', params: '> 80 km/h', statut: 'actif', metric: 'vent', created: '2025-09-01', lastTriggered: '2026-02-28', sensorIds: [1, 4], parcelIds: [] },
+  { id: 5, name: 'Rayonnement faible', params: '< 50 W/m²', statut: 'inactif', metric: 'rayonnement', created: '2026-03-01', lastTriggered: null, sensorIds: [], parcelIds: [1] },
+  { id: 6, name: 'DPV élevé > 2 kPa', params: '> 2 kPa', statut: 'actif', metric: 'temperature', created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2], parcelIds: [2, 3] },
+  { id: 7, name: 'Potentiel hydrique > 100 kPa', params: '> 100 kPa', statut: 'actif', metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6], parcelIds: [6] },
+  { id: 8, name: 'Température humide < 0°C', params: '< 0°C', statut: 'actif', metric: 'temp-humide', created: '2026-01-10', lastTriggered: '2026-03-05', sensorIds: [3], parcelIds: [1], phones: ['+33 6 12 34 56 78', '+33 7 52 18 93 46'] },
+  { id: 9, name: 'Température sèche > 35°C', params: '> 35°C', statut: 'actif', metric: 'temp-seche', created: '2026-02-15', lastTriggered: '2026-04-18', sensorIds: [4], parcelIds: [3], phones: ['+33 6 12 34 56 78'] },
 ]
 
 const ALERTS_ADHERENT = [
-  { id: 1, name: 'Gel précoce < 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-15', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [1] },
-  { id: 2, name: 'Pluie forte > 15 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-20', lastTriggered: '2026-04-10', sensorIds: [1], parcelIds: [2] },
-  { id: 3, name: 'Teneur en eau basse < 30%', statut: 'inactif', metric: 'teneur-eau', created: '2026-03-05', lastTriggered: null, sensorIds: [5], parcelIds: [] },
+  { id: 1, name: 'Gel précoce < 2°C', params: '< 2°C', statut: 'actif', metric: 'temperature', created: '2025-11-15', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [1] },
+  { id: 2, name: 'Pluie forte > 15 mm/h', params: 'cumul > 15 mm/h', statut: 'actif', metric: 'pluie', created: '2026-01-20', lastTriggered: '2026-04-10', sensorIds: [1], parcelIds: [2] },
+  { id: 3, name: 'Teneur en eau basse < 30%', params: '< 30%', statut: 'inactif', metric: 'teneur-eau', created: '2026-03-05', lastTriggered: null, sensorIds: [5], parcelIds: [] },
+  { id: 4, name: 'Température humide < 0°C', params: '< 0°C', statut: 'actif', metric: 'temp-humide', created: '2026-02-01', lastTriggered: '2026-03-05', sensorIds: [3], parcelIds: [1], phones: ['+33 6 78 92 34 15', '+33 7 41 08 63 22'] },
 ]
 
 const ALERTS = (localStorage.getItem('menuRole') === 'adherent-reseau') ? ALERTS_ADHERENT : ALERTS_ADMIN
@@ -273,7 +265,7 @@ function render() {
       </td>
       <td class="admin-links-cell">${cibleHtml}</td>
       <td>${METRIC_LABELS[alert.metric] || alert.metric}</td>
-      <td style="color:var(--txt3);font-style:italic;font-size:12px">—</td>
+      <td style="font-size:12px;color:var(--txt2)">${alert.params || '—'}</td>
       <td class="member-email">${(alert.phones || []).join('<br>') || '—'}</td>
       <td>
         <label class="toggle-switch" title="${isActif ? 'Désactiver' : 'Activer'}">

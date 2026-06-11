@@ -2,7 +2,10 @@
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { plots } from '../data/plots.js'
 import { integrations } from '../data/integrations.js'
+import { applyStoredPlotPatches } from '../data/store.js'
 export { integrations }
+
+applyStoredPlotPatches(plots)
 
 
 const TYPE_COLORS = {
@@ -11,7 +14,7 @@ const TYPE_COLORS = {
   fertilisation: 'var(--ok)'
 }
 
-const ADHERENT_ACTIVE_IDS = new Set(['irre-lis-multi', 'irre-lis-mono', 'decitrait', 'limacapt'])
+const ADHERENT_ACTIVE_IDS = new Set(['irre-lis-multi', 'decitrait', 'limacapt'])
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()

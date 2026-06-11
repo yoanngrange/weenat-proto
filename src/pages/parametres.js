@@ -58,17 +58,17 @@ const SUBSCRIPTION_PLANS = [
   {
     id: 'plus',
     name: 'Weenat Plus',
-    price: '16 €/mois',
-    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', '5 capteurs maximum', 'Parcelles illimitées'],
-    color: '#00B093',
-    current: true
+    price: '16,5 €/mois',
+    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', 'Parcelles illimitées'],
+    color: '#00B093'
   },
   {
     id: 'expert',
     name: 'Weenat Expert',
     price: '30 €/mois',
-    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', '20 capteurs maximum', 'Parcelles illimitées', 'Capteurs irrigation', 'Fonctionnalités irrigation'],
-    color: '#006798'
+    features: ['Historique illimité', 'Alertes', 'Intégrations', 'Exports', 'Accès API', '2 stations météo virtuelles', 'Parcelles illimitées', 'Capteurs irrigation', 'Fonctionnalités irrigation'],
+    color: '#006798',
+    current: true
   }
 ]
 
@@ -97,11 +97,22 @@ const org = isAdmin
     })()
 const owners = members.filter(m => m.role === 'propriétaire' || m.role === 'admin')
 
+const USER_ORGS = isAdmin
+  ? [{ id: '100', name: "Breiz'Agri Conseil" }, { id: '42', name: 'Exploitation Dupont' }]
+  : [{ id: '1', name: 'Ferme du Bocage' }, { id: 'dutilleul', name: 'Exploitation Dutilleul' }]
+let selectedOrgIdWeb = USER_ORGS[0].id
+
 function renderForm() {
   const el = document.getElementById('parametres-form')
   if (!el) return
 
   el.innerHTML = `
+    <div style="margin-bottom:20px;max-width:360px">
+      <label class="param-label" style="display:block;margin-bottom:6px;font-weight:600">Exploitation</label>
+      <select id="web-org-selector" class="param-input" style="width:100%">
+        ${USER_ORGS.map(o => `<option value="${o.id}"${o.id === selectedOrgIdWeb ? ' selected' : ''}>${o.name}</option>`).join('')}
+      </select>
+    </div>
     <div class="param-2col">
       <div class="param-section">
         <div class="param-section-title">Mon exploitation</div>
@@ -194,6 +205,14 @@ function renderForm() {
       </div>
 
       <div id="p-reseau-panel-independante" style="display:none">
+        <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+          <ul style="margin:0 0 10px;padding:0 0 0 4px;list-style:none;display:flex;flex-direction:column;gap:8px">
+            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Accédez aux capteurs partagés par votre réseau</li>
+            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Bénéficiez de conseils sur l'installation des capteurs et l'utilisation de l'app</li>
+            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Votre conseiller peut suivre l'état de vos parcelles et capteurs, avec votre accord</li>
+          </ul>
+          <p style="margin:0;font-size:12px;color:var(--txt3);line-height:1.5;border-top:1px solid var(--bdr);padding-top:10px">Contrairement à d'autres plateformes, vous ne partagez des données qu'avec les autres exploitations adhérentes du réseau, pas n'importe qui.</p>
+        </div>
         <div style="font-size:13px;color:var(--txt2);margin-bottom:14px">20 réseaux proches de votre exploitation</div>
         <div style="display:flex;flex-wrap:wrap;gap:10px">
           ${NEARBY_NETWORKS.map((net, i) => `
@@ -210,7 +229,6 @@ function renderForm() {
               <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--txt2)">
                 <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Capteurs</span>${net.capteurs}</div>
                 <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Parcelles</span>${net.parcelles}</div>
-                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Adhérents</span>${net.adherents}</div>
               </div>
               <div>
                 ${net.sharedTypes && net.sharedTypes.length
@@ -256,6 +274,12 @@ function renderForm() {
       const net = NEARBY_NETWORKS[+btn.dataset.netIdx]
       showToast(`Demande envoyée à ${net.name}`)
     })
+  })
+
+  el.querySelector('#web-org-selector')?.addEventListener('change', e => {
+    selectedOrgIdWeb = e.target.value
+    const found = USER_ORGS.find(o => o.id === selectedOrgIdWeb)
+    if (found) el.querySelector('#org-name').value = found.name
   })
 }
 

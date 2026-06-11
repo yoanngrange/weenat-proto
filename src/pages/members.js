@@ -30,8 +30,8 @@ let selectedIds     = new Set()
 let activeRender    = null
 
 const ADHERENT_MEMBERS = [
-  { id: 901, prenom: 'Marie',       nom: 'Martin',     email: 'marie.martin@ferme-du-bocage.fr',     role: 'propriétaire', statut: 'actif' },
-  { id: 902, prenom: 'Jean-Michel', nom: 'Dutilleul',  email: 'jm.dutilleul@ferme-du-bocage.fr',     role: 'admin',        statut: 'actif' },
+  { id: 901, prenom: 'Marie',       nom: 'Martin',    email: 'marie.martin@ferme-du-bocage.fr',  role: 'propriétaire', statut: 'actif', parcelIds: [1, 2, 3] },
+  { id: 902, prenom: 'Jean-Michel', nom: 'Dutilleul', email: 'jm.dutilleul@ferme-du-bocage.fr',  role: 'admin',        statut: 'actif', sensorIds: [1, 2] },
 ]
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -398,6 +398,11 @@ function renderAdherentMembers() {
   if (selectedRoles.length)   list = list.filter(m => selectedRoles.includes(m.role))
   if (selectedStatuts.length) list = list.filter(m => selectedStatuts.includes(m.statut))
 
+  // Hide the Organisations column — members of my org are always in my org only
+  document.querySelector('#members-table th[data-column="orgs"]')?.style && (
+    document.querySelector('#members-table th[data-column="orgs"]').style.display = 'none'
+  )
+
   const statsEl = document.getElementById('stats-cards')
   if (statsEl) {
     statsEl.innerHTML = [
@@ -410,21 +415,30 @@ function renderAdherentMembers() {
   if (!tbody) return
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--txt3)">Aucun membre ne correspond aux filtres.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--txt3)">Aucun membre ne correspond aux filtres.</td></tr>'
     return
   }
 
-  tbody.innerHTML = list.map(m => `
-    <tr>
-      <td class="col-check"></td>
-      <td><span class="member-name">${m.prenom} ${m.nom}</span><div class="member-email-sub">${m.email}</div></td>
-      <td>${m.role}</td>
-      <td class="admin-links-cell"><span class="tag-none">—</span></td>
-      <td class="admin-links-cell"><span class="tag-none">—</span></td>
-      <td class="admin-links-cell"><span class="tag-none">—</span></td>
-      <td>${statutBadge(m.statut)}</td>
-    </tr>
-  `).join('')
+  tbody.innerHTML = list.map(m => {
+    const memberParcels = plots.filter(p => (m.parcelIds || []).includes(p.id))
+    const memberSensors = sensors.filter(s => (m.sensorIds || []).includes(s.id))
+    const parcelsHtml = memberParcels.length
+      ? memberParcels.map(p => `<div class="admin-item-row"><a href="parcelle-detail.html?id=${p.id}" class="admin-link">${p.name}</a></div>`).join('')
+      : '<span class="tag-none">—</span>'
+    const sensorsHtml = memberSensors.length
+      ? memberSensors.map(s => `<div class="admin-item-row"><a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial} <span class="member-sensor-model">${s.model}</span></a></div>`).join('')
+      : '<span class="tag-none">—</span>'
+    return `
+      <tr>
+        <td class="col-check"></td>
+        <td><span class="member-name">${m.prenom} ${m.nom}</span><div class="member-email-sub">${m.email}</div></td>
+        <td>${m.role}</td>
+        <td class="admin-links-cell">${parcelsHtml}</td>
+        <td class="admin-links-cell">${sensorsHtml}</td>
+        <td>${statutBadge(m.statut)}</td>
+      </tr>
+    `
+  }).join('')
 }
 
 function showToast(msg) {

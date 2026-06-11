@@ -4,6 +4,9 @@ import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+import { applyStoredPlotPatches, patchParcel, getParcel } from '../data/store.js'
+
+applyStoredPlotPatches(plots)
 
 const urlParams = new URLSearchParams(window.location.search)
 const integId = urlParams.get('id')
@@ -55,7 +58,13 @@ function render() {
   const label = TYPE_LABELS[integ.type]
   const meta  = INTEG_META[integ.id] || {}
 
-  const connectedPlots = plots.filter(p => (p.integrations || []).includes(integ.name))
+  const isAdherent = localStorage.getItem('menuRole') === 'adherent-reseau'
+  const connectedPlots = plots.filter(p => {
+    if (!(p.integrations || []).includes(integ.name)) return false
+    if (isAdherent && p.orgId !== 1) return false
+    const plotModels = sensors.filter(s => (s.parcelIds || []).includes(p.id)).map(s => s.model)
+    return integ.sensors.some(req => plotModels.includes(req))
+  })
 
   document.getElementById('integ-detail').innerHTML = `
     <div class="integ-detail-layout">
@@ -100,7 +109,7 @@ function render() {
         </div>
 
         <div class="integ-detail-section">
-          <div class="integ-detail-section-title">Capteurs compatibles</div>
+          <div class="integ-detail-section-title">Capteurs requis</div>
           <div class="integ-sensors-list">
             ${integ.sensors.map(s => `
               <div class="integ-sensor-pill">
@@ -131,14 +140,14 @@ function render() {
                 ${connectedPlots.map(p => {
                   const org = orgs.find(o => o.id === p.orgId)
                   const ville = org?.ville || '—'
-                  const plotSensors = sensors.filter(s => s.parcelId === p.id)
+                  const plotSensors = sensors.filter(s => (s.parcelIds || []).includes(p.id) && integ.sensors.includes(s.model))
                   const models = [...new Set(plotSensors.map(s => s.model))].join(', ') || '—'
                   return `<tr>
                     <td style="font-weight:500">${p.name}</td>
                     <td class="member-email">${ville}</td>
                     <td class="num">${p.area} ha</td>
-                    <td>${p.crop}</td>
-                    <td>${p.irrigation}</td>
+                    <td>${p.crop || '—'}</td>
+                    <td>${p.irrigation || '—'}</td>
                     <td class="member-email">${models}</td>
                     <td class="num">${p.id}</td>
                   </tr>`
@@ -191,7 +200,7 @@ function render() {
         <div class="integ-aside-section">
           <div class="integ-aside-label">Aide</div>
           <div class="integ-aside-value">
-            <a href="#" style="color:var(--pri)">Comment faire ?</a>
+            <a href="#" style="color:var(--pri)">Comment activer ?</a>
           </div>
         </div>
       </div>
@@ -199,17 +208,115 @@ function render() {
     </div>
   `
 
-  document.getElementById('connect-btn').addEventListener('click', toggleConnect)
+  document.getElementById('connect-btn').addEventListener('click', () => {
+    if (integ.connected) {
+      // Désactiver directement
+      integ.connected = false
+      const btn = document.getElementById('connect-btn')
+      btn.className = 'integ-connect-btn'
+      btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Activer'
+    } else {
+      showActivateModal()
+    }
+  })
 }
 
-function toggleConnect() {
-  integ.connected = !integ.connected
+function showActivateModal() {
+  const isAdherent = localStorage.getItem('menuRole') === 'adherent-reseau'
+  const candidatePlots = plots.filter(p => !isAdherent || p.orgId === 1)
 
-  const btn = document.getElementById('connect-btn')
-  btn.className = `integ-connect-btn${integ.connected ? ' connected' : ''}`
-  btn.innerHTML = integ.connected
-    ? '<i class="bi bi-pause-circle-fill"></i> Désactiver'
-    : '<i class="bi bi-play-circle-fill"></i> Activer'
+  const compatible   = []
+  const incompatible = []
+
+  candidatePlots.forEach(p => {
+    const plotSensors  = sensors.filter(s => s.parcelId === p.id || (s.parcelIds || []).includes(p.id))
+    const plotModels   = [...new Set(plotSensors.map(s => s.model))]
+    const isCompatible = integ.sensors.some(req => plotModels.includes(req))
+    const alreadyOn    = (p.integrations || []).includes(integ.name)
+    ;(isCompatible ? compatible : incompatible).push({ p, alreadyOn })
+  })
+
+  const modal = document.createElement('div')
+  modal.className = 'modal add-modal'
+  modal.style.zIndex = '9999'
+
+  const compatibleRows = compatible.map(({ p, alreadyOn }) => `
+    <label class="integ-activate-row">
+      <input type="checkbox" class="integ-plot-cb" data-plot-id="${p.id}" ${alreadyOn ? 'checked' : ''}>
+      <span class="integ-activate-name">${p.name}</span>
+      <span class="integ-activate-sub">${[p.crop, p.irrigation].filter(Boolean).join(' · ') || ''}</span>
+    </label>
+  `).join('')
+
+  const incompatibleRows = incompatible.map(({ p }) => `
+    <label class="integ-activate-row integ-activate-row--disabled">
+      <input type="checkbox" disabled>
+      <span class="integ-activate-name">${p.name}</span>
+      <span class="integ-activate-sub">${[p.crop, p.irrigation].filter(Boolean).join(' · ') || ''}</span>
+    </label>
+  `).join('')
+
+  modal.innerHTML = `
+    <div class="add-modal-content" style="max-width:480px">
+      <div class="add-modal-header">
+        <span class="add-modal-title">Activer ${integ.name}</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div style="padding:0 20px 20px">
+        <p style="margin:0 0 12px;font-size:12px;color:var(--txt2)">
+          Capteurs requis : <strong>${integ.sensors.join(', ')}</strong>
+        </p>
+        ${compatible.length ? `
+          <div class="integ-activate-section-label">Parcelles compatibles</div>
+          <div class="integ-activate-list">${compatibleRows}</div>
+        ` : `<p style="font-size:13px;color:var(--txt3);margin:0 0 12px">Aucune parcelle compatible trouvée.</p>`}
+        ${incompatible.length ? `
+          <div class="integ-activate-section-label" style="margin-top:12px">Parcelles incompatibles</div>
+          <div class="integ-activate-list">${incompatibleRows}</div>
+        ` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button class="btn-secondary activate-cancel">Annuler</button>
+          <button class="btn-primary activate-ok">Activer</button>
+        </div>
+      </div>
+    </div>
+  `
+
+  modal.querySelector('.add-modal-close').addEventListener('click', () => modal.remove())
+  modal.querySelector('.activate-cancel').addEventListener('click', () => modal.remove())
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove() })
+
+  modal.querySelector('.activate-ok').addEventListener('click', () => {
+    const checked = [...modal.querySelectorAll('.integ-plot-cb:checked')].map(cb => parseInt(cb.dataset.plotId))
+    const unchecked = [...modal.querySelectorAll('.integ-plot-cb:not(:checked)')].map(cb => parseInt(cb.dataset.plotId))
+
+    checked.forEach(plotId => {
+      const stored = getParcel(plotId)
+      const existing = stored.integrations ?? (plots.find(p => p.id === plotId)?.integrations || [])
+      if (!existing.includes(integ.name)) {
+        patchParcel(plotId, { integrations: [...existing, integ.name] })
+        const p = plots.find(x => x.id === plotId)
+        if (p) p.integrations = [...(p.integrations || []), integ.name]
+      }
+    })
+
+    unchecked.forEach(plotId => {
+      const stored = getParcel(plotId)
+      const existing = stored.integrations ?? (plots.find(p => p.id === plotId)?.integrations || [])
+      if (existing.includes(integ.name)) {
+        const updated = existing.filter(n => n !== integ.name)
+        patchParcel(plotId, { integrations: updated })
+        const p = plots.find(x => x.id === plotId)
+        if (p) p.integrations = updated
+      }
+    })
+
+    integ.connected = checked.length > 0
+    modal.remove()
+    render()
+  })
+
+  document.body.appendChild(modal)
 }
 
 function getInitials(name) {

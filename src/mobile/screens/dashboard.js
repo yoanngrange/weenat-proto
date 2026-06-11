@@ -6,9 +6,10 @@ import { pushDetail, popDetail } from '../nav.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { flexLayer, checkIcon, buildSelectionHTML } from './irrigation.js'
 import { applyStoredPlotPatches } from '../../data/store.js'
+import { showParcelCreation, showSensorCreation } from './onboarding.js'
 
-const ORG_ID   = { admin: 100, adherent: 1 }
-const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage' }
+const ORG_ID   = { admin: 100, adherent: 1, new: 41 }
+const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage', new: 'GAEC Jourdain' }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 const DASH_KEY = 'weenat-m-dash'
@@ -20,18 +21,42 @@ function _saveDash(patch) { try { localStorage.setItem(DASH_KEY, JSON.stringify(
 const CATALOG = [
   { id: 'bilan_hydrique', title: 'Irrigation',        icon: 'bi-droplet',              color: '#0172A4', active: true,  available: true,  fixed: false },
   { id: 'previsions',     title: 'Prévisions',         icon: 'bi-cloud-sun',            color: '#f5a623', active: true,  available: true,  fixed: false },
-  { id: 'cumuls',         title: 'Cumuls',             icon: 'bi-bar-chart',            color: '#bf5af2', active: true,  available: true,  fixed: false },
-  { id: 'temps_reel',     title: 'Mesures',            icon: 'bi-activity',             color: '#ff9f0a', active: true,  available: true,  fixed: false },
+  { id: 'cumuls',         title: 'Cumuls préférés',    info: 'Mes cumuls préférés.<br><br>Ajoutez ici les valeurs des cumuls qui sont importants pour vous en ce moment afin de gagner du temps. Vous ouvrez l\'app, vous voyez ce qui intéresse. Vous fermez l\'app.',   gif: '',  icon: 'bi-bar-chart',  color: '#bf5af2', active: true,  available: true,  fixed: false },
+  { id: 'temps_reel',     title: 'Mesures préférées',  info: 'Mes mesures préférées.<br><br>Ajoutez ici les indicateurs de vos parcelles ou capteurs qui vous intéressent en ce moment afin de gagner du temps. Vous ouvrez l\'app, vous voyez ce qui intéresse. Vous fermez l\'app.', gif: '',  icon: 'bi-activity',   color: '#ff9f0a', active: true,  available: true,  fixed: false },
   { id: 'traitements',    title: 'Traitements',        icon: 'bi-shield',               color: '#4ecdc4', active: true,  available: true,  fixed: false },
   { id: 'cultures',       title: 'Cultures',           icon: 'bi-flower1',              color: '#a2c4c9', active: true,  available: true,  fixed: false },
   { id: 'evenements',     title: 'Anomalies capteurs', icon: 'bi-exclamation-triangle', color: '#ff3b30', active: true,  available: true,  fixed: false },
   { id: 'notes',          title: 'Notes',              icon: 'bi-pencil-square',        color: '#636366', active: false, available: true,  fixed: false },
+  { id: 'radar_pluie',   title: 'Radar de pluie',     icon: 'bi-cloud-rain-heavy',     color: '#0172A4', active: true,  available: true,  fixed: false },
   // Widgets fixes — toujours actifs, toujours en fin de liste
   { id: 'mon_reseau',     title: 'Infos Réseau',       icon: 'bi-diagram-3',            color: '#5b8dd9', active: true,  available: true,  fixed: true  },
   { id: 'support',        title: 'Besoin d\'aide ?',   icon: 'bi-question-circle',      color: '#30d158', active: true,  available: true,  fixed: true  },
 ]
 
 // ─── UI helpers (shared pattern, TODO: extract to ui.js) ──────────────────────
+function showWidgetInfoModal(title, text, gif) {
+  const screen = document.getElementById('phone-screen')
+  document.querySelector('.m-winfo-overlay')?.remove()
+  const overlay = document.createElement('div')
+  overlay.className = 'm-winfo-overlay'
+  overlay.innerHTML = `
+    <div class="m-winfo-modal">
+      <div class="m-winfo-hd">
+        <span class="m-winfo-title">${title}</span>
+        <button class="m-winfo-close" type="button"><i class="bi bi-x"></i></button>
+      </div>
+      <div class="m-winfo-gif">
+        ${gif
+          ? `<img src="${gif}" alt="${title}">`
+          : `<div class="m-winfo-gif-placeholder"><i class="bi bi-play-circle" style="font-size:28px;display:block;margin-bottom:6px"></i>GIF à venir</div>`}
+      </div>
+      <div class="m-winfo-body">${text}</div>
+    </div>`
+  overlay.querySelector('.m-winfo-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+  screen.appendChild(overlay)
+}
+
 function showToast(msg) {
   const screen = document.getElementById('phone-screen')
   document.querySelector('.m-toast')?.remove()
@@ -317,18 +342,17 @@ function msrCardHtml(m, idx) {
 
 function buildMesures(plots, sensors) {
   const atMax = mesuresList.length >= WF_MAX
-  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
-  const sensorOpts = sensors.filter(s => s.parcelIds.length > 0).map(s => {
-    const p = plots.find(x => s.parcelIds.includes(x.id))
-    return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
-  }).join('')
+  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${plotOptLabel(p)}</option>`).join('')
+  const sensorOpts = sensors.filter(s => s.parcelIds.length > 0).map(s =>
+    `<option value="s-${s.id}">${sensorOptLabel(s, plots)}</option>`
+  ).join('')
   const defSteps = msrStepOpts('7d')
   const listHtml = mesuresList.length
     ? mesuresList.map(msrCardHtml).join('')
-    : `<div class="m-wf-empty">Aucune mesure configurée</div>`
+    : `<div class="m-wf-empty">Ajoutez ici les mesures que vous souhaitez consulter très régulièrement</div>`
   return `
     <div id="msr-list">${listHtml}</div>
-    <div class="m-list-section-header" style="margin-top:${mesuresList.length ? '16px' : '0'}">Ajouter une mesure</div>
+    <div class="m-list-section-header" style="margin-top:${mesuresList.length ? '16px' : '0'}"></div>
     ${atMax ? `
     <div class="m-wf-max-msg">
       <i class="bi bi-slash-circle" style="font-size:18px;color:#8e8e93"></i>
@@ -354,7 +378,7 @@ function buildMesures(plots, sensors) {
           ${defSteps.map(s => `<option value="${s.id}">${s.label}</option>`).join('')}
         </select>
       </div>
-      <button class="m-wf-create-btn" id="msr-create" disabled>Créer la mesure</button>
+      <button class="m-wf-create-btn" id="msr-create" disabled>Ajouter la mesure</button>
     </div>`}`
 }
 
@@ -468,17 +492,12 @@ const trunc = (str, max = 40) => str.length > max ? str.slice(0, max - 1) + '…
 
 function buildPrevisions(plots, sensors, forecast, role) {
   const orgById = Object.fromEntries(allOrgs.map(o => [o.id, o]))
-  const plotOpts = plots.map(p => {
-    const commune = p.ville || orgById[p.orgId]?.ville || null
-    const label = trunc([p.name, p.crop || null, commune].filter(Boolean).join(' · '))
-    return `<option value="p-${p.id}">${label}</option>`
-  }).join('')
-  const sensorOpts = sensors.map(s => {
-    const ville = s.parcelIds.map(id => plots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville
-      || orgById[s.orgId]?.ville || ''
-    const label = trunc(`${s.serial}${ville ? ` — ${ville}` : ''}`)
-    return `<option value="s-${s.id}">${label}</option>`
-  }).join('')
+  const plotOpts = plots.map(p =>
+    `<option value="p-${p.id}">${trunc(plotOptLabel(p))}</option>`
+  ).join('')
+  const sensorOpts = sensors.map(s =>
+    `<option value="s-${s.id}">${trunc(sensorOptLabel(s, plots))}</option>`
+  ).join('')
   const opts = `
     <optgroup label="Parcelles">${plotOpts}</optgroup>
     ${sensorOpts ? `<optgroup label="Capteurs">${sensorOpts}</optgroup>` : ''}`
@@ -488,19 +507,39 @@ function buildPrevisions(plots, sensors, forecast, role) {
     return `
     <div class="m-prev-card" data-day="${i}" role="button">
       <div class="m-prev-card-hd">
-        <i class="bi ${d.icon}" style="color:${d.color};font-size:28px;flex-shrink:0"></i>
+        <i class="bi ${d.icon}" style="color:${d.color};font-size:26px;flex-shrink:0"></i>
         <div class="m-prev-card-hd-info">
           <span class="m-prev-card-day">${title}</span>
           <span class="m-prev-card-cond">${d.label}</span>
         </div>
         <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:13px;flex-shrink:0"></i>
       </div>
-      <div class="m-prev-card-body">
-        <div class="m-prev-row"><span>Pluie</span><strong>${d.pluie} mm</strong></div>
-        <div class="m-prev-row"><span>Température</span><strong>${d.tMin}°C <em>${d.tMinHeure}</em> — ${d.tMax}°C <em>${d.tMaxHeure}</em></strong></div>
-        <div class="m-prev-row"><span>Humidité</span><strong>${d.humMoy}%</strong></div>
-        <div class="m-prev-row"><span>Vent</span><strong>${d.ventMoy}/${d.ventRafales} km/h</strong></div>
-        <div class="m-prev-row m-prev-row--last"><span>Évapotranspiration</span><strong>${d.etp} mm</strong></div>
+      <div class="m-prev-tbl">
+        <div class="m-prev-tbl-cell">
+          <i class="bi bi-cloud-rain" style="color:#2E75B6"></i>
+          <span class="m-prev-tbl-val">${d.pluie}</span>
+          <span class="m-prev-tbl-unit">mm</span>
+        </div>
+        <div class="m-prev-tbl-cell">
+          <i class="bi bi-thermometer-half" style="color:#E05252"></i>
+          <span class="m-prev-tbl-val">${d.tMin}–${d.tMax}</span>
+          <span class="m-prev-tbl-unit">°C</span>
+        </div>
+        <div class="m-prev-tbl-cell">
+          <i class="bi bi-droplet" style="color:#2E75B6"></i>
+          <span class="m-prev-tbl-val">${d.humMoy}</span>
+          <span class="m-prev-tbl-unit">%</span>
+        </div>
+        <div class="m-prev-tbl-cell">
+          <i class="bi bi-wind" style="color:#636366"></i>
+          <span class="m-prev-tbl-val">${d.ventMoy}/<em>${d.ventRafales}</em></span>
+          <span class="m-prev-tbl-unit">km/h</span>
+        </div>
+        <div class="m-prev-tbl-cell">
+          <i class="bi bi-moisture" style="color:#24B066"></i>
+          <span class="m-prev-tbl-val">${d.etp}</span>
+          <span class="m-prev-tbl-unit">ETP</span>
+        </div>
       </div>
     </div>`
   }
@@ -524,12 +563,12 @@ function buildPrevisions(plots, sensors, forecast, role) {
 }
 
 const CUMULS_METRICS = [
-  { id: 'pluie', label: 'Cumul de pluie',        unit: 'mm',  base: 45,  amp: 80,   needsModels: ['P+','PT','P','SMV'] },
-  { id: 'dj',    label: 'Degrés-jours',           unit: 'DJ',  base: 120, amp: 300,  needsModels: ['P+','PT','SMV','TH'] },
-  { id: 'hf',    label: 'Heures de froid',        unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
-  { id: 'etp',   label: 'Évapotranspiration',     unit: 'mm',  base: 20,  amp: 60,   needsModels: ['P+','PT','SMV'] },
-  { id: 'rayo',  label: 'Rayonnement solaire',    unit: 'MJ',  base: 8,   amp: 20,   needsModels: ['PYRANO'] },
-  { id: 'humec', label: 'Humectation foliaire',   unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
+  { id: 'etp',        label: 'Évapotranspiration',     unit: 'mm',  base: 20,  amp: 60,   needsModels: null },
+  { id: 'rayo',       label: 'Rayonnement solaire',    unit: 'MJ',  base: 8,   amp: 20,   needsModels: null },
+  { id: 'pluie',      label: 'Cumul de pluie',         unit: 'mm',  base: 45,  amp: 80,   needsModels: ['P+','PT','P','SMV'] },
+  { id: 'dj',         label: 'Degrés-jours',           unit: 'DJ',  base: 120, amp: 300,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'hf',         label: 'Heures de froid',        unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
+  { id: 'humec',      label: 'Humectation foliaire',   unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
 ]
 
 // Set of all sensor models that qualify for at least one cumul
@@ -549,12 +588,12 @@ function getAvailableMetrics(subjectVal) {
 }
 
 const CUMUL_ICONS = {
-  pluie: { icon: 'bi-droplet-fill',    color: '#2E75B6' },
-  dj:    { icon: 'bi-thermometer-sun', color: '#FBAF05' },
-  hf:    { icon: 'bi-thermometer-low', color: '#FEE7B4' },
-  etp:   { icon: 'bi-moisture',        color: '#7DBDD7' },
-  rayo:  { icon: 'bi-sun-fill',        color: '#CBCB0B' },
-  humec: { icon: 'bi-droplet-half',    color: '#00887E' },
+  etp:        { icon: 'bi-moisture',        color: '#7DBDD7' },
+  rayo:       { icon: 'bi-sun-fill',        color: '#CBCB0B' },
+  pluie:      { icon: 'bi-droplet-fill',    color: '#2E75B6' },
+  dj:         { icon: 'bi-thermometer-sun', color: '#FBAF05' },
+  hf:         { icon: 'bi-thermometer-low', color: '#FEE7B4' },
+  humec:      { icon: 'bi-droplet-half',    color: '#00887E' },
 }
 
 function renderCumulCards() {
@@ -594,22 +633,19 @@ function buildCumuls(plots, sensors) {
   const defaultFrom = `${new Date().getFullYear()}-01-01`
 
   const qualSensors = sensors.filter(s => s.parcelIds.length > 0 && CUMUL_QUALIFYING_MODELS.has(s.model))
-  const qualPlotIds = new Set(qualSensors.flatMap(s => s.parcelIds))
-  const qualPlots   = plots.filter(p => qualPlotIds.has(p.id))
 
-  const plotOpts   = qualPlots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
-  const sensorOpts = qualSensors.map(s => {
-    const p = plots.find(x => s.parcelIds.includes(x.id))
-    return `<option value="s-${s.id}">${s.model} — ${s.serial}${p ? ` · ${p.name}` : ''}</option>`
-  }).join('')
+  const plotOpts   = plots.map(p => `<option value="p-${p.id}">${plotOptLabel(p)}</option>`).join('')
+  const sensorOpts = qualSensors.map(s =>
+    `<option value="s-${s.id}">${sensorOptLabel(s, plots)}</option>`
+  ).join('')
 
   const listHtml = cumulsList.length
     ? renderCumulCards()
-    : `<div class="m-wf-empty">Aucun cumul enregistré</div>`
+    : `<div class="m-wf-empty">Ajoutez ici les cumuls que vous souhaitez consulter très régulièrement</div>`
 
   return `
     <div id="cumuls-saved-list" style="display:flex;flex-direction:column;gap:8px">${listHtml}</div>
-    <div class="m-list-section-header" style="margin-top:${cumulsList.length ? '16px' : '0'}">Ajouter un cumul</div>
+    <div class="m-list-section-header" style="margin-top:${cumulsList.length ? '16px' : '0'}"></div>
     ${atMax ? `
     <div class="m-wf-max-msg">
       <i class="bi bi-slash-circle" style="font-size:18px;color:#8e8e93"></i>
@@ -635,7 +671,7 @@ function buildCumuls(plots, sensors) {
         </div>
       </div>
       <div id="cumuls-date-err" class="m-wf-err" style="display:none">Période supérieure à 365 jours. Choisissez une date plus récente.</div>
-      <button class="m-wf-create-btn" id="cumuls-create" disabled>Créer le cumul</button>
+      <button class="m-wf-create-btn" id="cumuls-create" disabled>Ajouter le cumul</button>
     </div>`}`
 }
 
@@ -716,6 +752,12 @@ function openTraitementSaisie(plots, showToastFn) {
   }
 
   function bindSel(layer) {
+    layer.querySelector('#irr-sel-all')?.addEventListener('click', () => {
+      const allSelected = plots.every(p => selectedIds.has(p.id))
+      plots.forEach(p => allSelected ? selectedIds.delete(p.id) : selectedIds.add(p.id))
+      layer.querySelector('#trait-sel-list').innerHTML = selHTML()
+      bindSel(layer); renderBar(layer)
+    })
     layer.querySelectorAll('.irr-group-card').forEach(el => {
       el.addEventListener('click', () => {
         const ids = el.dataset.gids.split(',').map(Number)
@@ -799,7 +841,7 @@ function openTraitementsCalendar(plots, role, showToastFn) {
     <div class="m-detail-tabs" style="display:none"></div>
     <div class="m-detail-content" style="top:52px;overflow-y:auto">
       <div style="padding:10px 16px 4px">
-        <select id="trait-filter" style="width:100%;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:8px;font-family:inherit;background:#fafafa">
+        <select id="trait-filter" class="m-prev-select" style="margin-bottom:0">
           <option value="">Toutes les parcelles</option>
           ${filterablePlots.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
         </select>
@@ -886,16 +928,16 @@ function openTraitementEdit(t, plots, showToastFn, onSaved) {
   body.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:10px">
       <div>
-        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Date</div>
-        <input type="date" id="tedit-date" value="${t.date}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+        <div class="m-form-label">Date</div>
+        <input type="date" class="m-sheet-input" id="tedit-date" value="${t.date}">
       </div>
       <div>
-        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Produit</div>
-        <input type="text" id="tedit-produit" value="${t.produit}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+        <div class="m-form-label">Produit</div>
+        <input type="text" class="m-sheet-input" id="tedit-produit" value="${t.produit}">
       </div>
       <div>
-        <div style="font-size:12px;color:#8e8e93;margin-bottom:4px">Dose</div>
-        <input type="text" id="tedit-dose" value="${t.dose}" style="width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit">
+        <div class="m-form-label">Dose</div>
+        <input type="text" class="m-sheet-input" id="tedit-dose" value="${t.dose}">
       </div>
     </div>`
   const sheet = showSheet({
@@ -918,32 +960,63 @@ function openTraitementEdit(t, plots, showToastFn, onSaved) {
 
 // ─── Anomalies capteur ─────────────────────────────────────────────────
 
-const SENSOR_EVENT_CFG = {
-  'capteur couché':         { icon: 'bi-arrow-down-circle-fill', color: '#ff9f0a' },
-  'émissions interrompues': { icon: 'bi-wifi-off',               color: '#ff3b30' },
-  'capteur déplacé':        { icon: 'bi-geo-alt-fill',            color: '#ff9f0a' },
-  'cuillère bloquée':       { icon: 'bi-x-octagon-fill',          color: '#ff3b30' },
+const SENSOR_EVENT_SVG = {
+  'capteur déplacé':        'M12 2c-2.117 0-3.98.741-5.588 2.225C4.803 5.708 4 7.699 4 10.199c0 1.6.6 3.322 1.8 5.164C7 17.205 8.818 19.2 11.25 21.35a1.2 1.2 0 0 0 .75.275 1.2 1.2 0 0 0 .75-.275c2.433-2.15 4.25-4.145 5.45-5.987C19.4 13.521 20 11.8 20 10.2c0-2.5-.803-4.491-2.412-5.974C15.98 2.74 14.117 2 12 2zm0 4a.97.97 0 0 1 .713.287A.97.97 0 0 1 13 7v3a.969.969 0 0 1-.287.713c-.192.192-.43.287-.713.287s-.522-.095-.713-.287A.966.966 0 0 1 11 10V7c0-.283.095-.52.287-.713A.969.969 0 0 1 12 6zm0 7a.97.97 0 0 1 .713.287c.191.192.287.43.287.713s-.096.522-.287.713c-.192.192-.43.287-.713.287s-.522-.095-.713-.287c-.192-.191-.287-.43-.287-.713s.095-.52.287-.713A.969.969 0 0 1 12 13z',
+  'émissions interrompues': 'M19.075 21.9 8.125 10.975c-.033.167-.063.333-.087.5S8 11.817 8 12c0 .383.046.746.138 1.087.091.342.229.663.412.963.15.25.217.517.2.8a1.04 1.04 0 0 1-.3.7c-.2.2-.438.292-.713.275s-.487-.133-.637-.35c-.35-.5-.62-1.042-.813-1.625A5.889 5.889 0 0 1 6 12a5.985 5.985 0 0 1 .575-2.575L5.1 7.95c-.35.6-.62 1.238-.813 1.913A7.79 7.79 0 0 0 4 12a7.855 7.855 0 0 0 1.675 4.9c.183.233.27.487.262.762-.008.275-.112.513-.312.713a.916.916 0 0 1-1.375-.05c-.7-.867-1.25-1.837-1.65-2.913S2 13.2 2 12c0-1.033.146-2.008.437-2.925A10.71 10.71 0 0 1 3.65 6.5L2.075 4.925a.948.948 0 0 1-.275-.7c0-.283.1-.525.3-.725a.948.948 0 0 1 .7-.275c.283 0 .525.092.725.275l16.975 17c.183.183.275.417.275.7s-.092.517-.275.7c-.2.2-.442.3-.725.3s-.517-.1-.7-.3zm1.275-4.4-1.45-1.45c.35-.6.62-1.238.813-1.913S20 12.75 20 12a7.854 7.854 0 0 0-1.675-4.9c-.183-.233-.27-.487-.263-.762s.113-.513.313-.713a.916.916 0 0 1 1.375.05c.7.867 1.25 1.833 1.65 2.9.4 1.067.6 2.208.6 3.425 0 1.017-.146 1.988-.438 2.913S20.867 16.7 20.35 17.5zm-2.925-2.925-1.55-1.55c.033-.167.062-.333.087-.5S16 12.183 16 12c0-.383-.046-.746-.138-1.088s-.229-.662-.412-.962a1.367 1.367 0 0 1-.2-.8 1.04 1.04 0 0 1 .3-.7.93.93 0 0 1 .712-.287.76.76 0 0 1 .638.337c.35.483.62 1.025.813 1.625.191.6.287 1.225.287 1.875a5.985 5.985 0 0 1-.575 2.575z',
+  'capteur couché':         'M6 5a2 2 0 0 0-2 2v2H3a1 1 0 0 0 0 2h1v2a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2h7a1 1 0 1 0 0-2h-7V7a2 2 0 0 0-2-2H6zm3 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM2 16v2h20v-2H2z',
+  'cuillère bloquée':       'M17.615 3.25c-.268 0-.537.103-.742.309L3.508 16.922a1.05 1.05 0 0 0 0 1.486l.031.027-.002.002.05.041c.459.438 1.055.718 1.733.813.678.094 1.416 0 2.139-.274a5.793 5.793 0 0 0 2.018-1.322 5.802 5.802 0 0 0 1.322-2.02c.411-1.087.411-2.189 0-3.074l7.558-7.558a1.047 1.047 0 0 0 0-1.485 1.046 1.046 0 0 0-.742-.308zm-1.037 8.416a.473.473 0 0 0-.35.137l-1.05 1.05a.435.435 0 0 0-.106.163.555.555 0 0 0-.031.187c0 .067.01.13.031.188.02.058.055.112.105.162l1.051 1.05a.473.473 0 0 0 .35.137.472.472 0 0 0 .488-.488.474.474 0 0 0-.138-.35l-.2-.199h.037c.834 0 1.542.292 2.125.875.584.584.875 1.292.875 2.125 0 .675-.198 1.274-.593 1.799a3.032 3.032 0 0 1-1.532 1.088.527.527 0 0 0-.267.187.465.465 0 0 0-.108.287c0 .167.06.3.176.4.117.1.254.13.412.089a3.912 3.912 0 0 0 2.1-1.426 3.882 3.882 0 0 0 .812-2.424c0-1.116-.387-2.063-1.162-2.838-.775-.775-1.72-1.162-2.838-1.162h-.037l.2-.201a.474.474 0 0 0 .138-.35.473.473 0 0 0-.488-.486zm-2.563 2.344a.462.462 0 0 0-.337.156c-.292.358-.516.75-.674 1.18-.159.429-.239.882-.239 1.357 0 .917.271 1.728.813 2.432a3.922 3.922 0 0 0 2.1 1.418.442.442 0 0 0 .414-.082.479.479 0 0 0 .173-.393.532.532 0 0 0-.375-.488 2.946 2.946 0 0 1-1.53-1.08 2.939 2.939 0 0 1-.595-1.807c0-.341.054-.666.163-.974.108-.309.262-.594.462-.852a.565.565 0 0 0 .131-.375.477.477 0 0 0-.142-.336.48.48 0 0 0-.364-.156z',
+}
+const CUILLERE_MODELS = new Set(['P+', 'PT', 'P'])
+
+function plotOptLabel(p) {
+  return [p.name, p.crop].filter(Boolean).join(' — ')
+}
+function sensorOptLabel(s, plots) {
+  const orgById = Object.fromEntries(allOrgs.map(o => [o.id, o]))
+  const nom = DASHBOARD_MODEL_NAMES[s.model] || s.model
+  const ville = (s.parcelIds || []).map(id => plots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville
+    || orgById[s.orgId]?.ville || ''
+  return [nom, s.serial, ville].filter(Boolean).join(' — ')
+}
+
+const DASHBOARD_MODEL_NAMES = {
+  'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermomètre-hygromètre',
+  'T_MINI': 'Thermomètre de sol', 'W': 'Anémomètre', 'PYRANO': 'Pyranomètre',
+  'PAR': 'Capteur PAR', 'LWS': "Capteur d'humectation foliaire", 'T_GEL': 'Capteur de gel',
+  'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde de fertirrigation',
 }
 
 function buildEvenements(plots, sensors) {
-  const withEvents = sensors.filter(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
+  const orgById = Object.fromEntries(allOrgs.map(o => [o.id, o]))
+  const withEvents = sensors.filter(s => {
+    if (!s.event) return false
+    const evList = Array.isArray(s.event) ? s.event : [s.event]
+    const filtered = evList.filter(ev => ev !== 'cuillère bloquée' || CUILLERE_MODELS.has(s.model))
+    return filtered.length > 0
+  })
   if (!withEvents.length) return `<div class="m-widget-empty"><i class="bi bi-check-circle" style="color:#30d158;font-size:28px"></i><p>Aucun événement en cours</p></div>`
   return `<div class="m-w-list">${withEvents.map(s => {
-    const parcel  = plots.find(p => s.parcelIds.includes(p.id))
-    const evList  = Array.isArray(s.event) ? s.event : [s.event]
-    const badges  = evList.map(ev => {
-      const cfg = SENSOR_EVENT_CFG[ev] || { icon: 'bi-exclamation-circle-fill', color: '#ff9f0a' }
-      return `<span class="m-ev-badge" style="color:${cfg.color}"><i class="bi ${cfg.icon}"></i> ${ev}</span>`
+    const parcel = plots.find(p => (s.parcelIds || []).includes(p.id))
+    const ville  = parcel?.ville || orgById[s.orgId]?.ville || ''
+    const evList = (Array.isArray(s.event) ? s.event : [s.event])
+      .filter(ev => ev !== 'cuillère bloquée' || CUILLERE_MODELS.has(s.model))
+    const icons  = evList.map(ev => {
+      const d = SENSOR_EVENT_SVG[ev] || ''
+      return `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#ff3b30;border-radius:6px;flex-shrink:0" title="${ev}"><svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="${d}"/></svg></span>`
     }).join('')
-    return `<div class="m-w-row m-w-row--clickable" data-sensor-id="${s.id}" style="flex-direction:column;align-items:flex-start;gap:4px">
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-        <div class="m-w-row-name">${s.model} — ${s.serial}</div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <span style="font-size:11px;color:#8e8e93">${parcel?.ville || parcel?.name || '—'}</span>
-          <i class="bi bi-chevron-right" style="font-size:12px;color:#C0BEB8"></i>
-        </div>
+    const nomModele = DASHBOARD_MODEL_NAMES[s.model] || s.model
+    return `<div class="m-w-row m-w-row--clickable" data-sensor-id="${s.id}">
+      <div style="flex:1;min-width:0">
+        <div class="m-w-row-name">${nomModele}</div>
+        <div style="font-size:12px;color:#636366;margin-top:1px">${s.model} — ${s.serial}</div>
+        ${ville ? `<div style="font-size:11px;color:#8e8e93;margin-top:1px">${ville}</div>` : ''}
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">${badges}</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;margin-left:12px">
+        <div style="display:flex;flex-wrap:wrap;gap:5px;width:61px;justify-content:flex-end">${icons}</div>
+        <i class="bi bi-chevron-right" style="font-size:12px;color:#C0BEB8"></i>
+      </div>
     </div>`
   }).join('')}</div>`
 }
@@ -1030,10 +1103,11 @@ function buildNotes(role) {
       : ''
     return `
       <div class="m-note-card" data-idx="${i}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative;cursor:${truncated || photoCount > 0 || n.linkedType ? 'pointer' : 'default'}">
-        <button class="m-note-del" data-idx="${i}" style="position:absolute;top:8px;right:8px;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:22px;height:22px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#636366">×</button>
-        <div style="font-size:11px;color:#8e8e93;margin-bottom:3px;display:flex;gap:8px;align-items:center">
+        <button class="m-note-del m-del-btn" data-idx="${i}" style="position:absolute;top:8px;right:8px">×</button>
+        <div style="font-size:11px;color:#8e8e93;margin-bottom:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <span>${fmtDate(n.date)}${n.time ? ' · ' + n.time : ''}</span>
           ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}
+          ${n.role ? `<span style="font-size:10px;background:${n.role === 'conseiller' ? '#eef4ff' : '#f2f2f7'};color:${n.role === 'conseiller' ? '#3a7bd5' : '#636366'};border-radius:4px;padding:1px 5px;font-weight:500">${n.role === 'conseiller' ? 'Conseiller' : 'Membre'}</span>` : ''}
         </div>
         <div style="font-size:13px;color:#1c1c1e;white-space:pre-wrap;word-break:break-word">${ellipsis(n.text)}</div>
         ${linkChip || photosBadge ? `<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${linkChip}${photosBadge}</div>` : ''}
@@ -1057,27 +1131,25 @@ function buildNotes(role) {
     ? allSensors.filter(s => s.parcelIds.some(id => visiblePlots.some(p => p.id === id)))
     : allSensors
 
-  const plotOpts = visiblePlots.map(p => `<option value="p-${p.id}">${p.name}</option>`).join('')
-  const sensorOpts = visibleSensors.map(s => {
-    const ville = s.parcelIds.map(id => allPlots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville || ''
-    return `<option value="s-${s.id}">${s.serial}${ville ? ' — ' + ville : ''}</option>`
-  }).join('')
-
-  const inputStyle = 'width:100%;box-sizing:border-box;font-size:13px;padding:7px 9px;border:1px solid rgba(0,0,0,.12);border-radius:6px;font-family:inherit;background:#fafafa'
+  const plotOpts   = visiblePlots.map(p => `<option value="p-${p.id}">${plotOptLabel(p)}</option>`).join('')
+  const sensorOpts = visibleSensors.map(s =>
+    `<option value="s-${s.id}">${sensorOptLabel(s, visiblePlots)}</option>`
+  ).join('')
 
   return `
     ${listHtml ? `<div id="notes-list" style="margin-bottom:12px">${listHtml}</div>` : ''}
     <div style="font-size:11px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Ajouter une note</div>
-    <select id="notes-link" style="${inputStyle};margin-bottom:6px;color:#1c1c1e">
-      <option value="">— Sans lien —</option>
-      <optgroup label="Parcelles">${plotOpts}</optgroup>
-      <optgroup label="Capteurs">${sensorOpts}</optgroup>
-    </select>
-    <textarea id="notes-input" placeholder="Votre note…" rows="2"
-      style="${inputStyle};resize:none;margin-bottom:6px"></textarea>
-    <div style="display:flex;gap:6px;margin-bottom:6px">
-      <input type="date" id="notes-date" value="${today}" style="${inputStyle}">
-      <input type="time" id="notes-time" value="${currentTime}" style="${inputStyle}">
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+      <select id="notes-link" class="m-sheet-input">
+        <option value="">— Sans lien —</option>
+        <optgroup label="Parcelles">${plotOpts}</optgroup>
+        <optgroup label="Capteurs">${sensorOpts}</optgroup>
+      </select>
+      <textarea id="notes-input" class="m-sheet-input" placeholder="Votre note…" rows="2" style="resize:none"></textarea>
+      <div style="display:flex;gap:6px">
+        <input type="date" id="notes-date" class="m-sheet-input" value="${today}" style="flex:1">
+        <input type="time" id="notes-time" class="m-sheet-input" value="${currentTime}" style="flex:1">
+      </div>
     </div>
     <div class="jrn-img-zone" style="margin-bottom:8px">
       <div class="jrn-img-previews" id="notes-previews"></div>
@@ -1086,8 +1158,8 @@ function buildNotes(role) {
       <div class="jrn-img-error" id="notes-img-error"></div>
     </div>
     <input type="hidden" id="notes-auteur" value="${auteur}">
-    <button id="notes-add" style="width:100%;background:#0172A4;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;margin-bottom:6px">Ajouter la note</button>
-    <button id="notes-view" style="width:100%;background:#f2f2f7;color:#1c1c1e;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer">Voir les notes${notes.length ? ` (${notes.length})` : ''}</button>`
+    <button id="notes-add" class="m-btn m-btn--primary" style="margin-bottom:6px">Ajouter la note</button>
+    <button id="notes-view" class="m-btn m-btn--secondary">Voir les notes${notes.length ? ` (${notes.length})` : ''}</button>`
 }
 
 function buildMonReseau(role) {
@@ -1248,6 +1320,7 @@ export function initDashboardScreen(screenEl, role) {
   const exploitSensors = allSensors.filter(s => s.parcelIds.some(id => plotIds.has(id)))
   let forecast = makeForecast()
   let bhSelectedOrgId = null
+  let radarMap = null
 
   function getBhPlots() {
     if (role !== 'admin') return exploitPlots
@@ -1278,6 +1351,100 @@ export function initDashboardScreen(screenEl, role) {
     })
   }
 
+  function buildOnboardingBlocks() {
+    return `
+      <div class="m-onboard-grid">
+        <div class="m-onboard-card">
+          <div class="m-onboard-hd">
+            <div class="m-onboard-icon" style="background:#ff9f0a20;color:#ff9f0a"><i class="bi bi-broadcast"></i></div>
+            <div class="m-onboard-title">Ajouter un capteur</div>
+          </div>
+          <div class="m-onboard-desc">Ajoutez vos capteurs pour accéder aux mesures.</div>
+          <button class="m-onboard-btn" data-action="add-sensor" type="button">Ajouter</button>
+        </div>
+        <div class="m-onboard-card">
+          <div class="m-onboard-hd">
+            <div class="m-onboard-icon" style="background:#30d15820;color:#30d158"><i class="bi bi-map"></i></div>
+            <div class="m-onboard-title">Créer une parcelle</div>
+          </div>
+          <div class="m-onboard-desc">Créez vos parcelles pour réunir vos capteurs et agréger vos données, gérer votre parcellaire, suivre vos cultures et piloter vos interventions et irrigations.</div>
+          <button class="m-onboard-btn" data-action="add-parcel" type="button">Créer</button>
+        </div>
+      </div>`
+  }
+
+  function buildRadarPluie() {
+    return `
+      <div style="position:relative">
+        <div id="radar-map" style="width:100%;aspect-ratio:1/1.4"></div>
+        <div id="radar-loading" class="radar-loading">Chargement du radar…</div>
+      </div>
+      <div class="radar-controls">
+        <button id="radar-play-btn" class="radar-play-btn" type="button"><i class="bi bi-play-fill"></i></button>
+        <div class="radar-slider-wrap">
+          <input id="radar-slider" type="range" min="0" max="11" value="8" step="1" class="radar-slider-input">
+        </div>
+        <span id="radar-time-lbl" class="radar-time-lbl">--:--</span>
+      </div>`
+  }
+
+  function initRadarMap() {
+    const L = window.L
+    if (!L) return
+    setTimeout(() => {
+      const el = content.querySelector('#radar-map')
+      if (!el || radarMap) return
+
+      const center = exploitPlots[0] ? [exploitPlots[0].lat, exploitPlots[0].lng] : [47.5, -1.5]
+      radarMap = L.map(el, { zoomControl: true, attributionControl: false, tap: false }).setView(center, 7)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 14 }).addTo(radarMap)
+
+      const slider  = content.querySelector('#radar-slider')
+      const timeLbl = content.querySelector('#radar-time-lbl')
+      const playBtn = content.querySelector('#radar-play-btn')
+      const loading = content.querySelector('#radar-loading')
+
+      let frames = [], pastCount = 0, currentIdx = 0, radarLayer = null, playing = false, playTimer = null
+
+      function showFrame(idx) {
+        if (!frames.length) return
+        if (radarLayer) radarMap.removeLayer(radarLayer)
+        const f = frames[idx]
+        radarLayer = L.tileLayer(
+          `https://tilecache.rainviewer.com${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
+          { opacity: 0.65, zIndex: 10 }
+        ).addTo(radarMap)
+        const d = new Date(f.time * 1000)
+        timeLbl.textContent = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        timeLbl.style.color = idx >= pastCount ? '#007aff' : '#8e8e93'
+        slider.value = idx
+      }
+
+      slider.addEventListener('input', () => { currentIdx = +slider.value; showFrame(currentIdx) })
+
+      playBtn.addEventListener('click', () => {
+        playing = !playing
+        playBtn.innerHTML = playing ? '<i class="bi bi-pause-fill"></i>' : '<i class="bi bi-play-fill"></i>'
+        if (playing) playTimer = setInterval(() => { currentIdx = (currentIdx + 1) % frames.length; showFrame(currentIdx) }, 500)
+        else clearInterval(playTimer)
+      })
+
+      fetch('https://api.rainviewer.com/public/weather-maps.json')
+        .then(r => r.json())
+        .then(data => {
+          loading?.remove()
+          const past = data.radar?.past || [], nowcast = data.radar?.nowcast || []
+          frames = [...past, ...nowcast]
+          pastCount = past.length
+          if (!frames.length) return
+          slider.max = frames.length - 1
+          currentIdx = Math.max(0, pastCount - 1)
+          showFrame(currentIdx)
+        })
+        .catch(() => { if (loading) loading.textContent = 'Radar indisponible' })
+    }, 50)
+  }
+
   function widgetCard(w, bodyHtml) {
     const menu = w.fixed ? '' :
       `<button class="m-widget-menu" data-widget="${w.id}" type="button">•••</button>`
@@ -1289,6 +1456,7 @@ export function initDashboardScreen(screenEl, role) {
             <i class="bi ${w.icon}"></i>
           </div>
           <span class="m-widget-title">${w.title}</span>
+          ${w.info ? `<button class="m-widget-info" data-widget="${w.id}" type="button"><i class="bi bi-info-circle"></i></button>` : ''}
           <i class="bi ${collapsed ? 'bi-chevron-down' : 'bi-chevron-up'}" style="font-size:14px;color:#636366;flex-shrink:0;margin-left:auto;margin-right:${w.fixed ? '0' : '8px'}"></i>
           ${menu}
         </div>
@@ -1297,11 +1465,13 @@ export function initDashboardScreen(screenEl, role) {
   }
 
   function render() {
+    radarMap?.remove(); radarMap = null
     forecast = makeForecast()
-    const custom = CATALOG.filter(w => w.active && !w.fixed)
-    const fixed  = CATALOG.filter(w => w.active && w.fixed)
+    const newUserIds = new Set(['previsions', 'support'])
+    const custom = CATALOG.filter(w => w.active && !w.fixed && (role !== 'new' || newUserIds.has(w.id)))
+    const fixed  = CATALOG.filter(w => w.active && w.fixed  && (role !== 'new' || newUserIds.has(w.id)))
     content.innerHTML = `
-      <button class="m-add-widget-btn" id="dash-add-widget-btn" style="margin-top:16px;margin-bottom:12px"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>
+      ${role === 'new' ? buildOnboardingBlocks() : `<button class="m-add-widget-btn" id="dash-add-widget-btn" style="margin-top:16px;margin-bottom:12px"><i class="bi bi-plus-circle"></i> Ajouter un widget</button>`}
       ${[...custom, ...fixed].map(w => {
         let body = ''
         if (w.id === 'bilan_hydrique') body = orgSelectorHTML() + buildBilanHydrique(getBhPlots())
@@ -1312,12 +1482,14 @@ export function initDashboardScreen(screenEl, role) {
         else if (w.id === 'evenements')  body = buildEvenements(exploitPlots, exploitSensors)
         else if (w.id === 'cultures')    body = buildCultures(exploitPlots)
         else if (w.id === 'notes')       body = buildNotes(role)
+        else if (w.id === 'radar_pluie') body = buildRadarPluie()
         else if (w.id === 'mon_reseau')  body = buildMonReseau(role)
         else if (w.id === 'support')     body = buildSupport()
         return widgetCard(w, body)
       }).join('')}
       <div style="height:24px"></div>`
     bindEvents()
+    if (!collapsedWidgets.has('radar_pluie')) initRadarMap()
   }
 
   const SVG_LOGO = `<svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.0184 1.16895C16.0184 1.16895 15.4978 1.17996 14.9386 1.81018H14.9373C14.7194 2.05554 14.6559 2.13527 14.5413 2.28722C14.012 2.99093 14.317 3.60621 14.317 3.60621L14.3134 3.60378C14.4429 3.87654 14.5162 4.18056 14.5162 4.5019C14.5162 4.60029 14.5076 4.69621 14.4939 4.79211L14.4965 4.78822C14.4965 4.78822 14.3072 5.56417 14.9748 6.18941C15.2737 6.4684 16.3909 7.47352 16.8841 7.86959C17.4259 8.30427 18.0574 8.3167 18.0574 8.3167L18.0535 8.31914C18.1083 8.3154 18.1631 8.31062 18.218 8.31062C18.4957 8.31062 18.7611 8.36524 19.0039 8.46363V8.4612C19.0039 8.4612 19.8161 8.76144 20.7864 7.85596C21.5661 7.12734 23.0816 5.51441 23.7118 4.80572C24.4653 3.95754 23.9211 3.45933 23.8551 3.40329C21.5821 1.98715 18.8981 1.16898 16.0223 1.16898L16.0184 1.16895ZM14.0791 1.29592C8.55534 2.01832 3.98808 5.77226 2.10114 10.834C2.06751 10.9909 1.96678 11.6633 2.65554 11.8576L2.65676 11.8564C3.24463 12.0221 4.23593 12.2663 4.87114 12.3622C5.79032 12.5017 6.20881 12.0345 6.20881 12.0345C6.42926 11.8128 6.69827 11.6422 6.99843 11.5351H6.99357C6.99357 11.5351 7.70348 11.3346 8.36487 10.2871C8.73229 9.70542 10.1036 7.40497 10.349 6.96406C10.7824 6.18563 10.644 5.68854 10.5618 5.5067C10.5506 5.48677 10.5419 5.46581 10.5307 5.44589C10.5244 5.43468 10.5195 5.42837 10.5195 5.42837L10.5234 5.4308C10.3826 5.14932 10.3017 4.83311 10.3054 4.50056C10.3141 3.33851 11.2495 2.39292 12.4116 2.39292C12.5124 2.39292 12.6107 2.40306 12.7078 2.41676L12.7042 2.41433C12.7042 2.41433 12.7241 2.41908 12.7553 2.42406C12.7652 2.42531 12.7753 2.42668 12.784 2.42917C12.9708 2.45657 13.4501 2.47652 13.8001 2.07547C13.9022 1.95839 13.9347 1.91238 14.109 1.68819C14.393 1.32326 14.1165 1.29842 14.0791 1.29592ZM25.5018 4.85557C25.2233 4.84281 24.8491 4.93643 24.4443 5.34745V5.34988H24.4431C23.4754 6.33134 21.5248 8.45878 21.1275 8.91463C20.4188 9.7267 20.3218 10.5462 20.3218 10.5462L20.3193 10.5426C20.3031 10.8079 20.2383 11.0595 20.1337 11.2887L20.1374 11.286C20.1374 11.286 19.8846 11.966 20.2495 13.1044C20.4413 13.7048 22.1189 18.423 22.3929 19.1055C22.703 19.8765 23.2213 19.9386 23.2886 19.9436H23.2959C23.5325 19.9672 23.758 20.0258 23.9709 20.1092L23.9673 20.1056C23.9673 20.1056 24.5925 20.4307 25.2763 19.0756C25.8331 17.9708 28.8347 11.5302 29.1274 10.8203C29.5783 9.72548 29.0228 8.84018 29.0228 8.84018C29.0278 8.84641 29.0315 8.85247 29.0364 8.85745C28.2368 7.40769 27.2031 6.10626 25.985 5.00274C25.9632 4.9878 25.7804 4.86858 25.5018 4.85581L25.5018 4.85557ZM13.625 6.3579C13.3945 6.36055 13.2473 6.4372 13.2473 6.4372C12.9907 6.54681 12.7093 6.60779 12.4116 6.6053C12.3743 6.6053 12.3393 6.6017 12.3019 6.59921L12.307 6.60165C12.307 6.60165 11.465 6.50203 11.0029 7.30663C10.7475 7.75127 9.52321 9.92841 9.11344 10.6907C8.6688 11.5177 8.9851 11.8416 9.04363 11.8914H9.0412V11.8926C9.0412 11.8926 9.04481 11.895 9.04606 11.8963C9.04855 11.8988 9.05117 11.8999 9.05117 11.8999C9.16825 11.9971 9.27276 12.108 9.36741 12.2288V12.2252C9.36741 12.2252 9.69132 12.7445 10.6517 12.4743C11.3678 12.2725 14.6934 11.3382 15.1206 11.2137C16.0236 10.9509 16.1158 10.2871 16.1158 10.2871L16.1219 10.2983C16.1393 9.97818 16.2265 9.67691 16.371 9.41037C16.371 9.40788 16.665 8.71164 16.0248 8.13373C15.7421 7.8784 14.854 7.03518 14.5027 6.72257C14.1695 6.42677 13.8556 6.35525 13.625 6.3579ZM30.0906 11.6345C29.992 11.636 29.8478 11.748 29.6478 12.1453L29.6491 12.1441C29.3427 12.7532 26.2776 19.216 25.9887 19.8076C25.2924 21.2374 25.4929 21.6934 25.4929 21.6934L25.4892 21.6897C25.5764 21.9413 25.6261 22.2091 25.6298 22.4893V22.4842C25.6298 22.4842 25.7257 23.2316 26.5041 23.3748C26.8927 23.4458 27.3264 23.5256 27.6788 23.5804C28.6254 23.7298 28.9317 23.351 28.984 23.2751C30.1871 21.1303 30.8734 18.6569 30.8734 16.0226C30.8734 14.5504 30.658 13.1293 30.2594 11.7867C30.242 11.7418 30.1891 11.6329 30.0906 11.6345ZM16.126 11.9819C15.9196 11.9852 15.6821 12.0139 15.4162 12.0843C14.7287 12.2661 11.2887 13.2263 10.8565 13.3533C9.8327 13.6535 9.6869 14.2291 9.6869 14.2291V14.2239C9.45524 14.8691 8.91974 15.3699 8.25209 15.5504H8.25573C8.25573 15.5504 7.40138 15.7174 7.298 16.7799C7.26188 17.1435 6.99648 19.5312 6.96036 19.8625C6.84577 20.885 7.257 21.1005 7.36661 21.1404H7.37026C7.38396 21.1453 7.39264 21.1464 7.39264 21.1464H7.3902C7.91954 21.3245 8.35549 21.7058 8.60335 22.199V22.1951C8.60335 22.1951 8.82992 22.8517 10.1028 22.8517C10.7106 22.8517 17.1299 22.7718 18.0616 22.7257C20.3072 22.6149 20.5689 21.6921 20.5689 21.6921V21.697C20.6847 21.3594 20.8665 21.0543 21.0995 20.7952L21.0931 20.7979C21.0931 20.7979 21.103 20.7902 21.1179 20.774C21.1316 20.7591 21.1456 20.743 21.1605 20.728C21.315 20.5474 21.6573 19.9982 21.3422 18.9233C21.1579 18.2968 19.7841 14.3897 19.5039 13.6934V13.6947C19.0318 12.5214 18.2209 12.5214 18.2209 12.5214C17.8024 12.5214 17.4139 12.3969 17.0863 12.1864V12.1889C17.0863 12.1889 16.7453 11.9717 16.126 11.9819ZM2.28722 12.7104C1.69434 12.6971 1.47356 13.1441 1.42802 13.2539C1.25863 14.1506 1.16895 15.0762 1.16895 16.0215C1.16895 18.6906 1.87275 21.1938 3.10583 23.3585C3.16935 23.4357 3.41109 23.6576 3.97281 23.4758H3.97403C4.61671 23.2678 4.65273 22.7708 4.65273 22.7708V22.7757C4.74116 22.2949 4.99017 21.8702 5.3414 21.5613H5.3341C5.3341 21.5613 5.85466 21.1891 6.04273 19.8102C6.07512 19.5723 6.36668 17.1236 6.40155 16.7238C6.51863 15.3749 6.07022 14.8468 6.07022 14.8468C5.87094 14.6027 5.72751 14.3125 5.65278 13.9961V14C5.65278 14 5.65287 13.9937 5.64913 13.9837C5.64415 13.9638 5.63924 13.9438 5.63551 13.9226C5.58942 13.752 5.40617 13.341 4.69749 13.1629C3.82439 12.9437 3.18558 12.8154 2.41087 12.7194C2.36798 12.7142 2.32675 12.7113 2.28722 12.7104ZM19.5275 23.6124C19.4563 23.6114 19.382 23.6122 19.3042 23.6151C18.6889 23.6388 10.8558 23.7197 10.1334 23.7309C9.05728 23.7483 8.58897 24.1818 8.44075 24.3612C8.42332 24.3849 8.40592 24.4086 8.38724 24.4322C8.38724 24.4347 8.38334 24.4371 8.38334 24.4371C8.15791 24.7261 7.86038 24.9566 7.51538 25.0973H7.51781C7.51781 25.0973 6.86764 25.3165 6.85394 26.0514C6.85021 26.2793 6.85031 26.3017 6.87024 26.7289C6.91259 27.6144 7.33718 28.0529 7.51903 28.2011C8.22772 28.6968 8.98125 29.1314 9.77339 29.4989C9.95398 29.5612 10.8932 29.7865 13.1015 28.764H13.1039C14.7629 27.9968 19.4373 25.6802 20.2357 25.2605C21.4065 24.6452 20.9307 24.0661 20.9307 24.0661C20.9307 24.0661 20.5957 23.6282 19.5275 23.6124ZM25.5942 24.0744C25.0894 24.0825 24.9773 24.2603 24.9773 24.2603L24.9797 24.2542C24.8539 24.3962 24.7121 24.5245 24.5589 24.6366L24.5664 24.6339C24.5664 24.6339 24.098 24.8645 24.5003 25.8111C24.7045 26.2931 24.8305 26.557 24.9912 26.8634C25.3212 27.4924 25.7758 27.2134 25.8343 27.1736C26.5642 26.5309 27.2304 25.8172 27.8232 25.0437C27.8731 24.9665 28.1259 24.5155 27.3562 24.3424H27.355V24.3412C27.2503 24.3175 26.6538 24.2104 26.2403 24.1356C25.9744 24.0877 25.7625 24.0717 25.5942 24.0744ZM4.54519 24.0856C4.45749 24.0836 4.35347 24.0977 4.23114 24.1369C3.79397 24.2777 3.85882 24.5181 3.88498 24.5828C4.44172 25.37 5.07187 26.1001 5.76681 26.7639C5.86396 26.8412 6.01099 26.9022 6.02344 26.5783H6.02466C6.03338 26.3566 6.0383 26.2419 6.02709 25.8571C6.00592 25.121 5.55638 24.893 5.55638 24.893C5.32222 24.7373 5.12045 24.537 4.96477 24.3041C4.96477 24.3041 4.85841 24.0925 4.54519 24.0856ZM22.8317 25.1248C22.7071 25.1198 22.2826 25.1647 21.1306 25.7376C19.9436 26.328 14.8394 28.9347 13.716 29.5338C12.2799 30.2985 12.9937 30.5564 13.0672 30.5788C14.0237 30.7719 15.0127 30.8741 16.0252 30.8741C19.0655 30.8741 21.8928 29.9597 24.2468 28.3916C24.3078 28.3418 24.7201 27.9708 24.4013 27.2222H24.4001C24.1099 26.5397 24.0612 26.4399 23.8843 26.0949C23.3762 25.111 22.8755 25.1297 22.8755 25.1297C22.8755 25.1297 22.8656 25.1261 22.8432 25.1248L22.8317 25.1248Z" fill="url(#wl)"/><path d="M12.4103 3.0918C12.2253 3.09178 12.0421 3.12821 11.8712 3.199C11.7002 3.26979 11.5449 3.37356 11.4141 3.50439C11.2833 3.63521 11.1795 3.79052 11.1087 3.96145C11.0379 4.13238 11.0015 4.31558 11.0015 4.50059C11.0015 4.68557 11.038 4.86875 11.1088 5.03965C11.1796 5.21055 11.2834 5.36583 11.4142 5.49663C11.545 5.62742 11.7003 5.73117 11.8712 5.80195C12.0421 5.87272 12.2253 5.90914 12.4103 5.90913C12.7838 5.90909 13.1421 5.76068 13.4062 5.49654C13.6704 5.23239 13.8188 4.87414 13.8188 4.50059C13.8188 4.3156 13.7824 4.13242 13.7117 3.9615C13.6409 3.79059 13.5371 3.63529 13.4063 3.50447C13.2755 3.37366 13.1203 3.26988 12.9494 3.19907C12.7785 3.12827 12.5953 3.09181 12.4103 3.0918ZM18.2203 9.00545C17.8468 9.00548 17.4885 9.15389 17.2244 9.41803C16.9602 9.68218 16.8118 10.0404 16.8118 10.414C16.8118 10.599 16.8482 10.7822 16.919 10.9531C16.9897 11.124 17.0935 11.2793 17.2243 11.4101C17.3551 11.5409 17.5104 11.6447 17.6813 11.7155C17.8522 11.7863 18.0353 11.8228 18.2203 11.8228C18.4053 11.8228 18.5885 11.7864 18.7595 11.7156C18.9304 11.6448 19.0857 11.541 19.2165 11.4102C19.3473 11.2794 19.4511 11.1241 19.5219 10.9531C19.5927 10.7822 19.6291 10.599 19.6291 10.414C19.6291 10.229 19.5926 10.0458 19.5218 9.87492C19.451 9.70402 19.3472 9.54874 19.2164 9.41795C19.0856 9.28715 18.9303 9.1834 18.7594 9.11263C18.5885 9.04185 18.4053 9.00543 18.2203 9.00545ZM7.70217 12.1092C7.51718 12.1092 7.334 12.1456 7.16308 12.2164C6.99217 12.2872 6.83687 12.3909 6.70605 12.5217C6.57524 12.6525 6.47146 12.8078 6.40065 12.9787C6.32985 13.1496 6.29339 13.3328 6.29338 13.5178C6.29336 13.7028 6.32979 13.886 6.40058 14.0569C6.47137 14.2278 6.57514 14.3832 6.70597 14.514C6.83679 14.6448 6.9921 14.7486 7.16303 14.8194C7.33396 14.8902 7.51716 14.9266 7.70217 14.9266C7.88718 14.9266 8.07038 14.8902 8.24131 14.8194C8.41223 14.7486 8.56755 14.6448 8.69837 14.514C8.82919 14.3832 8.93296 14.2278 9.00375 14.0569C9.07454 13.886 9.11097 13.7028 9.11095 13.5178C9.11094 13.3328 9.07449 13.1496 9.00368 12.9787C8.93287 12.8078 8.8291 12.6525 8.69828 12.5217C8.56746 12.3909 8.41216 12.2872 8.24125 12.2164C8.07033 12.1456 7.88715 12.1092 7.70217 12.1092ZM23.0306 20.631C22.7806 20.631 22.5332 20.6802 22.3023 20.7758C22.0714 20.8714 21.8616 21.0116 21.6848 21.1883C21.5081 21.365 21.3679 21.5748 21.2722 21.8057C21.1766 22.0366 21.1273 22.2841 21.1273 22.534C21.1273 22.7839 21.1766 23.0314 21.2722 23.2623C21.3679 23.4932 21.5081 23.7029 21.6848 23.8797C21.8616 24.0564 22.0714 24.1965 22.3023 24.2922C22.5332 24.3878 22.7806 24.437 23.0306 24.437C23.5353 24.437 24.0193 24.2364 24.3762 23.8796C24.733 23.5227 24.9335 23.0387 24.9336 22.534C24.9335 22.0293 24.733 21.5453 24.3762 21.1884C24.0193 20.8315 23.5353 20.631 23.0306 20.631ZM6.72196 21.7356C6.53697 21.7356 6.35379 21.7721 6.18289 21.8429C6.01199 21.9137 5.85671 22.0175 5.72592 22.1483C5.59512 22.2791 5.49137 22.4344 5.4206 22.6053C5.34982 22.7762 5.3134 22.9594 5.31342 23.1444C5.3134 23.3294 5.34982 23.5126 5.4206 23.6835C5.49137 23.8544 5.59512 24.0097 5.72592 24.1405C5.85671 24.2713 6.01199 24.3751 6.18289 24.4459C6.35379 24.5167 6.53697 24.5532 6.72196 24.5532C6.90696 24.5532 7.09016 24.5168 7.26109 24.446C7.43202 24.3752 7.58733 24.2714 7.71816 24.1406C7.84898 24.0098 7.95275 23.8545 8.02354 23.6836C8.09433 23.5126 8.13076 23.3294 8.13074 23.1444C8.13076 22.9594 8.09433 22.7762 8.02354 22.6053C7.95275 22.4343 7.84898 22.279 7.71816 22.1482C7.58733 22.0174 7.43202 21.9136 7.26109 21.8428C7.09016 21.772 6.90696 21.7356 6.72196 21.7356Z" fill="#0172A4"/><defs><linearGradient id="wl" x1="22.1214" y1="24.1023" x2="29.1448" y2="13.8518" gradientUnits="userSpaceOnUse"><stop stop-color="#0172A4"/><stop offset="1" stop-color="#002635"/></linearGradient></defs></svg>`
@@ -1390,11 +1562,23 @@ export function initDashboardScreen(screenEl, role) {
   function bindEvents() {
     screenEl.querySelector('.m-navbar-action')?.addEventListener('click', showAddPage)
     content.querySelector('#dash-add-widget-btn')?.addEventListener('click', showCatalog)
+    content.querySelector('[data-action="add-parcel"]')?.addEventListener('click', () => showParcelCreation(() => render()))
+    content.querySelector('[data-action="add-sensor"]')?.addEventListener('click', () => showSensorCreation(() => render()))
+
+    // Widget info
+    content.querySelectorAll('.m-widget-info').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const w = CATALOG.find(c => c.id === btn.dataset.widget)
+        if (w) showWidgetInfoModal(w.title, w.info, w.gif)
+      })
+    })
 
     // Widget collapse
     content.querySelectorAll('.m-widget-hd--toggle').forEach(hd => {
       hd.addEventListener('click', e => {
         if (e.target.closest('.m-widget-menu')) return
+        if (e.target.closest('.m-widget-info')) return
         const widgetId = hd.dataset.collapse
         if (collapsedWidgets.has(widgetId)) collapsedWidgets.delete(widgetId)
         else collapsedWidgets.add(widgetId)
@@ -1599,13 +1783,10 @@ export function initDashboardScreen(screenEl, role) {
         const c = cumulsList[idx]
         if (!c) return
         const qualSensors = exploitSensors.filter(s => s.parcelIds.length > 0 && CUMUL_QUALIFYING_MODELS.has(s.model))
-        const qualPlotIds = new Set(qualSensors.flatMap(s => s.parcelIds))
-        const qualPlots   = exploitPlots.filter(p => qualPlotIds.has(p.id))
-        const plotOpts    = qualPlots.map(p => `<option value="p-${p.id}"${c.subjectKey===`p-${p.id}`?' selected':''}>${p.name}</option>`).join('')
-        const sensorOpts  = qualSensors.map(s => {
-          const p = exploitPlots.find(x => s.parcelIds.includes(x.id))
-          return `<option value="s-${s.id}"${c.subjectKey===`s-${s.id}`?' selected':''}>${s.model} — ${s.serial}${p?` · ${p.name}`:''}</option>`
-        }).join('')
+        const plotOpts    = exploitPlots.map(p => `<option value="p-${p.id}"${c.subjectKey===`p-${p.id}`?' selected':''}>${plotOptLabel(p)}</option>`).join('')
+        const sensorOpts  = qualSensors.map(s =>
+          `<option value="s-${s.id}"${c.subjectKey===`s-${s.id}`?' selected':''}>${sensorOptLabel(s, exploitPlots)}</option>`
+        ).join('')
         const avail      = getAvailableMetrics(c.subjectKey)
         const metricOpts = avail.map(m => `<option value="${m.id}"${c.metricId===m.id?' selected':''}>${m.label}</option>`).join('')
 
@@ -1715,7 +1896,7 @@ export function initDashboardScreen(screenEl, role) {
           }
         }
         const notes = _loadNotes()
-        notes.unshift({ date, time, text, auteur, imageIds, linkedType, linkedId, linkedName })
+        notes.unshift({ date, time, text, auteur, role: 'membre', imageIds, linkedType, linkedId, linkedName })
         _saveNotes(notes)
         content.querySelector('#notes-input').value = ''
         rebuildNotesWidget()
@@ -1739,7 +1920,7 @@ export function initDashboardScreen(screenEl, role) {
               : ''
             return `
               <div class="m-note-card" data-idx="${i}" style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:10px 12px;margin-bottom:8px;position:relative;cursor:pointer">
-                <button class="m-note-del" data-idx="${i}" style="position:absolute;top:8px;right:8px;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:22px;height:22px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#636366">×</button>
+                <button class="m-note-del m-del-btn" data-idx="${i}" style="position:absolute;top:8px;right:8px">×</button>
                 <div style="font-size:11px;color:#8e8e93;margin-bottom:3px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                   <span>${fmtDate(n.date)}${n.time ? ' · ' + n.time : ''}</span>
                   ${n.auteur ? `<span style="color:#636366;font-weight:500">${n.auteur}</span>` : ''}

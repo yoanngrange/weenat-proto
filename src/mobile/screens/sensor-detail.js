@@ -4,15 +4,27 @@ import { plots as allPlots }   from '../../data/plots.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs }                from '../../data/orgs.js'
 
+const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
+
+const DASH_CUMUL_META = {
+  dj:    { metricLabel: 'Degrés-jours',        unit: 'DJ', icon: 'bi-thermometer-sun', color: '#FBAF05' },
+  hf:    { metricLabel: 'Heures de froid',      unit: 'h',  icon: 'bi-thermometer-low', color: '#5AC8FA' },
+  pluie: { metricLabel: 'Cumul de pluie',       unit: 'mm', icon: 'bi-droplet-fill',    color: '#2E75B6' },
+  rayo:  { metricLabel: 'Rayonnement solaire',  unit: 'MJ', icon: 'bi-sun-fill',        color: '#CBCB0B' },
+  etp:   { metricLabel: 'Évapotranspiration',   unit: 'mm', icon: 'bi-moisture',        color: '#7DBDD7' },
+  humec: { metricLabel: 'Humectation foliaire', unit: 'h',  icon: 'bi-droplet-half',    color: '#00887E' },
+}
+const DASH_KEY = 'weenat-m-dash'
+
 // ─── Model metadata (iso web) ─────────────────────────────────────────────────
 const MODEL_NAMES = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
-  'SMV': 'Station météo virtuelle', 'TH': 'Thermo-hygromètre',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermomètre-hygromètre',
   'T_MINI': 'Thermomètre de sol', 'W': 'Anémomètre', 'PYRANO': 'Pyranomètre',
-  'PAR': 'Capteur PAR', 'LWS': 'Humectation foliaire', 'T_GEL': 'Capteur gel',
+  'PAR': 'Capteur PAR', 'LWS': "Capteur d'humectation foliaire", 'T_GEL': 'Capteur de gel',
   'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
   'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive',
-  'EC': 'Sonde fertirrigation',
+  'EC': 'Sonde de fertirrigation',
 }
 
 const MODEL_BRANDS = {
@@ -122,7 +134,7 @@ function makeXLabels(period, W, PL, PR, H, PB = 20) {
   }).join('')
 }
 
-function svgChart(metricId, color, isCumul, period = '7d') {
+function svgChart(metricId, color, isCumul, period = '7d', unit = '') {
   const count = PERIOD_COUNTS[period] || 60
   const vals = mockSeries(metricId, count)
   const W = 320, H = 100, PL = 34, PR = 6, PT = 10, PB = 20
@@ -157,7 +169,7 @@ function svgChart(metricId, color, isCumul, period = '7d') {
   const path = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
   const area = `${path} L${xOf(vals.length - 1).toFixed(1)},${(PT + iH).toFixed(1)} L${PL},${(PT + iH).toFixed(1)} Z`
   const encoded = encodeURIComponent(JSON.stringify({ vals: vals.map(v => +v.toFixed(2)), minV: +minV.toFixed(2), maxV: +maxV.toFixed(2) }))
-  return `<div class="m-chart-svg-wrap" data-chart="${encoded}" data-color="${color}" style="position:relative">
+  return `<div class="m-chart-svg-wrap" data-chart="${encoded}" data-color="${color}" data-unit="${unit}" style="position:relative">
     <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" preserveAspectRatio="none">
       <defs><linearGradient id="${gId}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="${color}" stop-opacity=".25"/>
@@ -166,6 +178,7 @@ function svgChart(metricId, color, isCumul, period = '7d') {
       ${yLabels}${grid}${axisLine}
       <path d="${area}" fill="url(#${gId})"/>
       <path d="${path}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${pts.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${color}"/>`).join('')}
       ${xLabels}
     </svg>
     <div class="m-chart-crosshair" style="display:none"></div>
@@ -173,21 +186,29 @@ function svgChart(metricId, color, isCumul, period = '7d') {
   </div>`
 }
 
+function contrastColor(hex) {
+  const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16)
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.5 ? '#000000' : '#ffffff'
+}
+
 function bindChartTooltip(wrap) {
   const data = JSON.parse(decodeURIComponent(wrap.dataset.chart || '{}'))
   if (!data.vals) return
   const { vals } = data
-  const tip  = wrap.querySelector('.m-chart-tip')
-  const line = wrap.querySelector('.m-chart-crosshair')
+  const tip   = wrap.querySelector('.m-chart-tip')
+  const line  = wrap.querySelector('.m-chart-crosshair')
   const color = wrap.dataset.color || '#0172A4'
+  const unit  = wrap.dataset.unit  || ''
   function onMove(clientX) {
     const rect = wrap.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
     const idx = Math.round(ratio * (vals.length - 1))
     const val = vals[idx], x = ratio * 100
+    const display = (val < 10 ? val.toFixed(1) : String(Math.round(val))) + (unit ? ` ${unit}` : '')
+    const tc = contrastColor(color)
     line.style.cssText = `display:block;position:absolute;top:0;bottom:20px;left:${x}%;width:1px;background:${color};opacity:.5`
-    tip.style.cssText  = `display:block;position:absolute;top:8px;left:${Math.min(x, 75)}%;background:#1a1a1a;color:#fff;font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none`
-    tip.textContent = val < 10 ? val.toFixed(1) : String(Math.round(val))
+    tip.style.cssText  = `display:block;position:absolute;top:8px;left:${Math.min(x, 75)}%;background:${color};color:${tc};border:1.5px solid ${tc};font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;pointer-events:none`
+    tip.textContent = display
   }
   function onEnd() { line.style.display = 'none'; tip.style.display = 'none' }
   wrap.addEventListener('pointermove', e => { e.preventDefault(); onMove(e.clientX) })
@@ -208,26 +229,41 @@ function computeCumuls(metricId, period, type) {
   const vals = mockSeries(metricId, count)
   let chips = []
   if (type === 'temp') {
-    const dj = vals.reduce((s, v) => s + Math.max(0, v), 0) * (hoursPerPt / 24)
-    const hf = vals.filter(v => v < 7).length * hoursPerPt
-    chips = [{ label: 'Degrés jours', val: `${Math.round(dj)} DJ` },
-             { label: 'Heures de froid', val: `${Math.round(hf)} h` }]
+    const dj = vals.reduce((s, v) => s + Math.max(0, Math.min(v, cumulThresholds.djMax) - cumulThresholds.djMin), 0) * (hoursPerPt / 24)
+    const hf = vals.filter(v => v < cumulThresholds.hfSeuil).length * hoursPerPt
+    chips = [
+      { label: 'Degrés jours',    val: `${Math.round(dj)} DJ`, metricId: 'dj', thresholdText: `${cumulThresholds.djMin}°C → ${cumulThresholds.djMax}°C` },
+      { label: 'Heures de froid', val: `${Math.round(hf)} h`,  metricId: 'hf', thresholdText: `< ${cumulThresholds.hfSeuil}°C` },
+    ]
   } else if (type === 'pluie') {
     const total = vals.reduce((s, v) => s + v, 0)
-    chips = [{ label: 'Cumul pluie', val: `${total.toFixed(1)} mm` }]
+    chips = [{ label: 'Cumul pluie', val: `${total.toFixed(1)} mm`, metricId: 'pluie' }]
   } else if (type === 'rayo') {
     const h = vals.filter(v => v > 120).length * hoursPerPt
-    chips = [{ label: 'Ensoleillement', val: `${Math.round(h)} h` }]
+    chips = [{ label: 'Ensoleillement', val: `${Math.round(h)} h`, metricId: 'rayo' }]
   } else if (type === 'hws') {
     const h = vals.filter(v => v > 50).length * hoursPerPt
-    chips = [{ label: 'Heures d\'humectation', val: `${Math.round(h)} h` }]
+    chips = [{ label: 'Heures d\'humectation', val: `${Math.round(h)} h`, metricId: 'humec' }]
   }
   if (!chips.length) return ''
-  return `<div class="m-chart-cumuls">${chips.map(c =>
-    `<div class="m-chart-cumul-chip">
-      <span class="m-chart-cumul-label">${c.label}</span>
-      <span class="m-chart-cumul-val">${c.val}</span>
-    </div>`).join('')}</div>`
+  return `<div class="m-chart-cumuls">${chips.map(c => {
+    const editBtn = (c.metricId === 'dj' || c.metricId === 'hf')
+      ? `<button class="m-cumul-edit-btn" data-cumul-metric-id="${c.metricId}" title="Modifier seuils"><i class="bi bi-pencil"></i></button>`
+      : ''
+    return `<div class="m-chart-cumul-chip">
+      <div class="m-chart-cumul-info">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="m-chart-cumul-label">${c.label}</span>
+          ${c.thresholdText ? `<span class="m-chart-cumul-thresh">${c.thresholdText}</span>` : ''}
+        </div>
+        <span class="m-chart-cumul-val">${c.val}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:2px">
+        ${editBtn}
+        <button class="m-cumul-add-btn" data-cumul-label="${c.label}" data-cumul-val="${c.val}" data-cumul-metric-id="${c.metricId}" title="Ajouter au tableau de bord"><i class="bi bi-house"></i></button>
+      </div>
+    </div>`
+  }).join('')}</div>`
 }
 
 function triggerCsvDownload(content, filename) {
@@ -261,14 +297,15 @@ function donneesView(sensor, period = '7d', step = '1h') {
   const FS_METRIC_ID = { temp: 'temperature', tseche: 'temp_seche', thumide: 'temp_humide' }
   const cards = metrics.map(m => {
     const fsId = FS_METRIC_ID[m.id] || m.id
+    const cumulHtml = computeCumuls(m.id, period, m.cumulsType)
     return `
       <div class="m-chart-card">
         <div class="m-chart-card-hd">
           <span class="m-chart-label" style="color:${m.color}">${m.label}</span>
-          <button class="m-chart-expand-btn" data-metric-id="${fsId}" style="border:none;background:none;color:#007AFF;font-size:11px;padding:2px 4px;cursor:pointer;display:flex;align-items:center;margin-left:auto"><i class="bi bi-fullscreen"></i></button>
         </div>
-        ${svgChart(m.id, m.color, m.cumul, period)}
-        ${computeCumuls(m.id, period, m.cumulsType)}
+        ${svgChart(m.id, m.color, m.cumul, period, m.unit || '')}
+        <div class="m-chart-details-link" data-metric-id="${fsId}">Voir détails →</div>
+        ${cumulHtml}
       </div>`
   }).join('')
 
@@ -294,9 +331,9 @@ function donneesView(sensor, period = '7d', step = '1h') {
       ${period === 'custom' ? `
       <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
         <label style="font-size:12px;color:#8e8e93;white-space:nowrap">Du</label>
-        <input type="date" class="m-custom-from" value="${weekAgo}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+        <input type="date" class="m-custom-from m-custom-date" value="${weekAgo}">
         <label style="font-size:12px;color:#8e8e93;white-space:nowrap">au</label>
-        <input type="date" class="m-custom-to" value="${today}" style="flex:1;font-size:12px;padding:5px;border:1px solid rgba(0,0,0,.15);border-radius:6px;font-family:inherit;background:#fff">
+        <input type="date" class="m-custom-to m-custom-date" value="${today}">
       </div>` : ''}
     </div>
     <div class="m-detail-section">${cards}</div>`
@@ -470,7 +507,7 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
     </div>
     <div class="m-detail-tabs">
       <button class="m-detail-tab ${initialView === 'donnees' ? 'active' : ''}" data-view="donnees">Données</button>
-      <button class="m-detail-tab ${initialView === 'params'  ? 'active' : ''}" data-view="params">Paramètres</button>
+      <button class="m-detail-tab ${initialView === 'params'  ? 'active' : ''}" data-view="params">Paramètres${sensor.event && (Array.isArray(sensor.event) ? sensor.event.length > 0 : true) ? ' <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b30;vertical-align:middle;margin-left:3px;margin-bottom:1px;flex-shrink:0"></span>' : ''}</button>
     </div>
     <div id="detail-content" class="m-detail-content"></div>`)
 
@@ -502,15 +539,67 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
       currentStep = e.target.value; renderView()
     })
     layer.querySelectorAll('.m-chart-svg-wrap').forEach(wrap => bindChartTooltip(wrap))
-    // Expand chart → fullscreen chart layer
-    layer.querySelectorAll('.m-chart-expand-btn[data-metric-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
+    layer.querySelectorAll('.m-chart-details-link[data-metric-id]').forEach(link => {
+      link.addEventListener('click', () => {
         import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
           sensor,
-          metricId: btn.dataset.metricId,
-          backLabel: sensor.serial,
+          metricId: link.dataset.metricId,
+          backLabel: 'Retour',
         }))
       })
+    })
+    layer.addEventListener('click', e => {
+      const addBtn = e.target.closest('.m-cumul-add-btn')
+      if (addBtn) {
+        const metricId = addBtn.dataset.cumulMetricId
+        const val = addBtn.dataset.cumulVal
+        const meta = DASH_CUMUL_META[metricId]
+        if (!meta) return
+        const subjectLabel = `${sensor.model} ${sensor.serial}`
+        const body = document.createElement('div')
+        body.innerHTML = `<div style="padding:16px;font-size:14px;color:#3a3a3c">Ajouter <strong>${meta.metricLabel}</strong> (<em>${val}</em>) au tableau de bord du capteur <strong>${sensor.serial}</strong> ?</div>`
+        showSheet({ title: 'Tableau de bord', body, doneLabel: 'Ajouter', cancelLabel: 'Annuler', onDone: () => {
+          const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
+          const list = dash.cumulsList || []
+          if (list.length >= 5) { showToast('Maximum de cumuls atteint (5)'); return }
+          const thresholds = metricId === 'hf' ? { cold: cumulThresholds.hfSeuil }
+                           : metricId === 'dj' ? { low: cumulThresholds.djMin, high: cumulThresholds.djMax }
+                           : null
+          list.push({ metricId, ...meta, subjectKey: `s-${sensor.id}`, subjectLabel,
+            fromDate: `${new Date().getFullYear()}-01-01`, value: val, thresholds })
+          dash.cumulsList = list
+          localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+          showToast('Cumul ajouté au tableau de bord')
+        }})
+        return
+      }
+      const editBtn = e.target.closest('.m-cumul-edit-btn')
+      if (editBtn) {
+        const metricId = editBtn.dataset.cumulMetricId
+        const body = document.createElement('div')
+        if (metricId === 'hf') {
+          body.innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+            <label class="m-form-label">Seuil de froid (°C)</label>
+            <input type="number" class="m-sheet-input" id="edit-hf-seuil" value="${cumulThresholds.hfSeuil}" step="0.1" min="-20" max="20">
+          </div>`
+          showSheet({ title: 'Heures de froid', body, doneLabel: 'Appliquer', cancelLabel: 'Annuler', onDone: () => {
+            cumulThresholds.hfSeuil = +(body.querySelector('#edit-hf-seuil')?.value ?? 7.2)
+            renderView()
+          }})
+        } else if (metricId === 'dj') {
+          body.innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+            <label class="m-form-label">Température min (°C)</label>
+            <input type="number" class="m-sheet-input" id="edit-dj-min" value="${cumulThresholds.djMin}" step="1" min="-20" max="30">
+            <label class="m-form-label">Température max (°C)</label>
+            <input type="number" class="m-sheet-input" id="edit-dj-max" value="${cumulThresholds.djMax}" step="1" min="-20" max="50">
+          </div>`
+          showSheet({ title: 'Degrés-jours', body, doneLabel: 'Appliquer', cancelLabel: 'Annuler', onDone: () => {
+            cumulThresholds.djMin = +(body.querySelector('#edit-dj-min')?.value ?? 0)
+            cumulThresholds.djMax = +(body.querySelector('#edit-dj-max')?.value ?? 18)
+            renderView()
+          }})
+        }
+      }
     })
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
@@ -633,9 +722,9 @@ const MAINT_TYPES_M = [
 function getSJournal(sensorId) {
   try { const r = localStorage.getItem(SENSOR_JRN_KEY(sensorId)); if (r) return JSON.parse(r) } catch (_) {}
   return [
-    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', texte: '' },
-    { id: 2, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', texte: '' },
-    { id: 3, type: 'note',         date: '2023-11-02', user: 'Agriculteur',       texte: 'Capteur légèrement déplacé — redressé' },
+    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', role: 'conseiller', texte: '' },
+    { id: 2, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', role: 'conseiller', texte: '' },
+    { id: 3, type: 'note',         date: '2023-11-02', user: 'Jean Dupont',       role: 'membre',     texte: 'Capteur légèrement déplacé — redressé' },
   ]
 }
 
@@ -801,7 +890,7 @@ function openMobileSensorJournal(sensor, opts = {}) {
 
     let html = `
       <div style="padding:12px 16px 8px">
-        <button class="btn-primary" id="sjrn-add-btn" style="width:100%;justify-content:center;gap:8px;font-size:15px;padding:11px 16px;border-radius:10px">
+        <button class="m-btn m-btn--primary" id="sjrn-add-btn">
           <i class="bi bi-plus-circle-fill"></i> Ajouter une opération de maintenance
         </button>
       </div>
@@ -832,7 +921,7 @@ function openMobileSensorJournal(sensor, opts = {}) {
                   : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
-              ${e.user ? `<div style="font-size:11px;color:#8e8e93;margin-top:2px">${e.user}</div>` : ''}
+              ${e.user ? `<div style="font-size:11px;color:#8e8e93;margin-top:3px;display:flex;gap:5px;align-items:center">${e.user}${roleBadgeSensor(e.role)}</div>` : ''}
             </div>
           </div>`
       })
@@ -854,27 +943,37 @@ function openMobileSensorJournal(sensor, opts = {}) {
   if (opts.openForm) openSJournalForm(sensor.id, renderJournal)
 }
 
+function roleBadgeSensor(role) {
+  if (!role) return ''
+  const cfg = {
+    membre:     { label: 'Membre',     bg: '#f2f2f7', color: '#636366' },
+    conseiller: { label: 'Conseiller', bg: '#eef4ff', color: '#3a7bd5' },
+  }
+  const c = cfg[role] || cfg.membre
+  return `<span style="font-size:10px;background:${c.bg};color:${c.color};border-radius:4px;padding:1px 5px;font-weight:500">${c.label}</span>`
+}
+
 function openSJournalForm(sensorId, onSaved) {
   const today = new Date().toISOString().slice(0, 10)
   const body = document.createElement('div')
   body.innerHTML = `
     <div class="m-sheet-input-group" style="display:flex;flex-direction:column;gap:10px">
       <div>
-        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Type</div>
+        <div class="m-form-label">Type</div>
         <select class="m-sheet-input" id="sjf-type">
           ${MAINT_TYPES_M.map(t => `<option value="${t.id}">${t.label}</option>`).join('')}
         </select>
       </div>
       <div>
-        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Date</div>
+        <div class="m-form-label">Date</div>
         <input type="date" class="m-sheet-input" id="sjf-date" value="${today}">
       </div>
       <div>
-        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Intervenant</div>
+        <div class="m-form-label">Intervenant</div>
         <input type="text" class="m-sheet-input" id="sjf-user" value="Jean Dupont">
       </div>
       <div>
-        <div class="m-sheet-input-label" style="font-size:12px;color:#8e8e93;margin-bottom:4px">Note</div>
+        <div class="m-form-label">Note</div>
         <textarea class="m-sheet-input" id="sjf-texte" placeholder="Observations éventuelles…" style="resize:none;min-height:72px"></textarea>
       </div>
     </div>`
@@ -886,8 +985,9 @@ function openSJournalForm(sensorId, onSaved) {
       const type  = body.querySelector('#sjf-type').value
       const date  = body.querySelector('#sjf-date').value || today
       const user  = body.querySelector('#sjf-user').value.trim() || 'Jean Dupont'
+      const role  = localStorage.getItem('menuRole') === 'admin-reseau' ? 'conseiller' : 'membre'
       const texte = body.querySelector('#sjf-texte').value.trim()
-      saveSJournal(sensorId, [{ id: Date.now(), type, date, user, texte }, ...getSJournal(sensorId)])
+      saveSJournal(sensorId, [{ id: Date.now(), type, date, user, role, texte }, ...getSJournal(sensorId)])
       onSaved()
     }
   })

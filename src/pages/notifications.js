@@ -2,6 +2,7 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { sensors } from '../data/sensors.js'
 import { members } from '../data/members.js'
 import { orgs } from '../data/orgs.js'
+import { plots } from '../data/plots.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -37,6 +38,16 @@ const TYPE_COLORS = {
 
 const NETWORK_MEMBERS = members
   .filter(m => m.email.endsWith('@breizagri-conseil.fr'))
+  .map(m => `${m.prenom} ${m.nom}`)
+  .sort()
+
+const ADHERENT_ALL_MEMBERS = members
+  .filter(m => m.source === 'adherent')
+  .map(m => `${m.prenom} ${m.nom}`)
+  .sort()
+
+const MY_ORG_MEMBERS = members
+  .filter(m => m.source === 'adherent' && m.orgIds?.includes(1))
   .map(m => `${m.prenom} ${m.nom}`)
   .sort()
 
@@ -87,55 +98,74 @@ const CAPTEURS = sensors
   .map(s => ({ value: s.serial, label: `${s.serial} — ${s.model}` }))
   .sort((a, b) => a.value.localeCompare(b.value))
 
-let currentPage   = 1
-let filterOrg     = ''
-let filterType    = ''
-let filterSecteur = ''
-let filterCapteur = ''
-let filterPeriode = ''
+let currentPage      = 1
+let filterOrg        = ''
+let filterType       = ''
+let filterSecteur    = ''
+let filterCapteur    = ''
+let filterPeriode    = ''
+let filterMonSecteur = false
 
 function initFilters() {
+  const isAdherent = localStorage.getItem('menuRole') === 'adherent-reseau'
   const orgSel     = document.getElementById('filter-notif-org')
   const typeSel    = document.getElementById('filter-notif-type')
   const secteurSel = document.getElementById('filter-notif-secteur')
   const capteurSel = document.getElementById('filter-notif-capteur')
   const periodSel  = document.getElementById('filter-notif-periode')
 
-  ORG_NAMES.forEach(o => {
-    const opt = document.createElement('option')
-    opt.value = o; opt.textContent = o
-    orgSel?.appendChild(opt)
-  })
+  if (isAdherent) {
+    orgSel?.closest('select')?.remove?.() || (orgSel && (orgSel.style.display = 'none'))
+    capteurSel?.closest('select')?.remove?.() || (capteurSel && (capteurSel.style.display = 'none'))
+  } else {
+    ORG_NAMES.forEach(o => {
+      const opt = document.createElement('option')
+      opt.value = o; opt.textContent = o
+      orgSel?.appendChild(opt)
+    })
+  }
 
-  NETWORK_MEMBERS.forEach(m => {
+  const secteurList = isAdherent ? MY_ORG_MEMBERS : ADHERENT_ALL_MEMBERS
+  secteurList.forEach(m => {
     const opt = document.createElement('option')
     opt.value = m; opt.textContent = m
     secteurSel?.appendChild(opt)
   })
 
-  CAPTEURS.forEach(({ value, label }) => {
-    const opt = document.createElement('option')
-    opt.value = value; opt.textContent = label
-    capteurSel?.appendChild(opt)
-  })
+  if (!isAdherent) {
+    CAPTEURS.forEach(({ value, label }) => {
+      const opt = document.createElement('option')
+      opt.value = value; opt.textContent = label
+      capteurSel?.appendChild(opt)
+    })
+  }
 
   orgSel?.addEventListener('change', e => {
     filterOrg = e.target.value
-    if (filterOrg) { secteurSel.value = ''; filterSecteur = ''; capteurSel.value = ''; filterCapteur = '' }
+    if (filterOrg) { if (secteurSel) { secteurSel.value = ''; filterSecteur = '' } if (capteurSel) { capteurSel.value = ''; filterCapteur = '' } }
     currentPage = 1; render()
   })
   typeSel?.addEventListener('change', e => { filterType = e.target.value; currentPage = 1; render() })
   secteurSel?.addEventListener('change', e => {
     filterSecteur = e.target.value
-    if (filterSecteur) { orgSel.value = ''; filterOrg = ''; capteurSel.value = ''; filterCapteur = '' }
+    if (filterSecteur) { if (orgSel) { orgSel.value = ''; filterOrg = '' } if (capteurSel) { capteurSel.value = ''; filterCapteur = '' } }
     currentPage = 1; render()
   })
   capteurSel?.addEventListener('change', e => {
     filterCapteur = e.target.value
-    if (filterCapteur) { orgSel.value = ''; filterOrg = ''; secteurSel.value = ''; filterSecteur = '' }
+    if (filterCapteur) { if (orgSel) { orgSel.value = ''; filterOrg = '' } if (secteurSel) { secteurSel.value = ''; filterSecteur = '' } }
     currentPage = 1; render()
   })
   periodSel?.addEventListener('change', e => { filterPeriode = e.target.value; currentPage = 1; render() })
+
+  const monSecteurBtn = document.getElementById('filter-mon-secteur-btn')
+  if (monSecteurBtn) {
+    monSecteurBtn.addEventListener('click', () => {
+      filterMonSecteur = !filterMonSecteur
+      monSecteurBtn.classList.toggle('active', filterMonSecteur)
+      currentPage = 1; render()
+    })
+  }
 }
 
 function getFiltered() {
@@ -144,6 +174,14 @@ function getFiltered() {
     ? ALL_NOTIFS.filter(n => ADHERENT_NOTIF_IDS.has(n.id))
     : [...ALL_NOTIFS]
 
+  if (filterMonSecteur) {
+    const userId = isAdherent ? 31 : 1
+    const user = members.find(m => m.id === userId)
+    const myParcelIds = new Set(user?.parcelIds || [])
+    const myOrgIds = new Set(plots.filter(p => myParcelIds.has(p.id)).map(p => p.orgId))
+    const myOrgNames = new Set(orgs.filter(o => myOrgIds.has(o.id)).map(o => o.name))
+    list = list.filter(n => myOrgNames.has(n.org))
+  }
   if (filterOrg)     list = list.filter(n => n.org === filterOrg)
   if (filterType)    list = list.filter(n => n.type === filterType)
   if (filterSecteur) list = list.filter(n => n.membre === filterSecteur)
@@ -188,15 +226,17 @@ function render() {
   const wall = document.getElementById('notif-wall')
   if (!wall) return
 
+  const isAdherent = localStorage.getItem('menuRole') === 'adherent-reseau'
+
   if (!paged.length) {
     wall.innerHTML = '<div class="notif-empty"><i class="bi bi-bell-slash"></i> Aucune notification.</div>'
   } else {
     wall.innerHTML = paged.map(n => {
       const icon  = TYPE_ICONS[n.type] || 'bi-info-circle'
-      const color = TYPE_COLORS[n.type] || 'var(--txt3)'
+      const color = isAdherent ? 'var(--txt3)' : (TYPE_COLORS[n.type] || 'var(--txt3)')
       return `
         <div class="notif-item">
-          <div class="notif-icon" style="background:${color}20;color:${color}"><i class="bi ${icon}"></i></div>
+          <div class="notif-icon" style="background:var(--bdr2);color:${color}"><i class="bi ${icon}"></i></div>
           <div class="notif-body">
             <div class="notif-text">${n.text}</div>
             <div class="notif-meta">
