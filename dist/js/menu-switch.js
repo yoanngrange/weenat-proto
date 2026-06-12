@@ -108,7 +108,7 @@ function setupImgUpload(inputEl, addBtnEl, previewsEl, errEl, pendingImages) {
 const menuData = {
   'admin-reseau': {
     exploitation: [
-      { href: 'tableau-de-bord.html', icon: 'bi-grid-1x2', text: 'Tableau de bord' },
+      { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
@@ -127,7 +127,7 @@ const menuData = {
   },
   'adherent-reseau': {
     exploitation: [
-      { href: 'tableau-de-bord.html', icon: 'bi-grid-1x2', text: 'Tableau de bord' },
+      { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
@@ -183,6 +183,7 @@ function generateMenuContent(role, currentPage) {
   html += '<div class="nav-group compte">';
   const avatarUrl = localStorage.getItem('avatarUrl');
   const user = ROLE_USERS[role] || ROLE_USERS['admin-reseau'];
+  const unreadCount = parseInt(localStorage.getItem('notif-unread') || (role === 'adherent-reseau' ? '3' : '7'));
   accountLinks.forEach(link => {
     const isActive = link.href.replace('.html', '') === currentPage;
     let iconHtml;
@@ -193,7 +194,10 @@ function generateMenuContent(role, currentPage) {
     } else {
       iconHtml = `<i class="bi ${link.icon}"></i>`;
     }
-    html += `<a href="${link.href}" ${isActive ? 'class="active"' : ''}>${iconHtml} ${link.text}</a>`;
+    const badgeHtml = link.href === 'notifications.html' && unreadCount > 0
+      ? ` <span class="nav-notif-badge">${unreadCount}</span>`
+      : '';
+    html += `<a href="${link.href}" ${isActive ? 'class="active"' : ''}>${iconHtml} ${link.text}${badgeHtml}</a>`;
   });
   html += '</div>';
 

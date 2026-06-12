@@ -3,14 +3,16 @@ import { METIERS, IRRIG_TYPES, SOIL_TYPES } from '../../data/constants.js'
 import { sensors as ALL_SENSORS } from '../../data/sensors.js'
 
 const NEARBY_NETWORKS = [
-  { name: 'Allier AgriTech',       distance: 8,  adherents: 31, capteurs: 198, parcelles: 1140, sharedSensorTypes: ['Stations météo', 'Tensiomètres', 'Sondes capacitives'] },
-  { name: 'Auvergne Agri Conseil', distance: 15, adherents: 54, capteurs: 361, parcelles: 2080, sharedSensorTypes: ['Stations météo', 'Pluviomètres', 'Thermomètres-hygromètres'] },
-  { name: 'Réseau Bourbonnais',    distance: 22, adherents: 18, capteurs: 112, parcelles: 630,  sharedSensorTypes: ['Stations météo', 'Tensiomètres'] },
-  { name: 'Creuse Agri Net',       distance: 38, adherents: 12, capteurs: 74,  parcelles: 410,  sharedSensorTypes: ['Pluviomètres', 'Sondes capacitives'] },
-  { name: 'Puy-de-Dôme Connect',   distance: 45, adherents: 39, capteurs: 255, parcelles: 1490, sharedSensorTypes: ['Stations météo', 'Anémomètres', "Capteurs d'humectation foliaire"] },
+  { name: 'Allier AgriTech',       distance: 8,  adherents: 31, capteurs: 198, parcelles: 1140, sharedSensorTypes: ['Capteurs météo', "Capteurs d'irrigation"] },
+  { name: 'Auvergne Agri Conseil', distance: 15, adherents: 54, capteurs: 361, parcelles: 2080, sharedSensorTypes: ['Capteurs météo', 'Stations météo virtuelles'] },
+  { name: 'Réseau Bourbonnais',    distance: 22, adherents: 18, capteurs: 112, parcelles: 630,  sharedSensorTypes: ['Capteurs météo', "Capteurs d'irrigation"] },
+  { name: 'Creuse Agri Net',       distance: 38, adherents: 12, capteurs: 74,  parcelles: 410,  sharedSensorTypes: ["Capteurs d'irrigation"] },
+  { name: 'Puy-de-Dôme Connect',   distance: 45, adherents: 39, capteurs: 255, parcelles: 1490, sharedSensorTypes: ['Capteurs météo', 'Stations météo virtuelles'] },
 ]
 
 const INVITED_NETWORK = { name: "Breiz'Agri Conseil", city: 'Rennes (35)', phone: '02 99 XX XX XX', email: 'contact@breizagri.fr', adherents: 47, capteurs: 312, parcelles: 1830, sharedSensorTypes: ['Capteurs météo'] }
+
+const ALL_SENSOR_TYPES = ['Capteurs météo', "Capteurs d'irrigation", 'Stations météo virtuelles']
 
 function netInitials(name) {
   return name.split(' ').filter(w => w.length > 2).slice(0, 2).map(w => w[0].toUpperCase()).join('')
@@ -419,8 +421,10 @@ export function showOnboarding(role, onComplete) {
           <div style="text-align:center;flex:1"><div style="font-weight:700;font-size:18px">${net.parcelles}</div><div style="font-size:11px;color:#636366">parcelles</div></div>
         </div>
         <div style="padding-top:12px;border-top:.5px solid rgba(0,0,0,.1)">
-          <div style="font-size:13px;color:#3a3a3c;margin-bottom:${net.sharedSensorTypes?.length ? '8px' : '0'}">Capteurs partagés entre les adhérents${net.sharedSensorTypes?.length ? ' :' : ' : Aucun capteur partagé'}</div>
-          ${net.sharedSensorTypes?.length ? `<div class="m-ob-pills">${net.sharedSensorTypes.map(t => `<span class="m-ob-pill m-ob-pill--on" style="cursor:default">${t}</span>`).join('')}</div>` : ''}
+          ${net.sharedSensorTypes?.length ? `
+          <div style="font-size:13px;color:#3a3a3c;margin-bottom:8px">Capteurs partagés entre les adhérents :</div>
+          <div class="m-ob-pills">${ALL_SENSOR_TYPES.map(t => `<span class="m-ob-pill${net.sharedSensorTypes.includes(t) ? ' m-ob-pill--on' : ' m-ob-pill--off'}" style="cursor:default">${t}</span>`).join('')}</div>
+          ` : `<div style="font-size:13px;color:#3a3a3c">Aucun capteur n'est partagé entre les adhérents de ce réseau</div>`}
         </div>
       </div>
       <button class="m-ob-cta" id="ob-next">Continuer</button>
@@ -441,18 +445,44 @@ export function showOnboarding(role, onComplete) {
       </div>`).join('')}</div>`
   }
 
+  function rolePermsSummaryHtml(role) {
+    const perms = ROLE_PERMISSIONS[role]
+    if (!perms) return ''
+    const badges = perms.map(s => {
+      const okCount = s.items.filter(it => it.ok).length
+      const level = okCount === 0 ? 'none' : okCount === s.items.length ? 'full' : 'partial'
+      const icon = { full: 'check-circle-fill', partial: 'dash-circle-fill', none: 'x-circle' }[level]
+      const color = { full: '#30d158', partial: '#ff9500', none: '#c7c7cc' }[level]
+      const short = s.section.replace('Exploitations adhérentes', 'Adhérents')
+      return `<div class="m-rp-badge"><i class="bi bi-${icon}" style="color:${color}"></i><span>${short}</span></div>`
+    }).join('')
+    return `<div class="m-rp-summary">${badges}</div>`
+  }
+
+  function rolesInfoHtml() {
+    const roles = Object.keys(ROLE_PERMISSIONS)
+    return `
+      <button type="button" class="m-rp-toggle" id="ob-roles-info-toggle"><span>Comparer les droits par rôle</span><i class="bi bi-chevron-down"></i></button>
+      <div class="m-ob-roles-info" id="ob-roles-info" hidden>
+        <div class="m-ob-roles-tabs">${roles.map((r, i) => `<button type="button" class="m-ob-roles-tab${i === 0 ? ' m-ob-roles-tab--on' : ''}" data-role="${r}">${r}</button>`).join('')}</div>
+        <div id="ob-roles-info-detail">${rolePermsHtml(roles[0])}</div>
+      </div>`
+  }
+
   function inviteRowHtml() {
     return `
-      <div class="m-ob-invite-block">
-        <div style="display:flex;align-items:center;gap:8px">
-          <input class="m-ob-input m-ob-input--email" type="email" placeholder="adresse@email.fr" style="flex:1;min-width:0;margin-bottom:0">
+      <div class="m-ob-invite-item">
+        <div class="m-ob-invite-card">
+          <div class="m-ob-invite-fields">
+            <input class="m-ob-input" type="email" placeholder="adresse@email.fr">
+            <select class="m-ob-select m-ob-invite-role-sel">
+              <option value="">Choisir un rôle…</option>
+              <option>Administrateur</option><option>Agent</option><option>Lecteur</option>
+            </select>
+          </div>
           <button class="m-ob-invite-remove" type="button" title="Supprimer"><i class="bi bi-trash"></i></button>
         </div>
-        <select class="m-ob-select m-ob-invite-role-sel" style="margin-top:6px">
-          <option value="">Choisir un rôle…</option>
-          <option>Administrateur</option><option>Agent</option><option>Lecteur</option>
-        </select>
-        <div class="m-ob-role-perms-wrap"></div>
+        <div class="m-ob-role-summary-wrap"></div>
       </div>`
   }
 
@@ -462,10 +492,11 @@ export function showOnboarding(role, onComplete) {
         <div class="m-ob-logo-wrap" style="background:#e8fff0;color:#30d158"><i class="bi bi-people"></i></div>
         <h2 class="m-ob-h2">Inviter des membres</h2>
         <p class="m-ob-sub">Ajoutez des collègues de votre exploitation. Salariés, chefs de culture, conseillers externes...</p>
+        <p class="m-ob-sub" style="margin-top:6px">Chaque membre implique une licence payante additionnelle.</p>
       </div>
-      <div class="m-ob-form" id="ob-invite-list">${inviteRowHtml()}</div>
+      ${rolesInfoHtml()}
+      <div id="ob-invite-list">${inviteRowHtml()}</div>
       <button class="m-ob-add-member" id="ob-add-member" type="button"><i class="bi bi-plus-circle"></i> Ajouter un membre</button>
-      <p style="font-size:12px;color:#636366;margin:10px 0 4px;line-height:1.4"><i class="bi bi-info-circle" style="margin-right:4px"></i>Chaque membre implique une licence payante additionnelle.</p>
       <button class="m-ob-cta" id="ob-send-invites">Continuer</button>
       <button class="m-ob-link" id="ob-skip-invite" type="button">Passer cette étape</button>
     `)
@@ -977,18 +1008,34 @@ export function showOnboarding(role, onComplete) {
 
     // Supprimer un membre
     overlay.querySelector('#ob-invite-list')?.addEventListener('click', e => {
-      const btn = e.target.closest('.m-ob-invite-remove')
-      if (!btn) return
-      const block = btn.closest('.m-ob-invite-block')
+      const removeBtn = e.target.closest('.m-ob-invite-remove')
+      if (!removeBtn) return
+      const block = removeBtn.closest('.m-ob-invite-item')
       if (block) block.remove()
     })
 
-    // Permissions inline au changement de rôle
+    // Comparer les droits par rôle (section partagée)
+    overlay.querySelector('#ob-roles-info-toggle')?.addEventListener('click', () => {
+      const toggleBtn = overlay.querySelector('#ob-roles-info-toggle')
+      const details = overlay.querySelector('#ob-roles-info')
+      const expanded = !details.hidden
+      details.hidden = expanded
+      toggleBtn.classList.toggle('m-rp-toggle--open', !expanded)
+      toggleBtn.querySelector('span').textContent = expanded ? 'Comparer les droits par rôle' : 'Masquer la comparaison des rôles'
+    })
+    overlay.querySelector('#ob-roles-info')?.addEventListener('click', e => {
+      const tab = e.target.closest('.m-ob-roles-tab')
+      if (!tab) return
+      overlay.querySelectorAll('.m-ob-roles-tab').forEach(t => t.classList.toggle('m-ob-roles-tab--on', t === tab))
+      overlay.querySelector('#ob-roles-info-detail').innerHTML = rolePermsHtml(tab.dataset.role)
+    })
+
+    // Résumé des droits au changement de rôle
     overlay.querySelector('#ob-invite-list')?.addEventListener('change', e => {
       const sel = e.target.closest('.m-ob-invite-role-sel')
       if (!sel) return
-      const wrapEl = sel.closest('.m-ob-invite-block')?.querySelector('.m-ob-role-perms-wrap')
-      if (wrapEl) wrapEl.innerHTML = rolePermsHtml(sel.value)
+      const wrapEl = sel.closest('.m-ob-invite-item')?.querySelector('.m-ob-role-summary-wrap')
+      if (wrapEl) wrapEl.innerHTML = rolePermsSummaryHtml(sel.value)
     })
 
     // Retirer les invités depuis l'étape paiement

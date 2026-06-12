@@ -5,6 +5,7 @@ import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { plots as allPlots }    from '../../data/plots.js'
 import { getParcel, getOrgData, patchParcel } from '../../data/store.js'
+import { IRRIG_TYPES, SOIL_TYPES, SOIL_ANALYSIS_OPTION, ENV_TYPES } from '../../data/constants.js'
 import { getMJournal, saveMJournal, addMJournalEntry } from '../journal-store.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
@@ -21,6 +22,7 @@ const DASH_CUMUL_META = {
   irrigation: { metricLabel: "Cumul d'irrigation", unit: 'mm', icon: 'bi-moisture',     color: '#FF8C00' },
 }
 const DASH_KEY = 'weenat-m-dash'
+const WF_MAX = 4  // max mesures favorites (cf. dashboard.js)
 
 // Widget catalog — each item maps to a shared widget ID (same as web parcel page)
 const WIDGET_CATALOG = [
@@ -434,27 +436,61 @@ function computeCumuls(metricId, period, type, plotId = null) {
       </div>
       <div style="display:flex;align-items:center;gap:2px">
         ${editBtn}
-        <button class="m-cumul-add-btn" data-cumul-label="${c.label}" data-cumul-val="${c.val}" data-cumul-metric-id="${c.metricId}" title="Ajouter au tableau de bord"><i class="bi bi-house"></i></button>
+        <button class="m-cumul-add-btn" data-cumul-label="${c.label}" data-cumul-val="${c.val}" data-cumul-metric-id="${c.metricId}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button>
       </div>
     </div>`
   }).join('')}</div>`
 }
 
-function chartCard(metricId, period, sensorId = null, plotId = null) {
+const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'j7j7': 'J-7 → J+7', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
+const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
+
+function chartCard(metricId, period, sensorId = null, plotId = null, step = '1h', subject = null) {
   const m = CHART_METRICS[metricId]; if (!m) return ''
   const cumulHtml = computeCumuls(metricId, period, m.cumulsType, plotId)
   const detailLink = (sensorId || metricId === 'irrigation')
     ? `<div class="m-chart-details-link" data-sensor-id="${sensorId ?? ''}" data-metric-id="${metricId}">Voir détails →</div>`
     : ''
+  const favBtn = (subject && metricId !== 'irrigation')
+    ? `<button class="m-msr-add-btn" data-msr-metric-id="${metricId}" data-msr-subject-key="${subject.key}" data-msr-subject-label="${subject.label}" data-msr-period="${period}" data-msr-step="${step}" title="Ajouter aux mesures préférées"><i class="bi bi-house-add"></i></button>`
+    : ''
   return `
-    <div class="m-chart-card">
+    <div class="m-chart-card" data-metric-id="${metricId}">
       <div class="m-chart-card-hd">
         <span class="m-chart-label" style="color:${m.color}">${m.label}</span>
+        ${favBtn}
       </div>
       ${svgChart(metricId, m.color, m.cumul, period, m.unit || '', plotId)}
       ${detailLink}
       ${cumulHtml}
     </div>`
+}
+
+function addMesureToFavorites(btn) {
+  const metricId     = btn.dataset.msrMetricId
+  const subjectKey   = btn.dataset.msrSubjectKey
+  const subjectLabel = btn.dataset.msrSubjectLabel
+  const period       = btn.dataset.msrPeriod
+  const step         = btn.dataset.msrStep
+  const m = CHART_METRICS[metricId]
+  if (!m) return
+  const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
+  const list = dash.mesuresList || []
+  if (list.length >= WF_MAX) { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
+  if (list.some(x => x.subjectKey === subjectKey && x.metricId === metricId && x.period === period && x.step === step)) {
+    showToast('Cette mesure est déjà dans vos favoris')
+    return
+  }
+  list.push({
+    subjectKey, subjectLabel, metricId,
+    metricLabel: m.label, unit: m.unit || '',
+    period, periodLabel: MSR_PERIOD_LABELS[period] || period,
+    step, stepLabel: MSR_STEP_LABELS[step] || step,
+    color: m.color,
+  })
+  dash.mesuresList = list
+  localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+  showToast('Mesure ajoutée au tableau de bord')
 }
 
 function contrastColor(hex) {
@@ -501,21 +537,6 @@ function irrigationWidget(parcel) {
   const tReal   = real.reduce((s, i) => s + i.mm, 0)
   const tPlan   = plan.reduce((s, i) => s + i.mm, 0)
   const irrType = getParcel(parcel.id).irrigation ?? parcel.irrigation
-  const MN      = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
-  const fmtD    = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
-  const fmtM3w  = m3 => m3.toLocaleString('fr-FR') + ' m³'
-
-  const areaHa  = parcel.area ?? 0
-  const realM3w = Math.round(tReal * areaHa * 10)
-  const planM3w = Math.round(tPlan * areaHa * 10)
-  const totalM3w = realM3w + planM3w
-
-  const plotVolMax = getParcel(parcel.id).volumeMaxM3 ?? null
-  const parcelOrg  = orgs.find(o => o.id === parcel.orgId)
-  const orgVolMax  = getOrgData(parcel.orgId).volumeMax ?? parcelOrg?.volumeMax ?? null
-
-  const pctPlotR = plotVolMax && areaHa ? Math.min(100, Math.round(realM3w / plotVolMax * 100)) : 0
-  const pctPlotP = plotVolMax && areaHa ? Math.min(100 - pctPlotR, Math.round(planM3w / plotVolMax * 100)) : 0
 
   const NO_IRRIG_TYPES = new Set(['Non irrigué', 'Non renseigné', ''])
   const hasIrrigType = irrType && !NO_IRRIG_TYPES.has(irrType)
@@ -527,10 +548,6 @@ function irrigationWidget(parcel) {
         <button class="w-irrig-act-btn w-irrig-act-btn--sec m-irrig-act-saison" type="button"${!hasIrrigType ? ' disabled' : ''}>↺ Saisir une saison d'irrigation</button>
       </div>
     </div>`
-
-  const irrTypePill = irrType
-    ? `<span class="w-irrig-type-pill"><i class="bi bi-droplet-fill"></i> ${irrType}</span>`
-    : ''
 
   if (!hasIrrigType) {
     return mWidgetCard('Irrigations', 'bi-moisture', '#FF8C00', `
@@ -551,62 +568,25 @@ function irrigationWidget(parcel) {
           <div style="font-size:13px">Aucune irrigation enregistrée</div>
         </div>
         ${actionsHtml}
-      </div>`, 'irrigations', irrTypePill)
+      </div>`, 'irrigations')
   }
 
-  const progHtml = plotVolMax && areaHa ? `
-    <div class="w-irrig-progress">
-      <div class="w-irrig-prog-row">
-        <div class="w-irrig-prog-lbl">
-          <span>Volume limité de la parcelle :</span>
-          <span style="${totalM3w > plotVolMax ? 'color:#E05252;font-weight:600' : 'font-weight:600;color:var(--txt,#1c1c1e)'}">${fmtM3w(totalM3w)} / ${fmtM3w(plotVolMax)}</span>
-        </div>
-        <div class="w-irrig-prog-bg"><div class="w-irrig-prog-real" style="width:${pctPlotR}%"></div><div class="w-irrig-prog-plan" style="width:${pctPlotP}%"></div></div>
-      </div>
-    </div>` : ''
+  // Paramètres actuels de la saison (quantité + fréquence), si la parcelle suit une saison d'irrigation
+  let seasonParamsHtml = ''
+  const isSeason = irrigs.some(i => i.fromStrategy)
+  if (isSeason) {
+    const sorted = [...irrigs].sort((a, b) => a.iso.localeCompare(b.iso))
+    const last   = sorted[sorted.length - 1]
+    const prev   = sorted[sorted.length - 2]
+    const freqDays = prev ? Math.round((new Date(last.iso) - new Date(prev.iso)) / 86400000) : null
+    seasonParamsHtml = `
+      <div class="w-irrig-season-params">
+        <div class="w-irrig-season-lbl">Paramètres actuels de la saison :</div>
+        <div class="w-irrig-season-val"><strong>${last.mm} mm</strong>${freqDays ? ` tous les <strong>${freqDays} jours</strong>` : ''}.</div>
+      </div>`
+  }
 
-  // ── Timeline horizontale positionnelle ──
-  const sortedIsos = irrigs.map(i => i.iso).sort()
-  const trackStart = sortedIsos[0] || `${new Date().getFullYear()}-04-01`
-  const trackEnd   = sortedIsos[sortedIsos.length - 1] || `${new Date().getFullYear()}-10-10`
-  const startMs    = new Date(trackStart).getTime()
-  const endMs      = new Date(trackEnd).getTime()
-  const rangeMs    = Math.max(endMs - startMs, 1)
-  const toPct      = iso => ((new Date(iso).getTime() - startMs) / rangeMs * 100).toFixed(1)
-  const fmtDs      = iso => { const [,m,d] = iso.split('-'); return `${+d}/${+m}` }
-
-  const startMo = new Date(trackStart).getMonth() + 1
-  const endMo   = new Date(trackEnd).getMonth() + 1
-  const yr      = new Date(trackStart).getFullYear()
-  const moLabelsHtml = Array.from({ length: endMo - startMo + 1 }, (_, i) => startMo + i)
-    .map(m => {
-      const pct = toPct(`${yr}-${String(m).padStart(2,'0')}-01`)
-      return `<span class="w-irrig-track-mlbl" style="left:${pct}%">${MN[m-1]}</span>`
-    }).join('')
-
-  const dotsHtml = irrigs.map(i =>
-    `<div class="w-irrig-dot-track" style="left:${toPct(i.iso)}%;background:${i.real ? '#E07820' : '#FFB705'}" data-tip="${fmtD(i.iso)} · ${i.mm} mm"></div>`
-  ).join('')
-
-  const timelineHtml = `
-    <div class="w-irrig-track-wrap">
-      <div class="w-irrig-track-months">${moLabelsHtml}</div>
-      <div class="w-irrig-track">
-        <div class="w-irrig-track-line"></div>
-        ${dotsHtml}
-      </div>
-      <div class="w-irrig-track-range">
-        <span>${fmtDs(trackStart)}</span><span>${fmtDs(trackEnd)}</span>
-      </div>
-      <div class="w-irrig-track-legend">
-        <span><span class="w-irrig-dot-sml" style="background:#E07820"></span> Effectuée</span>
-        <span><span class="w-irrig-dot-sml" style="background:#FFB705"></span> Planifiée</span>
-      </div>
-    </div>`
-
-  const tTotal    = tReal + tPlan
-  const totalCount = real.length + plan.length
-  const totalM3wAll = realM3w + planM3w
+  const tTotal = tReal + tPlan
 
   const footerHtml = `<div class="m-irrig-footer-link">Voir les irrigations →</div>`
 
@@ -616,26 +596,22 @@ function irrigationWidget(parcel) {
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Effectuées</div>
           <div class="w-irrig-kpi-val" style="color:#E07820">${tReal} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub"><span>${real.length} apport${real.length > 1 ? 's' : ''}</span>${areaHa ? `<span>${fmtM3w(realM3w)}</span>` : ''}</div>
         </div>
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Planifiées</div>
           <div class="w-irrig-kpi-val" style="color:#FFB705">${tPlan} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub"><span>${plan.length} apport${plan.length > 1 ? 's' : ''}</span>${areaHa ? `<span>${fmtM3w(planM3w)}</span>` : ''}</div>
         </div>
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Total</div>
-          <div class="w-irrig-kpi-val" style="color:#0172A4">${tTotal} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub"><span>${totalCount} apport${totalCount > 1 ? 's' : ''}</span>${areaHa ? `<span>${fmtM3w(totalM3wAll)}</span>` : ''}</div>
+          <div class="w-irrig-kpi-val" style="color:#8e8e93">${tTotal} <span class="w-irrig-unit">mm</span></div>
         </div>
       </div>
-      ${progHtml}
-      ${timelineHtml}
+      ${seasonParamsHtml}
       ${actionsHtml}
     </div>
     ${footerHtml}`
 
-  return mWidgetCard('Irrigations', 'bi-moisture', '#FF8C00', body, 'irrigations', irrTypePill)
+  return mWidgetCard('Irrigations', 'bi-moisture', '#FF8C00', body, 'irrigations')
 }
 
 function widgetsView(parcel, linkedSensorIds = []) {
@@ -948,7 +924,12 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h', plotId = null)
       </div>` : ''}
     </div>
     <div class="m-detail-section">
-      ${(() => { const fallback = linkedSensorIds[0] ?? null; return unique.map(id => id === 'irrigation' ? chartCard(id, period, null, plotId) : chartCard(id, period, metricToSensorId[id] ?? fallback)).join('') })()}
+      ${(() => {
+        const fallback = linkedSensorIds[0] ?? null
+        const plot = plotId != null ? allPlots.find(p => p.id === plotId) : null
+        const subject = plot ? { key: `p-${plot.id}`, label: plot.name } : null
+        return unique.map(id => id === 'irrigation' ? chartCard(id, period, null, plotId) : chartCard(id, period, metricToSensorId[id] ?? fallback, null, step, subject)).join('')
+      })()}
     </div>`
 }
 
@@ -964,6 +945,15 @@ const INTEG_ICON = {
   'Rimpro':                              { icon: 'bi-cloud-lightning',  color: '#E53935' },
   'Cropwise Protector':                  { icon: 'bi-shield-fill-check',color: '#43A047' },
   'Movida GrapeVision':                  { icon: 'bi-eye',              color: '#7B1FA2' },
+}
+
+function textureDisplayValue(parcel) {
+  if (parcel.substrate) return 'Substrat : ' + parcel.substrate
+  if (parcel.texture === SOIL_ANALYSIS_OPTION && parcel.soilAnalysis) {
+    const { argile, limon, sable } = parcel.soilAnalysis
+    return `Analyse de sol (argile ${argile}% / limon ${limon}% / sable ${sable}%)`
+  }
+  return parcel.texture || '—'
 }
 
 function integLogo(name) {
@@ -982,9 +972,6 @@ const MODEL_NAMES_M = {
 
 function paramsView(parcel, org, linkedSensorIds) {
   const cropOptions = ['Blé tendre', 'Maïs', 'Orge', 'Colza', 'Prairie', 'Tournesol', 'Betterave', 'Pomme', 'Légumes', 'Vigne']
-  const irrigOptions = ['Non irrigué', 'Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Aspersion']
-  const textureOpts  = ['Limon', 'Limon argileux', 'Limon fin', 'Argile', 'Argile limoneuse', 'Sable limoneux']
-  const envOptions   = ['Plein champ', 'Sous abri', 'Serre', 'Arboriculture', 'Maraîchage', 'Vignoble']
 
   const linkedSensors = linkedSensorIds.map(id => allSensors.find(x => x.id === id)).filter(Boolean)
   const hasPPlus = linkedSensors.some(s => s.model === 'P+' || s.model === 'PT')
@@ -1060,7 +1047,7 @@ function paramsView(parcel, org, linkedSensorIds) {
       <div class="m-list">
         <div class="m-list-row" data-action="edit-env">
           <span class="m-list-row-label">Environnement</span>
-          <span class="m-list-row-value">${parcel.env || '—'}</span>
+          <span class="m-list-row-value">${parcel.env || 'Plein champ'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
         <div class="m-list-row" data-action="edit-irrigation">
@@ -1068,9 +1055,14 @@ function paramsView(parcel, org, linkedSensorIds) {
           <span class="m-list-row-value">${parcel.irrigation || '—'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
+        <div class="m-list-row" data-action="edit-volume-max">
+          <span class="m-list-row-label">Volume limité</span>
+          <span class="m-list-row-value">${(getParcel(parcel.id).volumeMaxM3 ?? parcel.volumeMaxM3) ? `${(getParcel(parcel.id).volumeMaxM3 ?? parcel.volumeMaxM3).toLocaleString('fr-FR')} m³` : 'Non défini'}</span>
+          <i class="bi bi-chevron-right m-list-chevron"></i>
+        </div>
         <div class="m-list-row m-list-row--last" data-action="edit-texture">
           <span class="m-list-row-label">Texture de sol</span>
-          <span class="m-list-row-value">${parcel.substrate ? 'Substrat : ' + parcel.substrate : (parcel.texture || '—')}</span>
+          <span class="m-list-row-value">${textureDisplayValue(parcel)}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
       </div>
@@ -1209,7 +1201,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
   }
 
   function openIrrigationTypeSheet() {
-    const options = ['Pivot', 'Enrouleur', 'Rampe', 'Goutte à goutte', 'Aspersion', 'Non irrigué']
+    const options = IRRIG_TYPES.filter(t => t !== 'Non renseigné')
     const current = getParcel(parcel.id).irrigation ?? parcel.irrigation
     const body = document.createElement('div')
     const renderPicker = () => {
@@ -1244,6 +1236,134 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     }
     const sheet = showSheet({ title: "Type d'irrigation", body, doneLabel: 'Fermer', onDone: () => {} })
     renderPicker()
+  }
+
+  function openEnvSheet() {
+    const options = ENV_TYPES
+    const current = getParcel(parcel.id).env ?? parcel.env ?? 'Plein champ'
+    const body = document.createElement('div')
+    const renderPicker = () => {
+      body.innerHTML = options.map(o => `
+        <div class="m-sheet-option${o === current ? ' m-sheet-option--active' : ''}" data-pick-env="${o}">
+          <span>${o}</span>
+          ${o === current ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+        </div>`).join('')
+      body.querySelectorAll('[data-pick-env]').forEach(row => {
+        row.addEventListener('click', () => {
+          const val = row.dataset.pickEnv
+          if (val && val !== current) {
+            patchParcel(parcel.id, { env: val })
+            parcel.env = val
+            addMJournalEntry(parcel.id, {
+              type: 'modification',
+              date: new Date().toISOString().slice(0, 10),
+              texte: `Environnement modifié : ${current || '—'} → ${val}.`,
+            })
+            renderView()
+            showToast('Environnement mis à jour')
+          }
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => sheet.remove(), 280)
+        })
+      })
+    }
+    const sheet = showSheet({ title: 'Environnement', body, doneLabel: 'Fermer', onDone: () => {} })
+    renderPicker()
+  }
+
+  function openTextureSheet() {
+    const options = [...SOIL_TYPES, SOIL_ANALYSIS_OPTION]
+    const current = getParcel(parcel.id).texture ?? parcel.texture
+    const body = document.createElement('div')
+    const renderPicker = () => {
+      body.innerHTML = `
+        <div class="m-sheet-option${!current ? ' m-sheet-option--active' : ''}" data-pick-texture="">
+          <span style="color:var(--txt3,#8e8e93)">Sélectionnez une texture</span>
+          ${!current ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+        </div>
+        ${options.map(o => `
+          <div class="m-sheet-option${o === current ? ' m-sheet-option--active' : ''}" data-pick-texture="${o}">
+            <span>${o}</span>
+            ${o === current ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+          </div>`).join('')}`
+      body.querySelectorAll('[data-pick-texture]').forEach(row => {
+        row.addEventListener('click', () => {
+          const val = row.dataset.pickTexture
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => sheet.remove(), 280)
+          if (val === SOIL_ANALYSIS_OPTION) {
+            openSoilAnalysisSheet(current)
+            return
+          }
+          if (val !== current) {
+            patchParcel(parcel.id, { texture: val || null, soilAnalysis: null })
+            parcel.texture = val || null
+            parcel.soilAnalysis = null
+            addMJournalEntry(parcel.id, {
+              type: 'modification',
+              date: new Date().toISOString().slice(0, 10),
+              texte: `Texture de sol modifiée : ${current || '—'} → ${val || '—'}.`,
+            })
+            renderView()
+            showToast('Texture de sol mise à jour')
+          }
+        })
+      })
+    }
+    const sheet = showSheet({ title: 'Texture de sol', body, doneLabel: 'Fermer', onDone: () => {} })
+    renderPicker()
+  }
+
+  function openSoilAnalysisSheet(previousTexture) {
+    const stored = getParcel(parcel.id).soilAnalysis ?? parcel.soilAnalysis ?? {}
+    const body = document.createElement('div')
+    body.innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label class="m-form-label">Argile (%)</label>
+        <input type="number" class="m-sheet-input" id="soil-argile" value="${stored.argile ?? ''}" placeholder="Ex : 25" min="0" max="100">
+      </div>
+      <div>
+        <label class="m-form-label">Limon (%)</label>
+        <input type="number" class="m-sheet-input" id="soil-limon" value="${stored.limon ?? ''}" placeholder="Ex : 40" min="0" max="100">
+      </div>
+      <div>
+        <label class="m-form-label">Sable (%)</label>
+        <input type="number" class="m-sheet-input" id="soil-sable" value="${stored.sable ?? ''}" placeholder="Ex : 35" min="0" max="100">
+      </div>
+    </div>`
+    showSheet({ title: 'Analyse de sol', body, doneLabel: 'Enregistrer', cancelLabel: 'Annuler', onDone: () => {
+      const argile = +(body.querySelector('#soil-argile')?.value || 0)
+      const limon  = +(body.querySelector('#soil-limon')?.value || 0)
+      const sable  = +(body.querySelector('#soil-sable')?.value || 0)
+      const soilAnalysis = { argile, limon, sable }
+      patchParcel(parcel.id, { texture: SOIL_ANALYSIS_OPTION, soilAnalysis })
+      parcel.texture = SOIL_ANALYSIS_OPTION
+      parcel.soilAnalysis = soilAnalysis
+      addMJournalEntry(parcel.id, {
+        type: 'modification',
+        date: new Date().toISOString().slice(0, 10),
+        texte: `Texture de sol modifiée : ${previousTexture || '—'} → analyse de sol (argile ${argile}% / limon ${limon}% / sable ${sable}%).`,
+      })
+      renderView()
+      showToast('Analyse de sol enregistrée')
+    }})
+  }
+
+  function openVolumeMaxSheet() {
+    const current = getParcel(parcel.id).volumeMaxM3 ?? parcel.volumeMaxM3 ?? null
+    const body = document.createElement('div')
+    body.innerHTML = `<div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+      <label class="m-form-label">Volume limité (m³)</label>
+      <input type="number" class="m-sheet-input" id="edit-volume-max" value="${current ?? ''}" placeholder="Ex : 33000" step="100" min="0">
+    </div>`
+    showSheet({ title: 'Volume limité de la parcelle', body, doneLabel: 'Appliquer', cancelLabel: 'Annuler', onDone: () => {
+      const raw = body.querySelector('#edit-volume-max')?.value
+      const val = raw === '' ? null : Math.max(0, +raw)
+      patchParcel(parcel.id, { volumeMaxM3: val })
+      parcel.volumeMaxM3 = val
+      renderView()
+      showToast('Volume limité mis à jour')
+    }})
   }
 
   const ALL_INTEGRATIONS_MOBILE = [
@@ -1381,6 +1501,9 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         activeView = 'donnees'
         layer.querySelectorAll('.m-detail-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'donnees'))
         renderView()
+        requestAnimationFrame(() => {
+          layer.querySelector('.m-chart-card[data-metric-id="irrigation"]')?.scrollIntoView({ block: 'start' })
+        })
       })
     })
     // Details link → open fullscreen chart
@@ -1406,6 +1529,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
           parcel,
         }))
       })
+    })
+    // Mesure add-to-favorites buttons
+    layer.querySelectorAll('.m-msr-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => addMesureToFavorites(btn))
     })
     // Cumul add-to-dashboard buttons
     layer.addEventListener('click', e => {
@@ -1519,7 +1646,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.action === 'edit-exploitation') pickExploitation()
+        else if (row.dataset.action === 'edit-env') openEnvSheet()
         else if (row.dataset.action === 'edit-irrigation') openIrrigationTypeSheet()
+        else if (row.dataset.action === 'edit-volume-max') openVolumeMaxSheet()
+        else if (row.dataset.action === 'edit-texture') openTextureSheet()
         else if (row.dataset.action === 'edit-integrations') openIntegrationsPage()
         else if (row.dataset.action === 'archive') {
           showConfirmSheet({

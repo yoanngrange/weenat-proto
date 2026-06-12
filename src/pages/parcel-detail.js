@@ -4,9 +4,9 @@ import { sensors as allSensors } from '../data/sensors.js'
 import { orgs } from '../data/orgs.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
-import { getParcel, patchParcel, getOrgData } from '../data/store.js'
-import { IRRIG_SEASON } from '../data/irrigations.js'
-import { IRRIG_TYPES, SOIL_TYPES } from '../data/constants.js'
+import { getParcel, patchParcel } from '../data/store.js'
+import { IRRIG_SEASON, saveIrrig, generateSeasonId } from '../data/irrigations.js'
+import { IRRIG_TYPES, SOIL_TYPES, SOIL_ANALYSIS_OPTION, ENV_TYPES } from '../data/constants.js'
 
 const urlParams = new URLSearchParams(window.location.search)
 const parcelId  = parseInt(urlParams.get('id'))
@@ -399,6 +399,16 @@ function openWebWidgetCatalog() {
 
 const JOURNAL_KEY = `weenat-journal-${parcelId}`
 const TODAY_STR = new Date().toISOString().slice(0, 10)
+
+function addDaysStr(iso, n) {
+  const d = new Date(iso); d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+function fmtDateFullStr(iso) {
+  const m = ['jan.','fév.','mar.','avr.','mai','jun.','jul.','aoû.','sep.','oct.','nov.','déc.']
+  const [, mo, d] = iso.split('-')
+  return `${parseInt(d)} ${m[parseInt(mo)-1]} ${iso.split('-')[0]}`
+}
 
 const NOTE_CATEGORIES = [
   'Observation générale', 'Préparation du sol (labour)', 'Préparation du sol (strip-till)',
@@ -2283,12 +2293,21 @@ function renderIdentification(org) {
   const texture    = p.texture    || null
   const irrigation = p.irrigation || null
   const crop       = p.crop       || CROP_LIST[0]
+  const env        = p.env        || null
+  const isAnalysis = texture === SOIL_ANALYSIS_OPTION
+  const analysis   = p.soilAnalysis || {}
 
   el.innerHTML = `
     ${editableRow('Nom',          p.name || '—', 'name', 'text')}
     ${editableSelect('Culture',   crop,          'crop',       CROP_LIST)}
     ${readonlyRow('Surface',     (p.area   ? `${p.area} ha` : '—') + ' <span class="field-computed">(calculé)</span>')}
-    ${editableSelectNullable('Texture sol', texture,    'texture',    SOIL_TYPES,  'Indéfini')}
+    ${editableSelectNullable('Environnement', env, 'env', ENV_TYPES, 'Plein champ')}
+    ${editableSelectNullable('Texture sol', texture,    'texture',    [...SOIL_TYPES, SOIL_ANALYSIS_OPTION],  'Indéfini')}
+    ${isAnalysis ? `
+      ${editableRow('Argile (%)', String(analysis.argile ?? ''), 'soilArgile', 'number')}
+      ${editableRow('Limon (%)',  String(analysis.limon  ?? ''), 'soilLimon',  'number')}
+      ${editableRow('Sable (%)',  String(analysis.sable  ?? ''), 'soilSable',  'number')}
+    ` : ''}
     ${editableSelectNullable('Irrigation',  irrigation, 'irrigation', IRRIG_TYPES, 'Non renseigné')}
     ${readonlyRow('Exploitation', org ? org.name : '—')}
   `
@@ -2298,7 +2317,19 @@ function renderIdentification(org) {
     updateBreadcrumb(v, { label: 'Parcelles', href: 'parcelles.html' })
   })
   bindEditable(el, 'crop',       crop,                 v => saveState({ crop: v }))
-  bindEditable(el, 'texture',    texture || '',        v => saveState({ texture: v || null }))
+  bindEditable(el, 'env',        env || '',            v => saveState({ env: v || null }))
+  bindEditable(el, 'texture',    texture || '',        v => {
+    const tex = v || null
+    const patch = { texture: tex }
+    if (tex !== SOIL_ANALYSIS_OPTION) patch.soilAnalysis = null
+    saveState(patch)
+    renderIdentification(org)
+  })
+  if (isAnalysis) {
+    bindEditable(el, 'soilArgile', String(analysis.argile ?? ''), v => saveState({ soilAnalysis: { ...parcelState.soilAnalysis, argile: +v } }))
+    bindEditable(el, 'soilLimon',  String(analysis.limon  ?? ''), v => saveState({ soilAnalysis: { ...parcelState.soilAnalysis, limon: +v } }))
+    bindEditable(el, 'soilSable',  String(analysis.sable  ?? ''), v => saveState({ soilAnalysis: { ...parcelState.soilAnalysis, sable: +v } }))
+  }
   bindEditable(el, 'irrigation', irrigation || '',     v => saveState({ irrigation: v || null }))
 }
 
@@ -3913,99 +3944,220 @@ function openIrrigWidgetAction(action) {
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
 }
 
+function showIrrigConflictModal(count, onOverwrite) {
+  document.querySelector('.irr-edit-overlay')?.remove()
+  const ov = document.createElement('div')
+  ov.className = 'irr-edit-overlay'
+  ov.innerHTML = `
+    <div class="irr-edit-modal">
+      <div class="irr-edit-hd">
+        <span>Irrigations existantes</span>
+        <button class="irr-edit-close" id="irr-cf-close">×</button>
+      </div>
+      <div class="irr-edit-body" style="font-size:13px;color:var(--txt);line-height:1.5">
+        <p style="margin:0"><strong>${count} irrigation${count > 1 ? 's' : ''}</strong> déjà enregistrée${count > 1 ? 's' : ''} pour cette parcelle.</p>
+        <p style="margin:8px 0 0;color:var(--txt2)">Voulez-vous les écraser avec la nouvelle saisie ?</p>
+      </div>
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-cf-cancel">Annuler</button>
+        <button class="iw-btn iw-btn--pri" id="irr-cf-overwrite">Écraser</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  const cancel = () => ov.remove()
+  ov.addEventListener('click', e => { if (e.target === ov) cancel() })
+  ov.querySelector('#irr-cf-close').addEventListener('click', cancel)
+  ov.querySelector('#irr-cf-cancel').addEventListener('click', cancel)
+  ov.querySelector('#irr-cf-overwrite').addEventListener('click', () => { ov.remove(); onOverwrite() })
+}
+
+function showIrrigSaveConfirm(title, lines) {
+  document.querySelector('.irr-save-confirm')?.remove()
+  const ov = document.createElement('div')
+  ov.className = 'irr-save-confirm'
+  ov.innerHTML = `
+    <div class="irr-save-confirm-box">
+      <div class="irr-save-confirm-icon">✓</div>
+      <div class="irr-save-confirm-title">${title}</div>
+      <div class="irr-save-confirm-lines">${lines.map(l => `<div>${l}</div>`).join('')}</div>
+      <button class="irr-pm-btn irr-pm-btn--pri" id="irr-confirm-close">Fermer</button>
+    </div>`
+  document.body.appendChild(ov)
+  const close = () => ov.remove()
+  ov.addEventListener('click', e => { if (e.target === ov) close() })
+  ov.querySelector('#irr-confirm-close').addEventListener('click', close)
+}
+
+function openIrrigSaisieModal(el) {
+  const ov = document.createElement('div')
+  ov.className = 'journal-form-overlay'
+  ov.innerHTML = `
+    <div class="journal-form-modal">
+      <div class="journal-form-title">Saisir une irrigation</div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Date</label>
+        <input type="date" id="irr-m-s-date" class="journal-form-input" value="${TODAY_STR}">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Quantité (mm)</label>
+        <input type="number" id="irr-m-s-qty" class="journal-form-input" value="10" min="1">
+      </div>
+      <div class="journal-form-actions">
+        <button class="btn-secondary" id="irr-m-s-cancel">Annuler</button>
+        <button id="irr-m-s-save">Enregistrer</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-m-s-cancel').onclick = () => ov.remove()
+  ov.querySelector('#irr-m-s-save').onclick = () => {
+    const dateVal = ov.querySelector('#irr-m-s-date').value
+    const qtyVal  = parseInt(ov.querySelector('#irr-m-s-qty').value) || 0
+    if (!dateVal || !qtyVal) return
+    const isFut = dateVal > TODAY_STR
+    const doSaisie = () => {
+      IRRIG_SEASON.push({ iso: dateVal, mm: qtyVal, real: !isFut, plotId: parcelBase.id, fromStrategy: false })
+      saveIrrig()
+      ov.remove()
+      renderWIrrigations(el)
+      showIrrigSaveConfirm('Irrigation enregistrée', [
+        `Date : ${fmtDateFullStr(dateVal)}`,
+        `Quantité : ${qtyVal} mm`,
+      ])
+    }
+    const conflicts = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id && i.iso === dateVal)
+    if (conflicts.length) {
+      showIrrigConflictModal(conflicts.length, () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(i.plotId === parcelBase.id && i.iso === dateVal)))
+        doSaisie()
+      })
+      return
+    }
+    doSaisie()
+  }
+}
+
+function openIrrigSaisonModal(el) {
+  const ov = document.createElement('div')
+  ov.className = 'journal-form-overlay'
+  ov.innerHTML = `
+    <div class="journal-form-modal">
+      <div class="journal-form-title">Saisir une saison d'irrigation</div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Début</label>
+        <input type="date" id="irr-m-sa-debut" class="journal-form-input" value="${TODAY_STR}">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Fin</label>
+        <input type="date" id="irr-m-sa-fin" class="journal-form-input" value="${addDaysStr(TODAY_STR, 120)}">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Quantité (mm)</label>
+        <input type="number" id="irr-m-sa-qty" class="journal-form-input" value="10" min="1">
+      </div>
+      <div class="journal-form-row">
+        <label class="journal-form-label">Fréquence (jours)</label>
+        <input type="number" id="irr-m-sa-freq" class="journal-form-input" value="7" min="1" max="30">
+      </div>
+      <div class="irr-lc-preview" id="irr-m-sa-preview">—</div>
+      <div class="journal-form-actions">
+        <button class="btn-secondary" id="irr-m-sa-cancel">Annuler</button>
+        <button id="irr-m-sa-save">Enregistrer</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+
+  const updatePreview = () => {
+    const debut = ov.querySelector('#irr-m-sa-debut').value
+    const fin   = ov.querySelector('#irr-m-sa-fin').value
+    const qty   = parseInt(ov.querySelector('#irr-m-sa-qty').value) || 0
+    const freq  = parseInt(ov.querySelector('#irr-m-sa-freq').value) || 0
+    const prev  = ov.querySelector('#irr-m-sa-preview')
+    if (!debut || !fin || freq <= 0) { prev.textContent = '—'; return }
+    let n = 0, cur = new Date(debut), end = new Date(fin)
+    while (cur <= end && n < 200) { n++; cur.setDate(cur.getDate() + freq) }
+    if (n > 0) {
+      const m3 = parcelBase.area > 0 ? Math.round(n * qty * parcelBase.area * 10) : 0
+      const m3Str = m3 > 0 ? ` · ${m3.toLocaleString('fr-FR')} m³` : ''
+      prev.innerHTML = `<span style="color:var(--pri);font-weight:600">↗ ${n} irrigations · ${n * qty} mm${m3Str}</span>`
+    } else {
+      prev.innerHTML = `<span style="color:var(--txt3)">Ajustez les paramètres</span>`
+    }
+  }
+  updatePreview()
+  ov.querySelector('#irr-m-sa-debut').addEventListener('change', updatePreview)
+  ov.querySelector('#irr-m-sa-fin').addEventListener('change', updatePreview)
+  ov.querySelector('#irr-m-sa-qty').addEventListener('input', updatePreview)
+  ov.querySelector('#irr-m-sa-freq').addEventListener('input', updatePreview)
+
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
+  ov.querySelector('#irr-m-sa-cancel').onclick = () => ov.remove()
+  ov.querySelector('#irr-m-sa-save').onclick = () => {
+    const debut = ov.querySelector('#irr-m-sa-debut').value
+    const fin   = ov.querySelector('#irr-m-sa-fin').value
+    const qty   = parseInt(ov.querySelector('#irr-m-sa-qty').value) || 10
+    const freq  = parseInt(ov.querySelector('#irr-m-sa-freq').value) || 7
+    if (!debut || !fin) return
+    const occs = []
+    let cur = new Date(debut), end = new Date(fin)
+    while (cur <= end && occs.length < 200) { occs.push(new Date(cur)); cur.setDate(cur.getDate() + freq) }
+    const seasonId = generateSeasonId()
+    const doSaison = () => {
+      occs.forEach(d => {
+        const iso = d.toISOString().slice(0, 10)
+        IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY_STR, plotId: parcelBase.id, fromStrategy: true, seasonId })
+      })
+      saveIrrig()
+      ov.remove()
+      renderWIrrigations(el)
+      showIrrigSaveConfirm('Saison enregistrée', [
+        `Début : ${fmtDateFullStr(debut)} · Fin : ${fmtDateFullStr(fin)}`,
+        `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
+      ])
+    }
+    const conflicts = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id && i.iso >= debut && i.iso <= fin)
+    if (conflicts.length) {
+      showIrrigConflictModal(conflicts.length, () => {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(i.plotId === parcelBase.id && i.iso >= debut && i.iso <= fin)))
+        doSaison()
+      })
+      return
+    }
+    doSaison()
+  }
+}
+
 function renderWIrrigations(el) {
   const irrigs   = IRRIG_SEASON.filter(i => i.plotId === parcelBase.id)
-  const TODAY_M  = new Date().toISOString().split('T')[0]
   const real     = irrigs.filter(i => i.real)
   const plan     = irrigs.filter(i => !i.real)
   const tReal    = real.reduce((s, i) => s + i.mm, 0)
   const tPlan    = plan.reduce((s, i) => s + i.mm, 0)
   const tTotal   = tReal + tPlan
-  const next     = plan.filter(i => i.iso >= TODAY_M).sort((a, b) => a.iso < b.iso ? -1 : 1)[0]
-  const last     = real.filter(i => i.iso <= TODAY_M).sort((a, b) => a.iso > b.iso ? -1 : 1)[0]
   const irrType  = parcelState.irrigation || parcelBase.irrigation
-  const MN       = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
-  const fmtD     = iso => { const [,m,d] = iso.split('-'); return `${+d} ${MN[+m-1]}` }
-  const fmtM3w   = m3 => m3.toLocaleString('fr-FR') + ' m³'
 
-  const areaHa   = parcelBase.area ?? 0
-  const realM3w  = Math.round(tReal * areaHa * 10)
-  const planM3w  = Math.round(tPlan * areaHa * 10)
-  const totalM3w = realM3w + planM3w
-
-  const plotVolMax = getParcel(parcelBase.id).volumeMaxM3 ?? null
-  const parcelOrg  = orgs.find(o => o.id === parcelBase.orgId)
-  const orgVolMax  = getOrgData(parcelBase.orgId).volumeMax ?? parcelOrg?.volumeMax ?? null
-
-  // Org-level consumption for this parcel's org
-  const orgPlotIds = new Set(plots.filter(p => p.orgId === parcelBase.orgId).map(p => p.id))
-  const plotsById  = new Map(plots.map(p => [p.id, p]))
-  const orgRealM3  = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && i.real)
-    .reduce((s, i) => s + Math.round(i.mm * (plotsById.get(i.plotId)?.area ?? 0) * 10), 0)
-  const orgPlanM3  = IRRIG_SEASON.filter(i => orgPlotIds.has(i.plotId) && !i.real)
-    .reduce((s, i) => s + Math.round(i.mm * (plotsById.get(i.plotId)?.area ?? 0) * 10), 0)
-
-  const pctPlotR = plotVolMax && areaHa ? Math.min(100, Math.round(realM3w / plotVolMax * 100)) : 0
-  const pctPlotP = plotVolMax && areaHa ? Math.min(100 - pctPlotR, Math.round(planM3w / plotVolMax * 100)) : 0
-  const pctPlot  = pctPlotR + pctPlotP
-  const pctOrgR  = orgVolMax ? Math.min(100, Math.round(orgRealM3 / orgVolMax * 100)) : 0
-  const pctOrgP  = orgVolMax ? Math.min(100 - pctOrgR, Math.round(orgPlanM3 / orgVolMax * 100)) : 0
-
-  // ── Timeline horizontale positionnelle ──
-  const sortedIsos = irrigs.map(i => i.iso).sort()
-  const trackStart = sortedIsos[0] || `${new Date().getFullYear()}-04-01`
-  const trackEnd   = sortedIsos[sortedIsos.length - 1] || `${new Date().getFullYear()}-10-10`
-  const startMs    = new Date(trackStart).getTime()
-  const endMs      = new Date(trackEnd).getTime()
-  const rangeMs    = Math.max(endMs - startMs, 1)
-  const toPct      = iso => ((new Date(iso).getTime() - startMs) / rangeMs * 100).toFixed(1)
-  const fmtDs      = iso => { const [,m,d] = iso.split('-'); return `${+d}/${+m}` }
-
-  const startMo    = new Date(trackStart).getMonth() + 1
-  const endMo      = new Date(trackEnd).getMonth() + 1
-  const yr         = new Date(trackStart).getFullYear()
-  const moLabelsHtml = Array.from({ length: endMo - startMo + 1 }, (_, i) => startMo + i)
-    .map(m => {
-      const pct = toPct(`${yr}-${String(m).padStart(2,'0')}-01`)
-      return `<span class="w-irrig-track-mlbl" style="left:${pct}%">${MN[m-1]}</span>`
-    }).join('')
-
-  const dotsHtml = irrigs.map(i =>
-    `<div class="w-irrig-dot-track" style="left:${toPct(i.iso)}%;background:${i.real ? '#E07820' : '#FFB705'}" data-tip="${fmtD(i.iso)} · ${i.mm} mm"></div>`
-  ).join('')
-
-  const timelineHtml = `
-    <div class="w-irrig-track-wrap">
-      <div class="w-irrig-track-months">${moLabelsHtml}</div>
-      <div class="w-irrig-track">
-        <div class="w-irrig-track-line"></div>
-        ${dotsHtml}
-      </div>
-      <div class="w-irrig-track-range">
-        <span>${fmtDs(trackStart)}</span><span>${fmtDs(trackEnd)}</span>
-      </div>
-      <div class="w-irrig-track-legend">
-        <span><span class="w-irrig-dot-sml" style="background:#E07820"></span> Effectuée</span>
-        <span><span class="w-irrig-dot-sml" style="background:#FFB705"></span> Planifiée</span>
-      </div>
-    </div>`
-
-  const progHtml = plotVolMax && areaHa ? `
-    <div class="w-irrig-progress">
-      <div class="w-irrig-prog-row">
-        <div class="w-irrig-prog-lbl">
-          <span>Volume limité de la parcelle :</span>
-          <span style="${totalM3w > plotVolMax ? 'color:#E05252;font-weight:600' : 'font-weight:600;color:var(--txt)'}">${fmtM3w(totalM3w)} / ${fmtM3w(plotVolMax)}</span>
-        </div>
-        <div class="w-irrig-prog-bg"><div class="w-irrig-prog-real" style="width:${pctPlotR}%"></div><div class="w-irrig-prog-plan" style="width:${pctPlotP}%"></div></div>
-      </div>
-    </div>` : ''
+  // Paramètres actuels de la saison (quantité + fréquence), si la parcelle suit une saison d'irrigation
+  let seasonParamsHtml = ''
+  const isSeason = irrigs.some(i => i.fromStrategy)
+  if (isSeason) {
+    const sorted = [...irrigs].sort((a, b) => a.iso.localeCompare(b.iso))
+    const last   = sorted[sorted.length - 1]
+    const prev   = sorted[sorted.length - 2]
+    const freqDays = prev ? Math.round((new Date(last.iso) - new Date(prev.iso)) / 86400000) : null
+    seasonParamsHtml = `
+      <div class="w-irrig-season-params">
+        <div class="w-irrig-season-lbl">Paramètres actuels de la saison :</div>
+        <div class="w-irrig-season-val"><strong>${last.mm} mm</strong>${freqDays ? ` tous les <strong>${freqDays} jours</strong>` : ''}.</div>
+      </div>`
+  }
 
   const actionsHtml = `
     <div class="w-irrig-actions">
       <div class="w-irrig-act-row">
-        <a class="w-irrig-act-btn w-irrig-act-btn--pri" href="irrigation.html?plot=${parcelBase.id}&action=saisie">+ Saisir une irrigation</a>
-        <a class="w-irrig-act-btn w-irrig-act-btn--sec" href="irrigation.html?plot=${parcelBase.id}&action=saison">↺ Saisir une saison d'irrigation</a>
+        <button class="w-irrig-act-btn w-irrig-act-btn--pri" type="button" id="w-irrig-act-saisie">+ Saisir une irrigation</button>
+        <button class="w-irrig-act-btn w-irrig-act-btn--sec" type="button" id="w-irrig-act-saison">↺ Saisir une saison d'irrigation</button>
       </div>
     </div>`
 
@@ -4018,21 +4170,15 @@ function renderWIrrigations(el) {
   }
 
   if (!hasIrrigType) {
-    const disabledActions = `
-      <div class="w-irrig-actions">
-        <div class="w-irrig-act-row">
-          <a class="w-irrig-act-btn w-irrig-act-btn--pri w-irrig-act-btn--disabled" aria-disabled="true" tabindex="-1">+ Saisir une irrigation</a>
-          <a class="w-irrig-act-btn w-irrig-act-btn--sec w-irrig-act-btn--disabled" aria-disabled="true" tabindex="-1">↺ Saisir une saison d'irrigation</a>
-        </div>
-      </div>`
     el.innerHTML = `
       <div class="w-irrig-layout">
         <div class="w-irrig-empty-state">
           <i class="bi bi-droplet" style="font-size:22px;color:var(--txt3)"></i>
           <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez préciser un type d'irrigation.</p>
         </div>
-        ${disabledActions}
+        <button class="w-irrig-act-btn w-irrig-act-btn--pri" type="button" id="w-irrig-set-type" style="width:100%">Renseigner le type d'irrigation</button>
       </div>`
+    el.querySelector('#w-irrig-set-type')?.addEventListener('click', () => openIrrigWidgetAction('type'))
     updateFooterLabel()
     return
   }
@@ -4046,6 +4192,9 @@ function renderWIrrigations(el) {
         </div>
         ${actionsHtml}
       </div>`
+    el.querySelector('#w-irrig-act-saisie')?.addEventListener('click', () => openIrrigSaisieModal(el))
+    el.querySelector('#w-irrig-act-saison')?.addEventListener('click', () => openIrrigSaisonModal(el))
+    updateFooterLabel()
     return
   }
 
@@ -4055,19 +4204,21 @@ function renderWIrrigations(el) {
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Effectuées</div>
           <div class="w-irrig-kpi-val" style="color:#E07820">${tReal} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub">${real.length} apport${real.length > 1 ? 's' : ''}${areaHa ? ` · ${fmtM3w(realM3w)}` : ''}</div>
         </div>
         <div class="w-irrig-kpi">
           <div class="w-irrig-kpi-lbl">Planifiées</div>
           <div class="w-irrig-kpi-val" style="color:#FFB705">${tPlan} <span class="w-irrig-unit">mm</span></div>
-          <div class="w-irrig-kpi-sub">${plan.length} apport${plan.length > 1 ? 's' : ''}${areaHa ? ` · ${fmtM3w(planM3w)}` : ''}</div>
         </div>
-        ${irrType ? `<div class="w-irrig-type-pill"><i class="bi bi-droplet-fill" style="color:#0172A4"></i> ${irrType}</div>` : ''}
+        <div class="w-irrig-kpi">
+          <div class="w-irrig-kpi-lbl">Total</div>
+          <div class="w-irrig-kpi-val" style="color:var(--txt3)">${tTotal} <span class="w-irrig-unit">mm</span></div>
+        </div>
       </div>
-      ${progHtml}
-      ${timelineHtml}
+      ${seasonParamsHtml}
       ${actionsHtml}
     </div>`
+  el.querySelector('#w-irrig-act-saisie')?.addEventListener('click', () => openIrrigSaisieModal(el))
+  el.querySelector('#w-irrig-act-saison')?.addEventListener('click', () => openIrrigSaisonModal(el))
   updateFooterLabel()
 }
 

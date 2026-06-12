@@ -14,6 +14,10 @@ export const SOIL_TYPES = [
   'Sable', 'Sable limoneux',
 ]
 
+export const SOIL_ANALYSIS_OPTION = 'Analyse de sol personnalisée'
+
+export const ENV_TYPES = ['Plein champ', 'Serre']
+
 export const METIERS = [
   'Arboriculture', 'Viticulture', 'Maraîchage', 'Grandes cultures', 'Polyculture-Élevage',
   'Pépiniériste', 'Floriculture', 'Trufficulture',

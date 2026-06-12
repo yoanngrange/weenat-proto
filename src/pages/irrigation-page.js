@@ -404,11 +404,6 @@ function renderVolBanner() {
   const pctPlan = volMax ? Math.min(100 - pctReal, Math.round(planM3 / volMax * 100)) : 0
   const pctUsed = pctReal + pctPlan
 
-  const _rawPrice   = getOrgData(targetOrgId).pricePerM3
-  const storedPrice = (_rawPrice != null && !isNaN(_rawPrice)) ? _rawPrice : 0.37
-  const cost = totalM3
-    ? (totalM3 * storedPrice).toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €'
-    : ''
   const fmtNum = n => n !== null && n !== undefined ? n.toLocaleString('fr-FR') : ''
 
   wrap.innerHTML = `
@@ -438,11 +433,6 @@ function renderVolBanner() {
           <input class="irr-vol-input" id="irr-vol-max-inp" type="text" inputmode="numeric" placeholder="—" value="${fmtNum(volMax)}" />
           <span class="irr-vol-ctrl-lbl">m³</span>
         </div>
-        <div class="irr-vol-ctrl-row">
-          <span class="irr-vol-ctrl-lbl" title="Coût eau + énergie + amortissement">Coût/m³ :</span>
-          <input class="irr-vol-input" id="irr-vol-price-inp" type="number" min="0" step="0.001" value="${storedPrice}" style="width:65px" />
-          <span class="irr-vol-ctrl-lbl">€${cost ? `<span class="irr-vol-cost"> → ${cost}</span>` : ''}</span>
-        </div>
       </div>
     </div>`
 
@@ -451,11 +441,6 @@ function renderVolBanner() {
     const v   = raw !== '' ? parseInt(raw) : null
     if (v !== null) e.target.value = v.toLocaleString('fr-FR')
     patchOrgData(targetOrgId, { volumeMax: v })
-    renderVolBanner()
-  })
-  wrap.querySelector('#irr-vol-price-inp')?.addEventListener('change', e => {
-    const v = e.target.value !== '' ? parseFloat(e.target.value) : 0.37
-    patchOrgData(targetOrgId, { pricePerM3: v })
     renderVolBanner()
   })
 }
@@ -1044,6 +1029,8 @@ function renderDetailPanel(p) {
   const panel = document.getElementById('irr-detail')
   if (!panel) return
 
+  const wasRealOpen = panel.querySelector('.irr-pr-details')?.open ?? false
+
   if (!hasIrrigType(p)) {
     panel.style.display = ''
     panel.dataset.plotId = String(p.id)
@@ -1188,7 +1175,7 @@ function renderDetailPanel(p) {
     </div>
     <div class="irr-det-scroll">
       ${real.length ? `
-        <details class="irr-pr-details">
+        <details class="irr-pr-details"${wasRealOpen ? ' open' : ''}>
           <summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Effectuées <span class="irr-pr-details-sub">${real.length}</span></summary>
           <div>${real.map(item).join('')}</div>
         </details>` : ''}

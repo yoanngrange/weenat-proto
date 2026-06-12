@@ -4773,6 +4773,37 @@ select.panel-field-input { max-width: 220px; cursor: pointer; }
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+.journal-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.journal-form-modal {
+  background: var(--srf);
+  border-radius: 12px;
+  padding: 20px;
+  width: 340px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.journal-form-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--txt);
+  margin-bottom: 14px;
+}
+.journal-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
 .journal-empty {
   padding: 32px 16px;
   text-align: center;
@@ -6650,32 +6681,15 @@ tr.row-selected td {
 .w-irrig-kpi-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--txt3); font-weight: 600; }
 .w-irrig-kpi-val { font-size: 20px; font-weight: 700; line-height: 1.1; }
 .w-irrig-unit { font-size: 11px; font-weight: 400; color: var(--txt3); }
-.w-irrig-kpi-sub { font-size: 10px; color: var(--txt3); }
-.w-irrig-type-pill { font-size: 11px; font-weight: 600; background: rgba(1,114,164,.08); color: #0172A4; border-radius: 20px; padding: 3px 10px; display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.w-irrig-track-months { position: relative; height: 14px; }
-.w-irrig-track-mlbl { position: absolute; font-size: 9px; color: var(--txt3); transform: translateX(-50%); white-space: nowrap; }
-.w-irrig-track { position: relative; height: 14px; }
-.w-irrig-track-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #e0e0e0; transform: translateY(-50%); border-radius: 1px; }
-.w-irrig-dot-track { position: absolute; top: 50%; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%, -50%); cursor: default; }
-.w-irrig-dot-track[data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); background: rgba(30,30,30,.88); color: #fff; font-size: 10px; font-weight: 500; padding: 3px 7px; border-radius: 5px; white-space: nowrap; pointer-events: none; z-index: 200; }
-.w-irrig-track-range { display: flex; justify-content: space-between; font-size: 9px; color: var(--txt3); margin-top: 1px; }
-.w-irrig-track-legend { display: flex; gap: 12px; font-size: 10px; color: var(--txt2); margin-top: 3px; }
-.w-irrig-dot-sml { display: inline-block; width: 7px; height: 7px; border-radius: 50%; vertical-align: middle; margin-right: 2px; }
-.w-irrig-footer { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--txt2); border-top: 1px solid var(--bdr2); padding-top: 5px; flex-shrink: 0; }
-.w-irrig-footer strong { color: var(--txt); }
-.w-irrig-progress { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; margin-bottom: 8px; }
-.w-irrig-prog-row { display: flex; flex-direction: column; gap: 2px; }
-.w-irrig-prog-lbl { font-size: 10px; color: var(--txt3); display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
-.w-irrig-prog-bg { height: 4px; background: #e8e8ed; border-radius: 3px; overflow: hidden; display: flex; }
-.w-irrig-prog-real { height: 100%; background: #FF8500; }
-.w-irrig-prog-plan { height: 100%; background: #FFB705; opacity: .85; }
-.w-irrig-track-wrap { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding: 4px 0 0; margin-bottom: 8px; }
+.w-irrig-season-params { font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+.w-irrig-season-lbl { color: var(--txt3); }
+.w-irrig-season-val { color: var(--txt2); }
+.w-irrig-season-val strong { color: var(--txt); font-weight: 700; }
 .w-irrig-actions { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
 .w-irrig-act-row { display: flex; flex-direction: column; gap: 6px; }
 .w-irrig-act-btn { padding: 8px 16px; font-size: 13px; font-weight: 600; border: 1px solid var(--bdr); border-radius: 6px; background: #fff; cursor: pointer; color: var(--txt); text-align: center; text-decoration: none; display: block; line-height: 1.3; }
 .w-irrig-act-btn--pri { background: var(--pri); color: #fff; border-color: var(--pri); }
 .w-irrig-act-btn--sec { background: var(--bg); border-color: var(--bdr); }
-.w-irrig-act-btn--disabled { opacity: .38; cursor: not-allowed; pointer-events: none; }
 .w-irrig-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 10px; text-align: center; padding: 8px 4px; }
 .w-irrig-empty-msg { font-size: 12px; color: var(--txt3); line-height: 1.5; margin: 0; }
 
@@ -6696,7 +6710,6 @@ tr.row-selected td {
 .irr-vol-ctrl-row { display: flex; align-items: center; gap: 6px; color: var(--txt3); }
 .irr-vol-ctrl-lbl { font-size: 11px; white-space: nowrap; }
 .irr-vol-input { width: 88px; padding: 3px 6px; border: 1px solid var(--bdr2); border-radius: 6px; font-size: 12px; text-align: right; }
-.irr-vol-cost { font-size: 11px; font-weight: 600; color: #0172A4; white-space: nowrap; }
 
 /* ── Irrigation detail panel — volume per plot ── */
 .irr-det-vol { padding: 10px 16px; border-top: 1px solid var(--bdr2); }

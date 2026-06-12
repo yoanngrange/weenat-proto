@@ -15,6 +15,9 @@ const DASH_CUMUL_META = {
   humec: { metricLabel: 'Humectation foliaire', unit: 'h',  icon: 'bi-droplet-half',    color: '#00887E' },
 }
 const DASH_KEY = 'weenat-m-dash'
+const WF_MAX = 4  // max mesures favorites (cf. dashboard.js)
+const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
+const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
 
 // ─── Model metadata (iso web) ─────────────────────────────────────────────────
 const MODEL_NAMES = {
@@ -260,7 +263,7 @@ function computeCumuls(metricId, period, type) {
       </div>
       <div style="display:flex;align-items:center;gap:2px">
         ${editBtn}
-        <button class="m-cumul-add-btn" data-cumul-label="${c.label}" data-cumul-val="${c.val}" data-cumul-metric-id="${c.metricId}" title="Ajouter au tableau de bord"><i class="bi bi-house"></i></button>
+        <button class="m-cumul-add-btn" data-cumul-label="${c.label}" data-cumul-val="${c.val}" data-cumul-metric-id="${c.metricId}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button>
       </div>
     </div>`
   }).join('')}</div>`
@@ -295,13 +298,20 @@ function donneesView(sensor, period = '7d', step = '1h') {
 
   // sensor-detail uses 'temp','tseche','thumide'; chart-fullscreen uses 'temperature','temp_seche','temp_humide'
   const FS_METRIC_ID = { temp: 'temperature', tseche: 'temp_seche', thumide: 'temp_humide' }
+  // Métriques compatibles avec le widget "Mesures préférées" du tableau de bord
+  const TR_METRIC_ID = { temp: 'temperature' }
+  const TR_UNSUPPORTED = new Set(['tseche', 'thumide'])
   const cards = metrics.map(m => {
     const fsId = FS_METRIC_ID[m.id] || m.id
     const cumulHtml = computeCumuls(m.id, period, m.cumulsType)
+    const favBtn = !TR_UNSUPPORTED.has(m.id)
+      ? `<button class="m-msr-add-btn" data-msr-metric-id="${TR_METRIC_ID[m.id] || m.id}" data-msr-label="${m.label}" data-msr-unit="${m.unit || ''}" data-msr-color="${m.color}" data-msr-period="${period}" data-msr-step="${step}" title="Ajouter aux mesures préférées"><i class="bi bi-house-add"></i></button>`
+      : ''
     return `
       <div class="m-chart-card">
         <div class="m-chart-card-hd">
           <span class="m-chart-label" style="color:${m.color}">${m.label}</span>
+          ${favBtn}
         </div>
         ${svgChart(m.id, m.color, m.cumul, period, m.unit || '')}
         <div class="m-chart-details-link" data-metric-id="${fsId}">Voir détails →</div>
@@ -546,6 +556,32 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
           metricId: link.dataset.metricId,
           backLabel: 'Retour',
         }))
+      })
+    })
+    layer.querySelectorAll('.m-msr-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const metricId = btn.dataset.msrMetricId
+        const subjectKey   = `s-${sensor.id}`
+        const subjectLabel = `${sensor.model} ${sensor.serial}`
+        const period = btn.dataset.msrPeriod
+        const step   = btn.dataset.msrStep
+        const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
+        const list = dash.mesuresList || []
+        if (list.length >= WF_MAX) { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
+        if (list.some(x => x.subjectKey === subjectKey && x.metricId === metricId && x.period === period && x.step === step)) {
+          showToast('Cette mesure est déjà dans vos favoris')
+          return
+        }
+        list.push({
+          subjectKey, subjectLabel, metricId,
+          metricLabel: btn.dataset.msrLabel, unit: btn.dataset.msrUnit || '',
+          period, periodLabel: MSR_PERIOD_LABELS[period] || period,
+          step, stepLabel: MSR_STEP_LABELS[step] || step,
+          color: btn.dataset.msrColor,
+        })
+        dash.mesuresList = list
+        localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+        showToast('Mesure ajoutée au tableau de bord')
       })
     })
     layer.addEventListener('click', e => {

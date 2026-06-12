@@ -1425,8 +1425,13 @@
     .m-chart-cumul-info { display: flex; flex-direction: column; gap: 2px; }
     .m-chart-cumul-label { font-size: 12px; color: #8e8e93; }
     .m-chart-cumul-val { font-size: 16px; font-weight: 700; color: #1c1c1e; }
-    .m-cumul-add-btn { background: none; border: none; color: #8e8e93; font-size: 18px; cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; }
-    .m-cumul-edit-btn { background: none; border: none; color: #8e8e93; font-size: 14px; cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0; }
+    .m-cumul-add-btn, .m-cumul-edit-btn, .m-msr-add-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: rgba(0,0,0,.07); border: none; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #8e8e93; font-size: 14px; cursor: pointer; line-height: 1;
+    }
+    .m-cumul-add-btn:active, .m-cumul-edit-btn:active, .m-msr-add-btn:active { background: rgba(255,59,48,.15); color: #ff3b30; }
     .m-chart-cumul-thresh { font-size: 10px; color: #8e8e93; background: rgba(0,0,0,.06); border-radius: 4px; padding: 1px 5px; }
 
     .m-export-btn {
@@ -1540,23 +1545,10 @@
     .w-irrig-kpi-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #8e8e93; font-weight: 600; }
     .w-irrig-kpi-val { font-size: 20px; font-weight: 700; line-height: 1.1; }
     .w-irrig-unit { font-size: 11px; font-weight: 400; color: #8e8e93; }
-    .w-irrig-kpi-sub { font-size: 10px; color: #8e8e93; display: flex; flex-direction: column; gap: 0; }
-    .w-irrig-type-pill { font-size: 11px; font-weight: 600; background: rgba(1,114,164,.08); color: #0172A4; border-radius: 20px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px; }
-    .w-irrig-track-wrap { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 0; margin-bottom: 8px; }
-    .w-irrig-track-months { position: relative; height: 14px; }
-    .w-irrig-track-mlbl { position: absolute; font-size: 9px; color: #8e8e93; transform: translateX(-50%); white-space: nowrap; }
-    .w-irrig-track { position: relative; height: 14px; }
-    .w-irrig-track-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #e0e0e0; transform: translateY(-50%); border-radius: 1px; }
-    .w-irrig-dot-track { position: absolute; top: 50%; width: 7px; height: 7px; border-radius: 50%; transform: translate(-50%, -50%); }
-    .w-irrig-track-range { display: flex; justify-content: space-between; font-size: 9px; color: #8e8e93; margin-top: 1px; }
-    .w-irrig-track-legend { display: flex; gap: 12px; font-size: 10px; color: #636366; margin-top: 3px; }
-    .w-irrig-dot-sml { display: inline-block; width: 7px; height: 7px; border-radius: 50%; vertical-align: middle; margin-right: 2px; }
-    .w-irrig-progress { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
-    .w-irrig-prog-row { display: flex; flex-direction: column; gap: 2px; }
-    .w-irrig-prog-lbl { font-size: 10px; color: #8e8e93; display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
-    .w-irrig-prog-bg { height: 4px; background: #e8e8ed; border-radius: 3px; overflow: hidden; display: flex; }
-    .w-irrig-prog-real { height: 100%; background: #FF8500; }
-    .w-irrig-prog-plan { height: 100%; background: #FFB705; opacity: .85; }
+    .w-irrig-season-params { font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+    .w-irrig-season-lbl { color: #8e8e93; }
+    .w-irrig-season-val { color: #3a3a3c; }
+    .w-irrig-season-val strong { color: #1c1c1e; font-weight: 700; }
     .w-irrig-actions { display: flex; flex-direction: column; gap: 5px; }
     .w-irrig-act-row { display: flex; flex-direction: column; gap: 6px; }
     .w-irrig-act-btn {
@@ -2598,25 +2590,54 @@
       background: #fff; font-size: 13px; font-weight: 500; color: #3a3a3c; cursor: pointer;
     }
     .m-ob-pill--on { background: #0172A420; border-color: #0172A4; color: #0172A4; font-weight: 600; }
+    .m-ob-pill--off { opacity: .4; }
     .m-ob-radios { display: flex; gap: 20px; }
     .m-ob-radio-row {
       display: flex; align-items: center; gap: 8px;
       font-size: 14px; color: #000; cursor: pointer;
     }
     .m-ob-radio-row input { accent-color: #0172A4; }
-    .m-ob-invite-block { display: flex; flex-direction: column; gap: 0; margin-bottom: 12px; }
-    .m-ob-invite-remove { flex-shrink: 0; border: none; background: none; color: #ff3b30; font-size: 16px; cursor: pointer; padding: 4px; line-height: 1; }
-    .m-ob-invite-block .m-ob-select { width: 100%; }
-    .m-ob-role-perms { background: #f2f2f7; border-radius: 0 0 10px 10px; padding: 12px 14px 8px; margin-top: 0; }
+    .m-ob-invite-item { margin-bottom: 18px; }
+    .m-ob-invite-card { display: flex; align-items: stretch; border: 1.5px solid #e5e5ea; border-radius: 12px; overflow: hidden; }
+    .m-ob-invite-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .m-ob-invite-fields .m-ob-input, .m-ob-invite-fields .m-ob-select { width: 100%; border: none; border-radius: 0; }
+    .m-ob-invite-fields .m-ob-input { border-bottom: 1px solid #e5e5ea; }
+    .m-ob-invite-remove {
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      border: none; border-left: 1.5px solid #e5e5ea; background: none;
+      color: #8e8e93; font-size: 16px; cursor: pointer; padding: 0 16px;
+    }
+    .m-ob-invite-remove:active { color: #ff3b30; background: #fef2f2; }
+    .m-rp-summary { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px; }
+    .m-rp-badge { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #3a3a3c; background: #f2f2f7; border-radius: 20px; padding: 4px 10px; }
+    .m-rp-badge .bi { font-size: 14px; flex-shrink: 0; }
+    .m-rp-toggle {
+      display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%;
+      border: none; background: none;
+      color: #0172A4; font-size: 13px; font-weight: 600; cursor: pointer; padding: 0;
+      margin-bottom: 14px;
+    }
+    .m-rp-toggle .bi { transition: transform .2s; }
+    .m-rp-toggle--open .bi { transform: rotate(180deg); }
+    .m-ob-roles-info { margin-top: 10px; margin-bottom: 18px; }
+    .m-ob-roles-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+    .m-ob-roles-tab {
+      flex: 1; border: 1.5px solid #e5e5ea; background: #fff; color: #3a3a3c;
+      font-size: 12px; font-weight: 600; border-radius: 8px; padding: 7px 4px; cursor: pointer;
+    }
+    .m-ob-roles-tab--on { background: #0172A420; border-color: #0172A4; color: #0172A4; }
+    .m-ob-role-perms { background: #f2f2f7; border-radius: 10px; padding: 12px 14px 8px; margin-top: 0; }
     .m-rp-section { margin-bottom: 12px; }
     .m-rp-section:last-child { margin-bottom: 0; }
     .m-rp-section-title { font-size: 11px; font-weight: 600; color: #8e8e93; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
     .m-rp-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #000; margin-bottom: 5px; }
     .m-rp-item .bi { font-size: 16px; flex-shrink: 0; }
     .m-ob-add-member {
-      border: none; background: none; color: #0172A4; font-size: 14px; font-weight: 600;
-      cursor: pointer; padding: 4px 0; text-align: left; margin-top: 4px;
+      margin-top: 4px; width: 100%; height: 50px; border: none; border-radius: 14px;
+      background: #f2f2f7; color: #0172A4; font-size: 15px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
     }
+    .m-ob-add-member:active { background: #e5e5ea; }
     .m-ob-cta {
       margin-top: 24px; width: 100%; height: 50px; border: none; border-radius: 14px;
       background: #0172A4; color: #fff; font-size: 16px; font-weight: 700;
