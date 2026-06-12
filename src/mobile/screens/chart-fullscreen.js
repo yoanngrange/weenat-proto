@@ -25,7 +25,7 @@ const METRIC_DEFS = {
 // Métriques disposant de prévisions et leur horizon (en jours)
 const FORECAST_DAYS = {
   pluie: 14, temperature: 14, humidite: 14, vent: 14, etp: 14, temp_rosee: 14, rayonnement: 14,
-  pothydr: 7,
+  pothydr: 7, irrigation: 7,
 }
 
 const MODEL_LABELS = {
@@ -136,16 +136,22 @@ function mockSeries(metricId, count) {
   })
 }
 
-function irrigationSeries(plotId, count, stepMins) {
+function irrigationSeries(plotId, count, stepMins, fcCount = 0, forecastMins = 0) {
   const now = Date.now()
   const bucketMs = stepMins * 60000
   const startMs = now - count * bucketMs
-  const vals = new Array(count).fill(0)
+  const vals = new Array(count + fcCount).fill(0)
+  const fcBucketMs = fcCount > 0 ? (forecastMins * 60000) / fcCount : 0
   IRRIG_SEASON.filter(i => i.plotId === plotId).forEach(i => {
     const t = new Date(i.iso).getTime()
-    if (t < startMs || t > now) return
-    const idx = Math.min(count - 1, Math.floor((t - startMs) / bucketMs))
-    vals[idx] += i.mm
+    if (t < startMs) return
+    if (t <= now) {
+      const idx = Math.min(count - 1, Math.floor((t - startMs) / bucketMs))
+      vals[idx] += i.mm
+    } else if (fcCount > 0 && t <= now + forecastMins * 60000) {
+      const idx = Math.min(fcCount - 1, Math.floor((t - now) / fcBucketMs))
+      vals[count + idx] += i.mm
+    }
   })
   return vals
 }
@@ -281,7 +287,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
   let _vals = null
 
   // Period helpers
-  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, '30d': 43200, '365d': 525600, 'custom': 10080 }
+  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, 'j7j7': 10080, '30d': 43200, '365d': 525600, 'custom': 10080 }
   const STEP_MINS   = { '1h': 60, '1d': 1440, '1w': 10080 }
   const getCount = () => {
     let mins = PERIOD_MINS[currentPeriod] || 10080
@@ -322,6 +328,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
           <option value="hier">Hier</option>
           <option value="3d">3 jours</option>
           <option value="7d" selected>7 jours</option>
+          <option value="j7j7">J-7 → J+7</option>
           <option value="30d">30 jours</option>
           <option value="365d">365 jours</option>
           <option value="custom">Personnalisée</option>
@@ -373,16 +380,17 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
 
     const periodDays = (count * stepMins) / 1440
     const fcDays = FORECAST_DAYS[currentMetricId] || 0
-    const fcCount = (fcDays > 0 && currentMetricId !== 'irrigation')
+    const fcCount = fcDays > 0
       ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count))
       : 0
     const totalCount = count + fcCount
+    const forecastMins = fcCount > 0 ? Math.min(fcDays, periodDays) / periodDays * (count * stepMins) : 0
 
     const PAD = { t: 28, r: 18, b: 36, l: 46 }
     const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b
 
     const vals = currentMetricId === 'irrigation' && parcel
-      ? irrigationSeries(parcel.id, count, stepMins)
+      ? irrigationSeries(parcel.id, count, stepMins, fcCount, forecastMins)
       : mockSeries(currentMetricId, totalCount)
     _vals = vals
     const { minV, maxV } = computeYRange(vals, currentMetricId)

@@ -2,6 +2,7 @@ import { pushDetail, popDetail, clearDirty } from '../nav.js'
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../../data/irrigations.js'
 import { patchParcel } from '../../data/store.js'
 import { IRRIG_TYPES } from '../../data/constants.js'
+import { addMJournalEntry } from '../journal-store.js'
 
 function initFakeScrollbars(container) {
   container.querySelectorAll('.irr-zone').forEach(zone => {
@@ -532,6 +533,15 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
         })
       })
       saveIrrig()
+      if (replaceSeasonIds) {
+        ids.forEach(plotId => {
+          addMJournalEntry(plotId, {
+            type: 'modification',
+            date: TODAY,
+            texte: `Saison d'irrigation modifiée : ${qty} mm tous les ${freq} jours, du ${fmtDateShort(debut)} au ${fmtDateShort(fin)} (${occs.length} irrigations).`,
+          })
+        })
+      }
       const plotNames = [...ids].map(id => plots.find(p => p.id === id)?.name).filter(Boolean)
       const parcelSections = [{ title: null, names: plotNames }]
       const calFilter = ids.size === 1 ? String([...ids][0]) : 'all'
@@ -1079,10 +1089,16 @@ export function openCalendar(plots, initialFilter) {
       })
       bodyEl.querySelector('#stop-confirm')?.addEventListener('click', () => {
         const seasonIds = getSeasonIds()
+        const removedCount = IRRIG_SEASON.filter(i => i.plotId === plotId && seasonIds.has(i.seasonId) && !i.real).length
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
           ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId) && !i.real))
         )
         saveIrrig()
+        addMJournalEntry(plotId, {
+          type: 'modification',
+          date: TODAY,
+          texte: `Saison d'irrigation arrêtée (${removedCount} irrigation(s) planifiée(s) annulée(s)).`,
+        })
         document.querySelector('.irr-sheet-overlay')?.remove()
         renderContent(layer)
       })
@@ -1091,10 +1107,16 @@ export function openCalendar(plots, initialFilter) {
       })
       bodyEl.querySelector('#delete-confirm')?.addEventListener('click', () => {
         const seasonIds = getSeasonIds()
+        const removedCount = IRRIG_SEASON.filter(i => i.plotId === plotId && seasonIds.has(i.seasonId)).length
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
           ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId)))
         )
         saveIrrig()
+        addMJournalEntry(plotId, {
+          type: 'modification',
+          date: TODAY,
+          texte: `Saison d'irrigation supprimée (${removedCount} irrigation(s) retirée(s) du calendrier).`,
+        })
         document.querySelector('.irr-sheet-overlay')?.remove()
         renderContent(layer)
       })

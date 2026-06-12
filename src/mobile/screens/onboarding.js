@@ -3,11 +3,11 @@ import { METIERS, IRRIG_TYPES, SOIL_TYPES } from '../../data/constants.js'
 import { sensors as ALL_SENSORS } from '../../data/sensors.js'
 
 const NEARBY_NETWORKS = [
-  { name: 'Allier AgriTech',       distance: 8,  adherents: 31, capteurs: 198, parcelles: 1140 },
-  { name: 'Auvergne Agri Conseil', distance: 15, adherents: 54, capteurs: 361, parcelles: 2080 },
-  { name: 'Réseau Bourbonnais',    distance: 22, adherents: 18, capteurs: 112, parcelles: 630  },
-  { name: 'Creuse Agri Net',       distance: 38, adherents: 12, capteurs: 74,  parcelles: 410  },
-  { name: 'Puy-de-Dôme Connect',   distance: 45, adherents: 39, capteurs: 255, parcelles: 1490 },
+  { name: 'Allier AgriTech',       distance: 8,  adherents: 31, capteurs: 198, parcelles: 1140, sharedSensorTypes: ['Stations météo', 'Tensiomètres', 'Sondes capacitives'] },
+  { name: 'Auvergne Agri Conseil', distance: 15, adherents: 54, capteurs: 361, parcelles: 2080, sharedSensorTypes: ['Stations météo', 'Pluviomètres', 'Thermomètres-hygromètres'] },
+  { name: 'Réseau Bourbonnais',    distance: 22, adherents: 18, capteurs: 112, parcelles: 630,  sharedSensorTypes: ['Stations météo', 'Tensiomètres'] },
+  { name: 'Creuse Agri Net',       distance: 38, adherents: 12, capteurs: 74,  parcelles: 410,  sharedSensorTypes: ['Pluviomètres', 'Sondes capacitives'] },
+  { name: 'Puy-de-Dôme Connect',   distance: 45, adherents: 39, capteurs: 255, parcelles: 1490, sharedSensorTypes: ['Stations météo', 'Anémomètres', "Capteurs d'humectation foliaire"] },
 ]
 
 const INVITED_NETWORK = { name: "Breiz'Agri Conseil", city: 'Rennes (35)', phone: '02 99 XX XX XX', email: 'contact@breizagri.fr', adherents: 47, capteurs: 312, parcelles: 1830, sharedSensorTypes: ['Capteurs météo'] }
@@ -383,6 +383,7 @@ export function showOnboarding(role, onComplete) {
         <div class="m-ob-net-info">
           <div class="m-ob-net-name">${net.name}</div>
           <div class="m-ob-net-meta">${net.distance} km · ${net.capteurs} capteurs · ${net.parcelles} parcelles</div>
+          ${net.sharedSensorTypes?.length ? `<div class="m-ob-net-tags">${net.sharedSensorTypes.map(t => `<span class="m-ob-net-tag">${t}</span>`).join('')}</div>` : ''}
         </div>
         <div class="m-ob-net-check"><i class="bi bi-circle"></i></div>
       </div>`).join('')

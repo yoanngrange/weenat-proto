@@ -4703,6 +4703,7 @@ select.panel-field-input { max-width: 220px; cursor: pointer; }
 .journal-type-badge--cycle        { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
 .journal-type-badge--stade        { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
 .journal-type-badge--irrigation   { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+.journal-type-badge--integration  { background: #f5f0fb; color: #7a4fa0; border: 1px solid #d8c2ee; }
 
 /* ── Journal — dropdown "Ajouter" ─────────────────────────────────────── */
 .jrn-add-wrap { position: relative; display: inline-block; }

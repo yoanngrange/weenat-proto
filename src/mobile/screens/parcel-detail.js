@@ -5,6 +5,7 @@ import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { plots as allPlots }    from '../../data/plots.js'
 import { getParcel, getOrgData, patchParcel } from '../../data/store.js'
+import { getMJournal, saveMJournal, addMJournalEntry } from '../journal-store.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
 
@@ -206,7 +207,7 @@ const CHART_METRICS = {
 // Métriques disposant de prévisions et leur horizon (en jours)
 const FORECAST_DAYS = {
   pluie: 14, temperature: 14, humidite: 14, vent: 14, etp: 14, temp_rosee: 14, rayonnement: 14,
-  pothydr: 7,
+  pothydr: 7, irrigation: 7,
 }
 
 const SENSOR_MODEL_METRICS = {
@@ -251,22 +252,28 @@ function mockSeries(metricId, count) {
   })
 }
 
-const PERIOD_COUNTS = { '365d': 52, '30d': 60, '7d': 84, 'hier': 48, '1d': 24, 'custom': 60 }
-const PERIOD_MINS   = { '365d': 525600, '30d': 43200, '7d': 10080, 'hier': 1440, '1d': 1440, 'custom': 10080 }
+const PERIOD_COUNTS = { '365d': 52, '30d': 60, '7d': 84, 'j7j7': 84, 'hier': 48, '1d': 24, 'custom': 60 }
+const PERIOD_MINS   = { '365d': 525600, '30d': 43200, '7d': 10080, 'j7j7': 10080, 'hier': 1440, '1d': 1440, 'custom': 10080 }
 
 // Série synchronisée avec les irrigations saisies (réelles + planifiées) d'une parcelle
-function irrigationSeries(plotId, period) {
+function irrigationSeries(plotId, period, fcCount = 0, forecastMins = 0) {
   const count    = PERIOD_COUNTS[period] || 60
   const totalMin = PERIOD_MINS[period] || 10080
   const now      = Date.now()
   const startMs  = now - totalMin * 60000
   const bucketMs = (totalMin * 60000) / count
-  const vals     = new Array(count).fill(0)
+  const vals     = new Array(count + fcCount).fill(0)
+  const fcBucketMs = fcCount > 0 ? (forecastMins * 60000) / fcCount : 0
   IRRIG_SEASON.filter(i => i.plotId === plotId).forEach(i => {
     const t = new Date(i.iso).getTime()
-    if (t < startMs || t > now) return
-    const idx = Math.min(count - 1, Math.floor((t - startMs) / bucketMs))
-    vals[idx] += i.mm
+    if (t < startMs) return
+    if (t <= now) {
+      const idx = Math.min(count - 1, Math.floor((t - startMs) / bucketMs))
+      vals[idx] += i.mm
+    } else if (fcCount > 0 && t <= now + forecastMins * 60000) {
+      const idx = Math.min(fcCount - 1, Math.floor((t - now) / fcBucketMs))
+      vals[count + idx] += i.mm
+    }
   })
   return vals
 }
@@ -300,11 +307,11 @@ function svgChart(metricId, color, isCumul, period = '7d', unit = '', plotId = n
   const histMins = PERIOD_MINS[period] || 10080
   const periodDays = histMins / 1440
   const fcDays = FORECAST_DAYS[metricId] || 0
-  const fcCount = (fcDays > 0 && metricId !== 'irrigation') ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count)) : 0
+  const fcCount = fcDays > 0 ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count)) : 0
   const forecastMins = fcCount > 0 ? Math.min(fcDays, periodDays) / periodDays * histMins : 0
 
   const vals = metricId === 'irrigation'
-    ? irrigationSeries(plotId, period)
+    ? irrigationSeries(plotId, period, fcCount, forecastMins)
     : mockSeries(metricId, count + fcCount)
   const W = 320, H = 100, PL = 34, PR = 6, PT = 10, PB = 20
   const iW = W - PL - PR, iH = H - PT - PB
@@ -921,6 +928,7 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h', plotId = null)
           <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
           <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
           <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
+          <option value="j7j7"${period==='j7j7'?' selected':''}>J-7 → J+7</option>
           <option value="hier"${period==='hier'?' selected':''}>Hier</option>
           <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
           <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
@@ -1221,6 +1229,11 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
           if (val && val !== current) {
             patchParcel(parcel.id, { irrigation: val })
             parcel.irrigation = val
+            addMJournalEntry(parcel.id, {
+              type: 'modification',
+              date: new Date().toISOString().slice(0, 10),
+              texte: `Type d'irrigation modifié : ${current || '—'} → ${val}.`,
+            })
             renderView()
             showToast('Type d\'irrigation mis à jour')
           }
@@ -1271,6 +1284,11 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         btn.addEventListener('click', () => {
           active = active.filter(i => i !== btn.dataset.integ)
           parcel.integrations = [...active]
+          addMJournalEntry(parcel.id, {
+            type: 'integration',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Intégration « ${btn.dataset.integ} » retirée de la parcelle.`,
+          })
           renderIntegList(listEl)
           showToast('Intégration déliée')
         })
@@ -1279,6 +1297,11 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         btn.addEventListener('click', () => {
           if (!active.includes(btn.dataset.integ)) active.push(btn.dataset.integ)
           parcel.integrations = [...active]
+          addMJournalEntry(parcel.id, {
+            type: 'integration',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Intégration « ${btn.dataset.integ} » activée sur la parcelle.`,
+          })
           renderIntegList(listEl)
           showToast('Intégration liée')
         })
@@ -1678,8 +1701,6 @@ function roleBadgeMobile(role) {
   return `<span style="font-size:10px;background:${c.bg};color:${c.color};border-radius:4px;padding:1px 5px;font-weight:500">${c.label}</span>`
 }
 
-const M_JOURNAL_KEY = id => `parcel-journal-${id}`
-
 const M_NOTE_CATEGORIES = [
   'Observation générale', 'Préparation du sol (labour)', 'Préparation du sol (strip-till)',
   'Préparation du sol (sous-solage)', 'Fertilisation', 'Semis', 'Récolte',
@@ -1687,16 +1708,59 @@ const M_NOTE_CATEGORIES = [
   'Irrigation manuelle', 'Autre',
 ]
 
-function getMJournal(parcelId) {
-  try { const r = localStorage.getItem(M_JOURNAL_KEY(parcelId)); if (r) return JSON.parse(r) } catch (_) {}
-  return [
-    { id: 1, type: 'note', category: 'Observation générale', date: '2026-05-11', auteur: 'Jean Dupont', role: 'membre', texte: 'Quelques pucerons sur feuilles basses. À surveiller.' },
-    { id: 2, type: 'traitement', date: '2026-05-16', auteur: 'Sophie Martin', role: 'conseiller', texte: 'Vent < 2 m/s, conditions conformes.', produit: 'Karate Zeon', dose: '0,1 L/ha', cible: 'Pucerons' },
-  ]
+const fmtJrnDate = iso => { const [y, m, j] = iso.split('-'); return `${j}/${m}/${y}` }
+
+// Entrées auto-générées : configuration de la parcelle (culture, sol, irrigation)
+function mAutoModificationEvents(parcel) {
+  const evts = []
+  const add = (date, texte) => evts.push({ id: `auto-mod-${date}-${texte.slice(0, 16)}`, type: 'modification', date, texte, _system: true })
+  add('2024-01-01', 'Création de la parcelle')
+  if (parcel.crop) add('2024-03-15', `Culture définie : ${parcel.crop}`)
+  const texture = parcel.substrate ? `Substrat : ${parcel.substrate}` : parcel.texture
+  if (texture) add('2024-03-15', `Texture de sol définie : ${texture}`)
+  if (parcel.irrigation) add('2024-04-01', `Type d'irrigation défini : ${parcel.irrigation}`)
+  return evts
 }
 
-function saveMJournal(parcelId, entries) {
-  localStorage.setItem(M_JOURNAL_KEY(parcelId), JSON.stringify(entries))
+// Entrées auto-générées : irrigations saisies (ponctuelles + saisons)
+function mAutoIrrigationEvents(parcelId) {
+  const evts = []
+  const own = IRRIG_SEASON.filter(i => i.plotId === parcelId)
+
+  own.filter(i => !i.fromStrategy).forEach(i => {
+    evts.push({
+      id: `auto-irrig-${i.iso}-${i.mm}`,
+      type: 'irrigation',
+      date: i.iso,
+      texte: i.real
+        ? `Irrigation ponctuelle de ${i.mm} mm enregistrée.`
+        : `Irrigation ponctuelle de ${i.mm} mm planifiée.`,
+      _system: true,
+    })
+  })
+
+  const seasons = new Map()
+  own.filter(i => i.fromStrategy && i.seasonId).forEach(i => {
+    if (!seasons.has(i.seasonId)) seasons.set(i.seasonId, [])
+    seasons.get(i.seasonId).push(i)
+  })
+  seasons.forEach((items, seasonId) => {
+    items.sort((a, b) => a.iso.localeCompare(b.iso))
+    const first = items[0], last = items[items.length - 1]
+    const qty   = first.mm
+    const freq  = items.length > 1
+      ? Math.round((new Date(items[1].iso) - new Date(items[0].iso)) / 86400000)
+      : 7
+    evts.push({
+      id: `auto-irrig-season-${seasonId}`,
+      type: 'irrigation',
+      date: first.iso,
+      texte: `Saison d'irrigation programmée : ${qty} mm tous les ${freq} jours, du ${fmtJrnDate(first.iso)} au ${fmtJrnDate(last.iso)} (${items.length} irrigation${items.length > 1 ? 's' : ''}, ${items.length * qty} mm au total).`,
+      _system: true,
+    })
+  })
+
+  return evts
 }
 
 function openMobileParcelJournal(parcel) {
@@ -1728,20 +1792,24 @@ function openMobileParcelJournal(parcel) {
     const dashNotes = (() => { try { return JSON.parse(localStorage.getItem('weenat-m-notes')) || [] } catch { return [] } })()
       .filter(n => n.linkedType === 'parcel' && n.linkedId === parcel.id)
       .map((n, i) => ({ id: `dash-${i}`, type: 'note', date: n.date, texte: n.text, auteur: n.auteur, role: n.role, _fromDashboard: true }))
-    const entries = [...getMJournal(parcel.id), ...dashNotes].sort((a, b) => b.date.localeCompare(a.date))
-    const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
+    const autoEntries = [...mAutoModificationEvents(parcel), ...mAutoIrrigationEvents(parcel.id)]
+    const entries = [...getMJournal(parcel.id), ...dashNotes, ...autoEntries].sort((a, b) => b.date.localeCompare(a.date))
+    const fmt = fmtJrnDate
 
     const CFG = {
-      note:       { label: 'Note',       icon: 'bi-pencil',     dotColor: '#3a7bd5', dotBg: '#eef4ff', badgeCls: 'note' },
-      traitement: { label: 'Traitement', icon: 'bi-eyedropper', dotColor: '#3a7a38', dotBg: '#f2faf0', badgeCls: 'traitement' },
+      note:         { label: 'Note',         icon: 'bi-pencil',        dotColor: '#3a7bd5', dotBg: '#eef4ff', badgeCls: 'note' },
+      traitement:   { label: 'Traitement',   icon: 'bi-eyedropper',    dotColor: '#3a7a38', dotBg: '#f2faf0', badgeCls: 'traitement' },
+      irrigation:   { label: 'Irrigation',   icon: 'bi-droplet-half',  dotColor: '#1d4ed8', dotBg: '#eff6ff', badgeCls: 'irrigation' },
+      integration:  { label: 'Intégration',  icon: 'bi-plug-fill',     dotColor: '#7a4fa0', dotBg: '#f5f0fb', badgeCls: 'integration' },
+      modification: { label: 'Modification', icon: 'bi-pencil-square', dotColor: '#7a6a1e', dotBg: '#fdf8ee', badgeCls: 'modification' },
     }
 
     let html = `
       <div style="padding:12px 16px 4px;display:flex;flex-direction:column;gap:8px">
-        <button class="m-btn m-btn--secondary" id="mjrn-add-note">
+        <button class="w-irrig-act-btn w-irrig-act-btn--sec" id="mjrn-add-note">
           <i class="bi bi-pencil-square"></i> Ajouter une note
         </button>
-        <button class="m-btn m-btn--secondary" id="mjrn-add-trait">
+        <button class="w-irrig-act-btn w-irrig-act-btn--sec" id="mjrn-add-trait">
           <i class="bi bi-eyedropper"></i> Ajouter un traitement
         </button>
       </div>
@@ -1756,6 +1824,7 @@ function openMobileParcelJournal(parcel) {
         const isTraitement = e.type === 'traitement'
         const isLast = idx === entries.length - 1
         const fromDash = !!e._fromDashboard
+        const isSystem = !!e._system
         html += `
           <div class="m-jrn-entry" data-id="${e.id}">
             <div class="m-jrn-aside">
@@ -1770,7 +1839,9 @@ function openMobileParcelJournal(parcel) {
                 <span class="journal-type-badge journal-type-badge--${c.badgeCls}">${c.label}</span>
                 ${fromDash
                   ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
-                  : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
+                  : isSystem
+                    ? ''
+                    : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
               ${e.auteur ? `<div style="font-size:11px;color:#8e8e93;margin-top:3px;display:flex;gap:5px;align-items:center">${e.auteur}${roleBadgeMobile(e.role)}</div>` : ''}
