@@ -240,13 +240,13 @@ function computeCumuls(metricId, period, type) {
     ]
   } else if (type === 'pluie') {
     const total = vals.reduce((s, v) => s + v, 0)
-    chips = [{ label: 'Cumul pluie', val: `${total.toFixed(1)} mm`, metricId: 'pluie' }]
+    chips = [{ label: 'Cumul de pluie', val: `${total.toFixed(1)} mm`, metricId: 'pluie' }]
   } else if (type === 'rayo') {
     const h = vals.filter(v => v > 120).length * hoursPerPt
-    chips = [{ label: 'Ensoleillement', val: `${Math.round(h)} h`, metricId: 'rayo' }]
+    chips = [{ label: 'Cumul d\'heures d\'ensoleillement', val: `${Math.round(h)} h`, metricId: 'rayo' }]
   } else if (type === 'hws') {
     const h = vals.filter(v => v > 50).length * hoursPerPt
-    chips = [{ label: 'Heures d\'humectation', val: `${Math.round(h)} h`, metricId: 'humec' }]
+    chips = [{ label: 'Cumul d\'heures d\'humectation', val: `${Math.round(h)} h`, metricId: 'humec' }]
   }
   if (!chips.length) return ''
   return `<div class="m-chart-cumuls">${chips.map(c => {

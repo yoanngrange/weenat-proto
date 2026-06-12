@@ -21,33 +21,33 @@ function rndf(min, max) { return parseFloat((Math.random() * (max - min) + min).
 
 // Always-available on every parcel (derived from closest weather station)
 const ALWAYS_METRICS = [
-  { id: 'etp',        name: 'Évapotranspiration (ETP)',  unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5),   cumul: { label: 'Cumul ETP',    unit: 'mm'  }, isCumul: false, chartType: 'bar' },
+  { id: 'etp',        name: 'Évapotranspiration (ETP)',  unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5),   cumul: { label: 'Cumul d\'ETP',    unit: 'mm'  }, isCumul: false, chartType: 'bar' },
   { id: 'rayonnement',name: 'Rayonnement',               unit: 'W/m²', color: '#CBCB0B', base: () => rnd(0, 900),    cumul: { label: 'Énergie',      unit: 'Wh/m²' }, isCumul: false },
   { id: 'temp_rosee', name: 'Température de rosée',      unit: '°C',   color: '#72B0D8', base: () => rnd(2, 16),     isCumul: false },
 ]
 
 const METRICS_BY_MODEL = {
   'P+':       [
-    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
     { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'PT': [
-    { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
-    { id: 'temp',  name: 'Température', unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
+    { id: 'temp',  name: 'Température', unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
     { id: 'etp',   name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'P': [
-    { id: 'pluie', name: 'Pluie', unit: 'mm', color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'pluie', name: 'Pluie', unit: 'mm', color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
   ],
   'SMV': [
-    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
     { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
     { id: 'etp',      name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'TH': [
-    { id: 'temp',     name: 'Température',  unit: '°C', color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'DJC', unit: '°j' } },
+    { id: 'temp',     name: 'Température',  unit: '°C', color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
     { id: 'humidite', name: 'Humidité', unit: '%',  color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'CHP-15/30': [
