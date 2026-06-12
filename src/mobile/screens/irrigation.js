@@ -177,7 +177,7 @@ function plotInfo(p) {
 
 // ─── Saisie d'une irrigation ──────────────────────────────────────────────────
 
-export function openIrrigationSaisie(plots, showToast, preselect = null, backToParcel = false) {
+export function openIrrigationSaisie(plots, showToast, preselect = null, backToParcel = false, onBack = null) {
   let selectedIds = new Set(preselect?.ids ?? [])
   let dateVal     = TODAY
   let qtyVal      = 10
@@ -292,7 +292,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
           { label: 'Date',     value: fmtDateFull(dateVal) },
           { label: 'Quantité', value: `${qtyVal} mm` },
         ],
-        parcelSections, isFut, plots, calFilter, addedCount: ids.size, stackDepth: 1, backToParcel,
+        parcelSections, isFut, plots, calFilter, addedCount: ids.size, stackDepth: 1, backToParcel, onBack,
       })
     })
   })
@@ -300,7 +300,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
 
 // ─── Stratégie d'irrigation ───────────────────────────────────────────────────
 
-export function openIrrigationStrategie(plots, showToast, preselect = null, replaceSeasonIds = null, backToParcel = false) {
+export function openIrrigationStrategie(plots, showToast, preselect = null, replaceSeasonIds = null, backToParcel = false, onBack = null) {
   let selectedIds = new Set(preselect?.ids ?? [])
   let debut = TODAY
   let fin   = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
@@ -555,7 +555,7 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
           { label: 'Fréquence',            value: `tous les ${freq} jours` },
           { label: 'Irrigations générées', value: `${occs.length * ids.size}` },
         ],
-        parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * ids.size, stackDepth: 2, backToParcel,
+        parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * ids.size, stackDepth: 2, backToParcel, onBack,
       })
     })
   })
@@ -647,7 +647,7 @@ function openTourDEau(enrPlots, freq, onConfirm) {
 
 // ─── Confirmation ─────────────────────────────────────────────────────────────
 
-function openConfirmation({ title, params, parcelSections = [], isFut, plots, calFilter, addedCount = 0, stackDepth = 3, backToParcel = false }) {
+function openConfirmation({ title, params, parcelSections = [], isFut, plots, calFilter, addedCount = 0, stackDepth = 3, backToParcel = false, onBack = null }) {
   const paramsHtml = (params || []).map(p => `
     <div class="irr-confirm-param">
       <span class="irr-confirm-param-lbl">${p.label}</span>
@@ -731,6 +731,7 @@ function openConfirmation({ title, params, parcelSections = [], isFut, plots, ca
 
   layer.querySelector('#conf-back').addEventListener('click', () => {
     for (let i = 0; i <= stackDepth; i++) popDetail()
+    onBack?.()
   })
 
   layer.querySelector('#conf-calendar').addEventListener('click', () => {

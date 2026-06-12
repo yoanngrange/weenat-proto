@@ -3,6 +3,7 @@ import { showToast, showSheet, showConfirmSheet } from '../ui.js'
 import { plots as allPlots }   from '../../data/plots.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { orgs }                from '../../data/orgs.js'
+import { addMesureFavorite, addCumulFavorite } from './dashboard.js'
 
 const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
@@ -14,7 +15,6 @@ const DASH_CUMUL_META = {
   etp:   { metricLabel: 'Évapotranspiration',   unit: 'mm', icon: 'bi-moisture',        color: '#7DBDD7' },
   humec: { metricLabel: 'Humectation foliaire', unit: 'h',  icon: 'bi-droplet-half',    color: '#00887E' },
 }
-const DASH_KEY = 'weenat-m-dash'
 const WF_MAX = 4  // max mesures favorites (cf. dashboard.js)
 const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
 const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
@@ -565,22 +565,15 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
         const subjectLabel = `${sensor.model} ${sensor.serial}`
         const period = btn.dataset.msrPeriod
         const step   = btn.dataset.msrStep
-        const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
-        const list = dash.mesuresList || []
-        if (list.length >= WF_MAX) { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
-        if (list.some(x => x.subjectKey === subjectKey && x.metricId === metricId && x.period === period && x.step === step)) {
-          showToast('Cette mesure est déjà dans vos favoris')
-          return
-        }
-        list.push({
+        const result = addMesureFavorite({
           subjectKey, subjectLabel, metricId,
           metricLabel: btn.dataset.msrLabel, unit: btn.dataset.msrUnit || '',
           period, periodLabel: MSR_PERIOD_LABELS[period] || period,
           step, stepLabel: MSR_STEP_LABELS[step] || step,
           color: btn.dataset.msrColor,
         })
-        dash.mesuresList = list
-        localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+        if (result === 'max') { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
+        if (result === 'dup') { showToast('Cette mesure est déjà dans vos favoris'); return }
         showToast('Mesure ajoutée au tableau de bord')
       })
     })
@@ -595,16 +588,12 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
         const body = document.createElement('div')
         body.innerHTML = `<div style="padding:16px;font-size:14px;color:#3a3a3c">Ajouter <strong>${meta.metricLabel}</strong> (<em>${val}</em>) au tableau de bord du capteur <strong>${sensor.serial}</strong> ?</div>`
         showSheet({ title: 'Tableau de bord', body, doneLabel: 'Ajouter', cancelLabel: 'Annuler', onDone: () => {
-          const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
-          const list = dash.cumulsList || []
-          if (list.length >= 5) { showToast('Maximum de cumuls atteint (5)'); return }
           const thresholds = metricId === 'hf' ? { cold: cumulThresholds.hfSeuil }
                            : metricId === 'dj' ? { low: cumulThresholds.djMin, high: cumulThresholds.djMax }
                            : null
-          list.push({ metricId, ...meta, subjectKey: `s-${sensor.id}`, subjectLabel,
+          const result = addCumulFavorite({ metricId, ...meta, subjectKey: `s-${sensor.id}`, subjectLabel,
             fromDate: `${new Date().getFullYear()}-01-01`, value: val, thresholds })
-          dash.cumulsList = list
-          localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+          if (result === 'max') { showToast('Maximum de cumuls atteint (5)'); return }
           showToast('Cumul ajouté au tableau de bord')
         }})
         return

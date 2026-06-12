@@ -257,6 +257,30 @@ let cumulsList = []
   if (s.cumulsList)  cumulsList  = s.cumulsList
 })()
 
+// Hooks vers les widgets du tableau de bord, branchés par initDashboardScreen()
+let _refreshMesuresWidget = null
+let _refreshCumulsWidget  = null
+
+// Appelé depuis parcel-detail.js / sensor-detail.js pour ajouter une mesure
+// préférée et rafraîchir le widget si le tableau de bord est déjà rendu.
+export function addMesureFavorite(entry) {
+  if (mesuresList.length >= WF_MAX) return 'max'
+  if (mesuresList.some(x => x.subjectKey === entry.subjectKey && x.metricId === entry.metricId && x.period === entry.period && x.step === entry.step)) return 'dup'
+  mesuresList.push(entry)
+  _saveDash({ mesuresList })
+  _refreshMesuresWidget?.()
+  return 'ok'
+}
+
+// Idem pour les cumuls préférés
+export function addCumulFavorite(entry) {
+  if (cumulsList.length >= CUMUL_MAX) return 'max'
+  cumulsList.push(entry)
+  _saveDash({ cumulsList })
+  _refreshCumulsWidget?.()
+  return 'ok'
+}
+
 function trMockSeries(subjectKey, metricId, count) {
   const seed = [...(subjectKey + metricId)].reduce((s, c) => s + c.charCodeAt(0), 1)
   const r    = i => (Math.sin(seed * 0.07 + i * 0.5) + Math.sin(seed * 0.03 + i * 1.3)) / 2 + 0.5
@@ -1682,6 +1706,7 @@ export function initDashboardScreen(screenEl, role) {
       const bd = content.querySelector('[data-widget="cumuls"] .m-widget-bd')
       if (bd) { bd.innerHTML = buildCumuls(exploitPlots, exploitSensors); bindCumulsEvents() }
     }
+    _refreshCumulsWidget = rebuildCumulsWidget
     function bindCumulsEvents() {
       const updateThresholds = () => {
         const metric = content.querySelector('#cumuls-metric')?.value
@@ -2054,6 +2079,7 @@ export function initDashboardScreen(screenEl, role) {
       const bd = content.querySelector('[data-widget="temps_reel"] .m-widget-bd')
       if (bd) { bd.innerHTML = buildMesures(exploitPlots, exploitSensors); bindMesuresEvents() }
     }
+    _refreshMesuresWidget = rebuildMesuresWidget
     function bindMesuresEvents() {
       const checkMsrCreate = () => {
         const btn = content.querySelector('#msr-create')

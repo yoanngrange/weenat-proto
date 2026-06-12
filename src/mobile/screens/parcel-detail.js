@@ -7,6 +7,7 @@ import { plots as allPlots }    from '../../data/plots.js'
 import { getParcel, getOrgData, patchParcel } from '../../data/store.js'
 import { IRRIG_TYPES, SOIL_TYPES, SOIL_ANALYSIS_OPTION, ENV_TYPES } from '../../data/constants.js'
 import { getMJournal, saveMJournal, addMJournalEntry } from '../journal-store.js'
+import { addMesureFavorite, addCumulFavorite } from './dashboard.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
 
@@ -21,7 +22,6 @@ const DASH_CUMUL_META = {
   humec: { metricLabel: 'Humectation foliaire', unit: 'h',  icon: 'bi-droplet-half',    color: '#00887E' },
   irrigation: { metricLabel: "Cumul d'irrigation", unit: 'mm', icon: 'bi-moisture',     color: '#FF8C00' },
 }
-const DASH_KEY = 'weenat-m-dash'
 const WF_MAX = 4  // max mesures favorites (cf. dashboard.js)
 
 // Widget catalog — each item maps to a shared widget ID (same as web parcel page)
@@ -402,21 +402,21 @@ function computeCumuls(metricId, period, type, plotId = null) {
     const dj = vals.reduce((s, v) => s + Math.max(0, Math.min(v, cumulThresholds.djMax) - cumulThresholds.djMin), 0) * (hoursPerPt / 24)
     const hf = vals.filter(v => v < cumulThresholds.hfSeuil).length * hoursPerPt
     chips = [
-      { label: 'Degrés jours',    val: `${Math.round(dj)} DJ`, metricId: 'dj', thresholdText: `${cumulThresholds.djMin}°C → ${cumulThresholds.djMax}°C` },
-      { label: 'Heures de froid', val: `${Math.round(hf)} h`,  metricId: 'hf', thresholdText: `< ${cumulThresholds.hfSeuil}°C` },
+      { label: 'Cumul de degrés jours',    val: `${Math.round(dj)} DJ`, metricId: 'dj', thresholdText: `${cumulThresholds.djMin}°C → ${cumulThresholds.djMax}°C` },
+      { label: 'Cumul d\'heures de froid', val: `${Math.round(hf)} h`,  metricId: 'hf', thresholdText: `< ${cumulThresholds.hfSeuil}°C` },
     ]
   } else if (type === 'pluie') {
     const total = vals.reduce((s, v) => s + v, 0)
-    chips = [{ label: 'Cumul pluie', val: `${total.toFixed(1)} mm`, metricId: 'pluie' }]
+    chips = [{ label: 'Cumul de pluie', val: `${total.toFixed(1)} mm`, metricId: 'pluie' }]
   } else if (type === 'rayo') {
     const h = vals.filter(v => v > 120).length * hoursPerPt
-    chips = [{ label: 'Ensoleillement', val: `${Math.round(h)} h`, metricId: 'rayo' }]
+    chips = [{ label: 'Cumul d\'heures d\'ensoleillement', val: `${Math.round(h)} h`, metricId: 'rayo' }]
   } else if (type === 'etp') {
     const total = vals.reduce((s, v) => s + v, 0) * (hoursPerPt / 24)
-    chips = [{ label: 'Évapotranspiration cumulée', val: `${total.toFixed(1)} mm`, metricId: 'etp' }]
+    chips = [{ label: 'Cumul d\'évapotranspiration', val: `${total.toFixed(1)} mm`, metricId: 'etp' }]
   } else if (type === 'hws') {
     const h = vals.filter(v => v > 50).length * hoursPerPt
-    chips = [{ label: 'Heures d\'humectation', val: `${Math.round(h)} h`, metricId: 'humec' }]
+    chips = [{ label: 'Cumul d\'heures d\'humectation foliaire', val: `${Math.round(h)} h`, metricId: 'humec' }]
   } else if (type === 'irrigation') {
     const total = vals.reduce((s, v) => s + v, 0)
     chips = [{ label: 'Cumul irrigation', val: `${total.toFixed(1)} mm`, metricId: 'irrigation' }]
@@ -474,22 +474,15 @@ function addMesureToFavorites(btn) {
   const step         = btn.dataset.msrStep
   const m = CHART_METRICS[metricId]
   if (!m) return
-  const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
-  const list = dash.mesuresList || []
-  if (list.length >= WF_MAX) { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
-  if (list.some(x => x.subjectKey === subjectKey && x.metricId === metricId && x.period === period && x.step === step)) {
-    showToast('Cette mesure est déjà dans vos favoris')
-    return
-  }
-  list.push({
+  const result = addMesureFavorite({
     subjectKey, subjectLabel, metricId,
     metricLabel: m.label, unit: m.unit || '',
     period, periodLabel: MSR_PERIOD_LABELS[period] || period,
     step, stepLabel: MSR_STEP_LABELS[step] || step,
     color: m.color,
   })
-  dash.mesuresList = list
-  localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+  if (result === 'max') { showToast(`Maximum de mesures atteint (${WF_MAX})`); return }
+  if (result === 'dup') { showToast('Cette mesure est déjà dans vos favoris'); return }
   showToast('Mesure ajoutée au tableau de bord')
 }
 
@@ -1545,16 +1538,12 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         const body = document.createElement('div')
         body.innerHTML = `<div style="padding:16px;font-size:14px;color:#3a3a3c">Ajouter <strong>${meta.metricLabel}</strong> (<em>${val}</em>) au tableau de bord de <strong>${parcel.name}</strong> ?</div>`
         showSheet({ title: 'Tableau de bord', body, doneLabel: 'Ajouter', cancelLabel: 'Annuler', onDone: () => {
-          const dash = JSON.parse(localStorage.getItem(DASH_KEY) || '{}')
-          const list = dash.cumulsList || []
-          if (list.length >= 5) { showToast('Maximum de cumuls atteint (5)'); return }
           const thresholds = metricId === 'hf' ? { cold: cumulThresholds.hfSeuil }
                            : metricId === 'dj' ? { low: cumulThresholds.djMin, high: cumulThresholds.djMax }
                            : null
-          list.push({ metricId, ...meta, subjectKey: `p-${parcel.id}`, subjectLabel: parcel.name,
+          const result = addCumulFavorite({ metricId, ...meta, subjectKey: `p-${parcel.id}`, subjectLabel: parcel.name,
             fromDate: `${new Date().getFullYear()}-01-01`, value: val, thresholds })
-          dash.cumulsList = list
-          localStorage.setItem(DASH_KEY, JSON.stringify(dash))
+          if (result === 'max') { showToast('Maximum de cumuls atteint (5)'); return }
           showToast('Cumul ajouté au tableau de bord')
         }})
         return
@@ -1693,10 +1682,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
 
     // Irrigations widget — actions
     layer.querySelector('.m-irrig-act-saisie')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationSaisie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, true))
+      import('./irrigation.js').then(m => m.openIrrigationSaisie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, true, renderView))
     })
     layer.querySelector('.m-irrig-act-saison')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationStrategie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, null, true))
+      import('./irrigation.js').then(m => m.openIrrigationStrategie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, null, true, renderView))
     })
     // Irrigations widget — type non renseigné → ouvrir Paramètres + bottom sheet
     layer.querySelector('.m-irrig-set-type')?.addEventListener('click', () => {
