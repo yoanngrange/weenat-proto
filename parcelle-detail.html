@@ -8,17 +8,17 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-BPpBm8PO.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/parcelle-detail-BhiluVkf.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-DHZTuoR0.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-CS05Ml5Z.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-Bejh2i72.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-CRadjF8G.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-DnFmvGlp.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-CuDabgg3.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-CzFWtd6d.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-BGemiHCf.js">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-Bgo0c0M9.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/irrigations-C22Dtsoo.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/constants-D_Yu58_o.js">
-  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-DzpZVyMO.css">
+  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-BSgeesMM.css">
 
   <body>
     <div id="app">
@@ -108,10 +108,11 @@
                   <div class="chart-controls-row">
                     <span class="chart-ctrl-label">Période</span>
                     <div class="period-presets" id="period-presets">
+                      <button class="period-preset-btn active" data-period="j7j2">J-7 → J+2</button>
                       <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
                       <button class="period-preset-btn" data-period="hier">Hier</button>
                       <button class="period-preset-btn" data-period="3d">3 jours</button>
-                      <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                      <button class="period-preset-btn" data-period="7d">7 jours</button>
                       <button class="period-preset-btn" data-period="30d">30 jours</button>
                       <button class="period-preset-btn" data-period="365d">365 jours</button>
                       <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
@@ -124,8 +125,8 @@
                     <span class="chart-ctrl-label">Pas de temps</span>
                     <select id="time-step" class="time-step-select">
                       <option value="max">Maximal</option>
-                      <option value="1h" selected>Horaire</option>
-                      <option value="1d">Journalier</option>
+                      <option value="1h">Horaire</option>
+                      <option value="1d" selected>Journalier</option>
                       <option value="1w">Hebdomadaire</option>
                       <option value="1mo">Mensuel</option>
                     </select>
@@ -210,10 +211,6 @@
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-bell"></i> Mes alertes</div>
                   <div class="panel-section-bd" id="panel-alertes"></div>
-                </div>
-                <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-lightning"></i> Actions</div>
-                  <div class="panel-section-bd" id="panel-actions"></div>
                 </div>
               </div>
             </div>
