@@ -22,11 +22,14 @@ const METRIC_DEFS = {
   irrigation:  { label: 'Irrigation',           unit: 'mm',         color: '#FF8C00', isCumul: true },
 }
 
-// Métriques disposant de prévisions et leur horizon (en jours)
-const FORECAST_DAYS = {
-  pluie: 14, temperature: 14, humidite: 14, vent: 14, etp: 14, temp_rosee: 14, rayonnement: 14,
-  pothydr: 7, irrigation: 7,
-}
+// Métriques pour lesquelles les prévisions affichent des courbes/données
+// (les autres métriques n'affichent que le hachurage de la zone future)
+const FORECAST_METRICS = new Set([
+  'pluie', 'temperature', 'humidite', 'vent', 'pothydr', 'etp', 'temp_rosee', 'rayonnement',
+])
+
+// Horizon de prévisions (en jours) selon la période sélectionnée
+const PERIOD_FC_DAYS = { j7j2: 2 }
 
 const MODEL_LABELS = {
   'P+':         'Station météo',
@@ -278,8 +281,8 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
 
   // State
   let currentMetricId = (metricId && metricIds.includes(metricId)) ? metricId : metricIds[0]
-  let currentPeriod   = '7d'
-  let currentStep     = '1h'
+  let currentPeriod   = 'j7j2'
+  let currentStep     = '1d'
   let yScaleMode      = 'auto'
   let yScaleMin = null, yScaleMax = null
   let customFromDate = null, customToDate = null
@@ -287,7 +290,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
   let _vals = null
 
   // Period helpers
-  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, 'j7j7': 10080, '30d': 43200, '365d': 525600, 'custom': 10080 }
+  const PERIOD_MINS = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, 'j7j2': 10080, '30d': 43200, '365d': 525600, 'custom': 10080 }
   const STEP_MINS   = { '1h': 60, '1d': 1440, '1w': 10080 }
   const getCount = () => {
     let mins = PERIOD_MINS[currentPeriod] || 10080
@@ -298,7 +301,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     return Math.max(2, Math.min(200, Math.floor(mins / (STEP_MINS[currentStep] || 60))))
   }
   const getStepMins = () => STEP_MINS[currentStep] || 60
-  const getDefaultStep = p => p === '365d' ? '1d' : p === '30d' ? '1d' : '1h'
+  const getDefaultStep = p => p === '365d' ? '1d' : p === '30d' ? '1d' : p === 'j7j2' ? '1d' : '1h'
 
   const showModel = new Set(Object.values(metricToSensor).map(s => s.model)).size > 1
 
@@ -324,19 +327,19 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
       </select>
       <div style="display:flex;gap:6px">
         <select class="m-period-sel" id="m-period-sel">
+          <option value="j7j2" selected>J-7 → J+2</option>
           <option value="1d">Aujourd'hui</option>
           <option value="hier">Hier</option>
           <option value="3d">3 jours</option>
-          <option value="7d" selected>7 jours</option>
-          <option value="j7j7">J-7 → J+7</option>
+          <option value="7d">7 jours</option>
           <option value="30d">30 jours</option>
           <option value="365d">365 jours</option>
           <option value="custom">Personnalisée</option>
         </select>
-        <select class="m-step-sel" id="m-step-sel">
-          <option value="1h" selected>Horaire</option>
-          <option value="1d">Journalier</option>
-          <option value="1w">Hebdo</option>
+        <select class="m-step-sel" id="m-step-sel"${currentPeriod === 'j7j2' ? ' disabled' : ''}>
+          ${currentPeriod === 'j7j2' ? '' : `<option value="1h"${currentStep === '1h' ? ' selected' : ''}>Horaire</option>`}
+          <option value="1d"${currentStep === '1d' ? ' selected' : ''}>Journalier</option>
+          <option value="1w"${currentStep === '1w' ? ' selected' : ''}>Hebdo</option>
         </select>
       </div>
       <div class="m-fs-custom-row" id="m-custom-row" style="display:none">
@@ -345,9 +348,9 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
         <input type="date" id="m-custom-to" class="m-custom-date">
       </div>
     </div>
-    <div class="m-fs-chart-wrap" id="m-chart-wrap">
-      <svg id="m-main-chart" width="100%" height="100%"></svg>
-      <div class="m-fs-tooltip" id="m-chart-tip"></div>
+    <div class="m-fs-chart-wrap" id="m-chart-wrap" style="flex:1;position:relative;overflow:hidden;background:#fff">
+      <svg id="m-main-chart" width="100%" height="100%" style="display:block"></svg>
+      <div id="m-chart-tip" style="display:none;position:absolute;pointer-events:none;background:rgba(28,28,30,.88);color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;z-index:10;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2)"></div>
     </div>`)
 
   layer.classList.add('m-fs-layer')
@@ -379,19 +382,19 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     const count = getCount(), stepMins = getStepMinutes()
 
     const periodDays = (count * stepMins) / 1440
-    const fcDays = FORECAST_DAYS[currentMetricId] || 0
-    const fcCount = fcDays > 0
-      ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count))
-      : 0
-    const totalCount = count + fcCount
-    const forecastMins = fcCount > 0 ? Math.min(fcDays, periodDays) / periodDays * (count * stepMins) : 0
+    const periodFcDays = PERIOD_FC_DAYS[currentPeriod] || 0
+    const hatchCount = periodFcDays > 0 ? Math.max(1, Math.round(periodFcDays / periodDays * count)) : 0
+    const showFcData = hatchCount > 0 && FORECAST_METRICS.has(currentMetricId)
+    const fcCount = showFcData ? hatchCount : 0
+    const totalCount = count + hatchCount
+    const forecastMins = hatchCount > 0 ? periodFcDays * 1440 : 0
 
     const PAD = { t: 28, r: 18, b: 36, l: 46 }
     const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b
 
     const vals = currentMetricId === 'irrigation' && parcel
-      ? irrigationSeries(parcel.id, count, stepMins, fcCount, forecastMins)
-      : mockSeries(currentMetricId, totalCount)
+      ? irrigationSeries(parcel.id, count, stepMins, hatchCount, hatchCount > 0 ? periodFcDays * 1440 : 0)
+      : mockSeries(currentMetricId, count + fcCount)
     _vals = vals
     const { minV, maxV } = computeYRange(vals, currentMetricId)
     const range = maxV - minV || 1
@@ -412,7 +415,7 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     </defs>`
 
     // Zone striée représentant la portion "prévisions" du graphique
-    if (fcCount > 0) {
+    if (hatchCount > 0) {
       const nowX = xOf(count - 1)
       const stripeId = `${cid}_stripe`
       out += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -483,21 +486,25 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     const cross  = svg.querySelector('.m-fs-cross')
     const dot    = svg.querySelector('.m-fs-dot')
     const tip    = layer.querySelector('#m-chart-tip')
+    const wrap   = layer.querySelector('#m-chart-wrap')
     if (!hRect) return
 
     function onPos(clientX, clientY) {
       const svgR = svg.getBoundingClientRect()
-      const frac = Math.max(0, Math.min(1, (clientX - svgR.left) * (W / svgR.width) - PAD.l) / innerW)
+      const frac = Math.max(0, Math.min(1, ((clientX - svgR.left) * (W / svgR.width) - PAD.l) / innerW))
       const idx  = Math.round(frac * (totalCount - 1))
       if (idx < 0 || idx >= vals.length) return
       const v = vals[idx], cx = xOf(idx), cy = yOf(v)
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.display = ''
       dot.setAttribute('cx', cx); dot.setAttribute('cy', cy); dot.style.display = ''
-      const wR = layer.querySelector('#m-chart-wrap').getBoundingClientRect()
-      const tipLeft = Math.min(clientX - wR.left + 12, wR.width - 130)
-      const tipTop  = Math.max(clientY - wR.top - 76, 8)
-      tip.innerHTML = `<div class="m-fs-tip-name">${def.label}</div><div class="m-fs-tip-val" style="color:${hi}">${fmtV(v)} <span class="m-fs-tip-unit">${def.unit}</span></div><div class="m-fs-tip-ts">${tipLabel((count-idx)*stepMins, stepMins)}</div>`
-      tip.style.cssText = `display:block;left:${tipLeft}px;top:${tipTop}px`
+      const wR = wrap.getBoundingClientRect()
+      const relX = clientX - wR.left
+      const relY = clientY - wR.top
+      tip.style.display = 'none'
+      const tipLeft = relX + 14 + tip.offsetWidth > wR.width ? relX - tip.offsetWidth - 10 : relX + 14
+      const tipTop  = Math.max(relY - 50, 8)
+      tip.innerHTML = `<div style="font-size:10px;opacity:.7;margin-bottom:2px">${def.label}</div><div style="font-size:16px;font-weight:700;color:${hi}">${fmtV(v)} <span style="font-size:11px;font-weight:400;opacity:.8">${def.unit}</span></div><div style="font-size:10px;opacity:.7;margin-top:2px">${tipLabel((count-idx)*stepMins, stepMins)}</div>`
+      tip.style.cssText = `display:block;position:absolute;pointer-events:none;background:rgba(28,28,30,.88);color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;z-index:10;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2);left:${tipLeft}px;top:${tipTop}px`
     }
     function onEnd() { cross.style.display='none'; dot.style.display='none'; tip.style.display='none' }
 
@@ -520,8 +527,13 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
     currentPeriod = e.target.value
     const customRow = layer.querySelector('#m-custom-row')
     customRow.style.display = currentPeriod === 'custom' ? 'flex' : 'none'
+    const stepSel = layer.querySelector('#m-step-sel')
+    stepSel.querySelectorAll('option[value="1h"]').forEach(o => o.remove())
+    if (currentPeriod !== 'j7j2') {
+      stepSel.insertAdjacentHTML('afterbegin', '<option value="1h">Horaire</option>')
+    }
+    stepSel.disabled = currentPeriod === 'j7j2'
     if (currentPeriod !== 'custom') {
-      const stepSel = layer.querySelector('#m-step-sel')
       stepSel.value = getDefaultStep(currentPeriod)
       currentStep = stepSel.value
     }

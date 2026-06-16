@@ -180,7 +180,7 @@ function render() {
   list.forEach(m => {
     const isAgent = m.role === 'agent'
     const memberOrgs    = isAgent ? orgs.filter(o => m.orgIds.includes(o.id)) : []
-    const memberParcels = plots.filter(p => m.parcelIds.includes(p.id))
+    const memberParcels = plots.filter(p => m.parcelIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'fr'))
     const excluded = m.excludedSensorIds || []
     const memberSensors = sensors.filter(s => m.parcelIds.includes(s.parcelId) && !excluded.includes(s.id))
 
@@ -293,7 +293,7 @@ function updateActionBar() {
         <span>Parcelle</span>
         <select id="bulk-plot-sel" class="bulk-select">
           <option value="">— choisir —</option>
-          ${plots.slice(0,30).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+          ${[...plots].sort((a,b)=>a.name.localeCompare(b.name,'fr')).slice(0,30).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
         </select>
       </label>
       <label class="bulk-action-group">
@@ -420,7 +420,7 @@ function renderAdherentMembers() {
   }
 
   tbody.innerHTML = list.map(m => {
-    const memberParcels = plots.filter(p => (m.parcelIds || []).includes(p.id))
+    const memberParcels = plots.filter(p => (m.parcelIds || []).includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'fr'))
     const memberSensors = sensors.filter(s => (m.sensorIds || []).includes(s.id))
     const parcelsHtml = memberParcels.length
       ? memberParcels.map(p => `<div class="admin-item-row"><a href="parcelle-detail.html?id=${p.id}" class="admin-link">${p.name}</a></div>`).join('')

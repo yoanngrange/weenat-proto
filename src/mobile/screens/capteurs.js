@@ -149,6 +149,7 @@ export function initCapteursScreen(screenEl, role) {
   }
 
   function getSensors() {
+    if (role === 'new' || role === 'new-adherent') return []
     if (isAdmin) {
       if (orgFilter === 'anomalies') return allSensors.filter(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
       if (orgFilter === 'all') return allSensors
@@ -245,7 +246,9 @@ export function initCapteursScreen(screenEl, role) {
               </div>
               ${valHtml}
             </div>`}).join('')}</div>`
-      : `<div class="m-empty-state"><i class="bi bi-broadcast"></i><p>Aucun capteur</p></div>`
+      : (role === 'new' || role === 'new-adherent')
+        ? `<div class="m-empty-state"><i class="bi bi-broadcast"></i><p>Vous n'avez pas encore de capteur</p><button onclick="window.showMobileAddPage?.()" style="margin-top:8px;background:#0172A4;color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer">Ajouter un capteur</button></div>`
+        : `<div class="m-empty-state"><i class="bi bi-broadcast"></i><p>Aucun capteur</p></div>`
 
     content.innerHTML = `
       <div class="m-screen-controls">
@@ -281,6 +284,25 @@ export function initCapteursScreen(screenEl, role) {
       const el = content.querySelector('#sensor-map'); if (!el) return
       mapInstance = L.map(el, { zoomControl: false, attributionControl: false })
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(mapInstance)
+      if (!sensors.length && (role === 'new' || role === 'new-adherent')) {
+        const org = orgs.find(o => o.id === ADHERENT_ORG_ID)
+        if (org) mapInstance.setView([org.lat, org.lng], 13)
+        mapInstance.invalidateSize()
+        const wrap = el.parentElement
+        wrap.style.position = 'relative'
+        const ov = document.createElement('div')
+        ov.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none'
+        ov.innerHTML = `
+          <div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:24px 20px;width:260px;text-align:center;pointer-events:auto">
+            <i class="bi bi-broadcast" style="font-size:36px;color:#0172A4;display:block;margin-bottom:12px"></i>
+            <p style="font-size:15px;font-weight:600;margin:0 0 6px;color:#1c1c1e">Vous n'avez pas encore de capteur</p>
+            <p style="font-size:13px;color:#8e8e93;margin:0 0 18px;line-height:1.4">Ajoutez votre premier capteur pour commencer à collecter des données.</p>
+            <button id="empty-add-sensor-btn" style="background:#0172A4;color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer;width:100%">Ajouter un capteur</button>
+          </div>`
+        wrap.appendChild(ov)
+        wrap.querySelector('#empty-add-sensor-btn').addEventListener('click', () => window.showMobileAddPage?.())
+        return
+      }
       const bounds = []
       sensors.forEach(s => {
         const pos = sensorPos(s); if (!pos) return

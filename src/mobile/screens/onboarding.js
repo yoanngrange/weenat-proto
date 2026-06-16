@@ -47,6 +47,11 @@ const OB_SENSOR_METRICS = {
   'CAPA-60-6': ['teneur', 'temp_sol'], 'EC': ['teneur', 'temp_sol'],
 }
 const OB_TENSIO_MODELS = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90'])
+const OB_TENSIO_DEPTH_RANGES = {
+  'CHP-15/30': [15, 30],
+  'CHP-30/60': [30, 60],
+  'CHP-60/90': [45, 90],
+}
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -916,6 +921,32 @@ export function showOnboarding(role, onComplete) {
     }, 50)
   }
 
+  const STEPS_NEEDING_VALIDATION = new Set(['orgInfo', 'networkChoice', 'networkPick', 'plan', 'payment', 'volumeChoice'])
+
+  function checkNextEnabled() {
+    const id = currentId()
+    if (!STEPS_NEEDING_VALIDATION.has(id)) return
+    const btn = overlay.querySelector('#ob-next')
+    if (!btn) return
+    let enabled = true
+    if (id === 'orgInfo') {
+      enabled = overlay.querySelectorAll('.m-ob-pill--on').length > 0
+    } else if (id === 'networkChoice') {
+      enabled = overlay.querySelectorAll('[data-join].m-ob-plan-card--on').length > 0
+    } else if (id === 'networkPick') {
+      enabled = overlay.querySelectorAll('[data-net].m-ob-net-row--on').length > 0
+    } else if (id === 'plan') {
+      enabled = overlay.querySelectorAll('.m-ob-sub-card--on').length > 0
+    } else if (id === 'payment') {
+      const inputs = overlay.querySelectorAll('.m-ob-form .m-ob-input')
+      enabled = [...inputs].every(i => i.value.trim().length > 0)
+    } else if (id === 'volumeChoice') {
+      enabled = overlay.querySelectorAll('[data-volume].m-ob-plan-card--on').length > 0
+    }
+    btn.disabled = !enabled
+    btn.style.opacity = enabled ? '' : '0.4'
+  }
+
   function bind() {
     overlay.querySelector('#ob-back')?.addEventListener('click', back)
     overlay.querySelectorAll('#ob-next').forEach(btn => btn.addEventListener('click', next))
@@ -958,6 +989,7 @@ export function showOnboarding(role, onComplete) {
       card.addEventListener('click', () => {
         joinNetwork = card.dataset.join === 'oui'
         overlay.querySelectorAll('[data-join]').forEach(c => c.classList.toggle('m-ob-plan-card--on', c === card))
+        checkNextEnabled()
       })
     })
 
@@ -969,6 +1001,7 @@ export function showOnboarding(role, onComplete) {
           r.classList.toggle('m-ob-net-row--on', isMe)
           r.querySelector('.bi').className = `bi bi-${isMe ? 'check-circle-fill' : 'circle'}`
         })
+        checkNextEnabled()
       })
     })
 
@@ -995,7 +1028,7 @@ export function showOnboarding(role, onComplete) {
 
     // Pills métiers
     overlay.querySelectorAll('.m-ob-pill').forEach(btn => {
-      btn.addEventListener('click', () => btn.classList.toggle('m-ob-pill--on'))
+      btn.addEventListener('click', () => { btn.classList.toggle('m-ob-pill--on'); checkNextEnabled() })
     })
 
     // Ajouter un membre
@@ -1090,6 +1123,7 @@ export function showOnboarding(role, onComplete) {
         overlay.querySelectorAll('[data-volume]').forEach(c => c.classList.toggle('m-ob-plan-card--on', c === card))
         const field = overlay.querySelector('#ob-volume-field')
         if (field) field.style.display = hasVolumeLimit ? 'block' : 'none'
+        checkNextEnabled()
       })
     })
 
@@ -1116,6 +1150,13 @@ export function showOnboarding(role, onComplete) {
       overlay.classList.add('m-ob-overlay--out')
       setTimeout(() => { overlay.remove(); onComplete() }, 400)
     })
+
+    // Payment fields
+    overlay.querySelectorAll('.m-ob-form .m-ob-input').forEach(inp => {
+      inp.addEventListener('input', checkNextEnabled)
+    })
+
+    checkNextEnabled()
   }
 
   paint()
@@ -1149,11 +1190,36 @@ function renderScannerScreen({ showBack = true, btnLabel = 'Ajouter', showSkip =
         </div>
         <div style="background:#fff;border-radius:20px;padding:16px 16px 4px;flex-shrink:0">
           <input class="m-ob-input" id="ob-sensor-serial" type="text" placeholder="Ou entrez le numéro de série du capteur" style="margin-bottom:12px">
+          <select class="m-ob-input m-ob-input--select" id="ob-sensor-model" style="margin-bottom:12px">
+            ${Object.entries(MODEL_DISPLAY_NAMES).map(([m, label]) => `<option value="${m}">${label} (${m})</option>`).join('')}
+          </select>
+          <div class="m-ob-field" id="ob-sensor-depth-field" style="display:none;margin-bottom:12px">
+            <label class="m-ob-label">Profondeur d'installation</label>
+            <select class="m-ob-input m-ob-input--select" id="ob-sensor-depth"></select>
+          </div>
           <button class="m-ob-cta" id="ob-next" style="margin:0 0 12px"><i class="bi bi-plus-lg"></i> ${btnLabel}</button>
           ${showSkip ? `<button class="m-ob-link" id="ob-skip-source" type="button" style="margin-bottom:8px">Passer cette étape</button>` : ''}
         </div>
       </div>
     </div>`
+}
+
+// Wires the model/depth selects in renderScannerScreen — call from each overlay's bind()
+function bindSensorDepthField(overlay) {
+  const modelSel = overlay.querySelector('#ob-sensor-model')
+  const depthField = overlay.querySelector('#ob-sensor-depth-field')
+  const depthSel = overlay.querySelector('#ob-sensor-depth')
+  if (!modelSel || !depthField || !depthSel) return
+  const update = () => {
+    const range = OB_TENSIO_DEPTH_RANGES[modelSel.value]
+    if (!range) { depthField.style.display = 'none'; return }
+    const opts = []
+    for (let d = range[0]; d <= range[1]; d += 5) opts.push(d)
+    depthSel.innerHTML = opts.map(d => `<option value="${d}">${d} cm</option>`).join('')
+    depthField.style.display = ''
+  }
+  modelSel.addEventListener('change', update)
+  update()
 }
 
 async function fetchCityName(lat, lng) {
@@ -1447,6 +1513,7 @@ export function showParcelCreation(onComplete) {
     overlay.querySelector('#ob-back')?.addEventListener('click', back)
     overlay.querySelector('#ob-close')?.addEventListener('click', close)
     overlay.querySelectorAll('#ob-next').forEach(btn => btn.addEventListener('click', next))
+    bindSensorDepthField(overlay)
 
     overlay.querySelectorAll('[data-psource]').forEach(card => {
       card.addEventListener('click', () => {
@@ -1532,6 +1599,7 @@ export function showSensorCreation(onComplete) {
     overlay.querySelector('#ob-next')?.addEventListener('click', next)
     overlay.querySelector('#ob-see-sensor')?.addEventListener('click', close)
     overlay.querySelector('#ob-finish')?.addEventListener('click', close)
+    bindSensorDepthField(overlay)
   }
 
   function paint() {

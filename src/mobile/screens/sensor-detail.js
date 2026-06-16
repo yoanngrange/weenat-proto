@@ -19,6 +19,227 @@ const WF_MAX = 4  // max mesures favorites (cf. dashboard.js)
 const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
 const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
 
+// ─── Anomaly resolution content ───────────────────────────────────────────────
+const ANOMALY_RESOLUTION = {
+  'cuillère bloquée': {
+    icon: 'bi-droplet-fill',
+    summary: 'La cuillère du pluviomètre ne se déverse pas correctement. Les mesures de pluie peuvent être inexactes ou nulles.',
+    causes: [
+      'Feuilles, insectes ou toiles d\'araignées obstruant l\'entonnoir',
+      'Corps étranger bloquant l\'axe de rotation de la cuillère',
+      'Dépôts calcaires ou algues dans le mécanisme',
+      'Capteur installé hors niveau (non vertical)',
+      'Gel partiel du mécanisme en période froide',
+    ],
+    solutions: [
+      { n: 1, title: 'Inspecter l\'entonnoir', desc: 'Retirez toute feuille, insecte ou débris présent dans l\'entonnoir. Inspectez visuellement la cuillère.' },
+      { n: 2, title: 'Tester la cuillère manuellement', desc: 'Appuyez alternativement sur chaque compartiment de la cuillère : elle doit basculer librement d\'un côté à l\'autre.' },
+      { n: 3, title: 'Rincer à l\'eau claire', desc: 'Versez lentement de l\'eau claire dans l\'entonnoir. Évitez les détergents qui pourraient laisser des résidus affectant les mesures.' },
+      { n: 4, title: 'Vérifier la verticalité', desc: 'Assurez-vous que le mat ou le support est bien vertical à l\'aide d\'un niveau à bulle. Une inclinaison de 5° peut bloquer la cuillère.' },
+      { n: 5, title: 'Observer les prochaines pluies', desc: 'Si l\'anomalie persiste après la prochaine pluie, comparez avec une station voisine. Contactez le support si nécessaire.' },
+    ],
+    diag: [
+      { label: 'Dernière mesure de pluie', hint: 'Vérifiez si des pluies ont bien été comptabilisées récemment' },
+      { label: 'Station voisine', hint: 'Comparez avec un autre capteur P ou P+ proche' },
+      { label: 'Historique nettoyage', hint: 'Vérifiez le journal de maintenance du capteur' },
+      { label: 'Saison', hint: 'Automne/hiver : vérifiez la présence de gel ou feuilles' },
+    ],
+  },
+  'capteur couché': {
+    icon: 'bi-phone-landscape',
+    summary: 'Le capteur a détecté une position anormale (inclinaison excessive). Les mesures météo peuvent être perturbées.',
+    causes: [
+      'Coup de vent violent ayant renversé ou incliné le support',
+      'Choc accidentel (passage d\'engins agricoles, animaux)',
+      'Support ou mat inadapté, insuffisamment ancré',
+      'Affaissement du sol après forte pluie',
+      'Neige ou givre ayant alourdi le capteur',
+    ],
+    solutions: [
+      { n: 1, title: 'Se rendre sur site', desc: 'Vérifiez visuellement l\'état du capteur et de son support.' },
+      { n: 2, title: 'Redresser et fixer le support', desc: 'Remettez le mat en position verticale. Utilisez un niveau à bulle pour vérifier. Renforcez l\'ancrage si nécessaire.' },
+      { n: 3, title: 'Vérifier l\'intégrité du capteur', desc: 'Inspectez le boîtier, l\'antenne et les capteurs externes (anémomètre, girouette, pluvio) pour tout dommage visible.' },
+      { n: 4, title: 'Contrôler la qualité du signal', desc: 'Après remise en place, vérifiez que les émissions reprennent normalement et que le signal est bon.' },
+      { n: 5, title: 'Signaler l\'anomalie résolue', desc: 'Utilisez le bouton "Arrêter" pour clore l\'anomalie une fois le capteur en position correcte.' },
+    ],
+    diag: [
+      { label: 'Qualité du signal', hint: 'Un signal dégradé peut indiquer un problème d\'antenne' },
+      { label: 'Date de l\'anomalie', hint: 'Correspond-elle à un épisode météo violent ?' },
+      { label: 'Type de support', hint: 'Mat télescopique, piquet, fixation murale ?' },
+      { label: 'Accès terrain', hint: 'Vérifiez si la parcelle est accessible (engins, conditions météo)' },
+    ],
+  },
+  'émissions interrompues': {
+    icon: 'bi-wifi-off',
+    summary: 'Le capteur n\'émet plus de données. Aucune mesure n\'a été reçue depuis un moment anormalement long.',
+    causes: [
+      'Batterie déchargée ou défaillante',
+      'Perte de couverture réseau télécom (Sigfox / LoRa)',
+      'Obstruction physique du signal (bâtiment, relief, végétation)',
+      'Défaillance électronique interne',
+      'Exposition à l\'eau ou à l\'humidité excessive (joint endommagé)',
+    ],
+    solutions: [
+      { n: 1, title: 'Vérifier le niveau de batterie', desc: 'Accédez aux paramètres du capteur et consultez l\'indicateur de batterie. Si critique, procédez au remplacement.' },
+      { n: 2, title: 'Contrôler la couverture réseau', desc: 'Vérifiez la carte de couverture Sigfox ou LoRa pour l\'emplacement du capteur. Un déplacement de quelques mètres peut suffire.' },
+      { n: 3, title: 'Relancer manuellement', desc: 'Sur certains modèles, un appui court sur le bouton d\'activation peut forcer une tentative d\'émission. Consultez la notice.' },
+      { n: 4, title: 'Inspecter l\'étanchéité', desc: 'Vérifiez l\'état des joints et du boîtier. Une infiltration d\'eau peut provoquer des courts-circuits.' },
+      { n: 5, title: 'Contacter le support', desc: 'Si les étapes précédentes n\'ont pas résolu le problème, le capteur peut nécessiter une réparation ou un remplacement.' },
+    ],
+    diag: [
+      { label: 'Dernière émission', hint: 'Il y a combien de temps ? Heure/jour de la dernière trame reçue' },
+      { label: 'Couverture réseau', hint: 'Vérifiez sur la carte de couverture opérateur' },
+      { label: 'Batterie', hint: 'Niveau batterie lors de la dernière émission connue' },
+      { label: 'Météo récente', hint: 'Orage, forte pluie, gel ayant pu affecter le capteur' },
+    ],
+  },
+  'capteur déplacé': {
+    icon: 'bi-geo-alt',
+    summary: 'Le capteur a été détecté à un emplacement différent de sa position habituelle.',
+    causes: [
+      'Déplacement intentionnel non enregistré dans l\'application',
+      'Vol ou déplacement non autorisé du capteur',
+      'Dérive GPS en cas de signal GNSS perturbé',
+      'Déplacement lors d\'opérations agricoles (travaux, irrigation)',
+    ],
+    solutions: [
+      { n: 1, title: 'Vérifier la position actuelle', desc: 'Rendez-vous sur site pour confirmer l\'emplacement physique du capteur.' },
+      { n: 2, title: 'Mettre à jour la position', desc: 'Si le capteur a été déplacé intentionnellement, mettez à jour sa géolocalisation dans les paramètres.' },
+      { n: 3, title: 'Signaler un vol', desc: 'Si le capteur a disparu, contactez les autorités et le support Weenat pour signalement et désactivation.' },
+      { n: 4, title: 'Clore l\'anomalie', desc: 'Une fois la situation clarifiée, utilisez le bouton "Arrêter" pour clore l\'événement.' },
+    ],
+    diag: [
+      { label: 'Coordonnées initiales', hint: 'Comparez avec les coordonnées enregistrées dans les paramètres' },
+      { label: 'Dernier passage', hint: 'Qui a eu accès à la parcelle récemment ?' },
+      { label: 'Signal GPS', hint: 'Un signal faible peut fausser la localisation sans déplacement réel' },
+    ],
+  },
+}
+
+function openAnomalyResolution(ev, sensor) {
+  const res = ANOMALY_RESOLUTION[ev] || {
+    icon: 'bi-exclamation-triangle',
+    summary: 'Anomalie détectée sur ce capteur.',
+    causes: ['Cause inconnue — contactez le support pour plus d\'informations.'],
+    solutions: [{ n: 1, title: 'Contacter le support', desc: 'Décrivez l\'anomalie observée pour obtenir de l\'aide.' }],
+    diag: [],
+  }
+
+  let activeTab = 'causes'
+
+  function tabHTML(id, label, active) {
+    return `<button class="m-anom-tab" data-tab="${id}" style="flex:1;padding:10px 4px;background:none;border:none;border-bottom:2px solid ${active ? '#0172A4' : 'transparent'};font-size:13px;font-weight:${active ? '600' : '400'};color:${active ? '#0172A4' : '#8e8e93'};cursor:pointer;font-family:inherit;white-space:nowrap">${label}</button>`
+  }
+
+  function causesHTML() {
+    return `<ul style="margin:0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:10px">
+      ${res.causes.map(c => `<li style="font-size:14px;color:#1c1c1e;line-height:1.5">${c}</li>`).join('')}
+    </ul>`
+  }
+
+  function solutionsHTML() {
+    return res.solutions.map(s => `
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #f2f2f7">
+        <div style="min-width:28px;height:28px;border-radius:50%;background:#0172A4;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${s.n}</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#1c1c1e;margin-bottom:3px">${s.title}</div>
+          <div style="font-size:13px;color:#636366;line-height:1.5">${s.desc}</div>
+        </div>
+      </div>`).join('')
+  }
+
+  function supportHTML() {
+    return `<div style="display:flex;flex-direction:column;gap:12px">
+      <p style="font-size:14px;color:#636366;line-height:1.5;margin:0 0 4px">Si les solutions proposées n'ont pas résolu le problème, l'équipe support Weenat est disponible pour vous aider.</p>
+
+      <a href="mailto:support@weenat.com" style="display:flex;align-items:center;gap:12px;background:#f5f5f7;border-radius:12px;padding:14px 16px;text-decoration:none;color:#1c1c1e">
+        <i class="bi bi-envelope-fill" style="font-size:20px;color:#0172A4;flex-shrink:0"></i>
+        <div>
+          <div style="font-size:13px;font-weight:600">Email</div>
+          <div style="font-size:13px;color:#0172A4">support@weenat.com</div>
+        </div>
+      </a>
+
+      <a href="tel:+33784968456" style="display:flex;align-items:center;gap:12px;background:#f5f5f7;border-radius:12px;padding:14px 16px;text-decoration:none;color:#1c1c1e">
+        <i class="bi bi-telephone-fill" style="font-size:20px;color:#30d158;flex-shrink:0"></i>
+        <div>
+          <div style="font-size:13px;font-weight:600">Téléphone</div>
+          <div style="font-size:13px;color:#30d158">+33 7 84 96 84 56</div>
+          <div style="font-size:11px;color:#8e8e93">Lun–Jeu 9h–18h · Ven 9h–17h</div>
+        </div>
+      </a>
+
+      <a href="https://support.weenat.com/" target="_blank" style="display:flex;align-items:center;gap:12px;background:#f5f5f7;border-radius:12px;padding:14px 16px;text-decoration:none;color:#1c1c1e">
+        <i class="bi bi-book-fill" style="font-size:20px;color:#ff9f0a;flex-shrink:0"></i>
+        <div>
+          <div style="font-size:13px;font-weight:600">Centre d'aide</div>
+          <div style="font-size:13px;color:#ff9f0a">support.weenat.com</div>
+        </div>
+      </a>
+
+      <div style="margin-top:4px;padding:12px;background:#fff8e8;border-radius:10px;border:1px solid #ffcc00">
+        <div style="font-size:12px;font-weight:600;color:#1c1c1e;margin-bottom:3px">Informations à préparer</div>
+        <ul style="margin:0;padding-left:16px;font-size:12px;color:#636366;line-height:1.6">
+          <li>Numéro de série : <strong>${sensor.serial}</strong></li>
+          <li>Modèle : <strong>${sensor.model}</strong></li>
+          <li>Anomalie signalée : <strong>${ev}</strong></li>
+        </ul>
+      </div>
+    </div>`
+  }
+
+  function tabsBar() {
+    return `
+      <div style="display:flex;border-bottom:1px solid #e5e5ea;background:#fff">
+        ${tabHTML('causes',    'Causes',    activeTab === 'causes')}
+        ${tabHTML('solutions', 'Solutions', activeTab === 'solutions')}
+        ${tabHTML('support',   'Support',   activeTab === 'support')}
+      </div>`
+  }
+
+  function contentHTML() {
+    if (activeTab === 'causes')    return causesHTML()
+    if (activeTab === 'solutions') return solutionsHTML()
+    return supportHTML()
+  }
+
+  const lay = pushDetail(`
+    <div class="m-detail-header" style="flex-shrink:0">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back" id="anom-back"><i class="bi bi-chevron-left"></i><span>Capteur</span></button>
+      </div>
+      <div style="padding:0 16px 12px;display:flex;align-items:center;gap:10px">
+        <i class="bi bi-exclamation-triangle-fill" style="color:#ff3b30;font-size:18px;flex-shrink:0"></i>
+        <div>
+          <div style="font-size:17px;font-weight:700;color:#1c1c1e">${ev.charAt(0).toUpperCase() + ev.slice(1)}</div>
+          <div style="font-size:12px;color:#8e8e93">${sensor.model} ${sensor.serial}</div>
+        </div>
+      </div>
+    </div>
+    <div id="anom-tabs-bar" style="flex-shrink:0">${tabsBar()}</div>
+    <div style="flex:1;overflow-y:auto">
+      <div style="padding:16px">
+        <p style="font-size:13px;color:#636366;line-height:1.5;margin:0 0 16px;padding:12px;background:#fff3f3;border-radius:10px;border-left:3px solid #ff3b30">${res.summary}</p>
+        <div id="anom-content">${contentHTML()}</div>
+      </div>
+    </div>
+  `)
+
+  lay.querySelector('#anom-back').addEventListener('click', popDetail)
+
+  function bindTabs() {
+    lay.querySelectorAll('.m-anom-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeTab = btn.dataset.tab
+        lay.querySelector('#anom-tabs-bar').innerHTML = tabsBar()
+        lay.querySelector('#anom-content').innerHTML = contentHTML()
+        bindTabs()
+      })
+    })
+  }
+  bindTabs()
+}
+
 // ─── Model metadata (iso web) ─────────────────────────────────────────────────
 const MODEL_NAMES = {
   'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
@@ -40,8 +261,8 @@ const MODEL_BRANDS = {
 
 function chpDepthRange(model) {
   if (model === 'CHP-15/30') return [15, 30]
-  if (model === 'CHP-30/60') return [15, 60]
-  if (model === 'CHP-60/90') return [15, 90]
+  if (model === 'CHP-30/60') return [30, 60]
+  if (model === 'CHP-60/90') return [45, 90]
   return null
 }
 
@@ -439,12 +660,15 @@ function paramsView(sensor) {
         ${events.length
           ? events.map((ev, idx) => {
               const canStop = ev.toLowerCase().includes('déplacé')
-              return `<div class="m-list-row" style="justify-content:space-between;gap:10px">
+              return `<div class="m-list-row m-ev-row" data-ev-idx="${idx}" style="justify-content:space-between;gap:10px;cursor:pointer">
                 <div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden">
                   <i class="bi bi-exclamation-triangle-fill" style="color:#ff3b30;flex-shrink:0"></i>
                   <span class="m-list-row-label" style="color:#ff3b30">${ev}</span>
                 </div>
-                ${canStop ? `<button class="ev-stop-btn" data-ev-idx="${idx}" style="flex-shrink:0;background:rgba(255,59,48,.1);border:1px solid #ff3b30;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff3b30;font-family:inherit;cursor:pointer;white-space:nowrap">Arrêter</button>` : ''}
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                  ${canStop ? `<button class="ev-stop-btn" data-ev-idx="${idx}" style="background:rgba(255,59,48,.1);border:1px solid #ff3b30;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff3b30;font-family:inherit;cursor:pointer;white-space:nowrap">Arrêter</button>` : ''}
+                  <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:12px"></i>
+                </div>
               </div>`
             }).join('')
           : '<div class="m-list-row"><i class="bi bi-check-circle-fill" style="color:#30d158"></i><span class="m-list-row-label">Aucun événement en cours</span></div>'}
@@ -659,6 +883,14 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
         renderView()
       })
     })
+    layer.querySelectorAll('.m-ev-row').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.ev-stop-btn')) return
+        const idx = +row.dataset.evIdx
+        const events = sensor.event ? (Array.isArray(sensor.event) ? sensor.event : [sensor.event]) : []
+        if (events[idx]) openAnomalyResolution(events[idx], sensor)
+      })
+    })
     layer.querySelectorAll('[data-unlink-plot-btn]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
@@ -775,9 +1007,9 @@ function openPlotPicker(sensor, role, onChanged) {
 
   function renderList(query = '') {
     const q = query.toLowerCase()
-    const filtered = q
+    const filtered = (q
       ? plots.filter(p => p.name.toLowerCase().includes(q) || (p.crop || '').toLowerCase().includes(q))
-      : plots
+      : plots).slice().sort((a, b) => a.name.localeCompare(b.name, 'fr'))
     const listEl = body.querySelector('#plot-list')
     if (!filtered.length) {
       listEl.innerHTML = `<div style="text-align:center;padding:28px 16px;color:#8e8e93;font-size:14px">Aucune parcelle trouvée</div>`

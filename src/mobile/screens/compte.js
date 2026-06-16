@@ -1,3 +1,107 @@
+import { pushDetail, popDetail } from '../nav.js'
+
+// ─── Notification settings ────────────────────────────────────────────────────
+const NOTIF_CATS = [
+  { key: 'orgs',     label: 'Organisations', icon: 'bi-building',  desc: 'Ajouts de membres, changements d\'organisation, nouvelles exploitations' },
+  { key: 'capteurs', label: 'Capteurs',       icon: 'bi-broadcast', desc: 'Anomalies, changements d\'état, mise à jour firmware' },
+  { key: 'alertes',  label: 'Alertes',        icon: 'bi-bell',      desc: 'Déclenchements de seuils et alertes météo configurées' },
+]
+const NOTIF_CHANNELS = [
+  { key: 'email', label: 'Email',             icon: 'bi-envelope' },
+  { key: 'sms',   label: 'SMS',               icon: 'bi-phone' },
+  { key: 'push',  label: 'Push',              icon: 'bi-bell' },
+]
+const NOTIF_PERIMETERS = ['Mon réseau', 'Mon organisation', 'Mon secteur']
+const NOTIF_DEFAULT_PERIMETERS = { orgs: 'Mon organisation', capteurs: 'Mon réseau', alertes: 'Mon secteur' }
+const NOTIF_DEFAULT_STATE = {
+  orgs:     { email: true,  sms: false, push: true  },
+  capteurs: { email: true,  sms: false, push: true  },
+  alertes:  { email: true,  sms: true,  push: true  },
+}
+
+function openNotifSettings(parentShowToast) {
+  let notifState = (() => {
+    try { return JSON.parse(localStorage.getItem('weenat-mobile-notif')) || JSON.parse(JSON.stringify(NOTIF_DEFAULT_STATE)) }
+    catch { return JSON.parse(JSON.stringify(NOTIF_DEFAULT_STATE)) }
+  })()
+  let periState = (() => {
+    try { return JSON.parse(localStorage.getItem('weenat-mobile-notif-peri')) || JSON.parse(JSON.stringify(NOTIF_DEFAULT_PERIMETERS)) }
+    catch { return JSON.parse(JSON.stringify(NOTIF_DEFAULT_PERIMETERS)) }
+  })()
+
+  function save() {
+    localStorage.setItem('weenat-mobile-notif', JSON.stringify(notifState))
+    localStorage.setItem('weenat-mobile-notif-peri', JSON.stringify(periState))
+    parentShowToast('Préférences enregistrées')
+  }
+
+  function catSection(cat) {
+    const st = notifState[cat.key] || {}
+    const peri = periState[cat.key] || NOTIF_DEFAULT_PERIMETERS[cat.key]
+    return `
+      <div class="m-list-section-header" style="display:flex;align-items:center;gap:6px">
+        <i class="bi ${cat.icon}" style="font-size:13px"></i> ${cat.label}
+      </div>
+      <p style="font-size:12px;color:#8e8e93;margin:0 16px 8px;line-height:1.4">${cat.desc}</p>
+      <div class="m-list">
+        ${NOTIF_CHANNELS.map((ch, ci) => {
+          const isLast = ci === NOTIF_CHANNELS.length - 1 && true
+          return `<div class="m-list-row${isLast ? '' : ''}">
+            <i class="bi ${ch.icon}" style="color:#636366;font-size:14px;flex-shrink:0;width:20px;text-align:center"></i>
+            <span class="m-list-row-label">${ch.label}</span>
+            <label class="m-toggle">
+              <input type="checkbox" class="notif-toggle" data-cat="${cat.key}" data-ch="${ch.key}" ${st[ch.key] ? 'checked' : ''}>
+              <span class="m-toggle-track"></span>
+            </label>
+          </div>`
+        }).join('')}
+        <div class="m-list-row m-list-row--last" style="align-items:center;gap:8px">
+          <i class="bi bi-geo-alt" style="color:#636366;font-size:14px;flex-shrink:0;width:20px;text-align:center"></i>
+          <span class="m-list-row-label">Périmètre</span>
+          <select class="notif-peri-sel" data-cat="${cat.key}" style="border:none;background:transparent;font-size:14px;color:#636366;font-family:inherit;text-align:right;flex:1;min-width:0;outline:none;cursor:pointer">
+            ${NOTIF_PERIMETERS.map(p => `<option value="${p}"${p === peri ? ' selected' : ''}>${p}</option>`).join('')}
+          </select>
+        </div>
+      </div>`
+  }
+
+  const lay = pushDetail(`
+    <div class="m-detail-header" style="flex-shrink:0">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back" id="notif-back"><i class="bi bi-chevron-left"></i><span>Compte</span></button>
+      </div>
+      <div style="padding:0 16px 12px">
+        <div style="font-size:20px;font-weight:700;color:#1c1c1e">Notifications</div>
+        <div style="font-size:13px;color:#8e8e93;margin-top:2px">Choisissez comment et pour quoi être notifié</div>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding-bottom:32px">
+      ${NOTIF_CATS.map(c => catSection(c)).join('')}
+      <div class="m-list-section-footer" style="margin-top:8px">
+        Les alertes de seuil se configurent depuis la section <strong>Alertes</strong> de l'application.
+      </div>
+    </div>
+  `)
+
+  lay.querySelector('#notif-back').addEventListener('click', popDetail)
+
+  lay.querySelectorAll('.notif-toggle').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const cat = cb.dataset.cat
+      const ch  = cb.dataset.ch
+      notifState[cat][ch] = cb.checked
+      save()
+    })
+  })
+
+  lay.querySelectorAll('.notif-peri-sel').forEach(sel => {
+    sel.addEventListener('change', () => {
+      periState[sel.dataset.cat] = sel.value
+      save()
+    })
+  })
+}
+
 const PROFILES = {
   admin: {
     initials: 'JD', prenom: 'Jean', nom: 'Dupont',
@@ -264,20 +368,13 @@ export function initCompteScreen(container, role) {
 
       <div class="m-list-section-header">Notifications</div>
       <div class="m-list">
-        <div class="m-list-row">
-          <span class="m-list-row-label">Email</span>
-          <label class="m-toggle"><input type="checkbox" checked data-notif="email"><span class="m-toggle-track"></span></label>
-        </div>
-        <div class="m-list-row">
-          <span class="m-list-row-label">SMS</span>
-          <label class="m-toggle"><input type="checkbox" data-notif="sms"><span class="m-toggle-track"></span></label>
-        </div>
-        <div class="m-list-row m-list-row--last">
-          <span class="m-list-row-label">Notification push</span>
-          <label class="m-toggle"><input type="checkbox" checked data-notif="push"><span class="m-toggle-track"></span></label>
+        <div class="m-list-row m-list-row--last" data-action="notif-settings" style="cursor:pointer">
+          <i class="bi bi-bell" style="color:#636366;font-size:16px;flex-shrink:0"></i>
+          <span class="m-list-row-label">Paramétrage des notifications</span>
+          <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
       </div>
-      <div class="m-list-section-footer">Les notifications concernent les parcelles, capteurs, et les membres. Les alertes sont paramétrables depuis la section « Alertes ».</div>
+      <div class="m-list-section-footer">Email, SMS et push par catégorie et périmètre.</div>
 
       <div class="m-list-section-header">Préférences</div>
       <div class="m-list">
@@ -351,19 +448,24 @@ export function initCompteScreen(container, role) {
           case 'phones':
             showPhonesSheet(p.phones, phones => { p.phones = phones; render() })
             break
-          case 'mdp':
-            showSheet({
-              title: 'Mot de passe',
-              body: Object.assign(document.createElement('div'), {
-                innerHTML: `
-                  <input class="m-sheet-input" type="password" placeholder="Mot de passe actuel" id="mdp-old">
-                  <input class="m-sheet-input" type="password" placeholder="Nouveau mot de passe" id="mdp-new">
-                  <input class="m-sheet-input" type="password" placeholder="Confirmer le nouveau" id="mdp-conf">
-                `
-              }),
-              doneLabel: 'Modifier', onDone: () => showToast('Fonctionnalité à venir')
+          case 'mdp': {
+            const body = document.createElement('div')
+            body.innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px">
+                <div style="width:56px;height:56px;border-radius:50%;background:rgba(0,122,255,.1);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
+                  <i class="bi bi-envelope-at" style="font-size:26px;color:#007aff"></i>
+                </div>
+                <p style="font-size:14px;color:#636366;line-height:1.5;margin:0 0 20px">Un e-mail de réinitialisation sera envoyé à <strong>${p.email}</strong>. Vous pourrez ensuite définir un nouveau mot de passe.</p>
+                <button id="send-reset-btn" style="background:#007aff;color:#fff;border:none;border-radius:12px;padding:14px 0;font-size:16px;font-weight:600;cursor:pointer;width:100%">Envoyer l'e-mail</button>
+              </div>`
+            const sheet = showSheet({ title: 'Réinitialiser le mot de passe', body, doneLabel: 'Annuler', onDone: () => {} })
+            body.querySelector('#send-reset-btn').addEventListener('click', () => {
+              sheet.classList.remove('m-sheet-overlay--show')
+              setTimeout(() => sheet.remove(), 280)
+              showToast('E-mail de réinitialisation envoyé')
             })
             break
+          }
           case 'langue':
             showOptionPicker('Langue', LANGUES, state.langue, v => {
               state.langue = v
@@ -379,6 +481,9 @@ export function initCompteScreen(container, role) {
           case 'gen-key':
             showGenerateKeySheet(key => { p.apiKeys.push(key); render() })
             break
+          case 'notif-settings':
+            openNotifSettings(showToast)
+            break
           case 'delete':
             showToast('Contactez le support pour supprimer votre compte')
             break
@@ -392,11 +497,6 @@ export function initCompteScreen(container, role) {
         const key = p.apiKeys.find(k => k.id === +row.dataset.keyId)
         if (key) showApiKeyDetail(key, p.apiKeys, render)
       })
-    })
-
-    // Notification toggles
-    container.querySelectorAll('.m-toggle input[data-notif]').forEach(t => {
-      t.addEventListener('change', () => showToast('Préférence enregistrée'))
     })
   }
 

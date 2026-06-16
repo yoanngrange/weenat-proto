@@ -1,8 +1,24 @@
 import { pushDetail, popDetail, clearDirty } from '../nav.js'
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../../data/irrigations.js'
+import { sensors } from '../../data/sensors.js'
 import { patchParcel } from '../../data/store.js'
 import { IRRIG_TYPES } from '../../data/constants.js'
 import { addMJournalEntry } from '../journal-store.js'
+
+export function goToPlot(plotId, plotsList, backLabel = 'Irrigations', scrollToWidget = null) {
+  const plot = plotsList.find(p => p.id === +plotId)
+  if (!plot) return
+  const linked = sensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
+  import('./parcel-detail.js').then(m => {
+    m.initParcelDetail(plot, linked, 'widgets', backLabel)
+    if (scrollToWidget) {
+      setTimeout(() => {
+        document.querySelector(`[data-widget-id="${scrollToWidget}"], #${scrollToWidget}`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 150)
+    }
+  })
+}
 
 function initFakeScrollbars(container) {
   container.querySelectorAll('.irr-zone').forEach(zone => {
@@ -306,6 +322,22 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
   let fin   = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
   let qty   = 10
   let freq  = 7
+  let origDebut = null
+  let origFin   = null
+
+  if (replaceSeasonIds) {
+    const existing = IRRIG_SEASON.filter(i => i.fromStrategy && replaceSeasonIds.has(i.seasonId))
+    if (existing.length) {
+      const isos = existing.map(i => i.iso).sort()
+      debut = isos[0]
+      fin   = isos[isos.length - 1]
+      qty   = existing[0].mm
+      const uniqIsos = [...new Set(isos)]
+      freq  = uniqIsos.length >= 2 ? Math.round((new Date(uniqIsos[1]) - new Date(uniqIsos[0])) / 86400000) : 7
+      origDebut = debut
+      origFin   = fin
+    }
+  }
 
   function computeOccs() {
     if (!debut || !fin || freq <= 0) return []
@@ -438,14 +470,18 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
     const occs = computeOccs()
-    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds, backToParcel)
+    openStrategieApercu(layer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds, backToParcel, onBack, origDebut, origFin)
   })
 }
 
 // ─── Aperçu stratégie ─────────────────────────────────────────────────────────
 
-function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds = null, backToParcel = false) {
+function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, freq, occs, showToast, preselect, replaceSeasonIds = null, backToParcel = false, onBack = null, origDebut = null, origFin = null) {
   const n = selectedIds.size
+  const datesChanged = !!replaceSeasonIds && (debut !== origDebut || fin !== origFin)
+  const scopeMsg = datesChanged
+    ? `Les dates de la saison ont été modifiées : ces changements s'appliqueront à <strong>toute la saison</strong>, y compris les irrigations déjà effectuées.`
+    : `La quantité et/ou la fréquence ont été modifiées sans changer les dates : ces changements ne s'appliqueront <strong>qu'aux irrigations à partir de demain</strong>. Les irrigations déjà effectuées ou prévues jusqu'à aujourd'hui restent inchangées.`
 
   const MAX_VISIBLE = 5
   const rest = occs.length - MAX_VISIBLE
@@ -465,9 +501,11 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
   const visibleFut = futureOccs.slice(0, MAX_VISIBLE)
   const restFut    = futureOccs.slice(MAX_VISIBLE)
 
-  const pastSection = pastOccs.length ? `
+  const pastSection = `
     <div class="irr-section-lbl" style="margin-top:0;margin-bottom:4px">Irrigations effectuées</div>
-    ${pastOccs.map(makeOccRow).join('')}` : ''
+    ${pastOccs.length
+      ? pastOccs.map(makeOccRow).join('')
+      : `<div style="font-size:13px;color:#9E9D98;padding:8px 0">Aucune irrigation effectuée</div>`}`
 
   const futureSection = futureOccs.length ? `
     <div class="irr-section-lbl" style="margin-top:${pastOccs.length ? '12px' : '0'};margin-bottom:4px">Irrigations planifiées</div>
@@ -501,6 +539,14 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
         ${futureSection}
         ${!pastOccs.length && !futureOccs.length ? '<div style="font-size:13px;color:#8e8e93;text-align:center;padding:8px 0">Aucune irrigation</div>' : ''}
       </div>
+      ${replaceSeasonIds ? `
+      <div class="irr-stop-confirm" style="margin-top:12px">
+        <div style="font-size:12px;font-weight:600;color:#7A3A00;margin-bottom:8px">${scopeMsg}</div>
+        <div id="apercu-edit-confirm" style="display:none;gap:8px">
+          <button class="irr-scope-btn" id="apercu-edit-cancel">Annuler</button>
+          <button class="irr-scope-btn irr-scope-btn--danger" id="apercu-edit-confirm-btn">Confirmer la modification</button>
+        </div>
+      </div>` : ''}
       <div class="irr-bottom-spacer"></div>
     </div>
     <div class="irr-bottom-bar">
@@ -517,16 +563,25 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
     e.target.remove()
   })
 
-  layer.querySelector('#apercu-confirm').addEventListener('click', () => {
+  function applyChanges() {
     const ids = preselect ? new Set(preselect.ids) : selectedIds
     askIrrigTypeIfNeeded(ids, plots, () => {
       if (replaceSeasonIds) {
-        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
-          ...IRRIG_SEASON.filter(i => !(replaceSeasonIds.has(i.seasonId) && i.fromStrategy && !i.real))
-        )
+        if (datesChanged) {
+          // Toute la saison est régénérée, y compris les irrigations passées
+          IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+            ...IRRIG_SEASON.filter(i => !(replaceSeasonIds.has(i.seasonId) && i.fromStrategy))
+          )
+        } else {
+          // Seules les irrigations à partir de demain sont remplacées
+          IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+            ...IRRIG_SEASON.filter(i => !(replaceSeasonIds.has(i.seasonId) && i.fromStrategy && i.iso > TODAY))
+          )
+        }
       }
+      const occsToAdd = (replaceSeasonIds && !datesChanged) ? occs.filter(d => d.toISOString().slice(0, 10) > TODAY) : occs
       const seasonId = generateSeasonId()
-      occs.forEach(d => {
+      occsToAdd.forEach(d => {
         const iso = d.toISOString().slice(0, 10)
         ids.forEach(plotId => {
           IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId })
@@ -534,11 +589,12 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
       })
       saveIrrig()
       if (replaceSeasonIds) {
+        const scopeTxt = datesChanged ? 'sur toute la saison' : 'à partir de demain'
         ids.forEach(plotId => {
           addMJournalEntry(plotId, {
             type: 'modification',
             date: TODAY,
-            texte: `Saison d'irrigation modifiée : ${qty} mm tous les ${freq} jours, du ${fmtDateShort(debut)} au ${fmtDateShort(fin)} (${occs.length} irrigations).`,
+            texte: `Saison d'irrigation modifiée (${scopeTxt}) : ${qty} mm tous les ${freq} jours, du ${fmtDateShort(debut)} au ${fmtDateShort(fin)} (${occs.length} irrigations).`,
           })
         })
       }
@@ -558,7 +614,21 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
         parcelSections, isFut: true, plots, calFilter, addedCount: occs.length * ids.size, stackDepth: 2, backToParcel, onBack,
       })
     })
+  }
+
+  layer.querySelector('#apercu-confirm').addEventListener('click', () => {
+    if (replaceSeasonIds) {
+      layer.querySelector('#apercu-edit-confirm').style.display = 'flex'
+      layer.querySelector('#apercu-edit-confirm').scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    applyChanges()
   })
+
+  layer.querySelector('#apercu-edit-cancel')?.addEventListener('click', () => {
+    layer.querySelector('#apercu-edit-confirm').style.display = 'none'
+  })
+  layer.querySelector('#apercu-edit-confirm-btn')?.addEventListener('click', applyChanges)
 }
 
 // ─── Tour d'eau Enrouleur ─────────────────────────────────────────────────────
@@ -1032,6 +1102,10 @@ export function openCalendar(plots, initialFilter) {
       )
     }
 
+    function hasPonctuelles() {
+      return IRRIG_SEASON.some(i => i.plotId === plotId && !i.fromStrategy)
+    }
+
     function renderBody() {
       bodyEl.innerHTML = `
         <div class="irr-strat-opt" id="strat-modify">
@@ -1066,6 +1140,7 @@ export function openCalendar(plots, initialFilter) {
         ${showDeleteConfirm ? `
         <div class="irr-stop-confirm">
           <div style="font-size:12px;font-weight:600;color:#7A3A00;margin-bottom:8px">Supprimer toutes les irrigations de cette saison ?</div>
+          ${hasPonctuelles() ? `<div style="font-size:12px;color:#7A3A00;margin-bottom:8px">Les irrigations saisies de manière ponctuelle sur cette parcelle seront elles aussi supprimées.</div>` : ''}
           <div style="display:flex;gap:8px">
             <button class="irr-scope-btn" id="delete-cancel">Annuler</button>
             <button class="irr-scope-btn irr-scope-btn--danger" id="delete-confirm">Supprimer tout</button>
@@ -1107,10 +1182,9 @@ export function openCalendar(plots, initialFilter) {
         showDeleteConfirm = false; renderBody()
       })
       bodyEl.querySelector('#delete-confirm')?.addEventListener('click', () => {
-        const seasonIds = getSeasonIds()
-        const removedCount = IRRIG_SEASON.filter(i => i.plotId === plotId && seasonIds.has(i.seasonId)).length
+        const removedCount = IRRIG_SEASON.filter(i => i.plotId === plotId).length
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
-          ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId)))
+          ...IRRIG_SEASON.filter(i => i.plotId !== plotId)
         )
         saveIrrig()
         addMJournalEntry(plotId, {
@@ -1183,7 +1257,7 @@ export function openCalendar(plots, initialFilter) {
 
     return `
       ${past.length ? `
-        <details class="irr-section-details" data-section="effectuees">
+        <details class="irr-section-details" data-section="effectuees"${!future.length ? ' open' : ''}>
           <summary class="irr-section-summary">Effectuées <span class="irr-section-count">${past.length}</span></summary>
           ${past.map(item).join('')}
         </details>` : ''}
@@ -1217,7 +1291,9 @@ export function openCalendar(plots, initialFilter) {
         if (!byPlot[key]) byPlot[key] = []
         byPlot[key].push(ir)
       }
-      const plotIds = Object.keys(byPlot)
+      // Ne garder que les parcelles connues dans le périmètre courant (évite les
+      // sections sans nom pour des plotId orphelins issus d'un autre périmètre)
+      const plotIds = Object.keys(byPlot).filter(pid => plots.some(p => String(p.id) === pid))
       if (!plotIds.length) {
         body.innerHTML = `<div style="text-align:center;padding:32px;font-size:13px;color:#9E9D98">Aucune irrigation enregistrée</div>`
         return
@@ -1230,31 +1306,53 @@ export function openCalendar(plots, initialFilter) {
       body.innerHTML = sortedIds.map(pid => {
         const irrig    = byPlot[pid]
         const hasStrat = irrig.some(i => i.fromStrategy)
-        const plotName = plots.find(p => String(p.id) === pid)?.name ?? pid
+        const plot     = plots.find(p => String(p.id) === pid)
+        const plotName = plot?.name ?? pid
+        const infoParts = [plot?.crop, plot?.irrigation].filter(Boolean)
         return `<div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:700;color:#1c1c1e;margin-bottom:6px">${plotName}</div>
+          <button class="irr-cal-plot-link" data-goto-pid="${pid}" style="display:flex;align-items:baseline;gap:6px;background:none;border:none;padding:0;margin-bottom:6px;text-align:left;cursor:pointer">
+            <span style="font-size:13px;font-weight:700;color:#185FA5;text-decoration:underline">${plotName}</span>
+            ${infoParts.length ? `<span style="font-size:11px;color:#8e8e93">${infoParts.join(' · ')}</span>` : ''}
+          </button>
           ${renderCumuls(irrig)}
           ${renderTimeline(irrig)}
           ${hasStrat ? `<div style="display:flex;justify-content:flex-end;margin-top:4px">
-            <button class="irr-cal-strat-btn" data-strat-pid="${pid}">Modifier la saison ↗</button>
+            <button class="irr-cal-strat-btn" data-strat-pid="${pid}">Modifier la saison <i class="bi bi-chevron-down"></i></button>
           </div>` : ''}
         </div>`
       }).join('')
       body.querySelectorAll('[data-strat-pid]').forEach(btn => {
         btn.addEventListener('click', () => openEditStratSheet(btn.dataset.stratPid, layer))
       })
+      body.querySelectorAll('[data-goto-pid]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          calFilter = btn.dataset.gotoPid
+          const sel = layer.querySelector('#cal-filter-sel')
+          if (sel) sel.value = calFilter
+          renderContent(layer)
+        })
+      })
       return
     }
 
     const irrig       = getIrrig()
     const hasStrategy = irrig.some(i => i.fromStrategy)
+    const plot        = calFilter !== 'all' ? plots.find(p => String(p.id) === String(calFilter)) : null
+    const plotViewLink = plot
+      ? `<button class="irr-cal-plot-link" id="cal-goto-plot" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;text-align:left;cursor:pointer;font-size:13px;font-weight:700;color:#185FA5;text-decoration:underline">
+          <svg width="13" height="13" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.23205 12.5C5.56103 11.809 4.98368 11.1423 4.5 10.5H3.49984C3.12107 10.5 2.77481 10.714 2.60542 11.0528L0.105694 16.0522C-0.0492999 16.3622 -0.0330139 16.7309 0.149193 17.0257C0.331399 17.3205 0.653266 17.5 0.999844 17.5H17.9998C18.3464 17.5 18.6683 17.3205 18.8505 17.0257C19.0327 16.7309 19.0493 16.3628 18.8943 16.0528L16.3943 11.0528C16.2249 10.714 15.8786 10.5 15.4998 10.5H14.5C14.0163 11.1423 13.439 11.809 12.768 12.5H14.8818L16.3818 15.5H2.61788L4.11788 12.5H6.23205Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M9.49984 14C9.40818 14 9.31651 13.9822 9.22484 13.9465C9.13318 13.9108 9.05297 13.8633 8.98422 13.8038C7.3113 12.2701 6.06234 10.8464 5.23734 9.53284C4.41234 8.2188 3.99984 6.99108 3.99984 5.84968C3.99984 4.06624 4.55282 2.64544 5.65878 1.58726C6.76428 0.529087 8.04464 0 9.49984 0C10.9551 0 12.2354 0.529087 13.3409 1.58726C14.4469 2.64544 14.9998 4.06624 14.9998 5.84968C14.9998 6.99108 14.5873 8.2188 13.7623 9.53284C12.9373 10.8464 11.6884 12.2701 10.0155 13.8038C9.94672 13.8633 9.86651 13.9108 9.77484 13.9465C9.68318 13.9822 9.59151 14 9.49984 14ZM9.49984 7C10.6044 7 11.4998 6.10457 11.4998 5C11.4998 3.89543 10.6044 3 9.49984 3C8.39527 3 7.49984 3.89543 7.49984 5C7.49984 6.10457 8.39527 7 9.49984 7Z" fill="currentColor"/></svg>
+          Voir la parcelle
+        </button>`
+      : ''
     const actionBar   = hasStrategy
-      ? `<div style="display:flex;justify-content:flex-end;margin-bottom:4px">
-           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la saison ↗</button>
+      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-bottom:4px">
+           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la saison <i class="bi bi-chevron-down"></i></button>
+           ${plotViewLink}
          </div>`
       : `<div class="irr-cal-add-bar">
            <button class="irr-cal-add-btn" id="cal-add-irrig"><i class="bi bi-droplet-fill"></i> Ajouter une irrigation</button>
            <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="cal-add-strat"><i class="bi bi-arrow-repeat"></i> Ajouter une saison d'irrigation</button>
+           ${plotViewLink}
          </div>`
 
     body.innerHTML = `
@@ -1263,6 +1361,10 @@ export function openCalendar(plots, initialFilter) {
       ${actionBar}
       ${renderFullList(irrig)}
     `
+
+    body.querySelector('#cal-goto-plot')?.addEventListener('click', () => {
+      if (plot) goToPlot(plot.id, plots)
+    })
 
     // Restore section open/closed state
     body.querySelectorAll('details[data-section]').forEach(d => {

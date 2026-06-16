@@ -401,13 +401,29 @@ function openSaisie(preselect = null) {
 
 // ─── Saison d'irrigation ─────────────────────────────────────────────────────
 
-function openSaison(preselect = null) {
+function openSaison(preselect = null, replaceSeasonIds = null) {
   const selectedIds = new Set(preselect?.ids ?? [])
   let debut  = TODAY
   let fin    = new Date(new Date().setMonth(new Date().getMonth() + 4)).toISOString().split('T')[0]
   let qty    = 10
   let freq   = 7
   let step   = 'form'
+  let origDebut = null
+  let origFin   = null
+
+  if (replaceSeasonIds) {
+    const existing = IRRIG_SEASON.filter(i => i.fromStrategy && replaceSeasonIds.has(i.seasonId))
+    if (existing.length) {
+      const isos = existing.map(i => i.iso).sort()
+      debut = isos[0]
+      fin   = isos[isos.length - 1]
+      qty   = existing[0].mm
+      const uniqIsos = [...new Set(isos)]
+      freq  = uniqIsos.length >= 2 ? Math.round((new Date(uniqIsos[1]) - new Date(uniqIsos[0])) / 86400000) : 7
+      origDebut = debut
+      origFin   = fin
+    }
+  }
 
   const { ov, close } = createOverlay()
 
@@ -508,7 +524,21 @@ function openSaison(preselect = null) {
         ${futureOccs.length > 6 ? `
           <div id="iw-apercu-rest" style="display:none">${futureOccs.slice(6).map(occRow).join('')}</div>
           <button class="iw-occ-more" id="iw-apercu-more">... et ${futureOccs.length - 6} irrigation${futureOccs.length - 6 > 1 ? 's' : ''} de plus</button>` : ''}` : ''}
+      ${replaceSeasonIds ? `
+        <div class="iw-confirm-box" style="margin-top:12px;display:block">
+          <div class="iw-confirm-box-txt">${datesChanged()
+            ? `Les dates de la saison ont été modifiées : ces changements s'appliqueront à <strong>toute la saison</strong>, y compris les irrigations déjà effectuées.`
+            : `La quantité et/ou la fréquence ont été modifiées sans changer les dates : ces changements ne s'appliqueront <strong>qu'aux irrigations à partir de demain</strong>. Les irrigations déjà effectuées ou prévues jusqu'à aujourd'hui restent inchangées.`}</div>
+          <div class="iw-confirm-box-btns" id="iw-edit-scope-confirm" style="display:none">
+            <button class="iw-btn iw-btn--sec iw-btn--sm" id="iw-edit-scope-cancel">Annuler</button>
+            <button class="iw-btn iw-btn--danger iw-btn--sm" id="iw-edit-scope-confirm-btn">Confirmer la modification</button>
+          </div>
+        </div>` : ''}
     `
+  }
+
+  function datesChanged() {
+    return !!replaceSeasonIds && (debut !== origDebut || fin !== origFin)
   }
 
   function updateNextBtn() {
@@ -548,6 +578,10 @@ function openSaison(preselect = null) {
         ov.querySelector('#iw-apercu-rest').style.display = ''
         e.target.remove()
       })
+      ov.querySelector('#iw-edit-scope-cancel')?.addEventListener('click', () => {
+        ov.querySelector('#iw-edit-scope-confirm').style.display = 'none'
+      })
+      ov.querySelector('#iw-edit-scope-confirm-btn')?.addEventListener('click', applySeasonChanges)
     }
   }
 
@@ -570,12 +604,19 @@ function openSaison(preselect = null) {
   ov.querySelector('#iw-cancel').addEventListener('click', close)
   ov.querySelector('#iw-back-btn').addEventListener('click', () => { step = 'form'; render() })
   ov.querySelector('#iw-next-btn').addEventListener('click', () => { step = 'apercu'; render() })
-  ov.querySelector('#iw-conf-btn').addEventListener('click', () => {
+  function applySeasonChanges() {
     const occs = computeOccs()
     const ids  = preselect ? new Set(preselect.ids) : selectedIds
     askIrrigTypeIfNeeded(ids, () => {
+      const changed = datesChanged()
+      if (replaceSeasonIds) {
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length,
+          ...IRRIG_SEASON.filter(i => !(replaceSeasonIds.has(i.seasonId) && i.fromStrategy && (changed || i.iso > TODAY)))
+        )
+      }
+      const occsToAdd = (replaceSeasonIds && !changed) ? occs.filter(d => d.toISOString().slice(0, 10) > TODAY) : occs
       const seasonId = generateSeasonId()
-      occs.forEach(d => {
+      occsToAdd.forEach(d => {
         const iso = d.toISOString().slice(0, 10)
         ids.forEach(plotId => {
           IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId })
@@ -598,6 +639,15 @@ function openSaison(preselect = null) {
         filterPlotId: ids.size === 1 ? [...ids][0] : null,
       })
     })
+  }
+
+  ov.querySelector('#iw-conf-btn').addEventListener('click', () => {
+    if (replaceSeasonIds) {
+      const box = ov.querySelector('#iw-edit-scope-confirm')
+      if (box) { box.style.display = 'flex'; box.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+      return
+    }
+    applySeasonChanges()
   })
 
   render()
@@ -669,6 +719,10 @@ function openEditStratModal(plotId, onDone) {
     )
   }
 
+  function hasPonctuelles() {
+    return IRRIG_SEASON.some(i => i.plotId === plotId && !i.fromStrategy)
+  }
+
   function renderBody() {
     const body = ov.querySelector('.iw-modal-body')
     body.innerHTML = `
@@ -704,6 +758,7 @@ function openEditStratModal(plotId, onDone) {
       ${showDelete ? `
       <div class="iw-confirm-box">
         <div class="iw-confirm-box-txt">Supprimer toutes les irrigations de cette saison ?</div>
+        ${hasPonctuelles() ? `<div class="iw-confirm-box-txt">Les irrigations saisies de manière ponctuelle sur cette parcelle seront elles aussi supprimées.</div>` : ''}
         <div class="iw-confirm-box-btns">
           <button class="iw-btn iw-btn--sec iw-btn--sm" id="del-cancel">Annuler</button>
           <button class="iw-btn iw-btn--danger iw-btn--sm" id="del-confirm">Supprimer tout</button>
@@ -714,7 +769,7 @@ function openEditStratModal(plotId, onDone) {
     const preselect = p ? { ids: [p.id], label: p.name } : null
 
     body.querySelector('#strat-modify')?.addEventListener('click', () => {
-      close(); openSaison(preselect)
+      close(); openSaison(preselect, getSeasonIds())
     })
     body.querySelector('#strat-stop')?.addEventListener('click', () => { showStop = true; showDelete = false; renderBody() })
     body.querySelector('#strat-delete')?.addEventListener('click', () => { showDelete = true; showStop = false; renderBody() })
@@ -726,8 +781,7 @@ function openEditStratModal(plotId, onDone) {
     })
     body.querySelector('#del-cancel')?.addEventListener('click', () => { showDelete = false; renderBody() })
     body.querySelector('#del-confirm')?.addEventListener('click', () => {
-      const seasonIds = getSeasonIds()
-      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId))))
+      IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => i.plotId !== plotId))
       saveIrrig(); close(); onDone()
     })
   }

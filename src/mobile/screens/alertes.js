@@ -76,7 +76,7 @@ export function initAlertesScreen(screenEl, role) {
     screenEl.appendChild(content)
   }
 
-  const alerts = [...(role === 'adherent' ? ALERTS_ADHERENT : ALERTS_ADMIN)]
+  const alerts = (role === 'new' || role === 'new-adherent') ? [] : [...(role === 'adherent' ? ALERTS_ADHERENT : ALERTS_ADMIN)]
 
   function render() {
     if (!alerts.length) {

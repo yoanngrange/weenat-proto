@@ -18,7 +18,7 @@ export const sensors = [
   { id: 12,  orgId: 1,  parcelIds: [9],  model: "P",         serial: "L700B54", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 79, messages7d: 84,  event: null },
   { id: 13,  orgId: 1,  parcelIds: [10], model: "PT",        serial: "W6006A9", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 83, messages7d: 86,  event: null },
   { id: 14,  orgId: 1,  parcelIds: [11], model: "CHP-30/60", serial: "X8004D3", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 89, messages7d: 92,  event: null, depth: 40 },
-  { id: 15,  orgId: 1,  parcelIds: [12, 13], model: "P+",        serial: "L700F82", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
+  { id: 15,  orgId: 1,  parcelIds: [12],      model: "P+",        serial: "L700F82", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 84, messages7d: 88,  event: null },
   { id: 16,  orgId: 1,  parcelIds: [13], model: "CAPA-30-3", serial: "W60019C", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 76, messages7d: 81,  event: null },
   { id: 17,  orgId: 1,  parcelIds: [14], model: "LWS",       serial: "X80035E", telecom: "Sigfox", lastMessage: "2024-10-01T10:00:00Z", networkQuality: 81, messages7d: 85,  event: null },
   { id: 18,  orgId: 1,  parcelIds: [15], model: "T_MINI",    serial: "L700A71", telecom: "LoRa",   lastMessage: "2024-10-01T10:00:00Z", networkQuality: 87, messages7d: 90,  event: null },

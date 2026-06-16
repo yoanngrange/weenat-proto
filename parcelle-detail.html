@@ -98,10 +98,11 @@
                   <div class="chart-controls-row">
                     <span class="chart-ctrl-label">Période</span>
                     <div class="period-presets" id="period-presets">
+                      <button class="period-preset-btn active" data-period="j7j2">J-7 → J+2</button>
                       <button class="period-preset-btn" data-period="1d">Aujourd'hui</button>
                       <button class="period-preset-btn" data-period="hier">Hier</button>
                       <button class="period-preset-btn" data-period="3d">3 jours</button>
-                      <button class="period-preset-btn active" data-period="7d">7 jours</button>
+                      <button class="period-preset-btn" data-period="7d">7 jours</button>
                       <button class="period-preset-btn" data-period="30d">30 jours</button>
                       <button class="period-preset-btn" data-period="365d">365 jours</button>
                       <button class="period-preset-btn" data-period="custom">Personnalisé…</button>
@@ -114,8 +115,8 @@
                     <span class="chart-ctrl-label">Pas de temps</span>
                     <select id="time-step" class="time-step-select">
                       <option value="max">Maximal</option>
-                      <option value="1h" selected>Horaire</option>
-                      <option value="1d">Journalier</option>
+                      <option value="1h">Horaire</option>
+                      <option value="1d" selected>Journalier</option>
                       <option value="1w">Hebdomadaire</option>
                       <option value="1mo">Mensuel</option>
                     </select>
@@ -200,10 +201,6 @@
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-bell"></i> Mes alertes</div>
                   <div class="panel-section-bd" id="panel-alertes"></div>
-                </div>
-                <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-lightning"></i> Actions</div>
-                  <div class="panel-section-bd" id="panel-actions"></div>
                 </div>
               </div>
             </div>

@@ -4,6 +4,8 @@ function shapeToLatlngs(plot) {
   const LAT_M = 1 / 111111
   const LNG_M = 1 / (111111 * Math.cos(lat * Math.PI / 180))
 
+  if (shape.type === 'point') return []
+
   if (shape.type === 'polygon') {
     const raw = shape.points
     const maxX = Math.max(...raw.map(p => p[0]))
@@ -395,6 +397,7 @@ export const plots = [
   { id: 252, env: "plein champ", orgId: 1, name: "La Vigne Neuve",    ville: "Sérent",           lat: 48.216, lng: -2.452, area: 5.3,  crop: "Tournesol",         reserveHydrique: 55, degresJour: 1265, texture: "Sable limoneux",       irrigation: "Goutte à goutte enterré", integrations: [], shape: { type: "rectangle", width: 168, height: 118 } },
   { id: 253, env: "serre", orgId: 1, name: "Le Moulin Neuf",    ville: "Bignan",           lat: 48.031, lng: -2.795, area: 8.4,  crop: "Blé tendre",        reserveHydrique: 80, degresJour: 1180, texture: "Limon argileux",               integrations: [], shape: { type: "rectangle", width: 210, height: 150 } },
   { id: 254, env: "plein champ", orgId: 1, name: "La Fontaine",       ville: "Pleugriffet",      lat: 48.101, lng: -2.502, area: 6.4,              reserveHydrique: 61, degresJour: 1142, texture: "Limon argilo-sableux", irrigation: "Pivot",                   integrations: [], shape: { type: "rectangle", width: 185, height: 132 } },
+  { id: 256, env: "plein champ", orgId: 1, name: "Champ Nouveau",     ville: "Josselin",         lat: 48.141, lng: -2.609, crop: "Tomate",         reserveHydrique: 66, degresJour: 1055, texture: "Limon sableux",       irrigation: "Goutte à goutte",        integrations: [], shape: { type: "point" } },
 
   // ── GAEC Jourdain (orgId:41) — Allier ────────────────────────────────────────
   { id: 255, env: "plein champ", orgId: 41, name: "Le Grand Champ", ville: "Saint-Pourçain-sur-Sioule", lat: 46.3021, lng: 3.2938, area: 12.5, crop: "Blé tendre", reserveHydrique: 70, degresJour: 1100, texture: "Limon argileux", integrations: [], shape: { type: "rectangle", width: 230, height: 200 } }

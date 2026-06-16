@@ -6738,6 +6738,9 @@ tr.row-selected td {
 .w-bilan-kpi-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--txt3); font-weight: 600; }
 .w-bilan-kpi-val { font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--txt); }
 
+/* ── Niveau de réservoir / Profil de réservoir widgets ── */
+.w-reservoir-agg-sel { font-size: 11px; color: var(--txt2); border: 1px solid var(--bdr2); border-radius: 6px; background: transparent; padding: 3px 6px; font-family: inherit; cursor: pointer; align-self: flex-start; }
+
 .w-sensor-rows { display: flex; flex-direction: column; gap: 4px; }
 .w-sensor-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .w-sensor-val { font-weight: 700; min-width: 55px; }
@@ -8068,6 +8071,8 @@ details[open] > summary .irr-pr-caret { transform: rotate(90deg); }
 }
 .irr-save-confirm-title { font-size: 17px; font-weight: 700; color: var(--txt); }
 .irr-save-confirm-lines { font-size: 13px; color: var(--txt2); line-height: 1.7; }
+.irr-save-confirm-link { font-size: 13px; color: var(--pri); text-decoration: none; font-weight: 600; }
+.irr-save-confirm-link:hover { text-decoration: underline; }
 
 /* ── Modifier la saison (detail panel) ── */
 .irr-det-strat-bar { margin-bottom:20px; }

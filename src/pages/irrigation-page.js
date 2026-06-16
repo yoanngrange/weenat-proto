@@ -910,6 +910,9 @@ function openModifierSaison(plotId, onDone) {
   let freq  = sorted.length >= 2
     ? Math.max(1, Math.round((new Date(sorted[sorted.length - 1].iso) - new Date(sorted[0].iso)) / 86400000 / (sorted.length - 1)))
     : 7
+  const origDebut = debut
+  const origFin   = fin
+  let step = 'form'
 
   document.querySelector('.irr-edit-overlay')?.remove()
   const ov = document.createElement('div')
@@ -934,12 +937,8 @@ function openModifierSaison(plotId, onDone) {
       : 'Ajustez les dates et la fréquence'
   }
 
-  ov.innerHTML = `
-    <div class="irr-edit-modal" style="max-width:460px">
-      <div class="irr-edit-hd">
-        <span>Modifier la saison</span>
-        <button class="irr-edit-close" id="irr-ms-close">×</button>
-      </div>
+  function renderForm() {
+    return `
       <div class="irr-edit-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
@@ -967,35 +966,78 @@ function openModifierSaison(plotId, onDone) {
       <div class="irr-edit-ft">
         <button class="iw-btn iw-btn--sec" id="irr-ms-cancel">Annuler</button>
         <button class="iw-btn iw-btn--pri" id="irr-ms-save">Enregistrer</button>
+      </div>`
+  }
+
+  function renderConfirm() {
+    const datesChanged = debut !== origDebut || fin !== origFin
+    const occs = computeOccs()
+    const scopeMsg = datesChanged
+      ? `Les dates de la saison ont été modifiées : ces changements s'appliqueront à <strong>toute la saison</strong>, y compris les irrigations déjà effectuées.`
+      : `La quantité et/ou la fréquence ont été modifiées sans changer les dates : ces changements ne s'appliqueront <strong>qu'aux irrigations à partir de demain</strong>. Les irrigations déjà effectuées ou prévues jusqu'à aujourd'hui restent inchangées.`
+    return `
+      <div class="irr-edit-body">
+        <div style="font-size:13px;color:var(--txt2);line-height:1.5;background:#FEF6E6;border:1px solid #F5D98B;border-radius:8px;padding:10px 12px">
+          ${scopeMsg}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--txt3)">
+          ${fmtDateFull(debut)} → ${fmtDateFull(fin)} · ${qty} mm tous les ${freq} jours · ${occs.length} irrigations
+        </div>
       </div>
-    </div>`
+      <div class="irr-edit-ft">
+        <button class="iw-btn iw-btn--sec" id="irr-ms-back">Retour</button>
+        <button class="iw-btn iw-btn--pri" id="irr-ms-confirm">Confirmer la modification</button>
+      </div>`
+  }
+
+  function render() {
+    ov.innerHTML = `
+      <div class="irr-edit-modal" style="max-width:460px">
+        <div class="irr-edit-hd">
+          <span>Modifier la saison</span>
+          <button class="irr-edit-close" id="irr-ms-close">×</button>
+        </div>
+        ${step === 'form' ? renderForm() : renderConfirm()}
+      </div>`
+
+    ov.querySelector('#irr-ms-close').addEventListener('click', () => ov.remove())
+
+    if (step === 'form') {
+      updatePreview()
+      ov.querySelector('#irr-ms-cancel').addEventListener('click', () => ov.remove())
+      ov.querySelector('#irr-ms-debut').addEventListener('change', e => { debut = e.target.value; updatePreview() })
+      ov.querySelector('#irr-ms-fin').addEventListener('change', e => { fin = e.target.value; updatePreview() })
+      ov.querySelector('#irr-ms-qty').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { qty = v; updatePreview() } })
+      ov.querySelector('#irr-ms-freq').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { freq = v; updatePreview() } })
+      ov.querySelector('#irr-ms-save').addEventListener('click', () => { step = 'confirm'; render() })
+    } else {
+      ov.querySelector('#irr-ms-back').addEventListener('click', () => { step = 'form'; render() })
+      ov.querySelector('#irr-ms-confirm').addEventListener('click', () => {
+        const datesChanged = debut !== origDebut || fin !== origFin
+        const occs = computeOccs()
+        const occsToAdd = datesChanged ? occs : occs.filter(iso => iso > TODAY)
+        const kept = IRRIG_SEASON.filter(i => !(
+          i.plotId === plotId && seasonIds.has(i.seasonId) && (datesChanged || i.iso > TODAY)
+        ))
+        IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...kept)
+        const newId = generateSeasonId()
+        for (const iso of occsToAdd) {
+          IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId: newId })
+        }
+        saveIrrig(); ov.remove()
+        showSaveConfirmModal('Saison modifiée', [
+          `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
+          `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
+          datesChanged ? 'Modifications appliquées à toute la saison.' : 'Modifications appliquées à partir de demain.',
+        ])
+        onDone?.()
+      })
+    }
+  }
 
   document.body.appendChild(ov)
-  updatePreview()
-
+  render()
   ov.addEventListener('click', e => { if (e.target === ov) ov.remove() })
-  ov.querySelector('#irr-ms-close').addEventListener('click', () => ov.remove())
-  ov.querySelector('#irr-ms-cancel').addEventListener('click', () => ov.remove())
-
-  ov.querySelector('#irr-ms-debut').addEventListener('change', e => { debut = e.target.value; updatePreview() })
-  ov.querySelector('#irr-ms-fin').addEventListener('change', e => { fin = e.target.value; updatePreview() })
-  ov.querySelector('#irr-ms-qty').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { qty = v; updatePreview() } })
-  ov.querySelector('#irr-ms-freq').addEventListener('input', e => { const v = parseInt(e.target.value); if (v > 0) { freq = v; updatePreview() } })
-
-  ov.querySelector('#irr-ms-save').addEventListener('click', () => {
-    const kept = IRRIG_SEASON.filter(i => !(i.plotId === plotId && seasonIds.has(i.seasonId)))
-    IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...kept)
-    const newId = generateSeasonId()
-    const occs = computeOccs()
-    for (const iso of occs) {
-      IRRIG_SEASON.push({ iso, mm: qty, real: iso <= TODAY, plotId, fromStrategy: true, seasonId: newId })
-    }
-    saveIrrig(); ov.remove()
-    showSaveConfirmModal('Saison modifiée', [
-      `Début : ${fmtDateFull(debut)} · Fin : ${fmtDateFull(fin)}`,
-      `${occs.length} irrigations · ${qty} mm · tous les ${freq} j`,
-    ])
-  })
 }
 
 function highlightTableRow(plotId) {
@@ -1175,7 +1217,7 @@ function renderDetailPanel(p) {
     </div>
     <div class="irr-det-scroll">
       ${real.length ? `
-        <details class="irr-pr-details"${wasRealOpen ? ' open' : ''}>
+        <details class="irr-pr-details"${(wasRealOpen || !plan.length) ? ' open' : ''}>
           <summary class="irr-pr-details-sum"><i class="bi bi-chevron-right irr-pr-caret"></i>Effectuées <span class="irr-pr-details-sub">${real.length}</span></summary>
           <div>${real.map(item).join('')}</div>
         </details>` : ''}
@@ -1208,11 +1250,13 @@ function renderDetailPanel(p) {
   })
   panel.querySelector('#irr-det-del-all')?.addEventListener('click', () => {
     panel.querySelector('#irr-det-strat-opts').style.display = 'none'
-    const toRemove = IRRIG_SEASON.filter(i => i.plotId === p.id && seasonIds.has(i.seasonId))
+    const toRemove = IRRIG_SEASON.filter(i => i.plotId === p.id)
     if (!toRemove.length) return
+    const hasPonctuelles = toRemove.some(i => !i.fromStrategy)
     showDeleteConfirmModal(
       `Supprimer toutes les irrigations de "${p.name}" ?`,
-      `${toRemove.length} irrigation${toRemove.length !== 1 ? 's' : ''} seront supprimées (passées et futures).`,
+      `${toRemove.length} irrigation${toRemove.length !== 1 ? 's' : ''} seront supprimées (passées et futures).`
+        + (hasPonctuelles ? '<br><br>Les irrigations saisies de manière ponctuelle sur cette parcelle seront elles aussi supprimées.' : ''),
       () => {
         IRRIG_SEASON.splice(0, IRRIG_SEASON.length, ...IRRIG_SEASON.filter(i => !toRemove.includes(i)))
         saveIrrig()

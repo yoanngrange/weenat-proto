@@ -158,6 +158,12 @@ function renderBillingPage() {
             </form>
           </div>
 
+          <div class="form-row billing-form-full" style="margin-top:16px">
+            <label for="bf-copie-factures">Copie des factures (facultatif)</label>
+            <p style="font-size:12px;color:var(--txt3);margin:0 0 8px;line-height:1.4">Ajoutez une adresse email pour envoyer un reçu et des copies des factures à un tiers (comptable, achats, finances…)</p>
+            <input id="bf-copie-factures" type="email" placeholder="Adresse email du destinataire">
+          </div>
+
           <div class="form-actions" style="margin-top:16px">
             <button type="button" id="billing-addr-save" class="btn-primary">
               <i class="bi bi-check-lg"></i> Enregistrer
@@ -264,6 +270,7 @@ function bindEvents() {
     document.getElementById('bf-ville').value    = BILLING_ADDR.ville
     document.getElementById('bf-pays').value     = BILLING_ADDR.pays
     document.getElementById('bf-siret').value    = BILLING_ADDR.siret
+    document.getElementById('bf-copie-factures').value = ''
     updateTaxField(BILLING_ADDR.pays)
   })
 

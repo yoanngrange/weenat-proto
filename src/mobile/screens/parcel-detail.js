@@ -4,8 +4,9 @@ import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { plots as allPlots }    from '../../data/plots.js'
-import { getParcel, getOrgData, patchParcel } from '../../data/store.js'
+import { getParcel, getOrgData, patchParcel, deleteParcel } from '../../data/store.js'
 import { IRRIG_TYPES, SOIL_TYPES, SOIL_ANALYSIS_OPTION, ENV_TYPES } from '../../data/constants.js'
+import { getPhenoStageNames } from '../../data/pheno-stages.js'
 import { getMJournal, saveMJournal, addMJournalEntry } from '../journal-store.js'
 import { addMesureFavorite, addCumulFavorite } from './dashboard.js'
 
@@ -204,13 +205,18 @@ const CHART_METRICS = {
   vent:         { label: 'Vent',                 unit: 'km/h', color: '#616161', cumul: false },
   par:          { label: 'Rayonnement PAR',      unit: 'µmol/m²/s', color: '#4CBB17', cumul: false },
   irrigation:   { label: 'Irrigation',           unit: 'mm',   color: '#FF8C00', cumul: true,  cumulsType: 'irrigation' },
+  rfu:          { label: 'Niveau de réservoir',                unit: 'mm',   color: '#0099CC', cumul: false },
+  nrs:          { label: 'Niveau de réservoir (spatialisé)',   unit: 'mm',   color: '#0172A4', cumul: false },
 }
 
-// Métriques disposant de prévisions et leur horizon (en jours)
-const FORECAST_DAYS = {
-  pluie: 14, temperature: 14, humidite: 14, vent: 14, etp: 14, temp_rosee: 14, rayonnement: 14,
-  pothydr: 7, irrigation: 7,
-}
+// Métriques pour lesquelles les prévisions affichent des courbes/données
+// (les autres métriques n'affichent que le hachurage de la zone future)
+const FORECAST_METRICS = new Set([
+  'pluie', 'temperature', 'humidite', 'vent', 'pothydr', 'etp', 'temp_rosee', 'rayonnement',
+])
+
+// Horizon de prévisions (en jours) selon la période sélectionnée
+const PERIOD_FC_DAYS = { j7j2: 2 }
 
 const SENSOR_MODEL_METRICS = {
   'P+':    ['pluie', 'temperature', 'humidite'],
@@ -245,6 +251,8 @@ function mockSeries(metricId, count) {
     humectation:  { base: 20,  amp: 80,  min: 0,   max: 100, sparse: true },
     vent:         { base: 15,  amp: 15,  min: 0,   max: 80  },
     par:          { base: 900, amp: 800, min: 0,   max: 2000 },
+    rfu:          { base: 60,  amp: 30,  min: 0,   max: 120  },
+    nrs:          { base: 65,  amp: 28,  min: 0,   max: 120  },
   }[metricId] || { base: 50, amp: 20, min: 0, max: 100 }
   return Array.from({ length: count }, (_, i) => {
     const t = i / count * Math.PI * 4
@@ -254,12 +262,12 @@ function mockSeries(metricId, count) {
   })
 }
 
-const PERIOD_COUNTS = { '365d': 52, '30d': 60, '7d': 84, 'j7j7': 84, 'hier': 48, '1d': 24, 'custom': 60 }
-const PERIOD_MINS   = { '365d': 525600, '30d': 43200, '7d': 10080, 'j7j7': 10080, 'hier': 1440, '1d': 1440, 'custom': 10080 }
+const PERIOD_COUNTS = { '365d': 52, '30d': 60, '7d': 84, 'j7j2': 108, 'hier': 48, '1d': 24, 'custom': 60 }
+const PERIOD_MINS   = { '365d': 525600, '30d': 43200, '7d': 10080, 'j7j2': 10080, 'hier': 1440, '1d': 1440, 'custom': 10080 }
 
 // Série synchronisée avec les irrigations saisies (réelles + planifiées) d'une parcelle
-function irrigationSeries(plotId, period, fcCount = 0, forecastMins = 0) {
-  const count    = PERIOD_COUNTS[period] || 60
+function irrigationSeries(plotId, period, fcCount = 0, forecastMins = 0, histCount = null) {
+  const count    = histCount ?? (PERIOD_COUNTS[period] || 60)
   const totalMin = PERIOD_MINS[period] || 10080
   const now      = Date.now()
   const startMs  = now - totalMin * 60000
@@ -305,15 +313,18 @@ function makeXLabels(period, W, PL, PR, H, PB = 20, forecastMins = 0) {
 }
 
 function svgChart(metricId, color, isCumul, period = '7d', unit = '', plotId = null) {
-  const count = PERIOD_COUNTS[period] || 60
+  const totalCount = PERIOD_COUNTS[period] || 60
   const histMins = PERIOD_MINS[period] || 10080
-  const periodDays = histMins / 1440
-  const fcDays = FORECAST_DAYS[metricId] || 0
-  const fcCount = fcDays > 0 ? Math.max(1, Math.round(Math.min(fcDays, periodDays) / periodDays * count)) : 0
-  const forecastMins = fcCount > 0 ? Math.min(fcDays, periodDays) / periodDays * histMins : 0
+  const periodFcDays = PERIOD_FC_DAYS[period] || 0
+  const histDays = histMins / 1440
+  const count = periodFcDays > 0 ? Math.round(totalCount * histDays / (histDays + periodFcDays)) : totalCount
+  const hatchCount = totalCount - count
+  const forecastMins = hatchCount > 0 ? periodFcDays * 1440 : 0
+  const showFcData = hatchCount > 0 && FORECAST_METRICS.has(metricId)
+  const fcCount = showFcData ? hatchCount : 0
 
   const vals = metricId === 'irrigation'
-    ? irrigationSeries(plotId, period, fcCount, forecastMins)
+    ? irrigationSeries(plotId, period, hatchCount, hatchCount > 0 ? periodFcDays * 1440 : 0, count)
     : mockSeries(metricId, count + fcCount)
   const W = 320, H = 100, PL = 34, PR = 6, PT = 10, PB = 20
   const iW = W - PL - PR, iH = H - PT - PB
@@ -321,7 +332,7 @@ function svgChart(metricId, color, isCumul, period = '7d', unit = '', plotId = n
   const maxV = Math.max(...vals, minV + 0.001)
   const range = maxV - minV
 
-  const xOf = i => PL + i / (vals.length - 1) * iW
+  const xOf = i => PL + i / (totalCount - 1) * iW
   const yOf = v => PT + iH - ((v - minV) / range) * iH
   const gId = `g${Math.random().toString(36).slice(2,8)}`
 
@@ -340,7 +351,7 @@ function svgChart(metricId, color, isCumul, period = '7d', unit = '', plotId = n
 
   // Zone striée représentant la portion "prévisions" du graphique
   let forecastBg = ''
-  if (fcCount > 0) {
+  if (hatchCount > 0) {
     const boundaryX = xOf(count - 0.5)
     const stripeId = `stripe${gId}`
     forecastBg = `<defs><pattern id="${stripeId}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -393,10 +404,13 @@ function svgChart(metricId, color, isCumul, period = '7d', unit = '', plotId = n
 
 function computeCumuls(metricId, period, type, plotId = null) {
   if (!type) return ''
-  const count = PERIOD_COUNTS[period] || 60
+  const totalCount = PERIOD_COUNTS[period] || 60
   const mins  = PERIOD_MINS[period] || 10080
+  const periodFcDays = PERIOD_FC_DAYS[period] || 0
+  const histDays = mins / 1440
+  const count = periodFcDays > 0 ? Math.round(totalCount * histDays / (histDays + periodFcDays)) : totalCount
   const hoursPerPt = mins / (count * 60)
-  const vals = metricId === 'irrigation' ? irrigationSeries(plotId, period) : mockSeries(metricId, count)
+  const vals = metricId === 'irrigation' ? irrigationSeries(plotId, period, 0, 0, count) : mockSeries(metricId, count)
   let chips = []
   if (type === 'temp') {
     const dj = vals.reduce((s, v) => s + Math.max(0, Math.min(v, cumulThresholds.djMax) - cumulThresholds.djMin), 0) * (hoursPerPt / 24)
@@ -442,7 +456,7 @@ function computeCumuls(metricId, period, type, plotId = null) {
   }).join('')}</div>`
 }
 
-const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'j7j7': 'J-7 → J+7', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
+const MSR_PERIOD_LABELS = { '365d': '365 derniers jours', '30d': '30 derniers jours', '7d': '7 derniers jours', 'j7j2': 'J-7 → J+2', 'hier': 'Hier', '1d': "Aujourd'hui", 'custom': 'Personnalisé' }
 const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
 
 function chartCard(metricId, period, sensorId = null, plotId = null, step = '1h', subject = null) {
@@ -451,7 +465,7 @@ function chartCard(metricId, period, sensorId = null, plotId = null, step = '1h'
   const detailLink = (sensorId || metricId === 'irrigation')
     ? `<div class="m-chart-details-link" data-sensor-id="${sensorId ?? ''}" data-metric-id="${metricId}">Voir détails →</div>`
     : ''
-  const favBtn = (subject && metricId !== 'irrigation')
+  const favBtn = subject
     ? `<button class="m-msr-add-btn" data-msr-metric-id="${metricId}" data-msr-subject-key="${subject.key}" data-msr-subject-label="${subject.label}" data-msr-period="${period}" data-msr-step="${step}" title="Ajouter aux mesures préférées"><i class="bi bi-house-add"></i></button>`
     : ''
   return `
@@ -634,7 +648,7 @@ function widgetsView(parcel, linkedSensorIds = []) {
 
 function mWidgetCard(title, icon, color, body, id = '', subtitle = '') {
   return `
-    <div class="m-widget-card">
+    <div class="m-widget-card"${id ? ` data-widget-id="${id}"` : ''}>
       <div class="m-widget-card-hd">
         <span class="m-widget-card-title" style="color:${color}"><i class="bi ${icon}"></i> ${title}</span>
         <button class="m-widget-menu" data-wid="${id}" type="button">•••</button>
@@ -734,6 +748,112 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
   return mWidgetCard('Cumuls', 'bi-bar-chart-fill', '#0172A4', body, 'cumuls')
 }
 
+const _prev5jCache = {}
+
+function makePrevForecast(parcel) {
+  const pid = parcel?.id || 1
+  const sr = (seed, min, max) => { const x = Math.sin(seed * 9301 + 49297) * 43758.5453; return min + Math.floor((x - Math.floor(x)) * (max - min + 1)) }
+  const WC = [
+    { label: 'Ensoleillé', icon: 'bi-sun',                   color: '#f4a01c' },
+    { label: 'Part. nuageux', icon: 'bi-cloud-sun',           color: '#5b8dd9' },
+    { label: 'Couvert',    icon: 'bi-cloud',                  color: '#8e8e93' },
+    { label: 'Pluie',      icon: 'bi-cloud-rain-fill',        color: '#2E75B6' },
+    { label: 'Orageux',    icon: 'bi-cloud-lightning-rain',   color: '#bf5af2' },
+  ]
+  const today = new Date()
+  return Array.from({ length: 14 }, (_, d) => {
+    const date = new Date(today); date.setDate(date.getDate() + d)
+    const wIdx = sr(pid * 17 + d * 7, 0, 4)
+    const w = WC[wIdx]
+    const rainy = wIdx >= 3
+    const tMin = sr(pid * 3 + d * 11, 6, 14)
+    const tMax = sr(pid * 5 + d * 13, 17, 32)
+    const hours = Array.from({ length: 24 }, (_, h) => {
+      const dayProg = Math.sin(Math.PI * (h - 6) / 12)
+      const temp = Math.round(tMin + (tMax - tMin) * Math.max(0, dayProg))
+      const pluieH = rainy && h >= 8 && h <= 16 && sr(pid + d * 100 + h, 0, 9) > 5
+        ? +(sr(pid + d * 100 + h + 1, 0, 30) / 10).toFixed(1) : 0
+      return {
+        label: `${String(h).padStart(2, '0')}h`, temp, pluie: pluieH,
+        hum: Math.round(85 - 40 * Math.max(0, dayProg)),
+        vent: sr(pid * 7 + d * 50 + h, 8, 30),
+        icon: pluieH > 0 ? 'bi-cloud-rain-fill' : (h < 7 || h > 20) ? 'bi-moon-fill' : w.icon,
+      }
+    })
+    return {
+      dayLabel: d === 0 ? "Aujourd'hui" : d === 1 ? 'Demain' : date.toLocaleDateString('fr-FR', { weekday: 'long' }),
+      dateStr: date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
+      ...w, pluie: rainy ? sr(pid * 23 + d * 31, 2, 20) : 0,
+      tMin, tMax, ventMoy: sr(pid * 11 + d * 17, 8, 30), ventRafales: sr(pid * 13 + d * 19, 18, 50),
+      hours,
+    }
+  })
+}
+
+function renderPrevDayDetailHTML(forecast, idx, locationName) {
+  const d = forecast[idx]
+  const title = `${d.dayLabel.charAt(0).toUpperCase() + d.dayLabel.slice(1)} · ${d.dateStr}`
+  const loc = locationName ? `<div style="font-size:12px;color:#8e8e93;text-align:center;padding:2px 0 6px"><i class="bi bi-geo-alt-fill" style="color:#0172A4"></i> ${locationName}</div>` : ''
+  return `
+    <div class="m-detail-header">
+      <div class="m-detail-row1">
+        <div style="width:32px"></div>
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Prévisions</span></button>
+        <div style="width:32px"></div>
+      </div>
+      <div class="m-detail-row2" style="justify-content:space-between;align-items:center;padding:4px 16px 10px">
+        <button class="m-day-nav" id="prev-day" ${idx === 0 ? 'disabled' : ''}>‹</button>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          ${loc}
+          <div style="display:flex;align-items:center;gap:6px"><i class="bi ${d.icon}" style="color:${d.color};font-size:20px"></i><span class="m-d-name">${title}</span></div>
+        </div>
+        <button class="m-day-nav" id="next-day" ${idx >= forecast.length - 1 ? 'disabled' : ''}>›</button>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div id="detail-content" class="m-detail-content" style="top:84px">
+      <div style="padding:12px 16px 0">
+        <div class="m-prev-detail-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+          <div class="m-prev-detail-stat"><i class="bi bi-cloud-rain"></i><strong>${d.pluie} mm</strong></div>
+          <div class="m-prev-detail-stat"><i class="bi bi-thermometer"></i><strong>${d.tMin} / ${d.tMax}°C</strong></div>
+          <div class="m-prev-detail-stat"><i class="bi bi-wind"></i><strong>${d.ventMoy}/${d.ventRafales}</strong></div>
+        </div>
+        <div class="m-list-section-header">Heure par heure</div>
+        <div style="background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,.07);overflow:hidden;margin-bottom:24px">
+          <div style="display:flex;align-items:center;gap:12px;padding:6px 14px;border-bottom:.5px solid rgba(0,0,0,.1);background:#f9f9f9">
+            <span style="width:28px;flex-shrink:0"></span>
+            <span style="width:18px;flex-shrink:0;font-size:10px;color:#8e8e93;text-align:center"><i class="bi bi-cloud"></i></span>
+            <span style="width:44px;flex-shrink:0;font-size:10px;color:#8e8e93"><i class="bi bi-droplet"></i></span>
+            <span style="width:40px;flex-shrink:0;font-size:10px;color:#8e8e93"><i class="bi bi-thermometer"></i></span>
+            <span style="font-size:10px;color:#8e8e93"><i class="bi bi-moisture"></i></span>
+            <span style="margin-left:auto;font-size:10px;color:#8e8e93"><i class="bi bi-wind"></i></span>
+          </div>
+          ${d.hours.map((h, i) => `
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;${i < d.hours.length - 1 ? 'border-bottom:.5px solid rgba(0,0,0,.06)' : ''}">
+              <span style="font-size:12px;color:#8e8e93;width:28px;flex-shrink:0">${h.label}</span>
+              <i class="bi ${h.icon}" style="color:#8e8e93;font-size:14px;width:18px;text-align:center;flex-shrink:0"></i>
+              <span style="font-size:12px;color:#2E75B6;width:44px;flex-shrink:0">${h.pluie > 0 ? h.pluie + 'mm' : ''}</span>
+              <span style="font-size:14px;font-weight:600;width:40px;flex-shrink:0">${h.temp}°C</span>
+              <span style="font-size:12px;color:#8e8e93">${h.hum}%</span>
+              <span style="font-size:12px;color:#8e8e93;margin-left:auto">${h.vent} km/h</span>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`
+}
+
+function openPrevDayDetail(parcel) {
+  const forecast = _prev5jCache[parcel.id] || makePrevForecast(parcel)
+  const locationName = parcel.name
+  const detailLayer = pushDetail(renderPrevDayDetailHTML(forecast, 0, locationName))
+  const bind = (layer, idx) => {
+    layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+    layer.querySelector('#prev-day')?.addEventListener('click', () => { layer.innerHTML = renderPrevDayDetailHTML(forecast, idx - 1, locationName); bind(layer, idx - 1) })
+    layer.querySelector('#next-day')?.addEventListener('click', () => { layer.innerHTML = renderPrevDayDetailHTML(forecast, idx + 1, locationName); bind(layer, idx + 1) })
+  }
+  bind(detailLayer, 0)
+}
+
 function mWidgetPrev5j(parcel) {
   const DN = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']
   const MN = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
@@ -743,28 +863,27 @@ function mWidgetPrev5j(parcel) {
   const org = orgs.find(o => o.id === parcel?.orgId)
   const city = parcel?.ville || org?.ville || '—'
   const pid = parcel?.id || 1
-  const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
-  const makeDay = (i, off) => {
-    const d = new Date(today); d.setDate(d.getDate() + i)
-    const wi = Math.floor(((pid * 7 + i * 3) % 11) / 2.2)
-    return {
-      lbl: i === 0 ? 'Auj.' : DN[d.getDay()],
-      date: `${d.getDate()} ${MN[d.getMonth()]}`,
-      tmax: rnd(17 + off, 34 + off), tmin: rnd(4 + off, 15 + off),
-      pluie: wi >= 3 ? rnd(2, 18) : 0,
-      vent: rnd(10, 35), wi
-    }
+  const forecast = makePrevForecast(parcel)
+  _prev5jCache[pid] = forecast
+
+  const makeDay = (i) => {
+    const f = forecast[i]
+    return { lbl: i === 0 ? 'Auj.' : DN[new Date(Date.now() + i * 86400000).getDay()], date: f.dateStr, tmax: f.tMax, tmin: f.tMin, pluie: f.pluie, vent: f.ventMoy, wi: WI.indexOf(f.icon) >= 0 ? WI.indexOf(f.icon) : (f.label === 'Ensoleillé' ? 0 : f.label === 'Part. nuageux' ? 1 : f.label === 'Couvert' ? 2 : f.label === 'Pluie' ? 3 : 4) }
   }
 
-  // AROME 0–72h (j0–j2), ICON EU 72–136h (j3–j4)
-  const days = [0,1,2].map(i => makeDay(i, 0)).concat([3,4].map(i => makeDay(i, -1)))
+  const WICONS = WI
+  const rawDays = forecast.slice(0, 5).map((f, i) => ({
+    lbl: i === 0 ? 'Auj.' : DN[new Date(Date.now() + i * 86400000).getDay()],
+    date: f.dateStr, tmax: f.tMax, tmin: f.tMin, pluie: f.pluie, vent: f.ventMoy,
+    icon: f.icon, label: f.label,
+  }))
 
   const dayHtml = d => `
     <div class="m-wprev5-col">
       <div class="m-wprev5-day">${d.lbl}</div>
       <div class="m-wprev5-date">${d.date}</div>
-      <i class="bi ${WI[d.wi]} m-wprev5-icon" title="${WL[d.wi]}"></i>
+      <i class="bi ${d.icon} m-wprev5-icon" title="${d.label}"></i>
       <div class="m-wprev5-rain${d.pluie === 0 ? ' m-wprev5-rain--none' : ''}">${d.pluie > 0 ? d.pluie + ' mm' : '—'}</div>
       <div class="m-wprev5-tmax">${d.tmax}°</div>
       <div class="m-wprev5-tmin">${d.tmin}°</div>
@@ -777,7 +896,10 @@ function mWidgetPrev5j(parcel) {
       <span class="m-wprev5-model-lbl" style="grid-column:1/4">AROME <span>(Météo France)</span></span>
       <span class="m-wprev5-model-lbl" style="grid-column:4/6">ICON EU <span>(DWD)</span></span>
     </div>
-    <div class="m-wprev5-grid">${days.map(dayHtml).join('')}</div>`
+    <div class="m-wprev5-grid">${rawDays.map(dayHtml).join('')}</div>
+    <div style="padding:6px 12px 4px;text-align:right">
+      <button class="m-prev5j-voir-details" style="background:none;border:none;color:#0172A4;font-size:13px;cursor:pointer;padding:4px 0">Voir détails <i class="bi bi-chevron-right" style="font-size:11px"></i></button>
+    </div>`
 
   return mWidgetCard('Prévisions 5 jours', 'bi-cloud-sun', '#5b8dd9', body, 'previsions-5j')
 }
@@ -813,15 +935,14 @@ function mWidgetSensorCards(sensors, wid = '') {
     const name  = MODEL_NAMES_M[sensor.model] || sensor.model
     const color = MODEL_COLORS[sensor.model] || '#0172A4'
     const mIds  = METRIC_IDS[sensor.model]  || []
-    const m = CHART_METRICS[mIds[0]]
     const primaryMetricId = mIds[0]
+    const isCapa = sensor.model.startsWith('CAPA')
+    const emitMin = isCapa ? 30 : 15
+    const minAgo = emitMin - ((sensor.id * 7) % emitMin)
 
     const body = `
-      <div style="margin-bottom:6px">
-        ${m ? svgChart(primaryMetricId, color, false, '1d', m.unit || '') : '<div style="height:100px;display:flex;align-items:center;justify-content:center;color:var(--txt3);font-size:12px">Données indisponibles</div>'}
-      </div>
-      <div class="m-wsensor-vals">
-        ${mIds.slice(0, 3).map(mid => {
+      <div class="m-wsensor-vals" style="margin:8px 0">
+        ${mIds.slice(0, 4).map(mid => {
           const cfg = CHART_METRICS[mid]; if (!cfg) return ''
           const series = mockSeries(mid, 1)
           const val = series[0]
@@ -833,7 +954,7 @@ function mWidgetSensorCards(sensors, wid = '') {
         }).join('')}
       </div>
       <div class="m-widget-footer" style="display:flex;align-items:center;justify-content:space-between">
-        <span>${sensor.serial}</span>
+        <span style="font-size:11px;color:#8e8e93">Il y a ${minAgo} min · ${sensor.serial}</span>
         <button class="m-wsensor-voir-donnees" data-sensor-id="${sensor.id}" data-metric-id="${primaryMetricId}" style="border:none;background:none;color:#007AFF;font-size:12px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;gap:3px">Voir les données <i class="bi bi-arrow-right-short"></i></button>
       </div>`
 
@@ -855,8 +976,11 @@ function exportCsvParcel(parcel, linkedSensorIds, period) {
     if (s) (SENSOR_MODEL_METRICS[s.model] || []).forEach(m => sensorMetrics.add(m))
   })
   const metricIds = [...new Set(['etp', 'rayonnement', 'temp_rosee', ...sensorMetrics])].filter(id => CHART_METRICS[id])
-  const count  = PERIOD_COUNTS[period] || 60
+  const totalCount = PERIOD_COUNTS[period] || 60
   const mins   = PERIOD_MINS[period]   || 10080
+  const periodFcDays = PERIOD_FC_DAYS[period] || 0
+  const histDays = mins / 1440
+  const count  = periodFcDays > 0 ? Math.round(totalCount * histDays / (histDays + periodFcDays)) : totalCount
   const stepMs = (mins / count) * 60000
   const end    = new Date()
   const start  = new Date(end - mins * 60000)
@@ -880,8 +1004,13 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h', plotId = null)
     })
   })
   const hasIrrigData = IRRIG_SEASON.some(i => i.plotId === plotId)
+  const IRRIG_SENSOR_MODELS = new Set(['CHP-15/30', 'CHP-30/60', 'CHP-60/90', 'CAPA-30-3', 'CAPA-60-6', 'EC'])
+  const hasIrrigSensor = linkedSensorIds.some(id => {
+    const s = allSensors.find(x => x.id === id)
+    return s && IRRIG_SENSOR_MODELS.has(s.model)
+  })
   const METRIC_PREFERRED_ORDER = ['pluie', 'irrigation', 'temperature', 'humidite', 'pothydr', 'teneur', 'temp_sol', 'vent', 'rayonnement', 'humectation', 'par', 'temp_rosee', 'etp']
-  const unique = [...new Set([...sensorMetrics, 'etp', 'rayonnement', 'temp_rosee', ...(hasIrrigData ? ['irrigation'] : [])])]
+  const unique = [...new Set([...sensorMetrics, 'etp', 'rayonnement', 'temp_rosee', ...(hasIrrigSensor ? ['rfu'] : ['nrs']), ...(hasIrrigData ? ['irrigation'] : [])])]
     .filter(id => CHART_METRICS[id])
     .sort((a, b) => {
       const ai = METRIC_PREFERRED_ORDER.indexOf(a), bi = METRIC_PREFERRED_ORDER.indexOf(b)
@@ -894,10 +1023,10 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h', plotId = null)
     <div class="m-period-bar" style="flex-direction:column;align-items:stretch">
       <div style="display:flex;gap:8px">
         <select class="m-period-sel" style="flex:1;min-width:0">
+          <option value="j7j2"${period==='j7j2'?' selected':''}>J-7 → J+2</option>
           <option value="365d"${period==='365d'?' selected':''}>365 jours</option>
           <option value="30d"${period==='30d'?' selected':''}>30 jours</option>
           <option value="7d"${period==='7d'?' selected':''}>7 jours</option>
-          <option value="j7j7"${period==='j7j7'?' selected':''}>J-7 → J+7</option>
           <option value="hier"${period==='hier'?' selected':''}>Hier</option>
           <option value="1d"${period==='1d'?' selected':''}>Aujourd'hui</option>
           <option value="custom"${period==='custom'?' selected':''}>Personnalisé</option>
@@ -921,7 +1050,7 @@ function donneesView(linkedSensorIds, period = '7d', step = '1h', plotId = null)
         const fallback = linkedSensorIds[0] ?? null
         const plot = plotId != null ? allPlots.find(p => p.id === plotId) : null
         const subject = plot ? { key: `p-${plot.id}`, label: plot.name } : null
-        return unique.map(id => id === 'irrigation' ? chartCard(id, period, null, plotId) : chartCard(id, period, metricToSensorId[id] ?? fallback, null, step, subject)).join('')
+        return unique.map(id => id === 'irrigation' ? chartCard(id, period, null, plotId, step, subject) : chartCard(id, period, metricToSensorId[id] ?? fallback, null, step, subject)).join('')
       })()}
     </div>`
 }
@@ -1012,12 +1141,12 @@ function paramsView(parcel, org, linkedSensorIds) {
         </div>
         <div class="m-list-row" data-action="edit-variety">
           <span class="m-list-row-label">Variété</span>
-          <span class="m-list-row-value">—</span>
+          <span class="m-list-row-value">${parcel.variety || '—'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
         <div class="m-list-row m-list-row--last" data-action="edit-stade">
           <span class="m-list-row-label">Stade phénologique</span>
-          <span class="m-list-row-value">—</span>
+          <span class="m-list-row-value">${parcel.phenoStage || '—'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
       </div>
@@ -1085,6 +1214,7 @@ function paramsView(parcel, org, linkedSensorIds) {
                   <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:13px;flex-shrink:0"></i>
                 </div>
                 ${metrics ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px">${metrics}</div>` : ''}
+                ${TENSIO_MODELS.has(s.model) && s.depth != null ? `<div style="font-size:12px;color:#8e8e93;margin-top:2px">Profondeur d'installation : ${s.depth} cm</div>` : ''}
               </div>`}).join('')
           : '<div class="m-list-row m-list-row--last"><span class="m-list-row-label" style="color:#8e8e93">Aucun capteur lié</span></div>'}
         ${conflictSensorIds.size ? `
@@ -1095,6 +1225,19 @@ function paramsView(parcel, org, linkedSensorIds) {
         <div class="m-list-row m-list-row--last" data-action="add-sensor" style="color:#0172A4">
           <i class="bi bi-plus-circle" style="font-size:15px;color:#0172A4"></i>
           <span class="m-list-row-label" style="color:#0172A4">Ajouter un capteur</span>
+        </div>
+      </div>
+
+      <div class="m-list-section-header">Données spatialisées</div>
+      <div class="m-list">
+        <div class="m-list-row m-list-row--last" style="flex-direction:column;align-items:stretch;gap:4px;padding:10px 16px">
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${[
+              CHART_METRICS.etp,
+              ...(linkedSensors.some(s => s.model === 'PYRANO') ? [] : [CHART_METRICS.rayonnement]),
+              CHART_METRICS.temp_rosee,
+            ].map(cfg => `<span style="font-size:10px;font-weight:500;padding:1px 6px;border-radius:10px;background:${cfg.color}18;color:${cfg.color};border:1px solid ${cfg.color}40;white-space:nowrap">${cfg.label}</span>`).join('')}
+          </div>
         </div>
       </div>
 
@@ -1126,9 +1269,9 @@ function paramsView(parcel, org, linkedSensorIds) {
           <span class="m-list-row-label">Date de création</span>
           <span class="m-list-row-value">01/01/2024</span>
         </div>
-        <div class="m-list-row m-list-row--last" data-action="archive" style="color:#ff9f0a">
-          <i class="bi bi-archive" style="font-size:15px;color:#ff9f0a"></i>
-          <span class="m-list-row-label" style="color:#ff9f0a">Archiver la parcelle</span>
+        <div class="m-list-row m-list-row--last m-tappable" data-action="delete-parcel">
+          <span class="m-list-row-label" style="color:#ff3b30">Supprimer la parcelle</span>
+          <i class="bi bi-trash" style="color:#ff3b30"></i>
         </div>
       </div>
       <div style="height:24px"></div>
@@ -1139,8 +1282,8 @@ function paramsView(parcel, org, linkedSensorIds) {
 export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'widgets', backLabel = 'Parcelles') {
   let org = orgs.find(o => o.id === parcel.orgId)
   let activeView    = initialView
-  let currentPeriod = '7d'
-  let currentStep   = '1h'
+  let currentPeriod = 'j7j2'
+  let currentStep   = '1d'
   let isFav = false
 
   const city = org?.ville || ''
@@ -1307,6 +1450,117 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     renderPicker()
   }
 
+  function openNameSheet() {
+    const current = parcel.name || ''
+    const input = document.createElement('div')
+    input.innerHTML = `<input class="m-sheet-input" type="text" value="${current.replace(/"/g, '&quot;')}" placeholder="Nom de la parcelle">`
+    const el = input.querySelector('input')
+    showSheet({
+      title: 'Nom', body: input, doneLabel: 'Enregistrer',
+      onDone: () => {
+        const val = el.value.trim()
+        if (val && val !== current) {
+          patchParcel(parcel.id, { name: val })
+          parcel.name = val
+          addMJournalEntry(parcel.id, {
+            type: 'modification',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Nom de la parcelle modifié : ${current} → ${val}.`,
+          })
+          renderView()
+          showToast('Nom mis à jour')
+        }
+      }
+    })
+    setTimeout(() => el.focus(), 300)
+  }
+
+  function openVarietySheet() {
+    const current = parcel.variety || ''
+    const input = document.createElement('div')
+    input.innerHTML = `<input class="m-sheet-input" type="text" value="${current.replace(/"/g, '&quot;')}" placeholder="Variété">`
+    const el = input.querySelector('input')
+    showSheet({
+      title: 'Variété', body: input, doneLabel: 'Enregistrer',
+      onDone: () => {
+        const val = el.value.trim()
+        if (val !== current) {
+          patchParcel(parcel.id, { variety: val || null })
+          parcel.variety = val || null
+          addMJournalEntry(parcel.id, {
+            type: 'modification',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Variété modifiée : ${current || '—'} → ${val || '—'}.`,
+          })
+          renderView()
+          showToast('Variété mise à jour')
+        }
+      }
+    })
+    setTimeout(() => el.focus(), 300)
+  }
+
+  function openCropSheet() {
+    const options = cropOptions
+    const current = parcel.crop
+    const body = document.createElement('div')
+    body.innerHTML = options.map(o => `
+      <div class="m-sheet-option${o === current ? ' m-sheet-option--active' : ''}" data-pick-crop="${o}">
+        <span>${o}</span>
+        ${o === current ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+      </div>`).join('')
+    const sheet = showSheet({ title: 'Culture', body, doneLabel: 'Fermer', onDone: () => {} })
+    body.querySelectorAll('[data-pick-crop]').forEach(row => {
+      row.addEventListener('click', () => {
+        const val = row.dataset.pickCrop
+        sheet.classList.remove('m-sheet-overlay--show')
+        setTimeout(() => sheet.remove(), 280)
+        if (val !== current) {
+          patchParcel(parcel.id, { crop: val, phenoStage: null })
+          parcel.crop = val
+          parcel.phenoStage = null
+          addMJournalEntry(parcel.id, {
+            type: 'modification',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Culture modifiée : ${current || '—'} → ${val}.`,
+          })
+          renderView()
+          showToast('Culture mise à jour')
+        }
+      })
+    })
+  }
+
+  function openStadeSheet() {
+    const options = getPhenoStageNames(parcel.crop)
+    const current = parcel.phenoStage
+    const body = document.createElement('div')
+    body.innerHTML = options.map(o => `
+      <div class="m-sheet-option${o === current ? ' m-sheet-option--active' : ''}" data-pick-stade="${o}">
+        <span>${o}</span>
+        ${o === current ? '<i class="bi bi-check" style="color:#007aff;font-size:18px"></i>' : ''}
+      </div>`).join('')
+    const sheet = showSheet({ title: 'Stade phénologique', body, doneLabel: 'Fermer', onDone: () => {} })
+    body.querySelectorAll('[data-pick-stade]').forEach(row => {
+      row.addEventListener('click', () => {
+        const val = row.dataset.pickStade
+        sheet.classList.remove('m-sheet-overlay--show')
+        setTimeout(() => sheet.remove(), 280)
+        if (val !== current) {
+          patchParcel(parcel.id, { phenoStage: val })
+          parcel.phenoStage = val
+          addMJournalEntry(parcel.id, {
+            type: 'modification',
+            date: new Date().toISOString().slice(0, 10),
+            texte: `Stade phénologique modifié : ${current || '—'} → ${val}.`,
+          })
+          renderView()
+          showToast('Stade phénologique mis à jour')
+        }
+      })
+    })
+  }
+
   function openSoilAnalysisSheet(previousTexture) {
     const stored = getParcel(parcel.id).soilAnalysis ?? parcel.soilAnalysis ?? {}
     const body = document.createElement('div')
@@ -1461,9 +1715,13 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
   }
 
   function bindViewEvents() {
+    // Prévisions 5j → voir détails
+    layer.querySelector('.m-prev5j-voir-details')?.addEventListener('click', () => openPrevDayDetail(parcel))
     // Period select → redraw charts
     layer.querySelector('.m-period-sel')?.addEventListener('change', e => {
-      currentPeriod = e.target.value; renderView()
+      currentPeriod = e.target.value
+      if (currentPeriod === 'j7j2') currentStep = '1d'
+      renderView()
     })
     // Step select → redraw charts
     layer.querySelector('.m-step-sel')?.addEventListener('change', e => {
@@ -1635,20 +1893,46 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
         if (row.dataset.action === 'edit-exploitation') pickExploitation()
+        else if (row.dataset.action === 'edit-name') openNameSheet()
+        else if (row.dataset.action === 'edit-crop') openCropSheet()
+        else if (row.dataset.action === 'edit-variety') openVarietySheet()
+        else if (row.dataset.action === 'edit-stade') openStadeSheet()
         else if (row.dataset.action === 'edit-env') openEnvSheet()
         else if (row.dataset.action === 'edit-irrigation') openIrrigationTypeSheet()
         else if (row.dataset.action === 'edit-volume-max') openVolumeMaxSheet()
         else if (row.dataset.action === 'edit-texture') openTextureSheet()
         else if (row.dataset.action === 'edit-integrations') openIntegrationsPage()
-        else if (row.dataset.action === 'archive') {
-          showConfirmSheet({
-            title: 'Archiver la parcelle',
-            message: `Archiver <strong>${parcel.name}</strong> ? Elle ne sera plus visible dans votre exploitation.`,
-            confirmLabel: 'Archiver',
-            confirmColor: '#ff9f0a',
-            onConfirm: () => showToast('Parcelle archivée (fonctionnalité à venir)')
+        else if (row.dataset.action === 'delete-parcel') {
+          const body = document.createElement('div')
+          body.innerHTML = `
+            <p style="font-size:14px;color:#636366;line-height:1.5;margin:0 0 14px;text-align:center">
+              La parcelle <strong>${parcel.name}</strong> sera définitivement supprimée.<br>Cette action est irréversible.
+            </p>
+            <div style="background:#fff8e8;border:1px solid #f0a500;border-radius:12px;padding:13px 14px;margin-bottom:18px">
+              <div style="font-size:13px;font-weight:600;color:#1c1c1e;margin-bottom:5px">
+                <i class="bi bi-lightbulb-fill" style="color:#f0a500;margin-right:4px"></i>Avant de supprimer…
+              </div>
+              <p style="font-size:13px;color:#636366;margin:0;line-height:1.55">
+                Vous souhaitez peut-être simplement <strong>changer de culture</strong> ou <strong>redémarrer un cycle de culture</strong> ?
+                Dans ce cas, modifiez la culture ou relancez un cycle depuis la configuration de la parcelle.
+              </p>
+            </div>
+            <button id="do-delete-parcel" style="width:100%;padding:14px;background:#ff3b30;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+              Supprimer la parcelle
+            </button>
+          `
+          const sheet = showSheet({ title: 'Supprimer la parcelle ?', body, doneLabel: 'Annuler', onDone: () => {} })
+          body.querySelector('#do-delete-parcel').addEventListener('click', () => {
+            sheet.classList.remove('m-sheet-overlay--show')
+            setTimeout(() => {
+              sheet.remove()
+              deleteParcel(parcel.id, allPlots)
+              popDetail()
+              window.dispatchEvent(new CustomEvent('parcel-deleted', { detail: { id: parcel.id } }))
+            }, 280)
           })
-        } else showToast('Fonctionnalité à venir')
+        }
+        else showToast('Fonctionnalité à venir')
       })
     })
     // Widget menus — retirer le widget

@@ -3,6 +3,7 @@ import { orgs }                from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON }        from '../../data/irrigations.js'
 import { initParcelDetail }    from './parcel-detail.js'
+import { hasIrrelis, getIrrelisVal, irrelisColor } from './irrelis-detail.js'
 
 const ADMIN_ORG_ID = 100
 
@@ -15,6 +16,7 @@ const METRIC_REQUIRES = {
 }
 
 function hasMetric(plot, metricId) {
+  if (metricId === 'irrelis') return hasIrrelis(plot)
   const req = METRIC_REQUIRES[metricId]
   if (!req) return true
   return allSensors.some(s => s.parcelIds.includes(plot.id) && req.includes(s.model))
@@ -28,10 +30,12 @@ const METRICS = [
   { id: 'temp_rosee',label: 'Température de rosée',unit: '°C', aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
   { id: 'rayonnement',label: 'Rayonnement solaire',unit: 'W/m²',aggs: ['Actuel', 'Journalier'],                               defaultAgg: 'Actuel'           },
   { id: 'rfu',      label: 'Réservoir',            unit: 'mm',  aggs: ['Actuel'],                                               defaultAgg: 'Actuel'           },
+  { id: 'nrs',      label: 'Niveau de réservoir (spatialisé)', unit: 'mm', aggs: ['30 derniers jours', '7 derniers jours', 'Hier'], defaultAgg: '7 derniers jours' },
   { id: 'hum',         label: 'Humidité',          unit: '%',          aggs: ['Actuel', 'Moyenne du jour'],          defaultAgg: 'Actuel'           },
   { id: 'vent',        label: 'Vent',                  unit: 'km/h',       aggs: ['Actuel', 'Moyen du jour', 'Rafales'], defaultAgg: 'Actuel'           },
   { id: 'par',         label: 'Rayonnement PAR',       unit: 'µmol/m²/s', aggs: ['Actuel', 'Journalier'],               defaultAgg: 'Actuel'           },
   { id: 'humectation', label: 'Humectation foliaire',  unit: '%',          aggs: ['Actuel', 'Heures du jour'],           defaultAgg: 'Actuel'           },
+  { id: 'irrelis',    label: 'Irré-LIS',              unit: 'mm',         aggs: ["Aujourd'hui", 'Demain', 'J+3', 'J+5'], defaultAgg: "Aujourd'hui"      },
 ]
 
 function contrastColor(hex) {
@@ -48,10 +52,12 @@ function getMetricColor(id, v) {
     case 'temp_rosee':  return v < 5 ? '#D2DEFA' : v < 12 ? '#5E88EC' : '#1B56E4'
     case 'rayonnement': return v < 200 ? '#FBFBB6' : v < 400 ? '#CBCB0B' : '#838307'
     case 'rfu':         return v < 30 ? '#E05252' : v < 60 ? '#FBAF05' : '#24B066'
+    case 'nrs':         return v < 30 ? '#E05252' : v < 60 ? '#FBAF05' : '#24B066'
     case 'hum':         return v < 40 ? '#E3C7FF' : v < 70 ? '#5B12A4' : '#29084A'
     case 'vent':        return v < 15 ? '#E1E1E1' : v < 30 ? '#616161' : '#343232'
     case 'par':         return v < 500 ? '#F9EED2' : v < 1200 ? '#E8B44C' : '#9B6E00'
     case 'humectation': return v < 30 ? '#B2FFF9' : v < 70 ? '#00887E' : '#003D39'
+    case 'irrelis':     return v >= 35 ? '#24B066' : v >= 12 ? '#E8A020' : '#E05252'
     default:            return '#0172A4'
   }
 }
@@ -82,6 +88,7 @@ function mockVal(id) {
     case 'temp_rosee':  return +(2 + Math.random() * 14).toFixed(1)
     case 'rayonnement': return Math.round(Math.random() * 900)
     case 'rfu':         return Math.round(20 + Math.random() * 110)
+    case 'nrs':         return Math.round(20 + Math.random() * 110)
     case 'hum':         return Math.round(40 + Math.random() * 55)
     case 'vent':        return +(Math.random() * 40).toFixed(1)
     case 'par':         return Math.round(Math.random() * 1800)
@@ -112,6 +119,10 @@ export function initParcellesScreen(screenEl, role) {
 
   function getVal(plotId) {
     if (metricId === 'irrigation') return irrigSum(plotId, aggLabel)
+    if (metricId === 'irrelis') {
+      const plot = allPlots.find(p => p.id === plotId)
+      return plot ? Math.round(getIrrelisVal(plot, aggLabel)) : 0
+    }
     const key = `${plotId}-${metricId}-${aggLabel}`
     if (!(key in valCache)) valCache[key] = mockVal(metricId)
     return valCache[key]
@@ -122,6 +133,7 @@ export function initParcellesScreen(screenEl, role) {
   }
 
   function getPlots() {
+    if (role === 'new' || role === 'new-adherent') return []
     if (!isAdmin) return allPlots.filter(p => p.orgId === 1)
     if (orgFilter === 'all')                return allPlots
     if (orgFilter === String(ADMIN_ORG_ID)) return allPlots.filter(p => p.orgId === ADMIN_ORG_ID)
@@ -144,17 +156,18 @@ export function initParcellesScreen(screenEl, role) {
         ${adherentOrgs.map(o => `<option value="${o.id}"${orgFilter === String(o.id) ? ' selected' : ''}>${o.name}</option>`).join('')}
       </select>` : ''
 
-    // Tri : avec métrique en premier (desc), sans métrique après
+    // Tri : avec métrique en premier (desc), sans métrique après (alphabétique)
     const sorted = [...plots].sort((a, b) => {
       const aHas = hasMetric(a, metricId), bHas = hasMetric(b, metricId)
       if (aHas && !bHas) return -1
       if (!aHas && bHas) return 1
-      return aHas ? getVal(b.id) - getVal(a.id) : 0
+      return aHas ? getVal(b.id) - getVal(a.id) : a.name.localeCompare(b.name, 'fr')
     })
 
     const listHtml = sorted.length
       ? `<div class="m-plain-list">${sorted.map(p => {
-          const sub  = [p.crop, p.irrigation].filter(Boolean).join(' · ')
+          const isPolygon = p.latlngs?.length > 0 || p.shape?.type === 'polygon' || p.shape?.type === 'rectangle'
+          const sub  = [p.crop, p.irrigation, isPolygon && p.area ? `${p.area} ha` : null].filter(Boolean).join(' · ')
           const has  = hasMetric(p, metricId)
           const parcelAnomaly = allSensors.filter(s => s.parcelIds.includes(p.id)).some(s => s.event && (Array.isArray(s.event) ? s.event.length > 0 : true))
           return `
@@ -168,7 +181,9 @@ export function initParcellesScreen(screenEl, role) {
                 <i class="bi bi-chevron-right" style="color:#c7c7cc;font-size:12px"></i>
               </div>
             </div>`}).join('')}</div>`
-      : `<div class="m-empty-state"><i class="bi bi-map"></i><p>Aucune parcelle</p></div>`
+      : (role === 'new' || role === 'new-adherent')
+        ? `<div class="m-empty-state"><i class="bi bi-map"></i><p>Vous n'avez pas encore de parcelle</p><button onclick="window.showMobileAddPage?.()" style="margin-top:8px;background:#0172A4;color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer">Créer une parcelle</button></div>`
+        : `<div class="m-empty-state"><i class="bi bi-map"></i><p>Aucune parcelle</p></div>`
 
     content.innerHTML = `
       <div class="m-screen-controls">
@@ -204,6 +219,25 @@ export function initParcellesScreen(screenEl, role) {
       const el = content.querySelector('#parcel-map'); if (!el) return
       mapInstance = L.map(el, { zoomControl: false, attributionControl: false })
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(mapInstance)
+      if (!plots.length && (role === 'new' || role === 'new-adherent')) {
+        const org = orgs.find(o => o.id === 1)
+        if (org) mapInstance.setView([org.lat, org.lng], 13)
+        mapInstance.invalidateSize()
+        const wrap = el.parentElement
+        wrap.style.position = 'relative'
+        const ov = document.createElement('div')
+        ov.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:500;pointer-events:none'
+        ov.innerHTML = `
+          <div style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.18);padding:24px 20px;width:260px;text-align:center;pointer-events:auto">
+            <i class="bi bi-geo-alt" style="font-size:36px;color:#0172A4;display:block;margin-bottom:12px"></i>
+            <p style="font-size:15px;font-weight:600;margin:0 0 6px;color:#1c1c1e">Vous n'avez pas encore de parcelle</p>
+            <p style="font-size:13px;color:#8e8e93;margin:0 0 18px;line-height:1.4">Créez votre première parcelle pour commencer à suivre vos cultures.</p>
+            <button id="empty-create-parcel-btn" style="background:#0172A4;color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer;width:100%">Créer une parcelle</button>
+          </div>`
+        wrap.appendChild(ov)
+        wrap.querySelector('#empty-create-parcel-btn').addEventListener('click', () => window.showMobileAddPage?.())
+        return
+      }
       const bounds = []
       plots.forEach(p => {
         const hasIrrig = metricId !== 'irrigation' || IRRIG_SEASON.some(i => i.plotId === p.id)

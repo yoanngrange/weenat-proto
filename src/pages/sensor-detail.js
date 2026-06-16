@@ -1161,7 +1161,7 @@ function renderConfig() {
   }
 
   if (isCHP) {
-    const range   = model === 'CHP-15/30' ? [15, 30] : model === 'CHP-30/60' ? [30, 60] : [60, 90]
+    const range   = model === 'CHP-15/30' ? [15, 30] : model === 'CHP-30/60' ? [30, 60] : [45, 90]
     const defDepth = sensor.depth ?? range[0]
     html += `
       <div class="config-section">

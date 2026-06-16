@@ -111,7 +111,7 @@ const METRIC_SENSORS = (() => {
 })()
 
 // Métriques calculées sans capteur (disponibles sur toutes les parcelles)
-const ALWAYS_COMPUTED_METRICS = new Set(['etp', 'irrigations'])
+const ALWAYS_COMPUTED_METRICS = new Set(['etp', 'irrigations', 'niveau-reservoir-spatialise'])
 
 // Profondeurs de mesure par modèle (pour l'affichage multi-horizon)
 const SENSOR_DEPTHS = {
@@ -151,8 +151,9 @@ const METRIC_LABELS = {
   'teneur-eau':             'Teneur en eau du sol',
   'conductivite':           'Électro-conductivité',
   'temp-sol':               'Température du sol',
-  'rfu':                    'Réservoir',
-  'irrigations':            'Irrigations',
+  'rfu':                              'Niveau de réservoir',
+  'niveau-reservoir-spatialise':      'Niveau de réservoir (spatialisé)',
+  'irrigations':                      'Irrigations',
   'intensite-humectation':  "Intensité d'humectation foliaire",
   'duree-humectation':      "Durée d'humectation foliaire",
   'temp-humide':            'Température humide',
@@ -269,7 +270,15 @@ const metricAggregates = {
     { value: '30jours', label: '30 jours' },
   ],
   'rfu': [
-    { value: 'reel', label: 'Temps réel' },
+    { value: 'reel',      label: 'Temps réel' },
+    { value: 'today',     label: "Aujourd'hui (J0)" },
+    { value: 'yesterday', label: 'Hier (J-1)' },
+    { value: '7jours',    label: '7 derniers jours (J-7)' },
+  ],
+  'niveau-reservoir-spatialise': [
+    { value: '30jours',   label: '30 derniers jours' },
+    { value: '7jours',    label: '7 derniers jours' },
+    { value: 'yesterday', label: 'Hier' },
   ],
   'temp-rosee': [
     { value: 'reel',      label: 'Temps réel' },
@@ -915,7 +924,7 @@ function updateMetricSelector(filteredParcels, filteredSensors) {
   let available = getAvailableMetrics(sensorList)
 
   if (pageType.startsWith('parcelles')) {
-    const alwaysOn = ['etp', 'irrigations', 'pluie']
+    const alwaysOn = ['etp', 'irrigations', 'pluie', 'niveau-reservoir-spatialise']
     alwaysOn.forEach(m => { if (!available.includes(m)) available.push(m) })
   }
 
@@ -1407,7 +1416,19 @@ function computeMetricValue(parcel, metric, aggregate) {
   }
 
   if (metric === 'rfu') {
-    return Math.max(0, Math.min(100, Math.round(parcel.reserveHydrique * 0.8 + noise * 2)))
+    const rhu = parcel.reserveHydrique || 80
+    const seed = (parcel.id * 17 + 13) % 41
+    const offsets = { reel: 0, today: 0, yesterday: -2, '7jours': -8 }
+    const pct = Math.min(95, Math.max(15, 55 + seed + (offsets[aggregate] ?? 0)))
+    return Math.round(rhu * pct / 100)
+  }
+
+  if (metric === 'niveau-reservoir-spatialise') {
+    const rhu = parcel.reserveHydrique || 80
+    const seed = (parcel.id * 19 + 7) % 37
+    const offsets = { '30jours': -12, '7jours': -6, yesterday: -2 }
+    const pct = Math.min(95, Math.max(15, 60 + seed + (offsets[aggregate] ?? 0)))
+    return Math.round(rhu * pct / 100)
   }
 
   if (metric === 'temp-rosee') {
@@ -1462,6 +1483,7 @@ function getMetricUnit(metric) {
   if (metric === 'irrigations') return 'mm'
   if (metric === 'ru') return '%'
   if (metric === 'rfu') return 'mm'
+  if (metric === 'niveau-reservoir-spatialise') return 'mm'
   if (metric === 'vent') return 'km/h'
   if (metric === 'rayonnement') return 'W/m²'
   if (metric === 'par') return 'µmol/m²/s'
@@ -2435,7 +2457,6 @@ function createParcelAdminTable(parcels) {
         <button class="btn-secondary btn-sm" id="bulk-member-btn"><i class="bi bi-person"></i> Associer à un membre</button>
         <button class="btn-secondary btn-sm" id="bulk-sensor-btn"><i class="bi bi-broadcast"></i> Lier un capteur</button>
         <button class="btn-secondary btn-sm" id="bulk-fav-btn"><i class="bi bi-star"></i> Ajouter aux favoris</button>
-        <button class="btn-secondary btn-sm bulk-archive-btn" id="bulk-archive-btn"><i class="bi bi-archive"></i> Archiver</button>
         <button class="btn-secondary btn-sm bulk-danger-btn" id="bulk-delete-btn"><i class="bi bi-trash"></i> Supprimer</button>
         <button class="btn-secondary btn-sm" id="bulk-org-btn"><i class="bi bi-building"></i> Changer d'organisation propriétaire</button>
         <button class="btn-secondary btn-sm" id="bulk-save-btn" style="color:var(--ok)"><i class="bi bi-check-lg"></i> Enregistrer</button>
@@ -2745,14 +2766,6 @@ function initParcelAdminTable(container) {
     checked.forEach(id => favoritePlotIds.add(id))
     saveFavorites()
     showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} ajoutée${checked.length > 1 ? 's' : ''} aux favoris`)
-  })
-
-  // Archiver
-  container.querySelector('#bulk-archive-btn')?.addEventListener('click', () => {
-    const checked = getCheckedAdminIds(container)
-    if (!checked.length) return
-    if (!confirm(`Archiver ${checked.length} parcelle${checked.length > 1 ? 's' : ''} ?`)) return
-    showToast(`${checked.length} parcelle${checked.length > 1 ? 's' : ''} archivée${checked.length > 1 ? 's' : ''}`)
   })
 
   // Supprimer

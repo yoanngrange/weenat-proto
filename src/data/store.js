@@ -27,7 +27,7 @@ export function patchParcel(id, patch) {
 }
 
 // Fields that can be user-edited and must stay in sync across all pages
-const PLOT_PATCH_FIELDS = ['name', 'crop', 'irrigation', 'texture', 'soilAnalysis', 'substrate', 'env', 'volumeMaxM3', 'orgId', 'area', 'integrations']
+const PLOT_PATCH_FIELDS = ['name', 'crop', 'variety', 'phenoStage', 'irrigation', 'texture', 'soilAnalysis', 'substrate', 'env', 'volumeMaxM3', 'orgId', 'area', 'integrations']
 
 // Apply localStorage overrides to the in-memory plots array — call once at page init
 export function applyStoredPlotPatches(plotsArray) {
@@ -37,6 +37,17 @@ export function applyStoredPlotPatches(plotsArray) {
     if (!stored) return
     PLOT_PATCH_FIELDS.forEach(f => { if (stored[f] !== undefined) p[f] = stored[f] })
   })
+  // Retire du tableau (en place) les parcelles supprimées par l'utilisateur
+  for (let i = plotsArray.length - 1; i >= 0; i--) {
+    if (store[`parcel_${plotsArray[i].id}`]?.deleted) plotsArray.splice(i, 1)
+  }
+}
+
+// Marque une parcelle comme supprimée et la retire immédiatement du tableau fourni
+export function deleteParcel(id, plotsArray) {
+  patchParcel(id, { deleted: true })
+  const idx = plotsArray.findIndex(p => p.id === id)
+  if (idx !== -1) plotsArray.splice(idx, 1)
 }
 
 // ─── Sensor ───────────────────────────────────────────────────────────────────

@@ -26,6 +26,8 @@ const ALWAYS_METRICS = [
   { id: 'temp_rosee', name: 'Température de rosée',      unit: '°C',   color: '#72B0D8', base: () => rnd(2, 16),     isCumul: false },
 ]
 
+const IRRIGATION_METRIC = { id: 'irrigation', name: 'Irrigation', unit: 'mm', color: '#FF8C00', base: () => 0, isCumul: true, chartType: 'bar', isIrrigation: true }
+
 const METRICS_BY_MODEL = {
   'P+':       [
     { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
@@ -257,12 +259,19 @@ function saveState(patch) {
 
 // ─── Period / step state ──────────────────────────────────────────────────────
 
-let currentPeriod = '7d'
+let currentPeriod = 'j7j2'
 let customFrom = null
 let customTo   = null
 
+// Métriques pour lesquelles les prévisions affichent des courbes/données
+// (les autres métriques n'affichent que le hachurage de la zone future)
+const FORECAST_METRICS = new Set(['pluie', 'temp', 'humidite', 'pothydr', 'etp', 'temp_rosee', 'rayonnement', '_vent'])
+
+// Horizon de prévisions (en jours) selon la période sélectionnée
+const PERIOD_FC_DAYS = { j7j2: 2 }
+
 function getPeriodMinutes() {
-  const table = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, '30d': 43200, '365d': 525600 }
+  const table = { '1d': 1440, 'hier': 1440, '3d': 4320, '7d': 10080, 'j7j2': 10080, '30d': 43200, '365d': 525600 }
   if (currentPeriod === 'custom' && customFrom && customTo) {
     return Math.max(60, Math.round((customTo - customFrom) / 60000))
   }
@@ -278,6 +287,7 @@ function getDefaultStep(period) {
   if (period === '365d') return '1mo'
   if (period === '30d')  return '1w'
   if (period === '7d')   return '1d'
+  if (period === 'j7j2') return '1d'
   return '1h'
 }
 
@@ -285,6 +295,14 @@ function getDisplayCount() {
   const total = getPeriodMinutes()
   const step  = getStepMinutes()
   return Math.max(2, Math.min(200, Math.floor(total / step)))
+}
+
+// Nombre de pas de temps réservés à la zone "prévisions" pour la période courante
+function getHatchCount() {
+  const periodFcDays = PERIOD_FC_DAYS[currentPeriod] || 0
+  if (!periodFcDays) return 0
+  const step = getStepMinutes()
+  return Math.max(1, Math.round((periodFcDays * 1440) / step))
 }
 
 // ─── Widget catalog ───────────────────────────────────────────────────────────
@@ -1023,6 +1041,12 @@ function renderChartsContent(container, linkedSensorIds) {
     .filter(m => !sensorMetricIds.has(m.id))
     .forEach(m => allCards.push({ key: `always-${m.id}`, type: 'metric', metric: m, source: 'parcelle', emissionMins: null, unavailable: stepMins < 60 }))
 
+  // Irrigation chart: shown when the parcel has an irrigation type configured or has irrigation data
+  const hasIrrigData = (!!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué') || IRRIG_SEASON.some(i => i.plotId === parcelId)
+  if (hasIrrigData) {
+    allCards.push({ key: 'always-irrigation', type: 'metric', metric: IRRIGATION_METRIC, source: 'parcelle', emissionMins: null })
+  }
+
   // Apply saved order
   const savedOrder = loadChartOrder()
   if (savedOrder?.length) {
@@ -1233,6 +1257,7 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   card.dataset.metricId   = m.id
   card.dataset.metricName = m.name
   card.dataset.metricUnit = m.unit
+  if (m.isIrrigation) card.dataset.isIrrigation = '1'
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
@@ -1348,47 +1373,67 @@ function tempFactor(h) {
   return 0.5 + 0.5 * Math.sin(2 * Math.PI * (h - 4) / 24 - Math.PI / 2)
 }
 
+// Variation jour à jour (ex: journée plus ou moins ensoleillée/chaude/humide),
+// stable pour une même journée calendaire afin que les agrégats journaliers varient
+// de façon cohérente d'un jour à l'autre (et créent des "vagues" au pas horaire).
+function dayFactor(minutesAgo) {
+  const dayIndex = Math.floor((Date.now() - minutesAgo * 60000) / 86400000)
+  const x = Math.sin(dayIndex * 12.9898 + 78.233) * 43758.5453
+  return x - Math.floor(x) // 0..1
+}
+
 function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
   const h  = hourOfDay(minutesAgo)
   const tf = tempFactor(h)
   const sf = solarFactor(h)
+  const df = dayFactor(minutesAgo)
   const n  = () => 1 + (Math.random() - 0.5) * 2 * noise
 
   switch (metricId) {
     case 'temp': {
-      return ((base - 6) + tf * 12) * n()
+      const amp = 0.6 + df * 0.8
+      return ((base - 6) + tf * 12 * amp) * n()
     }
     case 'tseche':
     case 'thumide': {
-      return ((base - 4) + tf * 8) * n()
+      const amp = 0.6 + df * 0.8
+      return ((base - 4) + tf * 8 * amp) * n()
     }
     case 'temp_rosee': {
-      const airTemp = (base - 6) + tf * 12
-      return Math.min(airTemp - 1, ((base - 8) + tf * 6)) * n()
+      const amp = 0.6 + df * 0.8
+      const airTemp = (base - 6) + tf * 12 * amp
+      return Math.min(airTemp - 1, ((base - 8) + tf * 6 * amp)) * n()
     }
     case 'tsol': {
       const h2 = hourOfDay(minutesAgo + 120)
-      return ((base - 3) + tempFactor(h2) * 6) * n()
+      const amp = 0.7 + df * 0.6
+      return ((base - 3) + tempFactor(h2) * 6 * amp) * n()
     }
     case 'humidite': {
-      return Math.min(100, Math.max(20, (base + (1 - tf) * 25 - tf * 15) * n()))
+      const wet = 1.4 - df * 0.8
+      return Math.min(100, Math.max(20, (base + (1 - tf) * 25 * wet - tf * 15) * n()))
     }
     case 'rayonnement': {
-      return Math.max(0, sf * base * 1.3 * n())
+      const cloud = 0.4 + df * 0.9
+      return Math.max(0, sf * base * 1.3 * cloud * n())
     }
     case 'etp': {
-      return Math.max(0, sf * base * 1.5 * n())
+      const cloud = 0.4 + df * 0.9
+      return Math.max(0, sf * base * 1.5 * cloud * n())
     }
 
     case 'humec': {
-      return Math.max(0, base * Math.max(0, 0.8 - sf * 1.2) * n())
+      const wet = 1.4 - df * 0.8
+      return Math.max(0, base * Math.max(0, 0.8 - sf * 1.2) * wet * n())
     }
     case 'pluie': {
-      return Math.random() < 0.12 ? base * Math.random() * 2 : 0
+      const rainChance = 0.06 + (1 - df) * 0.22
+      return Math.random() < rainChance ? base * Math.random() * 2.5 * (1.3 - df) : 0
     }
     case 'vent':
     case 'rafales': {
-      return Math.max(0, base * (0.6 + sf * 0.8) * n())
+      const windy = 0.5 + df
+      return Math.max(0, base * (0.6 + sf * 0.8) * windy * n())
     }
     default:
       return Math.max(0, base * n())
@@ -1400,6 +1445,7 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
 function drawAllCharts() {
   const count = getDisplayCount()
   const step  = getStepMinutes()
+  const hatchCount = getHatchCount()
   const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
   const tensioSensors = linkedSensors.filter(s => TENSIO_MODELS.includes(s.model))
 
@@ -1432,9 +1478,10 @@ function drawAllCharts() {
     const metricName = card.dataset.metricName || ''
     const metricUnit = card.dataset.metricUnit || ''
     if (card.dataset.isIrrigation) {
-      drawIrrigationChart(svg, color, count, step)
+      drawIrrigationChart(svg, color, count, step, hatchCount)
     } else {
-      drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit)
+      const showFcData = hatchCount > 0 && FORECAST_METRICS.has(metricId)
+      drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit, hatchCount, showFcData)
     }
   })
   renderPhenoOverlay()
@@ -1548,14 +1595,17 @@ function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
   svg.innerHTML = out
 }
 
-function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '') {
+function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '', hatchCount = 0, showFcData = false) {
   const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
+  const totalCount = count + hatchCount
+  const fcCount = showFcData ? hatchCount : 0
+  const genCount = count + fcCount
 
   // Generate values with realistic day/night cycle
   const rawPerStep = Math.max(1, Math.round(stepMins / 15))
-  const vals = Array.from({ length: count }, (_, idx) => {
+  const vals = Array.from({ length: genCount }, (_, idx) => {
     const minsAgo = (count - 1 - idx) * stepMins
     if (isCumul) {
       let sum = 0
@@ -1579,7 +1629,7 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   const maxV = Math.max(...vals)
   const range = maxV - minV || 1
 
-  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
 
   // Gradient ID (unique per SVG element)
@@ -1596,6 +1646,19 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
     </clipPath>
   </defs>`
 
+  // ── Zone striée représentant la portion "prévisions" du graphique ──
+  if (hatchCount > 0) {
+    const boundaryX = xOf(count - 0.5)
+    const stripeId = `stripe_${gradId}`
+    out += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+      </pattern></defs>
+      <rect x="${boundaryX.toFixed(1)}" y="${PAD.t}" width="${(W - PAD.r - boundaryX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+      <line x1="${boundaryX.toFixed(1)}" y1="${PAD.t}" x2="${boundaryX.toFixed(1)}" y2="${PAD.t + innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${(W - PAD.r - 4).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)" font-style="italic">Prévisions</text>`
+  }
+
   // ── Horizontal grid lines + Y labels ──
   for (let i = 0; i <= 4; i++) {
     const y = PAD.t + (i / 4) * innerH
@@ -1609,8 +1672,8 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
 
   // ── Vertical grid lines + X labels ──
-  const labelStep = Math.max(1, Math.floor(count / 6))
-  for (let i = 0; i < count; i += labelStep) {
+  const labelStep = Math.max(1, Math.floor(totalCount / 6))
+  for (let i = 0; i < totalCount; i += labelStep) {
     const x = xOf(i).toFixed(1)
     const agoMins = (count - i) * stepMins
     out += `<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="3,3"/>`
@@ -1618,17 +1681,18 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   }
 
   if (chartType === 'bar') {
-    const barW = Math.max(2, (innerW / count) * 0.65)
+    const barW = Math.max(2, (innerW / totalCount) * 0.65)
     vals.forEach((v, i) => {
       if (v <= 0) return
+      const isFc = i >= count
       const x = xOf(i)
       const y = yOf(v)
       const h = (PAD.t + innerH) - y
-      out += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="url(#${gradId})" opacity="0.9" rx="1"/>`
+      out += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${isFc ? '#C7C7CC' : `url(#${gradId})`}" opacity="${isFc ? '0.5' : '0.9'}" rx="1"/>`
     })
   } else {
-    const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
-    const linePath = smoothPath(pts)
+    const histPts = vals.slice(0, count).map((v, i) => ({ x: xOf(i), y: yOf(v) }))
+    const linePath = smoothPath(histPts)
 
     // Area fill (very light)
     const areaD = linePath +
@@ -1636,6 +1700,12 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
     out += `<path d="${areaD}" fill="${colorHigh}" opacity="0.07" clip-path="url(#clip_${gradId})"/>`
     // Stroke with gradient
     out += `<path d="${linePath}" fill="none" stroke="url(#${gradId})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#clip_${gradId})"/>`
+
+    if (fcCount > 0) {
+      const fcPts = vals.slice(count - 1).map((v, i) => ({ x: xOf(count - 1 + i), y: yOf(v) }))
+      const fcPath = smoothPath(fcPts)
+      out += `<path d="${fcPath}" fill="none" stroke="url(#${gradId})" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round" opacity="0.5" clip-path="url(#clip_${gradId})"/>`
+    }
   }
 
   // ── Invisible overlay for tooltip interaction ──
@@ -1644,10 +1714,10 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   svg.innerHTML = out
 
   // Attach tooltip
-  attachChartTooltip(svg, vals, xOf, yOf, minV, maxV, count, stepMins, metricName, metricUnit, color, PAD, W, H)
+  attachChartTooltip(svg, vals, xOf, yOf, minV, maxV, totalCount, count, stepMins, metricName, metricUnit, color, PAD, W, H)
 }
 
-function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, count, stepMins, metricName, metricUnit, color, PAD, W, _H) {
+function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, totalCount, nowCount, stepMins, metricName, metricUnit, color, PAD, W, _H) {
   const tip  = getTooltip()
   const rect = svg.querySelector('.chart-hover-rect')
   if (!rect) return
@@ -1671,7 +1741,7 @@ function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, count, stepMins, 
     // Find nearest index
     const innerW = W - PAD.l - PAD.r
     const frac   = Math.max(0, Math.min(1, (svgX - PAD.l) / innerW))
-    const idx    = Math.round(frac * (count - 1))
+    const idx    = Math.round(frac * (totalCount - 1))
     if (idx < 0 || idx >= vals.length) return
 
     const v  = vals[idx]
@@ -1682,7 +1752,7 @@ function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, count, stepMins, 
     dot.setAttribute('cy', cy)
     dot.style.display = ''
 
-    const agoMins = (count - idx) * stepMins
+    const agoMins = (nowCount - idx) * stepMins
     const tsLabel = xLabel(agoMins)
     const valLabel = Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)
 
@@ -1704,26 +1774,31 @@ function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, count, stepMins, 
   })
 }
 
-function drawIrrigationChart(svg, color, count, stepMins) {
+function irrigationSeriesWeb(plotId, count, stepMins, hatchCount = 0) {
+  const now = Date.now()
+  const bucketMs = stepMins * 60000
+  const startMs = now - count * bucketMs
+  const totalCount = count + hatchCount
+  const vals = new Array(totalCount).fill(0)
+  IRRIG_SEASON.filter(i => i.plotId === plotId).forEach(i => {
+    const t = new Date(i.iso).getTime()
+    if (t < startMs) return
+    const idx = Math.min(totalCount - 1, Math.floor((t - startMs) / bucketMs))
+    if (idx >= 0) vals[idx] += i.mm || 0
+  })
+  return vals
+}
+
+function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
   const W = 600, H = 180, PAD = { t: 12, r: 8, b: 28, l: 44 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
+  const totalCount = count + hatchCount
 
-  const now = Date.now()
-  const totalMs = count * stepMins * 60000
-
-  // Bin events into time steps
-  const bins = Array(count).fill(0)
-  ;(parcelState.irrigationEvents || []).forEach(ev => {
-    const ts = new Date(ev.isoDate).getTime()
-    const age = now - ts
-    if (age < 0 || age > totalMs) return
-    const idx = Math.floor((totalMs - age) / (stepMins * 60000))
-    if (idx >= 0 && idx < count) bins[idx] += (ev.mm || 0)
-  })
+  const bins = irrigationSeriesWeb(parcelId, count, stepMins, hatchCount)
 
   const maxV = Math.max(...bins, 1)
-  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - (v / maxV) * innerH
 
   let lines = ''
@@ -1734,13 +1809,27 @@ function drawIrrigationChart(svg, color, count, stepMins) {
     lines += `<text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="var(--txt3)">${v}</text>`
   }
 
-  const barW = Math.max(4, (innerW / count) * 0.65)
+  // Zone striée représentant la portion "prévisions" du graphique
+  if (hatchCount > 0) {
+    const boundaryX = xOf(count - 0.5)
+    const stripeId = `irrig_stripe_${Math.random().toString(36).slice(2, 8)}`
+    lines += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+      </pattern></defs>
+      <rect x="${boundaryX.toFixed(1)}" y="${PAD.t}" width="${(W - PAD.r - boundaryX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+      <line x1="${boundaryX.toFixed(1)}" y1="${PAD.t}" x2="${boundaryX.toFixed(1)}" y2="${PAD.t + innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${(W - PAD.r - 4).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)" font-style="italic">Prévisions</text>`
+  }
+
+  const barW = Math.max(4, (innerW / totalCount) * 0.65)
   bins.forEach((v, i) => {
     if (v <= 0) return
+    const isFc = i >= count
     const x = xOf(i)
     const y = yOf(v)
     const h = (PAD.t + innerH) - y
-    lines += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="0.85" rx="1"/>`
+    lines += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${isFc ? '#C7C7CC' : color}" opacity="${isFc ? '0.5' : '0.85'}" rx="1"/>`
   })
 
   svg.innerHTML = lines
@@ -2262,7 +2351,6 @@ function renderPanel() {
   renderIntegrations()
   renderPanelMembres()
   renderAlertes()
-  renderActions()
 }
 
 // ─── Identification (editable) ────────────────────────────────────────────────
@@ -3041,27 +3129,6 @@ function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfir
   document.body.appendChild(modal)
 }
 
-function renderActions() {
-  const el = document.getElementById('panel-actions')
-  el.innerHTML = `
-    <button class="action-btn action-btn--danger" id="archive-parcel-btn"><i class="bi bi-archive"></i> Archiver la parcelle</button>
-  `
-  el.querySelector('#archive-parcel-btn').addEventListener('click', () => {
-    const linkedSensors = allSensors.filter(s => parcelState.linkedSensorIds.includes(s.id))
-    const sensorList = linkedSensors.length
-      ? linkedSensors.map(s => `<strong>${s.model} ${s.serial}</strong>`).join(', ')
-      : 'aucun capteur lié'
-    showConfirmModal({
-      title: 'Archiver la parcelle',
-      message: `Vous êtes sur le point d'archiver <strong>${parcelState.name || parcelBase.name}</strong>.<br><br>` +
-               `Capteurs liés : ${sensorList}.<br><br>` +
-               `L'archivage masque la parcelle sans supprimer les données historiques.`,
-      confirmLabel: 'Archiver',
-      onConfirm: () => showToast('Parcelle archivée (fonctionnalité à venir)')
-    })
-  })
-}
-
 // ─── Mini map (Géolocalisation) ───────────────────────────────────────────────
 
 function initMiniMap() {
@@ -3153,8 +3220,8 @@ const WIDGET_DEFS = {
   'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#A6C157', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'w-ec':            { size:'1x1', title:'Sonde de fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
   'profil-capteurs': { size:'1x1', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
-  'niveau-reservoir':{ size:'1x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWPlaceholder },
-  'profil-reservoir':{ size:'1x1', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWPlaceholder },
+  'niveau-reservoir':{ size:'1x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWNiveauReservoir },
+  'profil-reservoir':{ size:'1x1', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWProfilReservoir },
 }
 
 const DASH_STORAGE_KEY = () => `dash-widgets-parcel-${parcelId}`
@@ -3282,8 +3349,7 @@ function initDashGrid() {
       const dd = document.createElement('div')
       dd.className = 'dash-dropdown'
       const irrigItems = wid === 'irrigations' ? `
-        <button class="dash-dd-item" data-action="set-vol">Définir le volume limité de la parcelle</button>
-        <button class="dash-dd-item" data-action="set-irrig-type">Modifier le type d'irrigation</button>` : ''
+        <button class="dash-dd-item" data-action="set-vol">Définir le volume limité de la parcelle</button>` : ''
       dd.innerHTML = `${irrigItems}<button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${wid}">Retirer le widget</button>`
       const rect = btn.getBoundingClientRect()
       const gridRect = grid.getBoundingClientRect()
@@ -3300,10 +3366,6 @@ function initDashGrid() {
       dd.querySelector('[data-action="set-vol"]')?.addEventListener('click', () => {
         dd.remove()
         openIrrigWidgetAction('vol')
-      })
-      dd.querySelector('[data-action="set-irrig-type"]')?.addEventListener('click', () => {
-        dd.remove()
-        openIrrigWidgetAction('type')
       })
       setTimeout(() => document.addEventListener('click', () => dd.remove(), { once: true }), 0)
     })
@@ -3747,6 +3809,84 @@ function renderWTavelure(el) {
   </div>`
 }
 
+// ─── Niveau de réservoir (RFU) / Profil de réservoir ──────────────────────────
+const RESERVOIR_AGGS = [
+  { id: 'j7',   label: 'J-7' },
+  { id: 'j1',   label: 'J-1' },
+  { id: 'j0',   label: 'J0' },
+  { id: 'last', label: 'Dernières données' },
+]
+// Le "Niveau de réservoir spatialisé" (profil) n'expose que J-7 et J-1
+const PROFIL_RESERVOIR_AGGS = RESERVOIR_AGGS.filter(o => o.id === 'j7' || o.id === 'j1')
+const reservoirAggState = () => `w-reservoir-agg-${parcelId}`
+const profilReservoirAggState = () => `w-profil-reservoir-agg-${parcelId}`
+function loadReservoirAgg(key, defaultAgg = 'j0') { return localStorage.getItem(key()) || defaultAgg }
+function saveReservoirAgg(key, val) { localStorage.setItem(key(), val) }
+
+function reservoirAggValue(agg) {
+  const rhu = parcelBase.reserveHydrique || 80
+  const seed = (parcelBase.id * 17 + 13) % 41
+  const offsets = { j7: -8, j1: -2, j0: 0, last: 1 }
+  const pct = Math.min(95, Math.max(15, 55 + seed + (offsets[agg] || 0)))
+  const mm = Math.round(rhu * pct / 100)
+  return { rhu, pct, mm }
+}
+
+function reservoirAggSelectHtml(agg, options = RESERVOIR_AGGS) {
+  return `<select class="w-reservoir-agg-sel">
+    ${options.map(o => `<option value="${o.id}"${o.id === agg ? ' selected' : ''}>${o.label}</option>`).join('')}
+  </select>`
+}
+
+function renderWNiveauReservoir(el) {
+  const agg = loadReservoirAgg(reservoirAggState)
+  const { rhu, pct, mm } = reservoirAggValue(agg)
+  const gaugeColor = pct > 60 ? '#2d9e5f' : pct > 35 ? '#e07820' : '#e04040'
+  el.innerHTML = `
+    <div class="w-bilan-layout">
+      ${reservoirAggSelectHtml(agg)}
+      <div class="w-bilan-gauge-wrap">
+        <div class="w-bilan-gauge-track"><div class="w-bilan-gauge-fill" style="width:${pct}%;background:${gaugeColor}"></div></div>
+        <div class="w-bilan-gauge-labels">
+          <span>0</span>
+          <span style="font-weight:600;color:${gaugeColor}">${mm} mm / ${rhu} mm RFU (${pct} %)</span>
+          <span>${rhu} mm</span>
+        </div>
+      </div>
+    </div>`
+  el.querySelector('.w-reservoir-agg-sel').addEventListener('change', e => {
+    saveReservoirAgg(reservoirAggState, e.target.value)
+    renderWNiveauReservoir(el)
+  })
+}
+
+function renderWProfilReservoir(el) {
+  const agg = loadReservoirAgg(profilReservoirAggState, 'j1')
+  const { pct } = reservoirAggValue(agg)
+  const seed = (parcelBase.id * 17 + 13) % 41
+  const depths = [
+    { label: '10 cm', pct: Math.min(100, Math.max(0, pct + (seed % 12) - 5)), color: '#f0cc60' },
+    { label: '30 cm', pct: Math.min(100, Math.max(0, pct + (seed % 8))),       color: '#c89c30' },
+    { label: '60 cm', pct: Math.min(100, Math.max(0, pct - (seed % 10) + 3)),  color: '#a07010' },
+  ]
+  el.innerHTML = `
+    <div class="w-bilan-layout">
+      ${reservoirAggSelectHtml(agg, PROFIL_RESERVOIR_AGGS)}
+      <div class="w-bilan-horizons">
+        ${depths.map(d => `
+          <div class="w-bilan-hz">
+            <span class="w-bilan-hz-lbl">${d.label}</span>
+            <div class="w-bilan-hz-bar"><div style="width:${d.pct}%;background:${d.color};height:100%;border-radius:3px;transition:width .4s"></div></div>
+            <span class="w-bilan-hz-val" style="color:${d.color}">${d.pct} %</span>
+          </div>`).join('')}
+      </div>
+    </div>`
+  el.querySelector('.w-reservoir-agg-sel').addEventListener('change', e => {
+    saveReservoirAgg(profilReservoirAggState, e.target.value)
+    renderWProfilReservoir(el)
+  })
+}
+
 function renderWPlaceholder(el) {
   el.innerHTML=`<div class="dash-empty" style="padding-top:20px">
     <i class="bi bi-hourglass" style="font-size:20px;opacity:.3;display:block;margin-bottom:6px"></i>
@@ -3980,6 +4120,7 @@ function showIrrigSaveConfirm(title, lines) {
       <div class="irr-save-confirm-icon">✓</div>
       <div class="irr-save-confirm-title">${title}</div>
       <div class="irr-save-confirm-lines">${lines.map(l => `<div>${l}</div>`).join('')}</div>
+      <a href="irrigation.html?plot=${parcelId}" class="irr-save-confirm-link">Gérer les irrigations de toutes mes parcelles &gt;</a>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-confirm-close">Fermer</button>
     </div>`
   document.body.appendChild(ov)

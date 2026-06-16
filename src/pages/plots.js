@@ -101,7 +101,7 @@ class PlotsPage {
       }
 
       return true;
-    });
+    }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
     this.updateFiltersDisplay();
     this.renderCurrentView();
