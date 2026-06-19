@@ -1,5 +1,6 @@
 import { pushDetail, popDetail } from '../nav.js'
 import { showToast, showSheet, showConfirmSheet } from '../ui.js'
+import { hasIrrelis, irrelisMobileWidget } from './irrelis-detail.js'
 import { orgs }                 from '../../data/orgs.js'
 import { sensors as allSensors } from '../../data/sensors.js'
 import { IRRIG_SEASON } from '../../data/irrigations.js'
@@ -11,6 +12,10 @@ import { getMJournal, saveMJournal, addMJournalEntry } from '../journal-store.js
 import { addMesureFavorite, addCumulFavorite } from './dashboard.js'
 
 const _role = new URLSearchParams(window.location.search).get('role') === 'adherent' ? 'adherent' : 'admin'
+
+function irrigPlots(parcel) {
+  return _role === 'adherent' ? allPlots.filter(p => p.orgId === parcel.orgId) : allPlots
+}
 
 const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
@@ -75,6 +80,7 @@ function _computeDefaultWidgetIds(parcel, linkedSensorIds) {
   Object.entries(WIDGET_SENSOR_MODELS).forEach(([wid, wModels]) => {
     if (wModels.some(m => models.has(m))) ids.push(wid)
   })
+  if (hasIrrelis(parcel)) ids.push('irrelis')
   return ids
 }
 
@@ -176,13 +182,13 @@ function openAddPage(parcel) {
       const action = btn.dataset.action
       if (action === 'irrigation') {
         popDetail()
-        import('./irrigation.js').then(m => m.openIrrigationSaisie([parcel], showToast, { ids: [parcel.id], label: parcel.name }))
+        import('./irrigation.js').then(m => m.openIrrigationSaisie(irrigPlots(parcel), showToast, { ids: [parcel.id], label: parcel.name }))
       } else if (action === 'strategie-irrigation') {
         popDetail()
-        import('./irrigation.js').then(m => m.openIrrigationStrategie([parcel], showToast, { ids: [parcel.id], label: parcel.name }))
+        import('./irrigation.js').then(m => m.openIrrigationStrategie(irrigPlots(parcel), showToast, { ids: [parcel.id], label: parcel.name }))
       } else if (action === 'calendrier') {
         popDetail()
-        import('./irrigation.js').then(m => m.openCalendar([parcel], ''))
+        import('./irrigation.js').then(m => m.openCalendar(irrigPlots(parcel), String(parcel.id)))
       } else {
         showToast('Fonctionnalité à venir')
       }
@@ -595,8 +601,6 @@ function irrigationWidget(parcel) {
 
   const tTotal = tReal + tPlan
 
-  const footerHtml = `<div class="m-irrig-footer-link">Voir les irrigations →</div>`
-
   const body = `
     <div class="w-irrig-layout">
       <div class="w-irrig-kpis">
@@ -615,8 +619,8 @@ function irrigationWidget(parcel) {
       </div>
       ${seasonParamsHtml}
       ${actionsHtml}
-    </div>
-    ${footerHtml}`
+      <button class="w-irrig-act-btn w-irrig-act-btn--sec m-irrig-view-cal" type="button" style="margin-top:5px"><i class="bi bi-calendar3"></i> Voir les irrigations</button>
+    </div>`
 
   return mWidgetCard('Irrigations', 'bi-moisture', '#FF8C00', body, 'irrigations')
 }
@@ -627,9 +631,10 @@ function widgetsView(parcel, linkedSensorIds = []) {
 
   let html = ''
   for (const wid of activeIds) {
-    if (wid === 'irrigations')    html += irrigationWidget(parcel)
-    else if (wid === 'cumuls')    html += mWidgetCumuls(parcel, linkedSensorIds)
+    if (wid === 'irrigations')        html += irrigationWidget(parcel)
+    else if (wid === 'cumuls')        html += mWidgetCumuls(parcel, linkedSensorIds)
     else if (wid === 'previsions-5j') html += mWidgetPrev5j(parcel)
+    else if (wid === 'irrelis')       html += irrelisMobileWidget(parcel)
     else if (WIDGET_SENSOR_MODELS[wid]) {
       const wModels  = new Set(WIDGET_SENSOR_MODELS[wid])
       const wSensors = sensors.filter(s => wModels.has(s.model))
@@ -1152,6 +1157,12 @@ function paramsView(parcel, org, linkedSensorIds) {
       </div>
 
       <div class="m-list-section-header">Localisation</div>
+      ${parcel.shape?.type === 'point' && !(parcel.latlngs?.length >= 3) ? `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;background:var(--pri2);border:1px solid var(--pri);border-radius:10px;margin-bottom:10px">
+          <i class="bi bi-info-circle-fill" style="color:var(--pri);flex-shrink:0;margin-top:1px"></i>
+          <span style="font-size:13px;color:var(--txt2);line-height:1.4">Cette parcelle n'a pas encore de contour tracé — elle n'apparaît que comme un point sur la carte. Rendez-vous sur la version Web pour le tracer (Parcelle → Localisation → Tracer le contour).</span>
+        </div>
+      ` : ''}
       <div class="m-list">
         <div id="parcel-minimap" class="m-minimap-container"></div>
         <div class="m-list-row">
@@ -1746,15 +1757,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         }))
       })
     })
-    // Irrigation widget footer → jump to "Données" tab (irrigation chart)
-    layer.querySelectorAll('.m-irrig-footer-link').forEach(link => {
-      link.addEventListener('click', () => {
-        activeView = 'donnees'
-        layer.querySelectorAll('.m-detail-tab').forEach(t => t.classList.toggle('active', t.dataset.view === 'donnees'))
-        renderView()
-        requestAnimationFrame(() => {
-          layer.querySelector('.m-chart-card[data-metric-id="irrigation"]')?.scrollIntoView({ block: 'start' })
-        })
+    // Irrigation widget "Voir les irrigations" → open calendar detail view
+    layer.querySelectorAll('.m-irrig-view-cal').forEach(btn => {
+      btn.addEventListener('click', () => {
+        import('./irrigation.js').then(m => m.openCalendar(irrigPlots(parcel), String(parcel.id)))
       })
     })
     // Details link → open fullscreen chart
@@ -1780,6 +1786,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
           parcel,
         }))
       })
+    })
+    // Irré-LIS widget → ouvrir bilan détail
+    layer.querySelector('.m-il-detail-btn')?.addEventListener('click', () => {
+      import('./irrelis-detail.js').then(m => m.openIrrelisDetail(parcel))
     })
     // Mesure add-to-favorites buttons
     layer.querySelectorAll('.m-msr-add-btn').forEach(btn => {
@@ -1966,10 +1976,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
 
     // Irrigations widget — actions
     layer.querySelector('.m-irrig-act-saisie')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationSaisie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, true, renderView))
+      import('./irrigation.js').then(m => m.openIrrigationSaisie(irrigPlots(parcel), showToast, { ids: [parcel.id], label: parcel.name }, true, renderView))
     })
     layer.querySelector('.m-irrig-act-saison')?.addEventListener('click', () => {
-      import('./irrigation.js').then(m => m.openIrrigationStrategie([parcel], showToast, { ids: [parcel.id], label: parcel.name }, null, true, renderView))
+      import('./irrigation.js').then(m => m.openIrrigationStrategie(irrigPlots(parcel), showToast, { ids: [parcel.id], label: parcel.name }, null, true, renderView))
     })
     // Irrigations widget — type non renseigné → ouvrir Paramètres + bottom sheet
     layer.querySelector('.m-irrig-set-type')?.addEventListener('click', () => {

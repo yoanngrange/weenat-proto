@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build"
+    "deploy": "npm run build && cp -r dist/. public/"
   },
   "devDependencies": {
     "playwright": "^1.60.0",

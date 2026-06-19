@@ -3,7 +3,7 @@ import { orgs } from '../data/orgs.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
-import { getStoredMembers, saveMembers } from '../data/store.js'
+import { getStoredMembers, saveMembers, getStoredAdherentMembers, saveAdherentMembers } from '../data/store.js'
 
 const ROLE_COLORS = {
   'propriétaire': 'var(--txt)',
@@ -33,6 +33,11 @@ const ADHERENT_MEMBERS = [
   { id: 901, prenom: 'Marie',       nom: 'Martin',    email: 'marie.martin@ferme-du-bocage.fr',  role: 'propriétaire', statut: 'actif', parcelIds: [1, 2, 3] },
   { id: 902, prenom: 'Jean-Michel', nom: 'Dutilleul', email: 'jm.dutilleul@ferme-du-bocage.fr',  role: 'admin',        statut: 'actif', sensorIds: [1, 2] },
 ]
+
+const ADHERENT_DATA_VERSION = 'v1'
+const _adherentStoredRaw = getStoredAdherentMembers()
+const _adherentStored = (_adherentStoredRaw && _adherentStoredRaw._version === ADHERENT_DATA_VERSION) ? _adherentStoredRaw.data : null
+const localAdherentMembers = _adherentStored || ADHERENT_MEMBERS.map(m => ({ ...m }))
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -71,10 +76,11 @@ function initFilters() {
   })
 
   document.getElementById('select-all-members')?.addEventListener('change', function () {
-    const allIds = getFiltered().map(m => m.id)
+    const list = activeRender === renderAdherentMembers ? getFilteredAdherent() : getFiltered()
+    const allIds = list.map(m => m.id)
     if (this.checked) allIds.forEach(id => selectedIds.add(id))
     else selectedIds.clear()
-    render()
+    activeRender()
   })
 
   document.getElementById('members-table').addEventListener('click', e => {
@@ -87,7 +93,7 @@ function initFilters() {
       currentSort.column = col
       currentSort.direction = 'asc'
     }
-    render()
+    activeRender()
   })
 }
 
@@ -393,15 +399,21 @@ function updateStats(list) {
   `).join('')
 }
 
-function renderAdherentMembers() {
-  let list = [...ADHERENT_MEMBERS]
+function getFilteredAdherent() {
+  let list = localAdherentMembers
   if (selectedRoles.length)   list = list.filter(m => selectedRoles.includes(m.role))
   if (selectedStatuts.length) list = list.filter(m => selectedStatuts.includes(m.statut))
+  return list
+}
+
+function persistAdherent() { saveAdherentMembers({ _version: ADHERENT_DATA_VERSION, data: localAdherentMembers }) }
+
+function renderAdherentMembers() {
+  const list = getFilteredAdherent()
 
   // Hide the Organisations column — members of my org are always in my org only
-  document.querySelector('#members-table th[data-column="orgs"]')?.style && (
-    document.querySelector('#members-table th[data-column="orgs"]').style.display = 'none'
-  )
+  const orgsTh = document.querySelector('#members-table th[data-column="orgs"]')
+  if (orgsTh) orgsTh.style.display = 'none'
 
   const statsEl = document.getElementById('stats-cards')
   if (statsEl) {
@@ -411,11 +423,20 @@ function renderAdherentMembers() {
     ].map(s => `<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value">${s.value}</div></div>`).join('')
   }
 
+  // Update select-all checkbox state
+  const allIds = list.map(m => m.id)
+  const selAll = document.getElementById('select-all-members')
+  if (selAll) {
+    selAll.checked = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+    selAll.indeterminate = !selAll.checked && allIds.some(id => selectedIds.has(id))
+  }
+
   const tbody = document.querySelector('#members-table tbody')
   if (!tbody) return
 
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:32px;text-align:center;color:var(--txt3)">Aucun membre ne correspond aux filtres.</td></tr>'
+    updateActionBarAdherent()
     return
   }
 
@@ -429,8 +450,8 @@ function renderAdherentMembers() {
       ? memberSensors.map(s => `<div class="admin-item-row"><a href="capteur-detail.html?id=${s.id}" class="admin-link">${s.serial} <span class="member-sensor-model">${s.model}</span></a></div>`).join('')
       : '<span class="tag-none">—</span>'
     return `
-      <tr>
-        <td class="col-check"></td>
+      <tr${selectedIds.has(m.id) ? ' class="row-selected"' : ''}>
+        <td class="col-check"><input type="checkbox" class="row-cb" data-id="${m.id}"${selectedIds.has(m.id) ? ' checked' : ''}></td>
         <td><span class="member-name">${m.prenom} ${m.nom}</span><div class="member-email-sub">${m.email}</div></td>
         <td>${m.role}</td>
         <td class="admin-links-cell">${parcelsHtml}</td>
@@ -439,6 +460,103 @@ function renderAdherentMembers() {
       </tr>
     `
   }).join('')
+
+  tbody.querySelectorAll('.row-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const id = parseInt(cb.dataset.id)
+      if (cb.checked) selectedIds.add(id); else selectedIds.delete(id)
+      renderAdherentMembers()
+    })
+  })
+
+  updateActionBarAdherent()
+}
+
+function updateActionBarAdherent() {
+  let bar = document.getElementById('members-action-bar')
+  if (!bar) {
+    bar = document.createElement('div')
+    bar.id = 'members-action-bar'
+    bar.className = 'bulk-action-bar hidden'
+    document.getElementById('stats-cards').insertAdjacentElement('afterend', bar)
+  }
+
+  if (selectedIds.size === 0) {
+    bar.classList.add('hidden')
+    return
+  }
+  bar.classList.remove('hidden')
+  bar.innerHTML = `
+    <span class="bulk-count">${selectedIds.size} sélectionné${selectedIds.size > 1 ? 's' : ''}</span>
+    <div class="bulk-actions">
+      <label class="bulk-action-group">
+        <span>Rôle</span>
+        <select id="bulk-role-sel" class="bulk-select">
+          <option value="">— choisir —</option>
+          ${ROLES.map(r => `<option value="${r}">${r}</option>`).join('')}
+        </select>
+      </label>
+      <label class="bulk-action-group">
+        <span>Parcelle</span>
+        <select id="bulk-plot-sel" class="bulk-select">
+          <option value="">— choisir —</option>
+          ${[...plots].sort((a,b)=>a.name.localeCompare(b.name,'fr')).slice(0,30).map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+        </select>
+      </label>
+      <label class="bulk-action-group">
+        <span>Capteur</span>
+        <select id="bulk-sensor-sel" class="bulk-select">
+          <option value="">— choisir —</option>
+          ${sensors.slice(0,30).map(s => `<option value="${s.id}">${s.serial} (${s.model})</option>`).join('')}
+        </select>
+      </label>
+      <button id="bulk-delete-btn" class="btn-secondary" style="color:var(--err)"><i class="bi bi-trash"></i> Supprimer</button>
+      <button id="bulk-save-btn" class="btn-secondary" style="color:var(--ok)"><i class="bi bi-check-lg"></i> Enregistrer</button>
+      <button id="bulk-cancel-btn" class="btn-secondary">Annuler</button>
+    </div>
+  `
+
+  bar.querySelector('#bulk-role-sel')?.addEventListener('change', e => {
+    if (!e.target.value) return
+    selectedIds.forEach(id => { const m = localAdherentMembers.find(x => x.id === id); if (m) m.role = e.target.value })
+    persistAdherent(); renderAdherentMembers()
+  })
+  bar.querySelector('#bulk-plot-sel')?.addEventListener('change', e => {
+    const plotId = parseInt(e.target.value); if (!plotId) return
+    selectedIds.forEach(id => {
+      const m = localAdherentMembers.find(x => x.id === id)
+      if (m) {
+        if (!m.parcelIds) m.parcelIds = []
+        if (!m.parcelIds.includes(plotId)) m.parcelIds = [...m.parcelIds, plotId]
+      }
+    })
+    persistAdherent(); showToast('Parcelle associée.'); renderAdherentMembers()
+  })
+  bar.querySelector('#bulk-sensor-sel')?.addEventListener('change', e => {
+    const sensorId = parseInt(e.target.value); if (!sensorId) return
+    selectedIds.forEach(id => {
+      const m = localAdherentMembers.find(x => x.id === id)
+      if (m) {
+        if (!m.sensorIds) m.sensorIds = []
+        if (!m.sensorIds.includes(sensorId)) m.sensorIds = [...m.sensorIds, sensorId]
+      }
+    })
+    persistAdherent(); showToast('Capteur associé.'); renderAdherentMembers()
+  })
+  bar.querySelector('#bulk-delete-btn')?.addEventListener('click', () => {
+    if (!confirm(`Supprimer ${selectedIds.size} membre(s) ?`)) return
+    selectedIds.forEach(id => {
+      const idx = localAdherentMembers.findIndex(x => x.id === id)
+      if (idx !== -1) localAdherentMembers.splice(idx, 1)
+    })
+    selectedIds.clear(); persistAdherent(); renderAdherentMembers()
+  })
+  bar.querySelector('#bulk-save-btn')?.addEventListener('click', () => {
+    persistAdherent(); showToast('Modifications enregistrées.')
+  })
+  bar.querySelector('#bulk-cancel-btn')?.addEventListener('click', () => {
+    selectedIds.clear(); renderAdherentMembers()
+  })
 }
 
 function showToast(msg) {

@@ -2,6 +2,8 @@ import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 
+const MY_ORG_ID = 1
+
 let selectedDayIndex = 0
 let selectedMetric   = 'temp'
 
@@ -56,12 +58,25 @@ document.addEventListener('DOMContentLoaded', () => {
 function populateLocationSelect() {
   const select = document.getElementById('location-select')
   if (!select) return
+  select.innerHTML = ''
+
+  const isAdherent     = (localStorage.getItem('menuRole') || 'admin-reseau') === 'adherent-reseau'
+  const visiblePlots   = isAdherent ? plots.filter(p => p.orgId === MY_ORG_ID) : plots
+  const visibleSensors = isAdherent ? sensors.filter(s => s.orgId === MY_ORG_ID) : sensors
+
+  const addrOpt = document.createElement('option')
+  addrOpt.value = 'addr'
+  addrOpt.textContent = 'Adresse de mon exploitation'
+  select.appendChild(addrOpt)
+
   const pg = document.createElement('optgroup'); pg.label = 'Parcelles'
-  plots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = p.crop ? `${p.name} (${p.crop})` : p.name; pg.appendChild(o) })
+  visiblePlots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = p.crop ? `${p.name} (${p.crop})` : p.name; pg.appendChild(o) })
   select.appendChild(pg)
   const sg = document.createElement('optgroup'); sg.label = 'Capteurs'
-  sensors.forEach(s => { const p = plots.find(x => x.id === s.parcelId); const o = document.createElement('option'); o.value = `sensor-${s.id}`; o.textContent = `${s.serial} — ${s.model}${p ? ` (${p.name})` : ''}`; sg.appendChild(o) })
+  visibleSensors.forEach(s => { const p = plots.find(x => (s.parcelIds || []).includes(x.id)); const o = document.createElement('option'); o.value = `sensor-${s.id}`; o.textContent = `${s.serial} — ${s.model}${p ? ` (${p.name})` : ''}`; sg.appendChild(o) })
   select.appendChild(sg)
+
+  select.value = 'addr'
   select.addEventListener('change', () => { generateForecast(); generateHourlySection(selectedDayIndex) })
 }
 

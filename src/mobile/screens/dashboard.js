@@ -7,7 +7,7 @@ import { IRRIG_SEASON } from '../../data/irrigations.js'
 import { flexLayer, checkIcon, buildSelectionHTML } from './irrigation.js'
 import { applyStoredPlotPatches } from '../../data/store.js'
 import { showParcelCreation, showSensorCreation } from './onboarding.js'
-import { hasIrrelis, getIrrelisVal, irrelisColor, makeIrrelisMiniSvg, getIrrelisConfig, getIrrelisDailyData } from './irrelis-detail.js'
+import { hasIrrelis, getIrrelisVal, irrelisColor, getIrrelisConfig } from './irrelis-detail.js'
 
 const ORG_ID   = { admin: 100, adherent: 1, new: 41 }
 const ORG_NAME = { admin: "Breiz'Agri Conseil", adherent: 'Ferme du Bocage', new: 'GAEC Jourdain' }
@@ -452,9 +452,6 @@ function buildIrrelis(plots) {
     return `<div class="m-widget-empty"><i class="bi bi-droplet" style="color:#0172A4;font-size:28px"></i><p>Aucune parcelle avec le service Irré-LIS</p></div>`
   }
 
-  const firstData = getIrrelisDailyData(irrelisPlots[0], 5)
-  const miniSvg   = makeIrrelisMiniSvg(firstData)
-
   const rows = irrelisPlots.map(p => {
     const cfg = getIrrelisConfig(p.id)
     const val = Math.round(getIrrelisVal(p, "Aujourd'hui"))
@@ -476,12 +473,12 @@ function buildIrrelis(plots) {
 
   const legend = `<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
     <span style="font-size:10px;color:#24B066;display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#24B066"></span>RFU</span>
-    <span style="font-size:10px;color:#E8A020;display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E8A020"></span>Sous RFU</span>
+    <span style="font-size:10px;color:#E8A020;display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E8A020"></span>Bas de RFU</span>
     <span style="font-size:10px;color:#E05252;display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#E05252"></span>Réservoir de survie</span>
+    <span style="font-size:10px;color:#007aff;display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#007aff"></span>Saturation</span>
   </div>`
 
   return `
-    <div style="margin-bottom:6px;border-radius:10px;overflow:hidden;border:1px solid rgba(0,0,0,.07)">${miniSvg}</div>
     <div style="font-size:11px;color:#8e8e93;margin-bottom:2px">Réserve en eau — Aujourd'hui</div>
     ${rows}
     ${legend}`
@@ -650,11 +647,7 @@ function buildPrevisions(plots, sensors, forecast, role) {
   const visible = forecast.slice(0, 3).map(makeCard).join('')
   const extra   = forecast.slice(3).map(makeCard).join('')
 
-  const exploit = allOrgs.find(o => o.id === (role === 'admin' ? 100 : 1))
-  const exploitAddr = exploit?.adresse || ''
-  const addrOpt = exploitAddr
-    ? `<option value="addr">${trunc(`${exploit.name} — ${exploit.ville || exploitAddr}`)}</option>`
-    : ''
+  const addrOpt = `<option value="addr" selected>Adresse de mon exploitation</option>`
   return `
     <div class="m-w-section-hd" style="margin-top:0">Lieu des prévisions</div>
     <select class="m-prev-select">${addrOpt}${opts}</select>

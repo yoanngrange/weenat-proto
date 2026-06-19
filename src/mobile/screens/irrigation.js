@@ -97,7 +97,12 @@ export function checkIcon(on, partial) {
 
 export function buildSelectionHTML(groups, plots, selectedIds) {
   const allSelected = plots.length > 0 && plots.every(p => selectedIds.has(p.id))
-  const rows = [...plots].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map(p => {
+  const rows = [...plots].sort((a, b) => {
+    const sa = selectedIds.has(a.id) ? 0 : 1
+    const sb = selectedIds.has(b.id) ? 0 : 1
+    if (sa !== sb) return sa - sb
+    return a.name.localeCompare(b.name, 'fr')
+  }).map(p => {
     const sel = selectedIds.has(p.id)
     return `<div class="irr-plot-row${sel ? ' irr-plot-row--sel' : ''}" data-pid="${p.id}">
       <div><div class="irr-plot-name">${p.name}</div>${plotInfo(p)}</div>
@@ -183,10 +188,9 @@ function askIrrigTypeIfNeeded(ids, plots, callback) {
 // ─── Shared plot info helper ──────────────────────────────────────────────────
 
 function plotInfo(p) {
-  const crop    = p.crop
-  const irr     = p.irrigation || null
-  const texture = p.substrate ? 'Substrat : ' + p.substrate : (p.texture || null)
-  const parts   = [crop, irr || '<em>type irrigation non renseigné</em>', texture].filter(Boolean)
+  const crop = p.crop
+  const irr  = p.irrigation || null
+  const parts = [crop, irr || '<em>type irrigation non renseigné</em>'].filter(Boolean)
   if (!crop && !irr) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
   return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
 }
@@ -211,15 +215,9 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
     const sum = layer.querySelector('.irr-summary')
     const btn = layer.querySelector('.irr-save-btn')
     if (!sum || !btn) return
-    if (preselect) {
-      sum.textContent = ''
-      btn.disabled    = false
-      btn.textContent = 'Enregistrer'
-    } else {
-      sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''} · ${qtyVal} mm`
-      btn.disabled    = n === 0
-      btn.textContent = 'Enregistrer'
-    }
+    sum.textContent = n === 0 ? '' : `${n} parcelle${n > 1 ? 's' : ''} · ${qtyVal} mm`
+    btn.disabled    = n === 0
+    btn.textContent = 'Enregistrer'
   }
 
   function bindZones(layer) {
@@ -239,12 +237,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
     })
   }
 
-  const selectionZone = preselect
-    ? `<div class="irr-presel-banner">
-         <i class="bi bi-geo-alt-fill" style="color:#185FA5;flex-shrink:0"></i>
-         <span>${preselect.ids.length > 1 ? 'Parcelles concernées' : 'Parcelle concernée'} : ${preselect.label}</span>
-       </div>`
-    : `<div id="irr-sel-list">${selectionHTML()}</div>`
+  const selectionZone = `<div id="irr-sel-list">${selectionHTML()}</div>`
 
   const layer = flexLayer(pushDetail(`
     <div class="irr-detail-header">
@@ -273,12 +266,12 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
     </div>
     <div class="irr-bottom-bar">
       <div class="irr-summary"></div>
-      <button class="irr-save-btn" ${preselect ? '' : 'disabled'}>Enregistrer</button>
+      <button class="irr-save-btn" disabled>Enregistrer</button>
     </div>
   `))
 
   layer.dataset.dirty = 'true'
-  if (!preselect) bindZones(layer)
+  bindZones(layer)
   renderBottomBar(layer)
 
   layer.querySelector('#irr-back').addEventListener('click', popDetail)
@@ -291,7 +284,7 @@ export function openIrrigationSaisie(plots, showToast, preselect = null, backToP
   })
 
   layer.querySelector('.irr-save-btn').addEventListener('click', () => {
-    const ids = preselect ? new Set(preselect.ids) : selectedIds
+    const ids = selectedIds
     askIrrigTypeIfNeeded(ids, plots, () => {
       const isFut = dateVal > TODAY
       ids.forEach(plotId => {
@@ -352,10 +345,9 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
   }
 
   function plotInfo(p) {
-    const crop    = p.crop
-    const irr     = p.irrigation || null
-    const texture = p.substrate ? 'Substrat : ' + p.substrate : (p.texture || null)
-    const parts   = [crop, irr, texture].filter(Boolean)
+    const crop  = p.crop
+    const irr   = p.irrigation || null
+    const parts = [crop, irr].filter(Boolean)
     if (!parts.length) return `<span class="irr-plot-info irr-plot-info--miss">Non renseigné</span>`
     return `<span class="irr-plot-info">${parts.join(' · ')}</span>`
   }
@@ -392,11 +384,7 @@ export function openIrrigationStrategie(plots, showToast, preselect = null, repl
         </div>
       </div>
       <div class="irr-preview-box" id="strat-preview">${preview}</div>
-      ${preselect
-        ? `<div class="irr-presel-banner"><i class="bi bi-geo-alt-fill" style="color:#185FA5;flex-shrink:0"></i>
-             <span>${preselect.ids.length > 1 ? 'Parcelles concernées' : 'Parcelle concernée'} : ${preselect.label}</span>
-           </div>`
-        : buildSelectionHTML([], plots, selectedIds)}
+      ${buildSelectionHTML([], plots, selectedIds)}
       <div class="irr-bottom-spacer"></div>
     `
   }
@@ -564,7 +552,7 @@ function openStrategieApercu(prevLayer, plots, selectedIds, debut, fin, qty, fre
   })
 
   function applyChanges() {
-    const ids = preselect ? new Set(preselect.ids) : selectedIds
+    const ids = selectedIds
     askIrrigTypeIfNeeded(ids, plots, () => {
       if (replaceSeasonIds) {
         if (datesChanged) {
@@ -1303,22 +1291,28 @@ export function openCalendar(plots, initialFilter) {
         const pb = plots.find(p => String(p.id) === b)?.name ?? b
         return pa.localeCompare(pb, 'fr')
       })
-      body.innerHTML = sortedIds.map(pid => {
+      body.innerHTML = sortedIds.map((pid, idx) => {
         const irrig    = byPlot[pid]
         const hasStrat = irrig.some(i => i.fromStrategy)
         const plot     = plots.find(p => String(p.id) === pid)
         const plotName = plot?.name ?? pid
         const infoParts = [plot?.crop, plot?.irrigation].filter(Boolean)
-        return `<div style="margin-bottom:20px">
+        const sep = idx > 0 ? `<hr style="border:none;border-top:1px solid #E0DED8;margin:0 0 16px">` : ''
+        const actionBtn = hasStrat
+          ? `<div class="irr-cal-add-bar" style="margin-top:8px">
+               <button class="irr-cal-add-btn irr-cal-add-btn--sec" data-strat-pid="${pid}"><i class="bi bi-pencil"></i> Modifier la saison</button>
+             </div>`
+          : `<div class="irr-cal-add-bar" style="margin-top:8px">
+               <button class="irr-cal-add-btn irr-cal-add-btn--tert" data-goto-pid="${pid}"><i class="bi bi-list-ul"></i> Voir les irrigations</button>
+             </div>`
+        return `${sep}<div style="margin-bottom:16px">
           <button class="irr-cal-plot-link" data-goto-pid="${pid}" style="display:flex;align-items:baseline;gap:6px;background:none;border:none;padding:0;margin-bottom:6px;text-align:left;cursor:pointer">
             <span style="font-size:13px;font-weight:700;color:#185FA5;text-decoration:underline">${plotName}</span>
             ${infoParts.length ? `<span style="font-size:11px;color:#8e8e93">${infoParts.join(' · ')}</span>` : ''}
           </button>
           ${renderCumuls(irrig)}
           ${renderTimeline(irrig)}
-          ${hasStrat ? `<div style="display:flex;justify-content:flex-end;margin-top:4px">
-            <button class="irr-cal-strat-btn" data-strat-pid="${pid}">Modifier la saison <i class="bi bi-chevron-down"></i></button>
-          </div>` : ''}
+          ${actionBtn}
         </div>`
       }).join('')
       body.querySelectorAll('[data-strat-pid]').forEach(btn => {
@@ -1338,24 +1332,27 @@ export function openCalendar(plots, initialFilter) {
     const irrig       = getIrrig()
     const hasStrategy = irrig.some(i => i.fromStrategy)
     const plot        = calFilter !== 'all' ? plots.find(p => String(p.id) === String(calFilter)) : null
-    const plotViewLink = plot
-      ? `<button class="irr-cal-plot-link" id="cal-goto-plot" style="display:inline-flex;align-items:center;gap:5px;background:none;border:none;padding:0;text-align:left;cursor:pointer;font-size:13px;font-weight:700;color:#185FA5;text-decoration:underline">
-          <svg width="13" height="13" viewBox="0 0 19 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.23205 12.5C5.56103 11.809 4.98368 11.1423 4.5 10.5H3.49984C3.12107 10.5 2.77481 10.714 2.60542 11.0528L0.105694 16.0522C-0.0492999 16.3622 -0.0330139 16.7309 0.149193 17.0257C0.331399 17.3205 0.653266 17.5 0.999844 17.5H17.9998C18.3464 17.5 18.6683 17.3205 18.8505 17.0257C19.0327 16.7309 19.0493 16.3628 18.8943 16.0528L16.3943 11.0528C16.2249 10.714 15.8786 10.5 15.4998 10.5H14.5C14.0163 11.1423 13.439 11.809 12.768 12.5H14.8818L16.3818 15.5H2.61788L4.11788 12.5H6.23205Z" fill="currentColor"/><path fill-rule="evenodd" clip-rule="evenodd" d="M9.49984 14C9.40818 14 9.31651 13.9822 9.22484 13.9465C9.13318 13.9108 9.05297 13.8633 8.98422 13.8038C7.3113 12.2701 6.06234 10.8464 5.23734 9.53284C4.41234 8.2188 3.99984 6.99108 3.99984 5.84968C3.99984 4.06624 4.55282 2.64544 5.65878 1.58726C6.76428 0.529087 8.04464 0 9.49984 0C10.9551 0 12.2354 0.529087 13.3409 1.58726C14.4469 2.64544 14.9998 4.06624 14.9998 5.84968C14.9998 6.99108 14.5873 8.2188 13.7623 9.53284C12.9373 10.8464 11.6884 12.2701 10.0155 13.8038C9.94672 13.8633 9.86651 13.9108 9.77484 13.9465C9.68318 13.9822 9.59151 14 9.49984 14ZM9.49984 7C10.6044 7 11.4998 6.10457 11.4998 5C11.4998 3.89543 10.6044 3 9.49984 3C8.39527 3 7.49984 3.89543 7.49984 5C7.49984 6.10457 8.39527 7 9.49984 7Z" fill="currentColor"/></svg>
-          Voir la parcelle
-        </button>`
+    const viewPlotBtn = plot
+      ? `<button class="irr-cal-add-btn irr-cal-add-btn--tert" id="cal-goto-plot"><i class="bi bi-geo-alt-fill"></i> Voir la parcelle</button>`
       : ''
-    const actionBar   = hasStrategy
-      ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;margin-bottom:4px">
-           <button class="irr-cal-strat-btn" id="open-strat-edit">Modifier la saison <i class="bi bi-chevron-down"></i></button>
-           ${plotViewLink}
+    const actionBar = hasStrategy
+      ? `<div class="irr-cal-add-bar">
+           <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="open-strat-edit"><i class="bi bi-pencil"></i> Modifier la saison</button>
+           ${viewPlotBtn}
          </div>`
       : `<div class="irr-cal-add-bar">
-           <button class="irr-cal-add-btn" id="cal-add-irrig"><i class="bi bi-droplet-fill"></i> Ajouter une irrigation</button>
-           <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="cal-add-strat"><i class="bi bi-arrow-repeat"></i> Ajouter une saison d'irrigation</button>
-           ${plotViewLink}
+           <button class="irr-cal-add-btn" id="cal-add-irrig"><i class="bi bi-droplet-fill"></i> Saisir une irrigation</button>
+           <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="cal-add-strat"><i class="bi bi-arrow-repeat"></i> Saisir une saison d'irrigation</button>
+           ${viewPlotBtn}
          </div>`
 
+    const infoParts = [plot?.crop, plot?.irrigation].filter(Boolean)
+    const plotInfoBar = infoParts.length
+      ? `<div style="padding:8px 14px 2px;font-size:13px;color:#636366">${infoParts.join(' · ')}</div>`
+      : ''
+
     body.innerHTML = `
+      ${plotInfoBar}
       ${renderCumuls(irrig)}
       ${renderTimeline(irrig)}
       ${actionBar}

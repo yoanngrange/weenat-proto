@@ -4,7 +4,7 @@ function shapeToLatlngs(plot) {
   const LAT_M = 1 / 111111
   const LNG_M = 1 / (111111 * Math.cos(lat * Math.PI / 180))
 
-  if (shape.type === 'point') return []
+  if (shape.type === 'point') return null
 
   if (shape.type === 'polygon') {
     const raw = shape.points

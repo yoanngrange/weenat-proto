@@ -195,6 +195,18 @@ initCompteScreen(document.getElementById('param-compte'), role)
 paramControllers['param-exploitation'] = initExploitationScreen(document.getElementById('param-exploitation'), role)
 paramControllers['param-reseau']       = initReseauScreen(document.getElementById('param-reseau'), role)
 
+// ─── Deep link : ?parcel=ID → ouvre la fiche parcelle ────────────────────────
+const _deepParcelId = urlParams.get('parcel')
+if (_deepParcelId) {
+  const _deepPlot = plots.find(p => p.id === +_deepParcelId)
+  if (_deepPlot) {
+    navigateTo('parcelles')
+    requestAnimationFrame(() => {
+      import('./screens/parcel-detail.js').then(m => m.initParcelDetail(_deepPlot, [], 'widgets', 'Parcelles'))
+    })
+  }
+}
+
 // ─── Mobile add modal (bouton + universel) ────────────────────────────────────
 
 function openMobileAddModal() {

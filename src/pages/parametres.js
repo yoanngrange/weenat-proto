@@ -25,6 +25,9 @@ function initParamMap() {
 }
 
 
+// Nombre de réseaux proches affichés dans le panneau "Indépendante"
+const NEARBY_NETWORKS_LIMIT = 9
+
 // sharedTypes parmi : 'Capteurs météo', 'Capteurs irrigation', 'Stations météo virtuelles'
 // ~15% (3/20) n'ont aucun type partagé
 const NEARBY_NETWORKS = [
@@ -114,132 +117,135 @@ function renderForm() {
       </select>
     </div>
     <div class="param-2col">
-      <div class="param-section">
-        <div class="param-section-title">Mon exploitation</div>
-        <div class="param-form-grid">
-          <div class="param-field">
-            <label class="param-label">Nom de l'exploitation</label>
-            <input type="text" class="param-input" id="org-name" value="${org.name || ''}">
-          </div>
-          <div class="param-field">
-            <label class="param-label">Propriétaire</label>
-            <select class="param-input" id="org-owner">
-              ${owners.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
-            </select>
-          </div>
-          <div class="param-field param-field--wide">
-            <label class="param-label">Métiers</label>
-            <div class="param-chips" id="profession-chips">
-              ${METIERS.map(p => `
-                <label class="param-chip">
-                  <input type="checkbox" value="${p}"> ${p}
-                </label>
-              `).join('')}
+      <div class="param-col">
+        <div class="param-section">
+          <div class="param-section-title">Mon exploitation</div>
+          <div class="param-form-grid">
+            <div class="param-field">
+              <label class="param-label">Nom de l'exploitation</label>
+              <input type="text" class="param-input" id="org-name" value="${org.name || ''}">
+            </div>
+            <div class="param-field">
+              <label class="param-label">Propriétaire</label>
+              <select class="param-input" id="org-owner">
+                ${owners.map(m => `<option value="${m.id}">${m.prenom} ${m.nom}</option>`).join('')}
+              </select>
+            </div>
+            <div class="param-field param-field--wide">
+              <label class="param-label">Métiers</label>
+              <div class="param-chips" id="profession-chips">
+                ${METIERS.map(p => `
+                  <label class="param-chip">
+                    <input type="checkbox" value="${p}"> ${p}
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+            <div class="param-field param-field--wide">
+              <label class="param-label">Adresse du siège</label>
+              <input type="text" class="param-input" id="org-address" placeholder="Numéro et rue" value="${org.adresse || ''}">
+            </div>
+            <div class="param-field">
+              <label class="param-label">Code postal</label>
+              <input type="text" class="param-input" id="org-cp" placeholder="00000" value="${org.codePostal || ''}">
+            </div>
+            <div class="param-field">
+              <label class="param-label">Ville</label>
+              <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${org.ville || ''}">
             </div>
           </div>
-          <div class="param-field param-field--wide">
-            <label class="param-label">Adresse du siège</label>
-            <input type="text" class="param-input" id="org-address" placeholder="Numéro et rue" value="${org.adresse || ''}">
+          <button class="btn-primary" id="save-org-btn" style="margin-top:16px">
+            <i class="bi bi-check-lg"></i> Enregistrer
+          </button>
+        </div>
+
+        <div class="param-section" style="padding:0;overflow:hidden;border-radius:8px;border:1px solid var(--bdr)">
+          <div style="padding:10px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--bdr);background:var(--bg2)">
+            <i class="bi bi-geo-alt" style="color:var(--pri)"></i> Localisation de l'exploitation
           </div>
-          <div class="param-field">
-            <label class="param-label">Code postal</label>
-            <input type="text" class="param-input" id="org-cp" placeholder="00000" value="${org.codePostal || ''}">
-          </div>
-          <div class="param-field">
-            <label class="param-label">Ville</label>
-            <input type="text" class="param-input" id="org-ville" placeholder="Ville" value="${org.ville || ''}">
+          <div id="param-map" style="height:100%;min-height:260px"></div>
+          <div style="padding:8px 14px;font-size:12px;color:var(--txt2)">
+            <i class="bi bi-info-circle"></i> Position calculée depuis l'adresse renseignée.
           </div>
         </div>
-        <button class="btn-primary" id="save-org-btn" style="margin-top:16px">
-          <i class="bi bi-check-lg"></i> Enregistrer
-        </button>
       </div>
 
-      <div class="param-section" style="padding:0;overflow:hidden;border-radius:8px;border:1px solid var(--bdr)">
-        <div style="padding:10px 14px;font-weight:600;font-size:13px;border-bottom:1px solid var(--bdr);background:var(--bg2)">
-          <i class="bi bi-geo-alt" style="color:var(--pri)"></i> Localisation de l'exploitation
-        </div>
-        <div id="param-map" style="height:100%;min-height:260px"></div>
-        <div style="padding:8px 14px;font-size:12px;color:var(--txt2)">
-          <i class="bi bi-info-circle"></i> Position calculée depuis l'adresse renseignée.
-        </div>
-      </div>
-    </div>
-
-    <div class="param-section">
-      <div class="param-section-title">Niveau d'abonnement</div>
-      <div class="param-plans">
-        ${SUBSCRIPTION_PLANS.map(plan => `
-          <div class="param-plan${plan.current ? ' param-plan--current' : ''}" style="border-color:${plan.current ? plan.color : 'var(--bdr)'}">
-            ${plan.current ? `<div class="param-plan-badge" style="background:${plan.color}">Actuel</div>` : ''}
-            <div class="param-plan-name" style="color:${plan.color}">${plan.name}</div>
-            <div class="param-plan-price">${plan.price}</div>
-            <ul class="param-plan-features">
-              ${plan.features.map(f => `<li><i class="bi bi-check-circle-fill" style="color:${plan.color}"></i> ${f}</li>`).join('')}
-            </ul>
-            ${!plan.current ? `<button class="btn-secondary" style="margin-top:12px;width:100%">Passer à ${plan.name.replace('Weenat ', '')}</button>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-
-    <div class="param-section">
-      <div class="param-section-title">Réseaux</div>
-      <div style="display:inline-flex;gap:0;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:3px;margin-bottom:20px">
-        <button class="p-reseau-tab" data-ptab="adherente" style="border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;background:#0172A4;color:#fff;font-family:inherit">Adhérente d'un réseau</button>
-        <button class="p-reseau-tab" data-ptab="independante" style="border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--txt2);font-family:inherit">Indépendante</button>
-      </div>
-
-      <div id="p-reseau-panel-adherente">
-        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;margin-bottom:14px">
-          <div style="width:48px;height:48px;border-radius:10px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span style="font-size:13px;font-weight:700;color:#0172A4">BA</span>
-          </div>
-          <div>
-            <div style="font-weight:600;font-size:15px;margin-bottom:4px">Breiz'Agri Conseil</div>
-            <div style="font-size:13px;color:var(--txt2);line-height:1.5">L'exploitation Ferme du Bocage est adhérente du réseau Breiz'Agri Conseil.</div>
-            <div style="font-size:12px;color:var(--txt3);margin-top:4px">Membre depuis le 15/03/2022</div>
-          </div>
-        </div>
-        <button id="p-btn-quitter-reseau" class="btn-danger">Quitter le réseau</button>
-      </div>
-
-      <div id="p-reseau-panel-independante" style="display:none">
-        <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px;margin-bottom:16px">
-          <ul style="margin:0 0 10px;padding:0 0 0 4px;list-style:none;display:flex;flex-direction:column;gap:8px">
-            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Accédez aux capteurs partagés par votre réseau</li>
-            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Bénéficiez de conseils sur l'installation des capteurs et l'utilisation de l'app</li>
-            <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Votre conseiller peut suivre l'état de vos parcelles et capteurs, avec votre accord</li>
-          </ul>
-          <p style="margin:0;font-size:12px;color:var(--txt3);line-height:1.5;border-top:1px solid var(--bdr);padding-top:10px">Contrairement à d'autres plateformes, vous ne partagez des données qu'avec les autres exploitations adhérentes du réseau, pas n'importe qui.</p>
-        </div>
-        <div style="font-size:13px;color:var(--txt2);margin-bottom:14px">20 réseaux proches de votre exploitation</div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px">
-          ${NEARBY_NETWORKS.map((net, i) => `
-            <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;min-width:260px;flex:1">
-              <div style="display:flex;align-items:center;gap:10px">
-                <div style="width:36px;height:36px;border-radius:8px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <span style="font-size:10px;font-weight:700;color:#0172A4">${netInitials(net.name)}</span>
-                </div>
-                <div style="min-width:0">
-                  <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${net.name}</div>
-                  <div style="font-size:11px;color:var(--txt3)">${net.ville} · ${net.distance} km</div>
-                </div>
+      <div class="param-col">
+        <div class="param-section">
+          <div class="param-section-title">Mon abonnement</div>
+          <div class="param-plans">
+            ${SUBSCRIPTION_PLANS.map(plan => `
+              <div class="param-plan${plan.current ? ' param-plan--current' : ''}" style="border-color:${plan.current ? plan.color : 'var(--bdr)'}">
+                ${plan.current ? `<div class="param-plan-badge" style="background:${plan.color}">Actuel</div>` : ''}
+                <div class="param-plan-name" style="color:${plan.color}">${plan.name}</div>
+                <div class="param-plan-price">${plan.price}</div>
+                <ul class="param-plan-features">
+                  ${plan.features.map(f => `<li><i class="bi bi-check-circle-fill" style="color:${plan.color}"></i> ${f}</li>`).join('')}
+                </ul>
+                ${!plan.current ? `<button class="btn-secondary" style="margin-top:12px;width:100%">Passer à ${plan.name.replace('Weenat ', '')}</button>` : ''}
               </div>
-              <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--txt2)">
-                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Capteurs</span>${net.capteurs}</div>
-                <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Parcelles</span>${net.parcelles}</div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="param-section">
+          <div class="param-section-title">Réseaux</div>
+          <div style="display:inline-flex;gap:0;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:3px;margin-bottom:20px">
+            <button class="p-reseau-tab" data-ptab="adherente" style="border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;background:#0172A4;color:#fff;font-family:inherit">Adhérente d'un réseau</button>
+            <button class="p-reseau-tab" data-ptab="independante" style="border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:var(--txt2);font-family:inherit">Indépendante</button>
+          </div>
+
+          <div id="p-reseau-panel-adherente">
+            <div style="display:flex;align-items:flex-start;gap:16px;padding:16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;margin-bottom:14px">
+              <div style="width:48px;height:48px;border-radius:10px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span style="font-size:13px;font-weight:700;color:#0172A4">BA</span>
               </div>
               <div>
-                ${net.sharedTypes && net.sharedTypes.length
-                  ? `<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Données partagées</div><div style="display:flex;flex-wrap:wrap;gap:4px">${net.sharedTypes.map(t => `<span style="font-size:11px;font-weight:500;padding:2px 8px;background:var(--bg);border:1px solid var(--bdr);border-radius:4px;color:var(--txt2)">${t}</span>`).join('')}</div>`
-                  : `<span style="font-size:11px;color:var(--txt3);font-style:italic">Capteurs non partagés</span>`}
+                <div style="font-weight:600;font-size:15px;margin-bottom:4px">Breiz'Agri Conseil</div>
+                <div style="font-size:13px;color:var(--txt2);line-height:1.5">L'exploitation Ferme du Bocage est adhérente du réseau Breiz'Agri Conseil.</div>
+                <div style="font-size:12px;color:var(--txt3);margin-top:4px">Membre depuis le 15/03/2022</div>
               </div>
-              <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="font-size:12px">Demander à rejoindre</button>
-            </div>`).join('')}
-          <div style="min-width:280px;flex:1;height:0;padding:0;margin:0"></div>
-          <div style="min-width:280px;flex:1;height:0;padding:0;margin:0"></div>
-          <div style="min-width:280px;flex:1;height:0;padding:0;margin:0"></div>
+            </div>
+            <button id="p-btn-quitter-reseau" class="btn-danger">Quitter le réseau</button>
+          </div>
+
+          <div id="p-reseau-panel-independante" style="display:none">
+            <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+              <ul style="margin:0 0 10px;padding:0 0 0 4px;list-style:none;display:flex;flex-direction:column;gap:8px">
+                <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Accédez aux capteurs partagés par votre réseau</li>
+                <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Bénéficiez de conseils sur l'installation des capteurs et l'utilisation de l'app</li>
+                <li style="display:flex;gap:8px;font-size:13px;color:var(--txt2)"><i class="bi bi-check-circle-fill" style="color:#0172A4;flex-shrink:0;margin-top:1px"></i>Votre conseiller peut suivre l'état de vos parcelles et capteurs, avec votre accord</li>
+              </ul>
+              <p style="margin:0;font-size:12px;color:var(--txt3);line-height:1.5;border-top:1px solid var(--bdr);padding-top:10px">Contrairement à d'autres plateformes, vous ne partagez des données qu'avec les autres exploitations adhérentes du réseau, pas n'importe qui.</p>
+            </div>
+            <div style="font-size:13px;color:var(--txt2);margin-bottom:14px">${NEARBY_NETWORKS_LIMIT} réseaux proches de votre exploitation</div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px">
+              ${NEARBY_NETWORKS.slice(0, NEARBY_NETWORKS_LIMIT).map((net, i) => `
+                <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;min-width:200px;flex:1">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:36px;height:36px;border-radius:8px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      <span style="font-size:10px;font-weight:700;color:#0172A4">${netInitials(net.name)}</span>
+                    </div>
+                    <div style="min-width:0">
+                      <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${net.name}</div>
+                      <div style="font-size:11px;color:var(--txt3)">${net.ville} · ${net.distance} km</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--txt2)">
+                    <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Capteurs</span>${net.capteurs}</div>
+                    <div><span style="color:var(--txt3);min-width:72px;display:inline-block">Parcelles</span>${net.parcelles}</div>
+                  </div>
+                  <div>
+                    ${net.sharedTypes && net.sharedTypes.length
+                      ? `<div style="font-size:11px;color:var(--txt3);margin-bottom:4px">Capteurs partagés</div><div style="display:flex;flex-wrap:wrap;gap:4px">${net.sharedTypes.map(t => `<span style="font-size:11px;font-weight:500;padding:2px 8px;background:var(--bg);border:1px solid var(--bdr);border-radius:4px;color:var(--txt2)">${t}</span>`).join('')}</div>`
+                      : `<span style="font-size:11px;color:var(--txt3);font-style:italic">Capteurs non partagés</span>`}
+                  </div>
+                  <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="font-size:12px">Demander à rejoindre</button>
+                </div>`).join('')}
+              <div style="min-width:200px;flex:1;height:0;padding:0;margin:0"></div>
+              <div style="min-width:200px;flex:1;height:0;padding:0;margin:0"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

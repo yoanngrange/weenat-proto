@@ -39,10 +39,7 @@ let selectedOrgs = []
 let selectedVilles = []
 let selectedParcelNames = []
 let selectedMemberNames = []
-let filterMonSecteur = false
 let filterMonFavoris = false
-
-const MON_SECTEUR_DEPTS = new Set(["Ille-et-Vilaine", "Morbihan", "Côtes-d'Armor"])
 
 const favoritePlotIds   = new Set(JSON.parse(localStorage.getItem('favPlots')   || '[1,3,5,8,12]'))
 const favoriteSensorIds = new Set(JSON.parse(localStorage.getItem('favSensors') || '[1,4,7,10]'))
@@ -328,6 +325,8 @@ function initNavigation() {
       updateNavigation()
       updateFiltersVisibility()
       rebuildCultureFilter()
+      rebuildParcelFilter()
+      rebuildMemberFilter()
       updateContent()
     })
   })
@@ -348,6 +347,8 @@ function initRoleSwitcher() {
     switcher.textContent = currentRole === 'admin' ? 'Admin réseau' : 'Adhérent'
     updateFiltersVisibility()
     rebuildCultureFilter()
+    rebuildParcelFilter()
+    rebuildMemberFilter()
     updateContent()
   })
 }
@@ -401,15 +402,6 @@ function initFilters() {
   // Multi-select dropdowns
   populateFilterDropdowns()
   initFilterDropdownToggle()
-
-  // Mon secteur checkbox
-  const monSecteurCb = document.getElementById('check-mon-secteur')
-  if (monSecteurCb) {
-    monSecteurCb.addEventListener('change', () => {
-      filterMonSecteur = monSecteurCb.checked
-      updateContent()
-    })
-  }
 
   // Mes favoris checkbox
   const favorisСb = document.getElementById('check-mes-favoris')
@@ -597,21 +589,32 @@ function populateFilterDropdowns() {
   makeCheckboxPanel('panel-ville', allVilles,
     { set: v => { selectedVilles = v } }, 'badge-ville', false)
 
-  // Parcelle panel for capteurs
-  const panelParcel = document.getElementById('panel-parcel-filter')
-  if (panelParcel) {
-    const allParcels = plots.map(p => p.name).sort()
-    makeCheckboxPanel('panel-parcel-filter', allParcels,
-      { set: v => { selectedParcelNames = v; updateContent() } }, 'badge-parcel-filter', true)
-  }
+  rebuildParcelFilter()
+  rebuildMemberFilter()
+}
 
-  // Membre panel for capteurs
+// Parcelle panel for capteurs — limité à sa propre org pour l'adhérent
+function rebuildParcelFilter() {
+  const panelParcel = document.getElementById('panel-parcel-filter')
+  if (!panelParcel) return
+  const sourceParcels = currentRole === 'adherent' ? plots.filter(p => p.orgId === ADHERENT_ORG_ID) : plots
+  const allParcels = sourceParcels.map(p => p.name).sort()
+  selectedParcelNames = []
+  updateBadge('badge-parcel-filter', 0)
+  makeCheckboxPanel('panel-parcel-filter', allParcels,
+    { set: v => { selectedParcelNames = v; updateContent() } }, 'badge-parcel-filter', true)
+}
+
+// Secteur (membre) panel for capteurs — limité à sa propre org pour l'adhérent
+function rebuildMemberFilter() {
   const panelMember = document.getElementById('panel-member-filter')
-  if (panelMember) {
-    const allMemberNames = members.map(m => `${m.prenom} ${m.nom}`).sort()
-    makeCheckboxPanel('panel-member-filter', allMemberNames,
-      { set: v => { selectedMemberNames = v; updateContent() } }, 'badge-member-filter', true)
-  }
+  if (!panelMember) return
+  const sourceMembers = currentRole === 'adherent' ? members.filter(m => m.orgIds.includes(ADHERENT_ORG_ID)) : members
+  const allMemberNames = sourceMembers.filter(m => m.statut === 'actif').map(m => `${m.prenom} ${m.nom}`).sort()
+  selectedMemberNames = []
+  updateBadge('badge-member-filter', 0)
+  makeCheckboxPanel('panel-member-filter', allMemberNames,
+    { set: v => { selectedMemberNames = v; updateContent() } }, 'badge-member-filter', true)
 }
 
 function updateBadge(id, count) {
@@ -805,15 +808,6 @@ function getFilteredData() {
   const telecomEl = document.getElementById('telecom-filter')
   const telecomVal = telecomEl ? telecomEl.value : ''
   if (telecomVal) filteredSensors = filteredSensors.filter(s => s.telecom === telecomVal)
-
-  if (filterMonSecteur) {
-    const currentUser = currentRole === 'adherent'
-      ? members.find(m => m.id === 31)
-      : members.find(m => m.id === 1)
-    const myParcelIds = new Set(currentUser?.parcelIds || [])
-    filteredParcels = filteredParcels.filter(p => myParcelIds.has(p.id))
-    filteredSensors = filteredSensors.filter(s => s.parcelIds.some(pid => myParcelIds.has(pid)))
-  }
 
   if (filterMonFavoris) {
     filteredParcels = filteredParcels.filter(p => favoritePlotIds.has(p.id))
@@ -1124,12 +1118,12 @@ function createParcelLayer(parcel) {
     opacity: 0.9
   }
 
-  if (parcel.latlngs) {
+  if (parcel.latlngs && parcel.latlngs.length >= 3) {
     return L.polygon(parcel.latlngs, style)
   }
 
-  // ~7% shown as simple point markers (no polygon shape)
-  if (!parcel.shape && parcel.id % 14 === 0) {
+  // Parcelle définie par un point (pas encore de contour tracé), ou ~7% sans shape du tout
+  if (parcel.shape?.type === 'point' || (!parcel.shape && parcel.id % 14 === 0)) {
     return L.circleMarker([parcel.lat, parcel.lng], {
       radius: 9, color: '#ffffff', fillColor: '#0172A4', fillOpacity: 0.85, weight: 2
     })
@@ -1999,8 +1993,9 @@ function renderAdmin(filteredParcels, filteredSensors) {
 
   if (pageType.startsWith('parcelles')) {
     // Parcel-specific stats
-    const totalArea = filteredParcels.reduce((s, p) => s + p.area, 0)
-    const avgArea = filteredParcels.length ? totalArea / filteredParcels.length : 0
+    const parcelsWithArea = filteredParcels.filter(p => p.area != null && !isNaN(p.area))
+    const totalArea = parcelsWithArea.reduce((s, p) => s + p.area, 0)
+    const avgArea = parcelsWithArea.length ? totalArea / parcelsWithArea.length : 0
     const withSensors = filteredParcels.filter(p => sensors.some(s => s.parcelIds.includes(p.id))).length
     const withoutSensors = filteredParcels.length - withSensors
     const withInteg = filteredParcels.filter(p => (p.integrations || []).length > 0).length

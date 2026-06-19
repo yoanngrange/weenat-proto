@@ -2,7 +2,6 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { sensors } from '../data/sensors.js'
 import { members } from '../data/members.js'
 import { orgs } from '../data/orgs.js'
-import { plots } from '../data/plots.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -104,7 +103,6 @@ let filterType       = ''
 let filterSecteur    = ''
 let filterCapteur    = ''
 let filterPeriode    = ''
-let filterMonSecteur = false
 
 function initFilters() {
   const isAdherent = localStorage.getItem('menuRole') === 'adherent-reseau'
@@ -157,15 +155,6 @@ function initFilters() {
     currentPage = 1; render()
   })
   periodSel?.addEventListener('change', e => { filterPeriode = e.target.value; currentPage = 1; render() })
-
-  const monSecteurBtn = document.getElementById('filter-mon-secteur-btn')
-  if (monSecteurBtn) {
-    monSecteurBtn.addEventListener('click', () => {
-      filterMonSecteur = !filterMonSecteur
-      monSecteurBtn.classList.toggle('active', filterMonSecteur)
-      currentPage = 1; render()
-    })
-  }
 }
 
 function getFiltered() {
@@ -174,14 +163,6 @@ function getFiltered() {
     ? ALL_NOTIFS.filter(n => ADHERENT_NOTIF_IDS.has(n.id))
     : [...ALL_NOTIFS]
 
-  if (filterMonSecteur) {
-    const userId = isAdherent ? 31 : 1
-    const user = members.find(m => m.id === userId)
-    const myParcelIds = new Set(user?.parcelIds || [])
-    const myOrgIds = new Set(plots.filter(p => myParcelIds.has(p.id)).map(p => p.orgId))
-    const myOrgNames = new Set(orgs.filter(o => myOrgIds.has(o.id)).map(o => o.name))
-    list = list.filter(n => myOrgNames.has(n.org))
-  }
   if (filterOrg)     list = list.filter(n => n.org === filterOrg)
   if (filterType)    list = list.filter(n => n.type === filterType)
   if (filterSecteur) list = list.filter(n => n.membre === filterSecteur)

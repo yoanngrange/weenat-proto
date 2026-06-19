@@ -47,7 +47,7 @@ export const members = [
   {
     id: 6, prenom: 'Alexandre', nom: 'Bernard',
     email: 'alexandre.bernard@breizagri-conseil.fr',
-    role: 'agent', statut: 'actif', source: 'réseau',
+    role: 'agent', statut: 'inactif', source: 'réseau',
     orgIds: [1], parcelIds: [1, 2, 3, 4, 7, 8]
   },
   {
