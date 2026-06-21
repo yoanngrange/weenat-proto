@@ -108,7 +108,7 @@ function setupImgUpload(inputEl, addBtnEl, previewsEl, errEl, pendingImages) {
 const menuData = {
   'admin-reseau': {
     exploitation: [
-      { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
+      // { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },
@@ -127,7 +127,7 @@ const menuData = {
   },
   'adherent-reseau': {
     exploitation: [
-      { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
+      // { href: 'tableau-de-bord.html', icon: 'bi-house', text: 'Tableau de bord' },
       { href: 'parcelles.html', icon: 'bi-geo-alt', text: 'Parcelles' },
       { href: 'capteurs.html', icon: 'bi-broadcast', text: 'Capteurs' },
       { href: 'previsions.html', icon: 'bi-cloud-sun', text: 'Prévisions' },

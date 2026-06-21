@@ -19,9 +19,14 @@ function irrigPlots(parcel) {
 
 const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
+// Correspondance entre les IDs du widget "Cumuls" (mWidgetCumuls) et ceux du tableau de bord
+const WCUMUL_TO_DASH = { etp: 'etp', enso: 'rayo', pluie: 'pluie', djc: 'dj', hfroid: 'hf', humec: 'humec' }
+// Forme de la courbe cumulative fullscreen par cumul (cf. initCumulFullscreen)
+const WCUMUL_GROWTH_SHAPE = { etp: 'evapo', enso: 'solar', pluie: 'bursty', djc: 'temperature', hfroid: 'cold', humec: 'bursty' }
+
 const DASH_CUMUL_META = {
   dj:    { metricLabel: 'Degrés-jours',        unit: 'DJ', icon: 'bi-thermometer-sun', color: '#FBAF05' },
-  hf:    { metricLabel: 'Heures de froid',      unit: 'h',  icon: 'bi-thermometer-low', color: '#5AC8FA' },
+  hf:    { metricLabel: 'Heures de froid',      unit: 'h',  icon: 'bi-thermometer-low', color: '#0B3A64' },
   pluie: { metricLabel: 'Cumul de pluie',       unit: 'mm', icon: 'bi-droplet-fill',    color: '#2E75B6' },
   rayo:  { metricLabel: 'Rayonnement solaire',  unit: 'MJ', icon: 'bi-sun-fill',        color: '#CBCB0B' },
   etp:   { metricLabel: 'Évapotranspiration',   unit: 'mm', icon: 'bi-moisture',        color: '#7DBDD7' },
@@ -567,7 +572,7 @@ function irrigationWidget(parcel) {
       <div class="w-irrig-layout">
         <div class="w-irrig-empty-state">
           <i class="bi bi-droplet" style="font-size:22px;color:var(--txt3,#8e8e93)"></i>
-          <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez préciser un type d'irrigation.</p>
+          <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez renseigner un type d'irrigation sur cette parcelle.</p>
         </div>
         <button class="w-irrig-act-btn w-irrig-act-btn--pri m-irrig-set-type" type="button" style="width:100%">Renseigner le type d'irrigation</button>
       </div>`, 'irrigations')
@@ -710,7 +715,7 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
     { id: 'pluie',      label: 'Pluie',                unit: 'mm', color: '#2E75B6', icon: 'bi-cloud-rain-heavy', val: _pcumulVal(parcel.id, 'pluie',      dates['pluie']      || jan1), show: metSet.has('pluie') },
     { id: 'djc',        label: 'Degrés jours',         unit: 'DJ', color: '#FBAF05', icon: 'bi-thermometer-half', val: _pcumulVal(parcel.id, 'djc',        dates['djc']        || jan1), show: metSet.has('temperature'), cfg: true,
       cfgLabel: `${cfg.djMin ?? 0}–${cfg.djMax ?? 18}°C` },
-    { id: 'hfroid',     label: 'Heures de froid',      unit: 'h',  color: '#FEE7B4', icon: 'bi-snow',             val: _pcumulVal(parcel.id, 'hfroid',     dates['hfroid']     || jan1), show: metSet.has('temperature'), cfg: true,
+    { id: 'hfroid',     label: 'Heures de froid',      unit: 'h',  color: '#0B3A64', icon: 'bi-snow',             val: _pcumulVal(parcel.id, 'hfroid',     dates['hfroid']     || jan1), show: metSet.has('temperature'), cfg: true,
       cfgLabel: `< ${cfg.hfSeuil ?? 7.2}°C` },
     { id: 'humec',      label: 'Humectation',          unit: 'h',  color: '#00887E', icon: 'bi-droplet',          val: _pcumulVal(parcel.id, 'humec',      dates['humec']      || jan1), show: metSet.has('humectation') },
   ].filter(i => i.show)
@@ -735,7 +740,10 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
     ? `<div class="m-cumuls-saved" style="padding:0 0 4px">${allItems.map(it => {
         const d = dates[it.id] || jan1
         return `<div class="m-cumuls-saved-card" style="position:relative">
-          <button class="m-pcumul-del m-del-btn" data-cid="${it.id}" data-pid="${parcel.id}" type="button" style="position:absolute;top:8px;right:8px">×</button>
+          <div style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;align-items:center;gap:18px">
+            <button class="m-pcumul-del m-del-btn" data-cid="${it.id}" data-pid="${parcel.id}" type="button">×</button>
+            <button class="m-pcumul-add-fav m-cumul-add-btn" data-cid="${it.id}" data-pid="${parcel.id}" data-valnum="${it.val}" data-unit="${it.unit}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button>
+          </div>
           <div class="m-pcumul-hd">
             <div class="m-pcumul-icon" style="background:${it.color}22;color:${it.color}"><i class="bi ${it.icon}"></i></div>
             <div class="m-pcumul-label" style="color:${it.color}">${it.label}</div>
@@ -746,6 +754,7 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
             <input type="date" class="m-pcumul-date m-pcumul-date-inp" data-cid="${it.id}" data-pid="${parcel.id}" value="${d}">
             ${it.cfg ? `<button class="m-pcumul-cfg m-pcumul-cfg-btn" data-cid="${it.id}" data-pid="${parcel.id}"><i class="bi bi-gear"></i> ${it.cfgLabel}</button>` : ''}
           </div>
+          <button class="m-pcumul-details m-widget-details-link" data-cid="${it.id}" data-pid="${parcel.id}" data-label="${it.label}" data-unit="${it.unit}" data-color="${it.color}" data-val="${it.val}" data-from="${d}">Voir détails →</button>
         </div>`
       }).join('')}${restoreHtml}</div>`
     : `<div style="font-size:13px;color:#8e8e93;padding:4px 0 4px">Tous les cumuls ont été supprimés.</div>${restoreHtml}`
@@ -902,9 +911,7 @@ function mWidgetPrev5j(parcel) {
       <span class="m-wprev5-model-lbl" style="grid-column:4/6">ICON EU <span>(DWD)</span></span>
     </div>
     <div class="m-wprev5-grid">${rawDays.map(dayHtml).join('')}</div>
-    <div style="padding:6px 12px 4px;text-align:right">
-      <button class="m-prev5j-voir-details" style="background:none;border:none;color:#0172A4;font-size:13px;cursor:pointer;padding:4px 0">Voir détails <i class="bi bi-chevron-right" style="font-size:11px"></i></button>
-    </div>`
+    <button class="m-prev5j-voir-details m-widget-details-link">Voir détails →</button>`
 
   return mWidgetCard('Prévisions 5 jours', 'bi-cloud-sun', '#5b8dd9', body, 'previsions-5j')
 }
@@ -958,10 +965,8 @@ function mWidgetSensorCards(sensors, wid = '') {
           </div>`
         }).join('')}
       </div>
-      <div class="m-widget-footer" style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:11px;color:#8e8e93">Il y a ${minAgo} min · ${sensor.serial}</span>
-        <button class="m-wsensor-voir-donnees" data-sensor-id="${sensor.id}" data-metric-id="${primaryMetricId}" style="border:none;background:none;color:#007AFF;font-size:12px;cursor:pointer;padding:0;font-family:inherit;display:flex;align-items:center;gap:3px">Voir les données <i class="bi bi-arrow-right-short"></i></button>
-      </div>`
+      <div style="font-size:11px;color:#8e8e93">Il y a ${minAgo} min · ${sensor.serial}</div>
+      <button class="m-wsensor-voir-donnees m-widget-details-link" data-sensor-id="${sensor.id}" data-metric-id="${primaryMetricId}">Voir détails →</button>`
 
     return mWidgetCard(name, icon, color, body, wid)
   }).join('')
@@ -1193,6 +1198,12 @@ function paramsView(parcel, org, linkedSensorIds) {
           <span class="m-list-row-value">${(getParcel(parcel.id).volumeMaxM3 ?? parcel.volumeMaxM3) ? `${(getParcel(parcel.id).volumeMaxM3 ?? parcel.volumeMaxM3).toLocaleString('fr-FR')} m³` : 'Non défini'}</span>
           <i class="bi bi-chevron-right m-list-chevron"></i>
         </div>
+        ${parcel.irrigation && !['Non irrigué', 'Non renseigné', ''].includes(parcel.irrigation) ? `
+        <div class="m-list-row" data-action="edit-debit">
+          <span class="m-list-row-label">Débit</span>
+          <span class="m-list-row-value">${getParcel(parcel.id).debitM3h ? `${getParcel(parcel.id).debitM3h} m³/h` : 'Non défini'}</span>
+          <i class="bi bi-chevron-right m-list-chevron"></i>
+        </div>` : ''}
         <div class="m-list-row m-list-row--last" data-action="edit-texture">
           <span class="m-list-row-label">Texture de sol</span>
           <span class="m-list-row-value">${textureDisplayValue(parcel)}</span>
@@ -1910,6 +1921,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         else if (row.dataset.action === 'edit-env') openEnvSheet()
         else if (row.dataset.action === 'edit-irrigation') openIrrigationTypeSheet()
         else if (row.dataset.action === 'edit-volume-max') openVolumeMaxSheet()
+        else if (row.dataset.action === 'edit-debit') openMobileVolDebitSheet(parcel, renderView)
         else if (row.dataset.action === 'edit-texture') openTextureSheet()
         else if (row.dataset.action === 'edit-integrations') openIntegrationsPage()
         else if (row.dataset.action === 'delete-parcel') {
@@ -1954,8 +1966,11 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         layer.querySelector('.m-widget-dd')?.remove()
         const dd = document.createElement('div')
         dd.className = 'm-widget-dd'
-        dd.style.cssText = 'position:absolute;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.18);z-index:200;overflow:hidden;min-width:180px'
-        dd.innerHTML = `<button class="m-widget-dd-remove" data-wid="${wid}" style="display:block;width:100%;text-align:left;padding:14px 16px;border:none;background:none;font-size:14px;color:#ff3b30;font-family:inherit;cursor:pointer">Retirer le widget</button>`
+        dd.style.cssText = 'position:absolute;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.18);z-index:200;overflow:hidden;min-width:220px'
+        const volItem = wid === 'irrigations'
+          ? `<button class="m-widget-dd-vol" style="display:block;width:100%;text-align:left;padding:14px 16px;border:none;border-bottom:.5px solid rgba(0,0,0,.08);background:none;font-size:14px;color:#1c1c1e;font-family:inherit;cursor:pointer">Définir le volume limité et le débit</button>`
+          : ''
+        dd.innerHTML = `${volItem}<button class="m-widget-dd-remove" data-wid="${wid}" style="display:block;width:100%;text-align:left;padding:14px 16px;border:none;background:none;font-size:14px;color:#ff3b30;font-family:inherit;cursor:pointer">Retirer le widget</button>`
         const content = layer.querySelector('.m-detail-content')
         const rect    = btn.getBoundingClientRect()
         const cRect   = content.getBoundingClientRect()
@@ -1963,6 +1978,10 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         dd.style.right = `${cRect.right - rect.right}px`
         content.style.position = 'relative'
         content.appendChild(dd)
+        dd.querySelector('.m-widget-dd-vol')?.addEventListener('click', () => {
+          dd.remove()
+          openMobileVolDebitSheet(parcel, renderView)
+        })
         dd.querySelector('.m-widget-dd-remove').addEventListener('click', () => {
           dd.remove()
           const ids = _getParcelWidgetIds(parcel, linkedSensorIds).filter(id => id !== wid)
@@ -1999,6 +2018,38 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         hidden.add(btn.dataset.cid)
         _savePCumul(pid, { hidden: [...hidden] })
         renderView()
+      })
+    })
+    // Parcel cumuls (widget) — ajouter au tableau de bord
+    layer.querySelectorAll('.m-pcumul-add-fav').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const dashId = WCUMUL_TO_DASH[btn.dataset.cid]
+        const meta = DASH_CUMUL_META[dashId]
+        if (!meta) return
+        const pid = +btn.dataset.pid
+        const fromDate = _loadPCumul(pid).dates?.[btn.dataset.cid] || `${new Date().getFullYear()}-01-01`
+        const body = document.createElement('div')
+        body.innerHTML = `<div style="padding:16px;font-size:14px;color:#3a3a3c">Ajouter <strong>${meta.metricLabel}</strong> (<em>${btn.dataset.valnum} ${btn.dataset.unit}</em>) au tableau de bord de <strong>${parcel.name}</strong> ?</div>`
+        showSheet({ title: 'Tableau de bord', body, doneLabel: 'Ajouter', cancelLabel: 'Annuler', onDone: () => {
+          const result = addCumulFavorite({
+            metricId: dashId, ...meta, subjectKey: `p-${pid}`, subjectLabel: parcel.name,
+            fromDate, value: btn.dataset.valnum, thresholds: null,
+          })
+          if (result === 'max') { showToast('Maximum de cumuls atteint (5)'); return }
+          showToast('Cumul ajouté au tableau de bord')
+        }})
+      })
+    })
+    // Parcel cumuls — voir détails (fullscreen)
+    layer.querySelectorAll('.m-pcumul-details').forEach(btn => {
+      btn.addEventListener('click', () => {
+        import('./chart-fullscreen.js').then(m => m.initCumulFullscreen({
+          label: btn.dataset.label, unit: btn.dataset.unit, color: btn.dataset.color,
+          total: +btn.dataset.val || 0, fromDateIso: btn.dataset.from,
+          backLabel: parcel.name, seedKey: `${btn.dataset.pid}-${btn.dataset.cid}`,
+          growthShape: WCUMUL_GROWTH_SHAPE[btn.dataset.cid] || 'linear',
+        }))
       })
     })
     // Parcel cumuls — date
@@ -2135,45 +2186,51 @@ function mAutoModificationEvents(parcel) {
   return evts
 }
 
-// Entrées auto-générées : irrigations saisies (ponctuelles + saisons)
+// Entrées auto-générées : irrigations passées en "effectuées" (real:true) dans IRRIG_SEASON
 function mAutoIrrigationEvents(parcelId) {
-  const evts = []
-  const own = IRRIG_SEASON.filter(i => i.plotId === parcelId)
+  const parcel = allPlots.find(p => p.id === parcelId)
+  return IRRIG_SEASON.filter(i => i.plotId === parcelId && i.real).map(i => ({
+    id: `auto-irrig-${parcelId}-${i.iso}-${i.mm}`,
+    type: 'irrigation',
+    date: i.iso,
+    volume: i.mm,
+    unite: 'mm',
+    methode: parcel?.irrigation || '',
+    texte: 'Irrigation effectuée.',
+    auteur: 'Système',
+    _system: true,
+  }))
+}
 
-  own.filter(i => !i.fromStrategy).forEach(i => {
-    evts.push({
-      id: `auto-irrig-${i.iso}-${i.mm}`,
-      type: 'irrigation',
-      date: i.iso,
-      texte: i.real
-        ? `Irrigation ponctuelle de ${i.mm} mm enregistrée.`
-        : `Irrigation ponctuelle de ${i.mm} mm planifiée.`,
-      _system: true,
-    })
+// Sheet "Définir le volume limité et le débit" — accessible depuis le widget Irrigation (···)
+// et depuis le bouton "Modifier les paramètres" du détail d'une saison.
+export function openMobileVolDebitSheet(parcel, onSaved) {
+  const cur   = getParcel(parcel.id).volumeMaxM3 ?? ''
+  const curDb = getParcel(parcel.id).debitM3h ?? ''
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div class="m-form-label">Volume limité (m³)</div>
+        <input type="number" class="m-sheet-input" id="mvd-vol" min="0" placeholder="—" value="${cur}">
+      </div>
+      <div>
+        <div class="m-form-label">Débit (m³/h)</div>
+        <input type="number" class="m-sheet-input" id="mvd-debit" min="0" step="0.1" placeholder="Ex. 12" value="${curDb}">
+      </div>
+      <div style="font-size:12px;color:#8e8e93">Si le débit est renseigné, la durée d'irrigation estimée s'affiche au survol des quantités dans le calendrier (web).</div>
+    </div>`
+  showSheet({
+    title: 'Volume limité et débit',
+    body,
+    doneLabel: 'Enregistrer',
+    onDone: () => {
+      const vol = body.querySelector('#mvd-vol').value
+      const db  = body.querySelector('#mvd-debit').value
+      patchParcel(parcel.id, { volumeMaxM3: vol !== '' ? parseInt(vol) : null, debitM3h: db !== '' ? parseFloat(db) : null })
+      onSaved?.()
+    }
   })
-
-  const seasons = new Map()
-  own.filter(i => i.fromStrategy && i.seasonId).forEach(i => {
-    if (!seasons.has(i.seasonId)) seasons.set(i.seasonId, [])
-    seasons.get(i.seasonId).push(i)
-  })
-  seasons.forEach((items, seasonId) => {
-    items.sort((a, b) => a.iso.localeCompare(b.iso))
-    const first = items[0], last = items[items.length - 1]
-    const qty   = first.mm
-    const freq  = items.length > 1
-      ? Math.round((new Date(items[1].iso) - new Date(items[0].iso)) / 86400000)
-      : 7
-    evts.push({
-      id: `auto-irrig-season-${seasonId}`,
-      type: 'irrigation',
-      date: first.iso,
-      texte: `Saison d'irrigation programmée : ${qty} mm tous les ${freq} jours, du ${fmtJrnDate(first.iso)} au ${fmtJrnDate(last.iso)} (${items.length} irrigation${items.length > 1 ? 's' : ''}, ${items.length * qty} mm au total).`,
-      _system: true,
-    })
-  })
-
-  return evts
 }
 
 function openMobileParcelJournal(parcel) {
@@ -2212,18 +2269,26 @@ function openMobileParcelJournal(parcel) {
     const CFG = {
       note:         { label: 'Note',         icon: 'bi-pencil',        dotColor: '#3a7bd5', dotBg: '#eef4ff', badgeCls: 'note' },
       traitement:   { label: 'Traitement',   icon: 'bi-eyedropper',    dotColor: '#3a7a38', dotBg: '#f2faf0', badgeCls: 'traitement' },
+      culture:      { label: 'Culture',      icon: 'bi-flower1',       dotColor: '#15803d', dotBg: '#f0fdf4', badgeCls: 'culture' },
+      stade:        { label: 'Stade phéno.', icon: 'bi-calendar2-check', dotColor: '#7c3aed', dotBg: '#f5f3ff', badgeCls: 'stade' },
       irrigation:   { label: 'Irrigation',   icon: 'bi-droplet-half',  dotColor: '#1d4ed8', dotBg: '#eff6ff', badgeCls: 'irrigation' },
+      cycle:        { label: 'Cycle cultural', icon: 'bi-arrow-repeat', dotColor: '#c2410c', dotBg: '#fff7ed', badgeCls: 'cycle' },
       integration:  { label: 'Intégration',  icon: 'bi-plug-fill',     dotColor: '#7a4fa0', dotBg: '#f5f0fb', badgeCls: 'integration' },
       modification: { label: 'Modification', icon: 'bi-pencil-square', dotColor: '#7a6a1e', dotBg: '#fdf8ee', badgeCls: 'modification' },
     }
+    const ADD_ITEMS = [
+      { type: 'note',       label: 'Note',                      icon: 'bi-pencil-square' },
+      { type: 'traitement', label: 'Traitement phytosanitaire', icon: 'bi-eyedropper' },
+      { type: 'culture',    label: 'Culture',                   icon: 'bi-flower1' },
+      { type: 'stade',      label: 'Stade phénologique',        icon: 'bi-calendar2-check' },
+      { type: 'irrigation', label: 'Irrigation',                icon: 'bi-droplet-half' },
+      { type: 'cycle',      label: 'Cycle cultural',            icon: 'bi-arrow-repeat' },
+    ]
 
     let html = `
-      <div style="padding:12px 16px 4px;display:flex;flex-direction:column;gap:8px">
-        <button class="w-irrig-act-btn w-irrig-act-btn--sec" id="mjrn-add-note">
-          <i class="bi bi-pencil-square"></i> Ajouter une note
-        </button>
-        <button class="w-irrig-act-btn w-irrig-act-btn--sec" id="mjrn-add-trait">
-          <i class="bi bi-eyedropper"></i> Ajouter un traitement
+      <div style="padding:12px 16px 4px">
+        <button class="w-irrig-act-btn w-irrig-act-btn--pri" id="mjrn-add-btn">
+          <i class="bi bi-plus-lg"></i> Ajouter
         </button>
       </div>
     `
@@ -2264,6 +2329,27 @@ function openMobileParcelJournal(parcel) {
                   ${e.dose    ? `<span class="m-jrn-chip"><i class="bi bi-droplet"></i>${e.dose}</span>` : ''}
                   ${e.cible   ? `<span class="m-jrn-chip"><i class="bi bi-bullseye"></i>${e.cible}</span>` : ''}
                 </div>` : ''}
+              ${e.type === 'culture' ? `
+                <div class="m-jrn-meta">
+                  ${e.action  ? `<span class="m-jrn-chip"><i class="bi bi-tag"></i>${e.action === 'ajout' ? 'Ajout' : e.action === 'retrait' ? 'Retrait' : 'Modification'}</span>` : ''}
+                  ${e.culture ? `<span class="m-jrn-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
+                  ${e.variete ? `<span class="m-jrn-chip"><i class="bi bi-tag-fill"></i>${e.variete}</span>` : ''}
+                </div>` : ''}
+              ${e.type === 'stade' ? `
+                <div class="m-jrn-meta">
+                  ${e.stade   ? `<span class="m-jrn-chip"><i class="bi bi-diagram-3"></i>${e.stade}</span>` : ''}
+                  ${e.culture ? `<span class="m-jrn-chip">${e.culture}</span>` : ''}
+                </div>` : ''}
+              ${e.type === 'irrigation' ? `
+                <div class="m-jrn-meta">
+                  ${e.volume  ? `<span class="m-jrn-chip"><i class="bi bi-droplet-fill"></i>${e.volume} ${e.unite || 'mm'}</span>` : ''}
+                  ${e.methode ? `<span class="m-jrn-chip"><i class="bi bi-water"></i>${e.methode}</span>` : ''}
+                </div>` : ''}
+              ${e.type === 'cycle' ? `
+                <div class="m-jrn-meta">
+                  <span class="m-jrn-chip"><i class="bi bi-arrow-right-circle"></i>${e.action === 'fin' ? 'Fin de cycle' : 'Début de cycle'}</span>
+                  ${e.annee ? `<span class="m-jrn-chip"><i class="bi bi-calendar3"></i>${e.annee}</span>` : ''}
+                </div>` : ''}
             </div>
           </div>`
       })
@@ -2272,8 +2358,19 @@ function openMobileParcelJournal(parcel) {
 
     el.innerHTML = html
 
-    el.querySelector('#mjrn-add-note')?.addEventListener('click', () => openMJournalForm('note', parcel.id, renderJournal))
-    el.querySelector('#mjrn-add-trait')?.addEventListener('click', () => openMJournalForm('traitement', parcel.id, renderJournal))
+    el.querySelector('#mjrn-add-btn')?.addEventListener('click', () => {
+      const body = document.createElement('div')
+      body.innerHTML = `<div class="m-sheet-links">${ADD_ITEMS.map(item =>
+        `<a class="m-sheet-link" data-type="${item.type}"><i class="bi ${item.icon}" style="margin-right:8px;color:#8e8e93"></i>${item.label}</a>`
+      ).join('')}</div>`
+      const sheet = showSheet({ title: 'Ajouter une entrée', body, doneLabel: 'Fermer', onDone: () => {} })
+      body.querySelectorAll('.m-sheet-link').forEach(link => {
+        link.addEventListener('click', () => {
+          sheet.classList.remove('m-sheet-overlay--show')
+          setTimeout(() => { sheet.remove(); openMJournalForm(link.dataset.type, parcel.id, renderJournal) }, 280)
+        })
+      })
+    })
     el.querySelectorAll('.m-jrn-del').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.id)
@@ -2287,31 +2384,35 @@ function openMobileParcelJournal(parcel) {
 }
 
 function openMJournalForm(type, parcelId, onSaved) {
-  const isTraitement = type === 'traitement'
   const today = new Date().toISOString().slice(0, 10)
   const role  = _role === 'admin' ? 'conseiller' : 'membre'
   const currentOrg = orgs.find(o => o.id === (_role === 'admin' ? 100 : 1))
   const auteur = currentOrg ? `${currentOrg.prenomProprietaire} ${currentOrg.nomProprietaire}` : 'Jean Dupont'
+  const parcel = allPlots.find(p => p.id === parcelId)
+  const crop = parcel?.crop || ''
 
-  const body = document.createElement('div')
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:12px">
-      ${!isTraitement ? `
+  const TITLES = {
+    note: 'Ajouter une note', traitement: 'Ajouter un traitement',
+    culture: 'Culture — événement', stade: 'Stade phénologique',
+    irrigation: 'Irrigation', cycle: 'Cycle cultural',
+  }
+  const EXTRA = {
+    note: `
       <div>
         <div class="m-form-label">Catégorie</div>
         <select class="m-sheet-input" id="mjf-category">
           ${M_NOTE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
         </select>
-      </div>` : ''}
-      <div>
-        <div class="m-form-label">Date</div>
-        <input type="date" class="m-sheet-input" id="mjf-date" value="${today}">
       </div>
       <div>
-        <div class="m-form-label">${isTraitement ? 'Observations' : 'Texte'}</div>
-        <textarea class="m-sheet-input" id="mjf-texte" placeholder="${isTraitement ? 'Conditions météo, remarques…' : 'Votre note…'}" style="resize:none;min-height:90px"></textarea>
+        <div class="m-form-label">Texte</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Votre note…" style="resize:none;min-height:90px"></textarea>
+      </div>`,
+    traitement: `
+      <div>
+        <div class="m-form-label">Observations</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Conditions météo, remarques…" style="resize:none;min-height:90px"></textarea>
       </div>
-      ${isTraitement ? `
       <div>
         <div class="m-form-label">Produit</div>
         <input type="text" class="m-sheet-input" id="mjf-produit" placeholder="Ex : Bordeaux mixture">
@@ -2325,25 +2426,132 @@ function openMJournalForm(type, parcelId, onSaved) {
           <div class="m-form-label">Cible</div>
           <input type="text" class="m-sheet-input" id="mjf-cible" placeholder="Ex : Mildiou" style="margin-bottom:0">
         </div>
-      </div>` : ''}
+      </div>`,
+    culture: `
+      <div>
+        <div class="m-form-label">Action</div>
+        <select class="m-sheet-input" id="mjf-action">
+          <option value="ajout">Ajout de culture</option>
+          <option value="modification" selected>Modification de culture</option>
+          <option value="retrait">Retrait de culture</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <div class="m-form-label">Culture</div>
+          <input type="text" class="m-sheet-input" id="mjf-culture" value="${crop}" placeholder="Ex : Blé tendre" style="margin-bottom:0">
+        </div>
+        <div style="flex:1">
+          <div class="m-form-label">Variété</div>
+          <input type="text" class="m-sheet-input" id="mjf-variete" placeholder="Ex : Apache" style="margin-bottom:0">
+        </div>
+      </div>
+      <div>
+        <div class="m-form-label">Note</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Précisions…" style="resize:none;min-height:70px"></textarea>
+      </div>`,
+    stade: `
+      <div>
+        <div class="m-form-label">Stade (BBCH)</div>
+        <input type="text" class="m-sheet-input" id="mjf-stade" placeholder="Ex : BBCH 30 — Début montaison">
+      </div>
+      <div>
+        <div class="m-form-label">Culture</div>
+        <input type="text" class="m-sheet-input" id="mjf-culture" value="${crop}" placeholder="Culture concernée">
+      </div>
+      <div>
+        <div class="m-form-label">Observations</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Observations…" style="resize:none;min-height:70px"></textarea>
+      </div>`,
+    irrigation: `
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <div class="m-form-label">Volume</div>
+          <input type="number" class="m-sheet-input" id="mjf-volume" min="0" step="0.5" placeholder="0" style="margin-bottom:0">
+        </div>
+        <div style="flex:1">
+          <div class="m-form-label">Unité</div>
+          <select class="m-sheet-input" id="mjf-unite" style="margin-bottom:0">
+            <option value="mm" selected>mm</option>
+            <option value="m³/ha">m³/ha</option>
+            <option value="m³">m³</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="m-form-label">Méthode</div>
+        <select class="m-sheet-input" id="mjf-methode">
+          <option value="">— Non précisé —</option>
+          <option>Aspersion</option><option>Goutte à goutte</option>
+          <option>Gravitaire</option><option>Pivot</option><option>Enrouleur</option><option>Autre</option>
+        </select>
+      </div>
+      <div>
+        <div class="m-form-label">Observations</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Observations…" style="resize:none;min-height:70px"></textarea>
+      </div>`,
+    cycle: `
+      <div>
+        <div class="m-form-label">Événement</div>
+        <select class="m-sheet-input" id="mjf-action">
+          <option value="début">Début de cycle cultural</option>
+          <option value="fin">Fin de cycle cultural</option>
+        </select>
+      </div>
+      <div>
+        <div class="m-form-label">Année</div>
+        <input type="text" class="m-sheet-input" id="mjf-annee" value="${new Date().getFullYear()}">
+      </div>
+      <div>
+        <div class="m-form-label">Note</div>
+        <textarea class="m-sheet-input" id="mjf-texte" placeholder="Précisions…" style="resize:none;min-height:70px"></textarea>
+      </div>`,
+  }
+
+  const body = document.createElement('div')
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <div class="m-form-label">Date</div>
+        <input type="date" class="m-sheet-input" id="mjf-date" value="${today}">
+      </div>
+      ${EXTRA[type] || EXTRA.note}
     </div>`
 
   showSheet({
-    title: isTraitement ? 'Ajouter un traitement' : 'Ajouter une note',
+    title: TITLES[type] || 'Ajouter une entrée',
     body,
     doneLabel: 'Enregistrer',
     onDone: () => {
-      const date     = body.querySelector('#mjf-date').value || today
-      const texte    = body.querySelector('#mjf-texte').value.trim()
-      const category = !isTraitement ? (body.querySelector('#mjf-category')?.value || '') : ''
-      const entry    = { id: Date.now(), type, date, texte, auteur, role }
-      if (!isTraitement) entry.category = category
-      if (isTraitement) {
+      const date  = body.querySelector('#mjf-date').value || today
+      const texte = body.querySelector('#mjf-texte')?.value.trim() || ''
+      const entry = { id: Date.now(), type, date, texte, auteur, role }
+
+      if (type === 'note') {
+        entry.category = body.querySelector('#mjf-category')?.value || ''
+      } else if (type === 'traitement') {
         entry.produit = body.querySelector('#mjf-produit').value.trim()
         entry.dose    = body.querySelector('#mjf-dose').value.trim()
         entry.cible   = body.querySelector('#mjf-cible').value.trim()
+      } else if (type === 'culture') {
+        entry.action  = body.querySelector('#mjf-action').value
+        entry.culture = body.querySelector('#mjf-culture').value.trim()
+        entry.variete = body.querySelector('#mjf-variete').value.trim()
+      } else if (type === 'stade') {
+        entry.stade   = body.querySelector('#mjf-stade').value.trim()
+        entry.culture = body.querySelector('#mjf-culture').value.trim()
+      } else if (type === 'irrigation') {
+        const vol = parseFloat(body.querySelector('#mjf-volume').value)
+        entry.volume  = isNaN(vol) ? 0 : vol
+        entry.unite   = body.querySelector('#mjf-unite').value
+        entry.methode = body.querySelector('#mjf-methode').value
+      } else if (type === 'cycle') {
+        entry.action = body.querySelector('#mjf-action').value
+        entry.annee  = body.querySelector('#mjf-annee').value.trim()
       }
-      if (!texte && !entry.produit) return
+
+      const hasData = texte || entry.produit || entry.culture || entry.stade || entry.volume || entry.annee
+      if (!hasData) return
       saveMJournal(parcelId, [entry, ...getMJournal(parcelId)])
       onSaved()
     }

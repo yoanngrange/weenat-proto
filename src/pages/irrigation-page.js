@@ -19,6 +19,7 @@ let advisorEnabled   = false
 let reservoirEnabled = false
 let detectorEnabled  = false
 const rainEdits = {}
+const correctedRain = {} // clé `${plotId}_${iso}` → true si une irrigation détectée a été corrigée en pluie
 
 let filterRealIrrig = true
 let filterPlanIrrig = true
@@ -73,6 +74,13 @@ function hasIrrigType(p) { return !!p.irrigation && !NO_IRRIG_TYPES.has(p.irriga
 function mmToM3(mm, areaHa) { return Math.round(mm * (areaHa ?? 0) * 10) }
 function fmtM3(m3) { return m3.toLocaleString('fr-FR') + ' m³' }
 
+function fmtDuree(decimalHours) {
+  const h = Math.floor(decimalHours)
+  const m = Math.round((decimalHours - h) * 60)
+  if (h <= 0) return `${m} min`
+  return m > 0 ? `${h} h ${String(m).padStart(2, '0')} min` : `${h} h`
+}
+
 function getOrgVolMax(orgId) {
   const stored = getOrgData(orgId).volumeMax
   if (stored !== undefined) return stored
@@ -80,6 +88,24 @@ function getOrgVolMax(orgId) {
 }
 
 function getPlotVolMax(plotId) { return getParcel(plotId).volumeMaxM3 ?? null }
+function getPlotDebit(plotId) { return getParcel(plotId).debitM3h ?? null }
+
+// Met à jour les icônes/tooltips de durée d'irrigation d'une parcelle sans reconstruire
+// toute la grille (qui ferait perdre la position de scroll) — réactif au changement de débit.
+function refreshDurationIcons(plotId) {
+  const debit = getPlotDebit(plotId)
+  const p     = plots.find(pl => pl.id === plotId)
+  document.querySelectorAll(`tr[data-row-plot="${plotId}"] .irr-gl-irrig`).forEach(span => {
+    span.querySelector('.irr-gl-dur-i')?.remove()
+    const mm = +span.dataset.mm
+    if (!debit || !mm) return
+    const icon = document.createElement('span')
+    icon.className   = 'irr-gl-dur-i'
+    icon.dataset.tip  = `Durée estimée : ${fmtDuree(mmToM3(mm, p?.area) / debit)}`
+    icon.textContent  = 'i'
+    span.appendChild(icon)
+  })
+}
 
 function orgPlotM3(orgId) {
   const orgPlots = plots.filter(p => p.orgId === orgId || (!IS_ADMIN && selectedOrgId === null))
@@ -543,12 +569,14 @@ function showGlobaleView(resetScroll = false) {
       const rainOffset  = (p.id * 7 + 3) % 3 - 1
       const rainSrcDate = addDays(d, rainOffset)
       const rainMm      = plotRainMm(p.id, d, rainMap[rainSrcDate] ?? forecastBase(rainSrcDate))
+      const rainKey     = `${p.id}_${d}`
       // Build fixed slots so rain/irrig/reservoir always sit at the same vertical position
       let rainHtml = ''
       if (rainMm && filterRain) {
+        const corrBadge = correctedRain[rainKey] ? `<span class="irr-gl-rain-corr-badge" title="Irrigation détectée corrigée en pluie">C</span>` : ''
         rainHtml = detectorEnabled && isDetector
-          ? `<span class="irr-gl-rain irr-gl-rain--edit" data-rain-plotid="${p.id}" data-rain-iso="${d}" data-rain-mm="${rainMm}">${rainMm} mm</span>`
-          : `<span class="irr-gl-rain">${rainMm} mm</span>`
+          ? `<span class="irr-gl-rain irr-gl-rain--edit" data-rain-plotid="${p.id}" data-rain-iso="${d}" data-rain-mm="${rainMm}">${rainMm} mm${corrBadge}</span>`
+          : `<span class="irr-gl-rain">${rainMm} mm${corrBadge}</span>`
       }
 
       let irrigHtml = ''
@@ -559,9 +587,11 @@ function showGlobaleView(resetScroll = false) {
           : visIrrigs.some(i => i.detectorConfirmed) ? `<span class="irr-gl-conf-badge" title="Irrigation confirmée">C</span>`
           : ''
         const detMm  = visDetDay.reduce((s,i) => s+i.mm, 0)
-        irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer"${
-          idxs ? ` data-idxs="${idxs}" data-iso="${d}"` : ` data-det-plotid="${p.id}" data-det-plotname="${p.name}" data-det-iso="${d}" data-det-mm="${detMm}"`
-        }>${total} mm${dBadge}</span>`
+        const debit  = getPlotDebit(p.id)
+        const durIcon = debit ? `<span class="irr-gl-dur-i" data-tip="Durée estimée : ${fmtDuree(mmToM3(total, p.area) / debit)}">i</span>` : ''
+        irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer" data-mm="${total}"${
+          idxs ? ` data-idxs="${idxs}" data-iso="${d}"` : ` data-det-plotid="${p.id}" data-det-plotname="${p.name}" data-det-iso="${d}" data-det-mm="${detMm}" data-det-rain="${rainMm}"`
+        }>${total} mm${dBadge}${durIcon}</span>`
       } else {
         irrigHtml = `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
       }
@@ -622,6 +652,7 @@ function showGlobaleView(resetScroll = false) {
           <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="plan-irrig" ${filterPlanIrrig ? 'checked' : ''}><span class="irr-gl-dot" style="background:#FFB705"></span>Irrig. planifiée</label>
           ${detectorEnabled ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="detected" ${filterDetected ? 'checked' : ''}><span class="irr-gl-det-badge">D</span>&nbsp;Irrig. détectée</label><label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="confirmed" ${filterConfirmed ? 'checked' : ''}><span class="irr-gl-conf-badge">C</span>&nbsp;Irrig. corrigée</label>` : ''}
           <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="rain" ${filterRain ? 'checked' : ''}><span class="irr-gl-dot" style="background:#3A7FC1"></span>Pluie</label>
+          ${detectorEnabled ? `<span class="irr-gl-filter-item"><span class="irr-gl-rain-corr-badge" style="margin-left:0">C</span>&nbsp;Pluie corrigée (ex-irrig. détectée)</span>` : ''}
           ${reservoirEnabled ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="reservoir" ${filterReservoir ? 'checked' : ''}><span class="irr-gl-dot" style="background:#9E9E9E"></span>Réservoir</label>` : ''}
         </div>
         <div class="irr-gl-scroll-top" id="irr-gl-scroll-top">
@@ -696,7 +727,7 @@ function showGlobaleView(resetScroll = false) {
       if (el.dataset.idxs) {
         showEditIrrigModal(el.dataset.idxs.split(',').map(Number), el.dataset.iso)
       } else if (el.dataset.detPlotid) {
-        showDetectorEditModal(+el.dataset.detPlotid, el.dataset.detPlotname, el.dataset.detIso, +el.dataset.detMm)
+        showDetectorEditModal(+el.dataset.detPlotid, el.dataset.detPlotname, el.dataset.detIso, +el.dataset.detMm, +el.dataset.detRain)
       }
     })
   })
@@ -807,7 +838,7 @@ function showEditRainModal(plotId, iso, currentMm) {
   })
 }
 
-function showDetectorEditModal(plotId, plotName, iso, detectedMm) {
+function showDetectorEditModal(plotId, plotName, iso, detectedMm, currentRainMm = 0) {
   document.querySelector('.irr-edit-overlay')?.remove()
   let editMm = detectedMm
   const ov = document.createElement('div')
@@ -824,11 +855,13 @@ function showDetectorEditModal(plotId, plotName, iso, detectedMm) {
           <input type="number" id="irr-det-ed-qty" value="${detectedMm}" min="1" style="width:64px" />
           <span>mm</span>
         </div>
+        <p style="font-size:12px;color:var(--txt3);margin:8px 0 0">En cas d'erreur de détection, cette irrigation peut être transformée en pluie.</p>
       </div>
       <div class="irr-edit-ft">
         <button class="iw-btn iw-btn--danger" id="irr-det-ed-del">Supprimer</button>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="iw-btn iw-btn--sec" id="irr-det-ed-cancel">Annuler</button>
+          <button class="iw-btn iw-btn--rain" id="irr-det-ed-rain">Transformer en pluie</button>
           <button class="iw-btn iw-btn--pri" id="irr-det-ed-save">Confirmer</button>
         </div>
       </div>
@@ -842,6 +875,12 @@ function showDetectorEditModal(plotId, plotName, iso, detectedMm) {
   ov.querySelector('#irr-det-ed-cancel').addEventListener('click', () => ov.remove())
   ov.querySelector('#irr-det-ed-del').addEventListener('click', () => {
     IRRIG_SEASON.push({ iso, mm: 0, real: true, plotId, detectorDismissed: true })
+    saveIrrig(); ov.remove(); showGlobaleView()
+  })
+  ov.querySelector('#irr-det-ed-rain').addEventListener('click', () => {
+    IRRIG_SEASON.push({ iso, mm: 0, real: true, plotId, detectorDismissed: true })
+    rainEdits[`${plotId}_${iso}`] = currentRainMm + editMm
+    correctedRain[`${plotId}_${iso}`] = true
     saveIrrig(); ov.remove(); showGlobaleView()
   })
   ov.querySelector('#irr-det-ed-save').addEventListener('click', () => {
@@ -1157,6 +1196,11 @@ function renderDetailPanel(p) {
         ? `<div class="irr-det-vol-note" style="color:#E05252">Dépassement ${fmtM3(totalM3det - plotVolMax)}</div>`
         : `<div class="irr-det-vol-note">${pctUsedDet}% · ${fmtM3(plotVolMax - totalM3det)} restants</div>`
       }` : ''}
+      <div class="irr-det-vol-row" style="margin-top:8px">
+        <span class="irr-det-vol-lbl">Débit :</span>
+        <input class="irr-det-vol-input" id="irr-det-debit-input" type="number" min="0" step="0.1" placeholder="—" value="${getPlotDebit(p.id) ?? ''}" />
+        <span class="irr-det-vol-lbl">m³/h</span>
+      </div>
     </div>`
 
   const item = ir => {
@@ -1286,6 +1330,12 @@ function renderDetailPanel(p) {
     patchParcel(p.id, { volumeMaxM3: val })
     renderDetailPanel(p)
     renderVolBanner()
+  })
+  panel.querySelector('#irr-det-debit-input')?.addEventListener('change', e => {
+    const val = e.target.value !== '' ? parseFloat(e.target.value) : null
+    patchParcel(p.id, { debitM3h: val })
+    renderDetailPanel(p)
+    refreshDurationIcons(p.id)
   })
 
   panel.querySelector('#irr-det-close').addEventListener('click', () => {

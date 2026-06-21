@@ -465,17 +465,51 @@ function autoEvents() {
 
 const NEW_JOURNAL_TYPES = new Set(['culture', 'stade', 'irrigation', 'cycle'])
 
+// Progressions de stades phéno — plusieurs variantes pour éviter d'afficher
+// toujours les mêmes libellés BBCH d'une parcelle à l'autre
+const STADE_PROGRESSIONS = [
+  ['BBCH 21 — Tallage actif', 'BBCH 30 — Début montaison', 'BBCH 45 — Gonflement épis'],
+  ['BBCH 13 — 3 feuilles étalées', 'BBCH 31 — Début élongation', 'BBCH 59 — Fin de floraison'],
+  ['BBCH 09 — Levée', 'BBCH 40 — Développement des organes de récolte', 'BBCH 49 — Taille de récolte atteinte'],
+  ['BBCH 15 — 5 feuilles étalées', 'BBCH 51 — Apparition inflorescence', 'BBCH 69 — Fin de floraison'],
+]
+const VARIETES = ['Apache', 'RGT Bilboa', 'Soissons', 'Fixion', 'Forum', 'Allez-y']
+const CYCLE_TEXTS = ['Mise en place de la saison 2026', 'Démarrage de la nouvelle campagne', 'Lancement de la saison sur cette parcelle']
+const DEV_TEXTS = ['Développement homogène sur la parcelle', 'Légère hétérogénéité en bordure, sous surveillance', 'Bon développement, conforme aux attentes']
+
 function buildNewTypeDemo(author1, author2) {
   const crop = parcelBase.crop || 'Blé tendre'
+  const seed = parcelBase.id % 100
+  const stades  = STADE_PROGRESSIONS[parcelBase.id % STADE_PROGRESSIONS.length]
+  const variete = VARIETES[parcelBase.id % VARIETES.length]
+  const dOffset = parcelBase.id % 6
   return [
-    { id: 1743465600000, type: 'cycle',     date: '2026-03-01', auteur: author1, action: 'début', annee: '2026', texte: 'Mise en place de la saison 2026' },
-    { id: 1743897600000, type: 'culture',   date: '2026-03-06', auteur: author1, action: 'modification', culture: crop, texte: 'Culture confirmée pour la saison 2026' },
-    { id: 1744329600000, type: 'stade',     date: '2026-04-11', auteur: author1, stade: 'BBCH 21 — Tallage actif', culture: crop, texte: '' },
-    { id: 1744761600000, type: 'irrigation',date: '2026-04-16', auteur: author1, volume: 25, unite: 'mm', methode: 'Aspersion', texte: 'Déclenchement suite alerte potentiel hydrique' },
-    { id: 1745366400000, type: 'stade',     date: '2026-04-23', auteur: author2, stade: 'BBCH 30 — Début montaison', culture: crop, texte: '' },
-    { id: 1745798400000, type: 'irrigation',date: '2026-04-28', auteur: author1, volume: 30, unite: 'mm', methode: 'Aspersion', texte: '' },
-    { id: 1746057600000, type: 'stade',     date: '2026-05-01', auteur: author2, stade: 'BBCH 45 — Gonflement épis', culture: crop, texte: 'Développement homogène sur la parcelle' },
+    { id: 1743465600000, type: 'cycle',     date: addDaysIso('2026-03-01', dOffset), auteur: author1, action: 'début', annee: '2026', texte: CYCLE_TEXTS[seed % CYCLE_TEXTS.length] },
+    { id: 1743897600000, type: 'culture',   date: addDaysIso('2026-03-06', dOffset), auteur: author1, action: 'modification', culture: crop, variete, texte: 'Culture confirmée pour la saison 2026' },
+    { id: 1744329600000, type: 'stade',     date: addDaysIso('2026-04-11', dOffset), auteur: author1, stade: stades[0], culture: crop, texte: '' },
+    { id: 1745366400000, type: 'stade',     date: addDaysIso('2026-04-23', dOffset), auteur: author2, stade: stades[1], culture: crop, texte: '' },
+    { id: 1746057600000, type: 'stade',     date: addDaysIso('2026-05-01', dOffset), auteur: author2, stade: stades[2], culture: crop, texte: DEV_TEXTS[seed % DEV_TEXTS.length] },
   ]
+}
+
+function addDaysIso(iso, n) {
+  const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+// Entrées auto-générées : irrigations passées en "effectuées" (real:true) dans IRRIG_SEASON
+function autoIrrigationEvents(plotId) {
+  return IRRIG_SEASON.filter(i => i.plotId === plotId && i.real).map(i => ({
+    id: `auto-irrig-${plotId}-${i.iso}-${i.mm}`,
+    type: 'irrigation',
+    date: i.iso,
+    volume: i.mm,
+    unite: 'mm',
+    methode: parcelBase.irrigation || '',
+    texte: 'Irrigation effectuée.',
+    auteur: 'Système',
+    _auto: true,
+  }))
 }
 
 function getJournal() {
@@ -497,10 +531,19 @@ function getJournal() {
       }
     }
   } catch (_) {}
+  const TRAITEMENT_SCENARIOS = [
+    { cible: 'Pucerons',  produit: 'Karate Zeon 10 CS',   dose: '0,1 L/ha',  obs1: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',          obs2: 'peu de pucerons visibles, situation sous contrôle.' },
+    { cible: 'Mildiou',   produit: 'Bordeaux mixture',     dose: '2 kg/ha',   obs1: 'Taches suspectes observées sur les feuilles basses, conditions humides.',         obs2: 'progression stoppée, feuillage sain.' },
+    { cible: 'Limaces',   produit: 'Métaldéhyde',          dose: '5 kg/ha',   obs1: 'Dégâts de limaces constatés en bordure de parcelle après les pluies.',           obs2: 'dégâts limités, population réduite.' },
+    { cible: 'Altises',   produit: 'Karaté K',             dose: '75 mL/ha',  obs1: 'Présence d\'altises sur jeunes plants, seuil de nuisibilité approché.',          obs2: 'population sous contrôle, reprise normale.' },
+  ]
+  const tIdx = parcelBase.id % TRAITEMENT_SCENARIOS.length
+  const scn  = TRAITEMENT_SCENARIOS[tIdx]
+  const tOffset = parcelBase.id % 6
   const demo = [
-    { id: 1746921600000, type: 'note',      category: 'Observation générale', date: '2026-05-11', auteur: author1, texte: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.' },
-    { id: 1747353600000, type: 'traitement',date: '2026-05-16', auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: 'Karate Zeon 10 CS', dose: '0,1 L/ha', cible: 'Pucerons' },
-    { id: 1747785600000, type: 'note',      category: 'Observation générale', date: '2026-05-21', auteur: author1, texte: 'Suite traitement du 16/05 : peu de pucerons visibles, situation sous contrôle.' },
+    { id: 1746921600000, type: 'note',      category: 'Observation générale', date: addDaysIso('2026-05-11', tOffset), auteur: author1, texte: scn.obs1 },
+    { id: 1747353600000, type: 'traitement',date: addDaysIso('2026-05-16', tOffset), auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: scn.produit, dose: scn.dose, cible: scn.cible },
+    { id: 1747785600000, type: 'note',      category: 'Observation générale', date: addDaysIso('2026-05-21', tOffset), auteur: author1, texte: `Suite traitement du ${addDaysIso('2026-05-16', tOffset).split('-').reverse().slice(0, 2).join('/')} : ${scn.obs2}` },
     ...buildNewTypeDemo(author1, author2),
   ]
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(demo))
@@ -515,7 +558,7 @@ function renderJournalTab() {
   const el = document.getElementById('journal-container')
   if (!el) return
   const userEntries = getJournal()
-  const auto = autoEvents()
+  const auto = [...autoEvents(), ...autoIrrigationEvents(parcelId)]
   const all = [...userEntries, ...auto].sort((a, b) => b.date.localeCompare(a.date))
 
   const fmt = d => { const [y, m, j] = d.split('-'); return `${j}/${m}/${y}` }
@@ -541,7 +584,7 @@ function renderJournalTab() {
   let html = `
     <div class="journal-add-bar">
       <div class="jrn-add-wrap" id="jrn-add-wrap">
-        <button class="btn-primary btn-sm" id="jrn-add-btn" style="gap:6px">
+        <button class="w-irrig-act-btn w-irrig-act-btn--pri" id="jrn-add-btn" style="width:auto">
           <i class="bi bi-plus-lg"></i> Ajouter
           <i class="bi bi-chevron-down" style="font-size:10px;margin-left:1px"></i>
         </button>
@@ -562,7 +605,7 @@ function renderJournalTab() {
   } else {
     all.forEach(e => {
       const c = CONFIG[e.type] || CONFIG.note
-      const isAuto = e.type === 'modification'
+      const isAuto = e.type === 'modification' || e._auto === true
       const isTraitement = e.type === 'traitement'
       html += `
         <div class="jrn-entry" data-id="${e.id}">
@@ -588,6 +631,7 @@ function renderJournalTab() {
             ${e.type === 'culture' ? `<div class="jrn-entry-meta">
                 <span class="jrn-entry-meta-chip"><i class="bi bi-tag"></i>${e.action === 'ajout' ? 'Ajout' : e.action === 'retrait' ? 'Retrait' : 'Modification'}</span>
                 ${e.culture ? `<span class="jrn-entry-meta-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
+                ${e.variete ? `<span class="jrn-entry-meta-chip"><i class="bi bi-tag-fill"></i>${e.variete}</span>` : ''}
               </div>` : ''}
             ${e.type === 'stade' ? `<div class="jrn-entry-meta">
                 ${e.stade   ? `<span class="jrn-entry-meta-chip"><i class="bi bi-diagram-3"></i>${e.stade}</span>` : ''}
@@ -697,9 +741,15 @@ function openJournalForm(type) {
           <option value="retrait">Retrait de culture</option>
         </select>
       </div>
-      <div class="journal-form-row">
-        <label class="journal-form-label">Culture</label>
-        <input type="text" id="jrn-f-culture" class="journal-form-input" value="${crop}" placeholder="Ex : Blé tendre">
+      <div class="journal-form-grid">
+        <div class="journal-form-row">
+          <label class="journal-form-label">Culture</label>
+          <input type="text" id="jrn-f-culture" class="journal-form-input" value="${crop}" placeholder="Ex : Blé tendre">
+        </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Variété</label>
+          <input type="text" id="jrn-f-variete" class="journal-form-input" placeholder="Ex : Apache">
+        </div>
       </div>
       <div class="journal-form-row">
         <label class="journal-form-label">Note</label>
@@ -829,6 +879,7 @@ function openJournalForm(type) {
     } else if (type === 'culture') {
       entry.action  = modal.querySelector('#jrn-f-action').value
       entry.culture = modal.querySelector('#jrn-f-culture').value.trim()
+      entry.variete = modal.querySelector('#jrn-f-variete').value.trim()
     } else if (type === 'stade') {
       entry.stade   = modal.querySelector('#jrn-f-stade').value.trim()
       entry.culture = modal.querySelector('#jrn-f-culture').value.trim()
@@ -1261,7 +1312,7 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
-    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${genCumulValue(m)} ${m.cumul.unit}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${genCumulValue(m)} ${m.cumul.unit}" title="Ajouter au tableau de bord"><i class="bi bi-house"></i></button></div>`
+    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${genCumulValue(m)} ${m.cumul.unit}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${genCumulValue(m)} ${m.cumul.unit}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button></div>`
     : ''
   const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
   const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
@@ -2384,11 +2435,19 @@ function renderIdentification(org) {
   const env        = p.env        || null
   const isAnalysis = texture === SOIL_ANALYSIS_OPTION
   const analysis   = p.soilAnalysis || {}
+  const latlngs    = p.latlngs
+  const hasShape   = Array.isArray(latlngs) && latlngs.length >= 3
+
+  const surfaceVal = p.area
+    ? `${p.area} ha <span class="field-computed">(calculé)</span>`
+    : hasShape
+      ? `— <span class="field-computed">(calculé)</span>`
+      : `<span class="field-computed">Tracez le contour pour calculer la surface de la parcelle.</span>`
 
   el.innerHTML = `
     ${editableRow('Nom',          p.name || '—', 'name', 'text')}
     ${editableSelect('Culture',   crop,          'crop',       CROP_LIST)}
-    ${readonlyRow('Surface',     (p.area   ? `${p.area} ha` : '—') + ' <span class="field-computed">(calculé)</span>')}
+    ${readonlyRow('Surface', surfaceVal)}
     ${editableSelectNullable('Environnement', env, 'env', ENV_TYPES, 'Plein champ')}
     ${editableSelectNullable('Texture sol', texture,    'texture',    [...SOIL_TYPES, SOIL_ANALYSIS_OPTION],  'Indéfini')}
     ${isAnalysis ? `
@@ -2478,7 +2537,7 @@ function bindEditable(container, field, currentValue, onSave) {
 
 function renderGeolocalisation(org) {
   const el = document.getElementById('panel-geoloc')
-  const latlngs = parcelState.latlngs || parcelBase.latlngs
+  const latlngs = parcelState.latlngs
 
   const hasShape = Array.isArray(latlngs) && latlngs.length >= 3
 
@@ -2968,7 +3027,7 @@ function renderAlertes() {
     `).join('')
   }
 
-  html += `<button id="create-alert-btn" class="action-btn" style="margin-top:6px"><i class="bi bi-plus"></i> Créer une alerte</button>`
+  html += `<button id="create-alert-btn" class="action-btn action-btn--primary" style="margin-top:6px"><i class="bi bi-plus"></i> Créer une alerte</button>`
 
   el.innerHTML = html
 
@@ -3134,9 +3193,11 @@ function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfir
 function initMiniMap() {
   if (_miniMapInstance) { _miniMapInstance.invalidateSize(); return }
   const org = orgs.find(o => o.id === parcelBase.orgId)
-  if (!org?.lat) return
+  const lat = parcelState.lat ?? parcelBase.lat ?? org?.lat
+  const lng = parcelState.lng ?? parcelBase.lng ?? org?.lng
+  if (lat == null || lng == null) return
 
-  const latlngs = parcelState.latlngs || parcelBase.latlngs
+  const latlngs = parcelState.latlngs
 
   const map = L.map('parcel-mini-map', { zoomControl: false, attributionControl: false })
   _miniMapInstance = map
@@ -3151,8 +3212,11 @@ function initMiniMap() {
     }).addTo(map)
     map.fitBounds(poly.getBounds(), { padding: [10, 10] })
   } else {
-    map.setView([org.lat, org.lng], 13)
-    L.circleMarker([org.lat, org.lng], {
+    // Parcelle représentée par un point : bounding box ±1 km de chaque côté, point centré.
+    const dLat = 1 / 111
+    const dLng = 1 / (111 * Math.cos(lat * Math.PI / 180))
+    map.fitBounds([[lat - dLat, lng - dLng], [lat + dLat, lng + dLng]])
+    L.circleMarker([lat, lng], {
       radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
     }).addTo(map)
   }
@@ -3349,7 +3413,7 @@ function initDashGrid() {
       const dd = document.createElement('div')
       dd.className = 'dash-dropdown'
       const irrigItems = wid === 'irrigations' ? `
-        <button class="dash-dd-item" data-action="set-vol">Définir le volume limité de la parcelle</button>` : ''
+        <button class="dash-dd-item" data-action="set-vol">Définir le volume limité et le débit</button>` : ''
       dd.innerHTML = `${irrigItems}<button class="dash-dd-item dash-dd-remove" data-action="remove" data-wid="${wid}">Retirer le widget</button>`
       const rect = btn.getBoundingClientRect()
       const gridRect = grid.getBoundingClientRect()
@@ -3532,16 +3596,32 @@ function renderWCumuls(el) {
   const dates=state.dates||{}
   const cfg=state.cfg||{}
 
-  const allItems=[
+  const allAvailable=[
     {id:'etp',  label:'Évapotranspiration',value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
     {id:'pluie',label:'Pluie',             value:rnd(10,50),             unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
     {id:'djc',  label:'Degrés jours',      value:rnd(40,180),            unit:'DJ',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp'),cfg:true,
       cfgLabel:`${cfg.djMin??0}–${cfg.djMax??18}°C`,cfgFields:[{key:'djMin',label:'T min',def:0},{key:'djMax',label:'T max',def:18}]},
-    {id:'hfroid',label:'Heures de froid',  value:rnd(5,40),              unit:'h', color:'#5b8dd9',icon:'bi-snow',show:met.has('temp'),cfg:true,
+    {id:'hfroid',label:'Heures de froid',  value:rnd(5,40),              unit:'h', color:'#0B3A64',icon:'bi-snow',show:met.has('temp'),cfg:true,
       cfgLabel:`< ${cfg.hfSeuil??7.2}°C`,cfgFields:[{key:'hfSeuil',label:'Seuil',def:7.2}]},
     {id:'humec',label:'Humectation',       value:rndf(2,20).toFixed(1),  unit:'h', color:'#78d8a0',icon:'bi-droplet',show:met.has('humec')},
     {id:'enso', label:'Ensoleillement',    value:rndf(30,90).toFixed(1), unit:'h', color:'#f5c842',icon:'bi-brightness-high',show:true},
-  ].filter(i=>i.show&&!hidden.has(i.id))
+  ].filter(i=>i.show)
+
+  const allItems=allAvailable.filter(i=>!hidden.has(i.id))
+  const hiddenItems=allAvailable.filter(i=>hidden.has(i.id))
+
+  const restoreHtml=hiddenItems.length
+    ?`<div style="border-top:1px solid var(--bdr2);padding-top:8px;margin-top:8px">
+        <div style="font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Disponibles</div>
+        ${hiddenItems.map(i=>`
+          <button class="w-cumul-restore" data-cid="${i.id}" type="button"
+            style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px dashed var(--bdr);border-radius:8px;padding:7px 10px;background:none;cursor:pointer;font-family:inherit;margin-bottom:6px">
+            <i class="bi ${i.icon}" style="color:${i.color};font-size:14px;flex-shrink:0"></i>
+            <span style="font-size:12px;color:var(--txt);flex:1">${i.label}</span>
+            <i class="bi bi-plus-circle" style="color:var(--pri);font-size:14px;flex-shrink:0"></i>
+          </button>`).join('')}
+      </div>`
+    :''
 
   el.innerHTML=`<div class="w-cumuls-list">${allItems.map(i=>{
     const d=dates[i.id]||jan1
@@ -3556,12 +3636,20 @@ function renderWCumuls(el) {
         </div>
         <button class="w-cumul-del" data-cid="${i.id}" title="Retirer">×</button>
       </div>`
-  }).join('')}</div>`
+  }).join('')}</div>${restoreHtml}`
 
   el.querySelectorAll('.w-cumul-del').forEach(btn=>{
     btn.addEventListener('click',e=>{
       e.stopPropagation()
       hidden.add(btn.dataset.cid)
+      saveCumulsState({hidden:[...hidden]})
+      renderWCumuls(el)
+    })
+  })
+  el.querySelectorAll('.w-cumul-restore').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation()
+      hidden.delete(btn.dataset.cid)
       saveCumulsState({hidden:[...hidden]})
       renderWCumuls(el)
     })
@@ -4035,7 +4123,8 @@ function openIrrigWidgetAction(action) {
   const ov = document.createElement('div')
   ov.className = 'journal-form-overlay'
   if (action === 'vol') {
-    const cur = getParcel(parcelId).volumeMaxM3 ?? ''
+    const cur   = getParcel(parcelId).volumeMaxM3 ?? ''
+    const curDb = getParcel(parcelId).debitM3h ?? ''
     ov.innerHTML = `
       <div class="journal-form-modal">
         <div class="journal-form-title">Volume limité de la parcelle</div>
@@ -4043,6 +4132,11 @@ function openIrrigWidgetAction(action) {
           <label class="journal-form-label">Volume limité (m³)</label>
           <input id="iwa-vol-inp" class="journal-form-input" type="number" min="0" placeholder="—" value="${cur}" style="width:120px">
         </div>
+        <div class="journal-form-row">
+          <label class="journal-form-label">Débit (m³/h)</label>
+          <input id="iwa-debit-inp" class="journal-form-input" type="number" min="0" step="0.1" placeholder="Ex. 12" value="${curDb}" style="width:120px">
+        </div>
+        <div style="font-size:11px;color:var(--txt3);margin-top:-4px">Si renseigné, la durée d'irrigation estimée s'affiche au survol des quantités dans le calendrier d'irrigation.</div>
         <div class="journal-form-actions">
           <button class="btn-secondary" id="iwa-cancel">Annuler</button>
           <button id="iwa-save">Enregistrer</button>
@@ -4051,8 +4145,9 @@ function openIrrigWidgetAction(action) {
     document.body.appendChild(ov)
     ov.querySelector('#iwa-cancel').onclick = () => ov.remove()
     ov.querySelector('#iwa-save').onclick = () => {
-      const v = ov.querySelector('#iwa-vol-inp').value
-      patchParcel(parcelId, { volumeMaxM3: v !== '' ? parseInt(v) : null })
+      const v  = ov.querySelector('#iwa-vol-inp').value
+      const db = ov.querySelector('#iwa-debit-inp').value
+      patchParcel(parcelId, { volumeMaxM3: v !== '' ? parseInt(v) : null, debitM3h: db !== '' ? parseFloat(db) : null })
       ov.remove()
       document.querySelector('#dblock-irrigations') && renderWIrrigations(document.querySelector('#dblock-irrigations'))
     }
@@ -4315,7 +4410,7 @@ function renderWIrrigations(el) {
       <div class="w-irrig-layout">
         <div class="w-irrig-empty-state">
           <i class="bi bi-droplet" style="font-size:22px;color:var(--txt3)"></i>
-          <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez préciser un type d'irrigation.</p>
+          <p class="w-irrig-empty-msg">Afin de pouvoir saisir et gérer vos irrigations, vous devez renseigner un type d'irrigation sur cette parcelle.</p>
         </div>
         <button class="w-irrig-act-btn w-irrig-act-btn--pri" type="button" id="w-irrig-set-type" style="width:100%">Renseigner le type d'irrigation</button>
       </div>`

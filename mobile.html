@@ -1384,6 +1384,19 @@
       font-size: 12px; color: #3a3a3c; background: rgba(0,0,0,.05);
       border-radius: 6px; padding: 3px 8px;
     }
+    .journal-type-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+    }
+    .journal-type-badge--note         { background: #eef4ff; color: #3a7bd5; border: 1px solid #c4d8f8; }
+    .journal-type-badge--traitement   { background: #f2faf0; color: #3a7a38; border: 1px solid #b8e0b4; }
+    .journal-type-badge--modification { background: #fdf8ee; color: #7a6a1e; border: 1px solid #e0d090; }
+    .journal-type-badge--culture      { background: #f0fdf4; color: #15803d; border: 1px solid #86efac; }
+    .journal-type-badge--cycle        { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+    .journal-type-badge--stade        { background: #f5f3ff; color: #7c3aed; border: 1px solid #c4b5fd; }
+    .journal-type-badge--irrigation   { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+    .journal-type-badge--integration  { background: #f5f0fb; color: #7a4fa0; border: 1px solid #d8c2ee; }
+    .journal-type-badge--maintenance  { background: #f5f5f7; color: #5b6470; border: 1px solid #d3d6db; }
 
     .m-detail-tabs {
       display: flex;
@@ -1501,12 +1514,6 @@
       font-size: 12px; color: #8e8e93; font-weight: 600;
       margin: -6px 0 10px;
     }
-    .m-irrig-footer-link {
-      text-align: center; color: #0172A4; font-weight: 600;
-      cursor: pointer; border-top: .5px solid rgba(0,0,0,.08);
-      margin-top: 8px; padding-top: 8px; font-size: 12px;
-    }
-    .m-irrig-footer-link:active { opacity: .6; }
     /* Cumuls widget */
     .m-wcumuls-list { display: flex; flex-direction: column; gap: 6px; }
     .m-wcumuls-row {
@@ -1553,6 +1560,8 @@
     .w-irrig-season-val strong { color: #1c1c1e; font-weight: 700; }
     .w-irrig-actions { display: flex; flex-direction: column; gap: 5px; }
     .w-irrig-act-row { display: flex; flex-direction: column; gap: 6px; }
+    .w-irrig-act-row--h { flex-direction: row; }
+    .w-irrig-act-row--h > .w-irrig-act-btn { flex: 1; }
     .w-irrig-act-btn {
       padding: 10px 16px; font-size: 13px; font-weight: 600; border: 1px solid rgba(0,0,0,.1);
       border-radius: 8px; background: #fff; cursor: pointer; color: #1c1c1e; text-align: center;
@@ -1561,6 +1570,8 @@
     .w-irrig-act-btn--pri { background: #0172A4; color: #fff; border-color: #0172A4; }
     .w-irrig-act-btn--sec { background: #E6F1FB; border: 1px solid #0172A4; }
     .w-irrig-act-btn[disabled] { opacity: .38; cursor: not-allowed; pointer-events: none; }
+    .m-widget-details-link { display: block; width: 100%; text-align: center; background: none; border: none; border-top: .5px solid rgba(0,0,0,.07); margin-top: 8px; padding: 9px 0 0; font-size: 13px; font-weight: 600; color: #0172A4; cursor: pointer; font-family: inherit; }
+    .m-widget-details-link:active { opacity: .6; }
     .w-irrig-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 8px 4px 16px; }
     .w-irrig-empty-msg { font-size: 12px; color: #8e8e93; line-height: 1.5; margin: 0; }
 
@@ -1592,10 +1603,6 @@
     .m-add-item:first-child { border-top: none; }
     .m-add-item:active { background: #f2f2f7; }
     .m-add-item i { color: #0172A4; width: 22px; text-align: center; flex-shrink: 0; font-size: 18px; }
-    .m-alert-more-btn {
-      background: none; border: none; padding: 0;
-      font-size: 13px; color: #0172A4; cursor: pointer; font-family: inherit;
-    }
     .m-sheet-info-rows { padding: 4px 0; }
     .m-sheet-info-row {
       display: flex; justify-content: space-between; align-items: baseline;
@@ -2067,11 +2074,8 @@
       border-radius: 14px;
       border: 1px solid rgba(0,0,0,.07);
       overflow: hidden;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
     }
     .m-alert-card:first-child { margin-top: 12px; }
-    .m-alert-card:active { opacity: .85; }
 
     .m-alert-card-hd {
       display: flex; align-items: center; gap: 10px;

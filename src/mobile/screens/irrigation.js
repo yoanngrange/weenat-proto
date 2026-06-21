@@ -1335,9 +1335,13 @@ export function openCalendar(plots, initialFilter) {
     const viewPlotBtn = plot
       ? `<button class="irr-cal-add-btn irr-cal-add-btn--tert" id="cal-goto-plot"><i class="bi bi-geo-alt-fill"></i> Voir la parcelle</button>`
       : ''
+    const paramsBtn = plot
+      ? `<button class="irr-cal-add-btn irr-cal-add-btn--tert" id="cal-edit-params"><i class="bi bi-sliders"></i> Modifier les paramètres</button>`
+      : ''
     const actionBar = hasStrategy
       ? `<div class="irr-cal-add-bar">
            <button class="irr-cal-add-btn irr-cal-add-btn--sec" id="open-strat-edit"><i class="bi bi-pencil"></i> Modifier la saison</button>
+           ${paramsBtn}
            ${viewPlotBtn}
          </div>`
       : `<div class="irr-cal-add-bar">
@@ -1361,6 +1365,10 @@ export function openCalendar(plots, initialFilter) {
 
     body.querySelector('#cal-goto-plot')?.addEventListener('click', () => {
       if (plot) goToPlot(plot.id, plots)
+    })
+    body.querySelector('#cal-edit-params')?.addEventListener('click', () => {
+      if (!plot) return
+      import('./parcel-detail.js').then(m => m.openMobileVolDebitSheet(plot, () => renderContent(layer)))
     })
 
     // Restore section open/closed state

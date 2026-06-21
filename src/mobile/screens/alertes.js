@@ -19,21 +19,22 @@ function generateAlertHistory(alertId) {
 }
 
 const ALERTS_ADMIN = [
-  { id: 1, name: 'Pluie forte > 10 mm/h',       statut: 'actif',   metric: 'pluie',             created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
-  { id: 2, name: 'Gel précoce < 2°C',            statut: 'actif',   metric: 'temperature',        created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2],    parcelIds: [3] },
-  { id: 3, name: 'Teneur en eau critique',        statut: 'inactif', metric: 'teneur-eau',         created: '2026-02-20', lastTriggered: null,         sensorIds: [5],    parcelIds: [4, 5] },
-  { id: 4, name: 'Vent violent > 80 km/h',        statut: 'actif',   metric: 'vent',               created: '2025-09-01', lastTriggered: '2026-02-28', sensorIds: [1, 4], parcelIds: [] },
-  { id: 5, name: 'Rayonnement faible',            statut: 'inactif', metric: 'rayonnement',        created: '2026-03-01', lastTriggered: null,         sensorIds: [],     parcelIds: [1] },
-  { id: 6, name: 'DPV élevé > 2 kPa',            statut: 'actif',   metric: 'temperature',        created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2],    parcelIds: [2, 3] },
-  { id: 7, name: 'Potentiel hydrique > 100 kPa', statut: 'actif',   metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6],    parcelIds: [6] },
-  { id: 8, name: 'Température humide < 0°C',      statut: 'actif',   metric: 'temp-humide',        created: '2026-01-10', lastTriggered: '2026-03-05', sensorIds: [3],    parcelIds: [1], phones: ['+33 6 12 34 56 78', '+33 7 52 18 93 46'] },
-  { id: 9, name: 'Température sèche > 35°C',      statut: 'actif',   metric: 'temp-seche',         created: '2026-02-15', lastTriggered: '2026-04-18', sensorIds: [4],    parcelIds: [3], phones: ['+33 6 12 34 56 78'] },
+  { id: 1, name: 'Pluie forte > 10 mm/h',       params: 'cumul > 10 mm/h',    statut: 'actif',   metric: 'pluie',             created: '2026-01-15', lastTriggered: '2026-04-10', sensorIds: [1, 3], parcelIds: [1, 2] },
+  { id: 2, name: 'Gel précoce < 2°C',            params: '< 2°C',              statut: 'actif',   metric: 'temperature',        created: '2025-11-03', lastTriggered: '2026-03-18', sensorIds: [2],    parcelIds: [3] },
+  { id: 3, name: 'Teneur en eau critique',        params: '< 20%',             statut: 'inactif', metric: 'teneur-eau',         created: '2026-02-20', lastTriggered: null,         sensorIds: [5],    parcelIds: [4, 5] },
+  { id: 4, name: 'Vent violent > 80 km/h',        params: '> 80 km/h',         statut: 'actif',   metric: 'vent',               created: '2025-09-01', lastTriggered: '2026-02-28', sensorIds: [1, 4], parcelIds: [] },
+  { id: 5, name: 'Rayonnement faible',            params: '< 50 W/m²',         statut: 'inactif', metric: 'rayonnement',        created: '2026-03-01', lastTriggered: null,         sensorIds: [],     parcelIds: [1] },
+  { id: 6, name: 'DPV élevé > 2 kPa',            params: '> 2 kPa',           statut: 'actif',   metric: 'temperature',        created: '2026-03-15', lastTriggered: '2026-04-14', sensorIds: [2],    parcelIds: [2, 3] },
+  { id: 7, name: 'Potentiel hydrique > 100 kPa', params: '> 100 kPa',         statut: 'actif',   metric: 'potentiel-hydrique', created: '2026-04-01', lastTriggered: '2026-04-12', sensorIds: [6],    parcelIds: [6] },
+  { id: 8, name: 'Température humide < 0°C',      params: '< 0°C',             statut: 'actif',   metric: 'temp-humide',        created: '2026-01-10', lastTriggered: '2026-03-05', sensorIds: [3],    parcelIds: [1], phones: ['+33 6 12 34 56 78', '+33 7 52 18 93 46'] },
+  { id: 9, name: 'Température sèche > 35°C',      params: '> 35°C',            statut: 'actif',   metric: 'temp-seche',         created: '2026-02-15', lastTriggered: '2026-04-18', sensorIds: [4],    parcelIds: [3], phones: ['+33 6 12 34 56 78'] },
 ]
 
 const ALERTS_ADHERENT = [
-  { id: 1, name: 'Gel précoce < 2°C',         statut: 'actif',   metric: 'temperature', created: '2025-11-15', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [1] },
-  { id: 2, name: 'Pluie forte > 15 mm/h',     statut: 'actif',   metric: 'pluie',       created: '2026-01-20', lastTriggered: '2026-04-10', sensorIds: [1], parcelIds: [2] },
-  { id: 3, name: 'Teneur en eau basse < 30%', statut: 'inactif', metric: 'teneur-eau',  created: '2026-03-05', lastTriggered: null,         sensorIds: [5], parcelIds: [] },
+  { id: 1, name: 'Gel précoce < 2°C',         params: '< 2°C',           statut: 'actif',   metric: 'temperature', created: '2025-11-15', lastTriggered: '2026-03-18', sensorIds: [2], parcelIds: [1] },
+  { id: 2, name: 'Pluie forte > 15 mm/h',     params: 'cumul > 15 mm/h', statut: 'actif',   metric: 'pluie',       created: '2026-01-20', lastTriggered: '2026-04-10', sensorIds: [1], parcelIds: [2] },
+  { id: 3, name: 'Teneur en eau basse < 30%', params: '< 30%',           statut: 'inactif', metric: 'teneur-eau',  created: '2026-03-05', lastTriggered: null,         sensorIds: [5], parcelIds: [] },
+  { id: 4, name: 'Température humide < 0°C', params: '< 0°C',           statut: 'actif',   metric: 'temp-humide', created: '2026-02-01', lastTriggered: '2026-03-05', sensorIds: [3], parcelIds: [1], phones: ['+33 6 78 92 34 15', '+33 7 41 08 63 22'] },
 ]
 
 const METRIC_LABELS = {
@@ -106,13 +107,14 @@ export function initAlertesScreen(screenEl, role) {
               <span class="m-alert-row-label">Métrique</span>
               <span class="m-alert-row-val">${METRIC_LABELS[a.metric] || a.metric}</span>
             </div>
-            <div class="m-alert-row">
+            <div class="m-alert-row m-alert-row--last">
               <span class="m-alert-row-label">Dernier déclenchement</span>
               <span class="m-alert-row-val">${fmtDate(a.lastTriggered)}</span>
             </div>
-            <div class="m-alert-row m-alert-row--last">
-              <button class="m-alert-more-btn" data-id="${a.id}">Plus d'infos…</button>
-            </div>
+          </div>
+          <div class="w-irrig-act-row" style="padding:0 14px 14px">
+            <button class="w-irrig-act-btn w-irrig-act-btn--pri m-alert-detail-btn" type="button" data-id="${a.id}">Voir le détail</button>
+            <button class="w-irrig-act-btn w-irrig-act-btn--sec m-alert-edit-btn" type="button" data-id="${a.id}">Modifier l'alerte</button>
           </div>
         </div>`
     }).join('')
@@ -135,8 +137,16 @@ export function initAlertesScreen(screenEl, role) {
       })
     })
 
-    // Plus d'infos button → detail sheet
-    content.querySelectorAll('.m-alert-more-btn').forEach(btn => {
+    // Modifier l'alerte → édition (à venir)
+    content.querySelectorAll('.m-alert-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        showToast('Modification à venir')
+      })
+    })
+
+    // Voir le détail → detail sheet
+    content.querySelectorAll('.m-alert-detail-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
         const id = +btn.dataset.id
@@ -172,6 +182,7 @@ export function initAlertesScreen(screenEl, role) {
           rows.className = 'm-sheet-info-rows'
           rows.innerHTML = `
             <div class="m-sheet-info-row"><span>Métrique</span><span>${METRIC_LABELS[alert.metric] || alert.metric}</span></div>
+            <div class="m-sheet-info-row"><span>Paramètres</span><span>${alert.params || '—'}</span></div>
             <div class="m-sheet-info-row"><span>Dernier déclenchement</span><span>${fmtDate(alert.lastTriggered)}</span></div>
             <div class="m-sheet-info-row"><span>Créée le</span><span>${fmtDate(alert.created)}</span></div>
             ${alert.phones?.length ? `<div class="m-sheet-info-row"><span>Téléphone(s)</span><span>${alert.phones.join(', ')}</span></div>` : ''}
@@ -203,38 +214,23 @@ export function initAlertesScreen(screenEl, role) {
               showToast('Retiré du périmètre')
             })
           })
+
+          const delLink = document.createElement('a')
+          delLink.className = 'm-sheet-link m-sheet-link--danger'
+          delLink.style.marginTop = '8px'
+          delLink.textContent = "Supprimer l'alerte"
+          delLink.addEventListener('click', () => {
+            const idx = alerts.findIndex(a => a.id === id)
+            if (idx !== -1) alerts.splice(idx, 1)
+            sheet.classList.remove('m-sheet-overlay--show')
+            setTimeout(() => { sheet.remove(); render() }, 280)
+            showToast('Alerte supprimée')
+          })
+          body.appendChild(delLink)
         }
 
         rebuildBody()
-        showSheet({ title: alert.name, body, doneLabel: 'Fermer', onDone: () => {} })
-      })
-    })
-
-    // Tap card → options sheet
-    content.querySelectorAll('.m-alert-card').forEach(card => {
-      card.addEventListener('click', e => {
-        if (e.target.closest('.m-alert-toggle')) return
-        if (e.target.closest('.m-alert-more-btn')) return
-        const id    = +card.dataset.id
-        const alert = alerts.find(a => a.id === id); if (!alert) return
-        const body  = document.createElement('div')
-        body.innerHTML = `
-          <div class="m-sheet-links">
-            <a class="m-sheet-link" id="al-edit">Modifier</a>
-            <a class="m-sheet-link m-sheet-link--danger" id="al-delete">Supprimer</a>
-          </div>`
         const sheet = showSheet({ title: alert.name, body, doneLabel: 'Fermer', onDone: () => {} })
-        body.querySelector('#al-edit').addEventListener('click', () => {
-          sheet.classList.remove('m-sheet-overlay--show')
-          setTimeout(() => { sheet.remove(); showToast('Modification à venir') }, 280)
-        })
-        body.querySelector('#al-delete').addEventListener('click', () => {
-          const idx = alerts.findIndex(a => a.id === id)
-          if (idx !== -1) alerts.splice(idx, 1)
-          sheet.classList.remove('m-sheet-overlay--show')
-          setTimeout(() => { sheet.remove(); render() }, 280)
-          showToast('Alerte supprimée')
-        })
       })
     })
   }

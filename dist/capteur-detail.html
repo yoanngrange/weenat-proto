@@ -8,15 +8,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" />
-  <script type="module" crossorigin src="/weenat-proto/assets/capteur-detail-DHKmjaWY.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/capteur-detail-BBZqXnLn.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/sensors-CRadjF8G.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-DhtWL7s_.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/orgs-DnFmvGlp.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/members-Cr98hVG_.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/breadcrumb-CzFWtd6d.js">
-  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-BQ9NCY7W.js">
-  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-Dst7Ebxb.css">
+  <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-c0FlIf2T.js">
+  <link rel="stylesheet" crossorigin href="/weenat-proto/assets/main-CIUNGEcx.css">
 
   <body>
     <div id="app">
@@ -141,7 +141,7 @@
                   <div class="panel-section-bd" id="panel-ident"></div>
                 </div>
                 <div class="panel-section">
-                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Localisation</div>
+                  <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Géolocalisation</div>
                   <div id="sensor-mini-map" class="mini-map"></div>
                   <div class="panel-section-bd" id="panel-loc"></div>
                 </div>
@@ -156,6 +156,12 @@
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-geo-alt"></i> Parcelles liées</div>
                   <div class="panel-section-bd" id="panel-plots"></div>
+                  <div class="panel-add-row" id="plot-add-row" style="display:none">
+                    <select id="add-plot-select" class="panel-add-select">
+                      <option value="">Ajouter une parcelle…</option>
+                    </select>
+                    <button id="add-plot-btn" class="panel-add-btn">Ajouter</button>
+                  </div>
                 </div>
                 <div class="panel-section">
                   <div class="panel-section-hd"><i class="bi bi-graph-up"></i> Données disponibles</div>
@@ -172,25 +178,21 @@
                 <div class="panel-section" id="panel-membres-section">
                   <div class="panel-section-hd"><i class="bi bi-person-fill"></i> Membres liés</div>
                   <div class="panel-section-bd" id="panel-membres"></div>
-                  <div style="padding:8px 0 0" id="add-membre-org-row">
-                    <div style="display:flex;gap:6px;align-items:center">
-                      <select id="add-membre-org-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
-                        <option value="">Associer un membre…</option>
-                      </select>
-                      <button id="add-membre-org-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
-                    </div>
+                  <div class="panel-add-row" id="add-membre-org-row">
+                    <select id="add-membre-org-select" class="panel-add-select">
+                      <option value="">Associer un membre…</option>
+                    </select>
+                    <button id="add-membre-org-btn" class="panel-add-btn">Ajouter</button>
                   </div>
                 </div>
                 <div class="panel-section" id="panel-conseillers-section">
                   <div class="panel-section-hd"><i class="bi bi-people"></i> Conseillers liés</div>
                   <div class="panel-section-bd" id="panel-conseillers"></div>
-                  <div style="padding:8px 0 0" id="add-conseiller-row">
-                    <div id="add-membre-row" style="display:flex;gap:6px;align-items:center">
-                      <select id="add-membre-select" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;background:var(--srf);color:var(--txt)">
-                        <option value="">Ajouter un conseiller…</option>
-                      </select>
-                      <button id="add-membre-btn" class="btn-secondary" style="font-size:12px;padding:4px 10px">Ajouter</button>
-                    </div>
+                  <div class="panel-add-row" id="add-conseiller-row">
+                    <select id="add-membre-select" class="panel-add-select">
+                      <option value="">Ajouter un conseiller…</option>
+                    </select>
+                    <button id="add-membre-btn" class="panel-add-btn">Ajouter</button>
                   </div>
                 </div>
                 <div class="panel-section">

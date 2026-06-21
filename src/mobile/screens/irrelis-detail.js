@@ -1,6 +1,7 @@
 import { pushDetail, popDetail } from '../nav.js'
 import { showSheet, showToast }  from '../ui.js'
 import { plots }                 from '../../data/plots.js'
+import { ADHERENT_ORG_ID }       from '../../data/constants.js'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,9 @@ export function getIrrelisConfig(plotId) {
   } catch {}
   const seed     = plotId * 13
   const ru       = 60 + (seed % 50)
-  const rfu      = Math.round(ru * 0.42)
+  // rfu = seuil (depuis le vide) en-dessous duquel on est dans le réservoir de survie.
+  // Le réservoir de survie représente toujours 1/3 de la RU globale (donc RFU = 2/3, rfu = ru/3).
+  const rfu      = Math.round(ru / 3)
   const cultures = ['Maïs','Maïs','Maïs','Blé','Maïs','Tournesol','Orge','Maïs']
   const culture  = cultures[plotId % cultures.length]
   const day      = String(5 + (plotId % 16)).padStart(2, '0')
@@ -68,7 +71,7 @@ function generateRainArray(seed, total, nDays) {
   return result
 }
 
-export function getIrrelisDailyData(plot, nFcDays = 5) {
+export function getIrrelisDailyData(plot, nFcDays = 14) {
   const cfg  = getIrrelisConfig(plot.id)
   const { ru, rfu } = cfg
   const seed = plot.id
@@ -114,7 +117,10 @@ export function getIrrelisDailyData(plot, nFcDays = 5) {
 
     const ruI = ruArr[i]
     res = res - etpV + pluieV + irrigV
-    const dr = Math.max(0, res - ruI)
+    // Le drainage ne peut jamais excéder la moitié de l'apport du jour (pluie + irrigation) :
+    // le sol absorbe et retient l'essentiel de l'eau, il ne la laisse pas filtrer entièrement d'un coup.
+    const overflow = Math.max(0, res - ruI)
+    const dr = Math.min(overflow, (pluieV + irrigV) * 0.5)
     drainage.push(+dr.toFixed(1))
     res = Math.max(0, Math.min(ruI, res))
     reservoir.push(+res.toFixed(1))
@@ -124,7 +130,7 @@ export function getIrrelisDailyData(plot, nFcDays = 5) {
 }
 
 export function getIrrelisVal(plot, aggLabel) {
-  const d = getIrrelisDailyData(plot, 5)
+  const d = getIrrelisDailyData(plot, 14)
   const i = d.nDays
   switch (aggLabel) {
     case "Aujourd'hui": return d.reservoir[i]     ?? 0
@@ -158,15 +164,55 @@ function getSlice(period, nDays, nFcDays, total) {
 
 // ─── Chart helpers ────────────────────────────────────────────────────────────
 
-const PHENO_MAIS = [
-  { label: 'Levée',        daysAfter: 10 },
-  { label: '4 feuilles',   daysAfter: 22 },
-  { label: '10 feuilles',  daysAfter: 38 },
-  { label: '15 feuilles',  daysAfter: 52 },
-  { label: 'Floraison',    daysAfter: 68 },
-  { label: 'Sl. laiteux',  daysAfter: 83 },
-  { label: '70% humidité', daysAfter: 100 },
-]
+const PHENO_BY_CULTURE = {
+  'Maïs': [
+    { label: 'Levée',        daysAfter: 10 },
+    { label: '4 feuilles',   daysAfter: 22 },
+    { label: '10 feuilles',  daysAfter: 38 },
+    { label: '15 feuilles',  daysAfter: 52 },
+    { label: 'Floraison',    daysAfter: 68 },
+    { label: 'Sl. laiteux',  daysAfter: 83 },
+    { label: '70% humidité', daysAfter: 100 },
+  ],
+  'Blé': [
+    { label: 'Levée',     daysAfter: 12 },
+    { label: 'Tallage',   daysAfter: 35 },
+    { label: 'Épiaison',  daysAfter: 95 },
+    { label: 'Floraison', daysAfter: 110 },
+    { label: 'Maturité',  daysAfter: 150 },
+  ],
+  'Orge': [
+    { label: 'Levée',     daysAfter: 10 },
+    { label: 'Tallage',   daysAfter: 30 },
+    { label: 'Épiaison',  daysAfter: 85 },
+    { label: 'Floraison', daysAfter: 95 },
+    { label: 'Maturité',  daysAfter: 135 },
+  ],
+  'Colza': [
+    { label: 'Levée',        daysAfter: 8 },
+    { label: '4-6 feuilles', daysAfter: 25 },
+    { label: 'Floraison',    daysAfter: 70 },
+    { label: 'Maturité',     daysAfter: 110 },
+  ],
+  'Tournesol': [
+    { label: 'Levée',         daysAfter: 10 },
+    { label: 'Bouton étoilé', daysAfter: 45 },
+    { label: 'Floraison',     daysAfter: 65 },
+    { label: 'Maturité',      daysAfter: 105 },
+  ],
+  'Sorgho': [
+    { label: 'Levée',     daysAfter: 12 },
+    { label: 'Tallage',   daysAfter: 30 },
+    { label: 'Floraison', daysAfter: 75 },
+    { label: 'Maturité',  daysAfter: 115 },
+  ],
+  'Betterave': [
+    { label: 'Levée',                daysAfter: 15 },
+    { label: 'Couverture du sol',    daysAfter: 55 },
+    { label: 'Grossissement racine', daysAfter: 90 },
+    { label: 'Récolte',              daysAfter: 160 },
+  ],
+}
 
 // RU factor (0→1) relative to max configured RU, evolving with root depth at each stade
 const MAIS_RU_STAGES = [
@@ -217,14 +263,29 @@ const RES_PAD  = { t: 24, r: 38, b: 28, l: 52 }
 const HIST_PAD = { t: 8,  r: 38, b: 28, l: 52 }
 
 function makeReservoirSvg(W, H, data, startIdx, displayLen) {
-  const { reservoir, nDays, ru, rfu, cfg, apr1, ruArr, rfuArr } = data
+  const { reservoir, nDays, nFcDays, cfg, apr1, ruArr, rfuArr } = data
   const PAD = RES_PAD
   const iW  = W - PAD.l - PAD.r
   const iH  = H - PAD.t - PAD.b
 
-  // Fixed scale based on configured max RU so white space below shrinks as roots grow
-  const displayMax = ru * 1.05
-  const yOf = v => PAD.t + iH - (Math.max(0, Math.min(displayMax, v)) / displayMax) * iH
+  // Déficit courant = réserve actuelle - capacité du jour (0 = saturation, négatif = déficit)
+  const deficitArr  = reservoir.map((v, i) => v - ruArr[i])
+  const boundaryArr = rfuArr.map((v, i) => v - ruArr[i])   // frontière RFU / réservoir de survie
+  const ruNegArr    = ruArr.map(v => -v)                   // bas du réservoir de survie (= -RU du jour)
+
+  // Échelle : auto-scale sur la période affichée, mais en vue "saison" on garde toujours
+  // tout le réservoir de survie visible (y compris en fin de saison où la RU — donc la
+  // profondeur du réservoir — est la plus grande). En-dessous, c'est du blanc.
+  const sliceDeficit = deficitArr.slice(startIdx, startIdx + displayLen)
+  const sliceRu       = ruArr.slice(startIdx, startIdx + displayLen)
+  const dataMin       = Math.min(0, ...sliceDeficit)
+  const maxRuInRange  = Math.max(...sliceRu)
+  const isSeasonView  = startIdx === 0 && displayLen === reservoir.length
+  const AXIS_MIN = isSeasonView
+    ? Math.min(dataMin, -maxRuInRange) * 1.05
+    : Math.min(dataMin * 1.15, -5)
+
+  const yOf = v => PAD.t + (Math.max(AXIS_MIN, Math.min(0, v)) / AXIS_MIN) * iH
   const xOf = i => PAD.l + ((i - startIdx) / Math.max(displayLen - 1, 1)) * iW
   const yBot  = PAD.t + iH
   const yFull = PAD.t
@@ -244,40 +305,36 @@ function makeReservoirSvg(W, H, data, startIdx, displayLen) {
     return pts.trim()
   }
 
-  const rfuPts    = buildStepPts(rfuArr)
-  const rfuPtsRev = rfuPts.split(' ').reverse().join(' ')
-  const ruPts     = buildStepPts(ruArr)
-  const ruPtsRev  = ruPts.split(' ').reverse().join(' ')
+  const boundaryPts    = buildStepPts(boundaryArr)
+  const boundaryPtsRev = boundaryPts.split(' ').reverse().join(' ')
+  const ruNegPts        = buildStepPts(ruNegArr)
+  const ruNegPtsRev     = ruNegPts.split(' ').reverse().join(' ')
 
-  // Three zones (fixed scale):
-  // Green  : chart top → RFU line  (réserve facilement utilisable)
-  // Red    : RFU line  → RU line   (zone de stress, accessible mais difficile)
-  // White  : RU line   → chart bot (sol inaccessible — racines pas encore descendues)
-  const greenPoly = `${PAD.l},${yFull} ${(PAD.l + iW).toFixed(1)},${yFull} ${rfuPtsRev}`
-  const redPoly   = `${rfuPts} ${ruPtsRev}`
+  // Deux zones :
+  // Vert  : 0 → frontière RFU              (réserve facilement utilisable, 2/3 de la RU)
+  // Rouge : frontière RFU → -RU du jour    (réservoir de survie, 1/3 de la RU) — blanc au-delà
+  const greenPoly = `${PAD.l},${yFull} ${(PAD.l + iW).toFixed(1)},${yFull} ${boundaryPtsRev}`
+  const redPoly   = `${boundaryPts} ${ruNegPtsRev}`
 
-  const todayIdx  = Math.min(nDays, rfuArr.length - 1)
-  const rfuLabelY = (yOf(rfuArr[todayIdx]) - 5).toFixed(1)
-  const ruLabelY  = (yOf(ruArr[todayIdx])  - 5).toFixed(1)
+  const todayIdx       = Math.min(nDays, boundaryArr.length - 1)
+  const boundaryLabelY = (yOf(boundaryArr[todayIdx]) - 5).toFixed(1)
 
   const zones = `
     <polygon points="${greenPoly}" fill="#24B066" opacity="0.1" clip-path="url(#il-c)"/>
-    <polygon points="${redPoly}"   fill="#E05252" opacity="0.08" clip-path="url(#il-c)"/>
-    <polyline points="${ruPts}"  fill="none" stroke="#0172A4" stroke-width="1"   stroke-dasharray="4,4" opacity="0.35" clip-path="url(#il-c)"/>
-    <polyline points="${rfuPts}" fill="none" stroke="#24B066" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.65" clip-path="url(#il-c)"/>
-    <text x="${(PAD.l + iW - 4).toFixed(1)}" y="${rfuLabelY}" text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#24B066" font-weight="700">RFU</text>
-    <text x="${(PAD.l + iW - 4).toFixed(1)}" y="${ruLabelY}"  text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#0172A4" font-weight="600" opacity="0.7">RU</text>`
+    <polygon points="${redPoly}"   fill="#E05252" opacity="0.1" clip-path="url(#il-c)"/>
+    <polyline points="${boundaryPts}" fill="none" stroke="#24B066" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.65" clip-path="url(#il-c)"/>
+    <text x="${(PAD.l + iW - 4).toFixed(1)}" y="${boundaryLabelY}" text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#24B066" font-weight="700">RFU</text>`
 
-  // Phenological stades
+  // Stades phénologiques : trait vertical + point cliquable en bas (nom au tap)
   const semis    = new Date(cfg.semisDate + 'T00:00:00')
   const semisOff = Math.round((semis - apr1) / 86400000)
-  const stadesSvg = (cfg.culture === 'Maïs' ? PHENO_MAIS : []).map(s => {
+  const stadesSvg = (PHENO_BY_CULTURE[cfg.culture] || []).map(s => {
     const di = semisOff + s.daysAfter
     if (di < startIdx || di >= startIdx + displayLen) return ''
-    const x  = xOf(di), xf = x.toFixed(1)
-    const tx = (x + 3).toFixed(0), ty = (yBot - 4).toFixed(0)
+    const xf = xOf(di).toFixed(1)
     return `<line x1="${xf}" y1="${yFull}" x2="${xf}" y2="${yBot}" stroke="#4CAF50" stroke-width="1.5" stroke-dasharray="3,2" opacity="0.55"/>
-<text transform="translate(${tx},${ty}) rotate(-90)" font-size="10" font-family="-apple-system,sans-serif" fill="#4CAF50" font-weight="600">${s.label}</text>`
+<circle class="il-stade-dot" data-label="${s.label}" cx="${xf}" cy="${yBot}" r="9" fill="transparent" style="cursor:pointer"/>
+<circle cx="${xf}" cy="${yBot}" r="4.5" fill="#4CAF50" stroke="#fff" stroke-width="1.5" style="pointer-events:none"/>`
   }).join('')
 
   // Month lines + X labels (centered between month boundaries, with year)
@@ -297,45 +354,54 @@ function makeReservoirSvg(W, H, data, startIdx, displayLen) {
     }
   }
 
-  // Y labels: fixed scale based on configured RU/RFU (max values)
-  const yTickVals = [0, rfu, ru]
-  const yLabels = yTickVals.map(v => {
-    const y = (yOf(v) + 4).toFixed(1)
-    return `<text x="${PAD.l - 6}" y="${y}" text-anchor="end" font-size="12" font-family="-apple-system,sans-serif" fill="#8e8e93">${v}</text>`
-  }).join('') + `<text x="${PAD.l - 6}" y="${PAD.t - 7}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">mm</text>`
+  // Y labels: échelle auto-scale 0 → AXIS_MIN (variable selon la période affichée)
+  const yLabels = `
+    <text x="${PAD.l - 6}" y="${(yOf(0) + 11).toFixed(1)}" text-anchor="end" font-size="12" font-family="-apple-system,sans-serif" fill="#8e8e93">0</text>
+    <text x="${PAD.l - 6}" y="${(yOf(AXIS_MIN) - 3).toFixed(1)}" text-anchor="end" font-size="12" font-family="-apple-system,sans-serif" fill="#8e8e93">${Math.round(AXIS_MIN)}</text>
+    <text x="${PAD.l - 6}" y="${PAD.t - 7}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">mm</text>`
 
-  // Curve — forecast capped at J+7 beyond today
-  const FC_DAYS   = 7
-  const sliceVals = reservoir.slice(startIdx, startIdx + displayLen)
+  // Courbe de déficit — historique plein, prévision réelle (J+nFcDays) en pointillé
+  const sliceVals = deficitArr.slice(startIdx, startIdx + displayLen)
   const allPts    = sliceVals.map((v, j) => ({ x: xOf(startIdx + j), y: yOf(v) }))
   const todayRel  = nDays - startIdx
   const histPts   = allPts.slice(0, Math.min(Math.max(todayRel + 1, 1), allPts.length))
-  const fcEndRel  = Math.min(todayRel + FC_DAYS + 1, allPts.length)
+  const fcEndRel  = Math.min(todayRel + nFcDays + 1, allPts.length)
   const fcPts     = (todayRel >= 0 && todayRel < allPts.length) ? allPts.slice(todayRel, fcEndRel) : []
   const hPath     = smooth(histPts)
   const fcPath    = fcPts.length >= 2 ? smooth(fcPts) : ''
   const todayX    = xOf(Math.max(startIdx, Math.min(nDays, startIdx + displayLen - 1))).toFixed(1)
   const fillEnd   = histPts.length ? histPts[histPts.length - 1].x.toFixed(1) : todayX
-  const fill      = hPath ? `${hPath} L${fillEnd},${yBot} L${PAD.l},${yBot} Z` : ''
+  const fill      = hPath ? `${hPath} L${fillEnd},${yFull} L${PAD.l},${yFull} Z` : ''
+
+  // Hachures : au-delà d'aujourd'hui, données spéculatives (pas de prévision réelle au-delà de J+nFcDays)
+  const hatchX = Math.max(PAD.l, Math.min(PAD.l + iW, +todayX))
+  const hatchW = (PAD.l + iW - hatchX)
+  const hatch  = hatchW > 0 ? `<rect x="${hatchX.toFixed(1)}" y="${PAD.t}" width="${hatchW.toFixed(1)}" height="${iH}" fill="url(#il-hatch)" clip-path="url(#il-c)"/>` : ''
 
   return `<svg width="${W}" height="${H}" style="display:block;flex-shrink:0">
     <defs>
       <clipPath id="il-c"><rect x="${PAD.l}" y="${PAD.t}" width="${iW}" height="${iH}"/></clipPath>
       <linearGradient id="il-g" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#0172A4" stop-opacity="0.2"/>
-        <stop offset="100%" stop-color="#0172A4" stop-opacity="0.01"/>
+        <stop offset="0%" stop-color="#0172A4" stop-opacity="0.01"/>
+        <stop offset="100%" stop-color="#0172A4" stop-opacity="0.2"/>
       </linearGradient>
+      <pattern id="il-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(142,142,147,.22)" stroke-width="3"/>
+      </pattern>
     </defs>
     ${zones}
-    <g clip-path="url(#il-c)">${monthLines}${stadesSvg}</g>
+    ${hatch}
+    <g clip-path="url(#il-c)">${monthLines}</g>
     ${fill ? `<path d="${fill}" fill="url(#il-g)" clip-path="url(#il-c)"/>` : ''}
     ${hPath ? `<path d="${hPath}" fill="none" stroke="#0172A4" stroke-width="2.5" stroke-linejoin="round" clip-path="url(#il-c)"/>` : ''}
     ${fcPath ? `<path d="${fcPath}" fill="none" stroke="#0172A4" stroke-width="2" stroke-dasharray="7,5" stroke-linejoin="round" opacity="0.7" clip-path="url(#il-c)"/>` : ''}
-    <line x1="${todayX}" y1="${PAD.t}" x2="${todayX}" y2="${yBot}" stroke="#8e8e93" stroke-width="1" stroke-dasharray="3,3"/>
-    <text x="${todayX}" y="${PAD.t - 6}" text-anchor="middle" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">Auj.</text>
+    <line x1="${todayX}" y1="${PAD.t}" x2="${todayX}" y2="${yBot}" stroke="#1c1c1e" stroke-width="2"/>
+    <text x="${todayX}" y="${PAD.t - 6}" text-anchor="middle" font-size="11" font-family="-apple-system,sans-serif" fill="#1c1c1e" font-weight="700">Aujourd'hui</text>
     ${yLabels}
     ${xLabels}
     <rect x="${PAD.l}" y="${PAD.t}" width="${iW}" height="${iH}" fill="none" stroke="rgba(0,0,0,.07)" stroke-width="1"/>
+    ${stadesSvg}
   </svg>`
 }
 
@@ -352,8 +418,14 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
   const sliceD = drainage.slice(startIdx, startIdx + displayLen)
   const sliceI = irrigation.slice(startIdx, startIdx + displayLen)
 
-  const maxPos = Math.max(...sliceP.map((p, j) => p + (sliceI[j] || 0)), 1)
-  const maxNeg = Math.max(...sliceE.map((e, j) => e + (sliceD[j] || 0)), 1)
+  // Pluie/ETP (et le drainage qui en découle) ne sont des prévisions fiables que sur J+nFcDays
+  // (14j) — au-delà, ce ne sont que des valeurs spéculatives qu'on ne montre plus. L'irrigation
+  // reste affichée (c'est planifié par l'utilisateur, pas une prévision météo).
+  const fcCutoff  = nDays + nFcDays
+  const inForecast = j => (startIdx + j) <= fcCutoff
+
+  const maxPos = Math.max(...sliceP.map((p, j) => (inForecast(j) ? p : 0) + (sliceI[j] || 0)), 1)
+  const maxNeg = Math.max(...sliceE.map((e, j) => (inForecast(j) ? e + (sliceD[j] || 0) : 0)), 1)
   const scale  = Math.max(maxPos, maxNeg, 1)
   const half   = iH / 2
 
@@ -362,16 +434,20 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
 
   let bars = ''
   for (let j = 0; j < displayLen; j++) {
-    const pH  = (sliceP[j] / scale) * half
+    const beyond = !inForecast(j)
+    const pVal = beyond ? 0 : sliceP[j]
+    const eVal = beyond ? 0 : sliceE[j]
+    const dVal = beyond ? 0 : sliceD[j]
+    const pH  = (pVal / scale) * half
     const iH2 = (sliceI[j] / scale) * half
-    const eH  = (sliceE[j] / scale) * half
-    const dH  = (sliceD[j] / scale) * half
+    const eH  = (eVal / scale) * half
+    const dH  = (dVal / scale) * half
     const x   = bx(j).toFixed(1)
     const bw  = barW.toFixed(1)
-    if (sliceP[j] > 0)  bars += `<rect x="${x}" y="${(mid - pH).toFixed(1)}" width="${bw}" height="${pH.toFixed(1)}" fill="#2E75B6" opacity="0.85"/>`
+    if (pVal > 0)       bars += `<rect x="${x}" y="${(mid - pH).toFixed(1)}" width="${bw}" height="${pH.toFixed(1)}" fill="#2E75B6" opacity="0.85"/>`
     if (sliceI[j] > 0)  bars += `<rect x="${x}" y="${(mid - pH - iH2).toFixed(1)}" width="${bw}" height="${iH2.toFixed(1)}" fill="#FF8C00" opacity="0.85"/>`
-    bars += `<rect x="${x}" y="${mid.toFixed(1)}" width="${bw}" height="${eH.toFixed(1)}" fill="#00887E" opacity="0.75"/>`
-    if (sliceD[j] > 0)  bars += `<rect x="${x}" y="${(mid + eH).toFixed(1)}" width="${bw}" height="${dH.toFixed(1)}" fill="#8B1A1A" opacity="0.75"/>`
+    if (!beyond)        bars += `<rect x="${x}" y="${mid.toFixed(1)}" width="${bw}" height="${eH.toFixed(1)}" fill="#00887E" opacity="0.75"/>`
+    if (dVal > 0)       bars += `<rect x="${x}" y="${(mid + eH).toFixed(1)}" width="${bw}" height="${dH.toFixed(1)}" fill="#8B1A1A" opacity="0.75"/>`
   }
 
   // Y labels
@@ -407,10 +483,23 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
     ? (PAD.l + (todayJ / Math.max(displayLen - 1, 1)) * iW).toFixed(1)
     : null
 
+  // Hachures : au-delà d'aujourd'hui, données spéculatives
+  const hatchX = todayX !== null ? Math.max(PAD.l, Math.min(PAD.l + iW, +todayX)) : null
+  const hatch  = hatchX !== null && (PAD.l + iW - hatchX) > 0
+    ? `<rect x="${hatchX.toFixed(1)}" y="${PAD.t}" width="${(PAD.l + iW - hatchX).toFixed(1)}" height="${iH}" fill="url(#il-hatch-h)"/>`
+    : ''
+
   return `<svg width="${W}" height="${H}" style="display:block;flex-shrink:0">
+    <defs>
+      <pattern id="il-hatch-h" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(142,142,147,.22)" stroke-width="3"/>
+      </pattern>
+    </defs>
     <line x1="${PAD.l}" y1="${mid.toFixed(1)}" x2="${PAD.l + iW}" y2="${mid.toFixed(1)}" stroke="rgba(0,0,0,.12)" stroke-width="1"/>
+    ${hatch}
     ${bars}
-    ${todayX ? `<line x1="${todayX}" y1="${PAD.t}" x2="${todayX}" y2="${PAD.t + iH}" stroke="#8e8e93" stroke-width="1" stroke-dasharray="3,3" opacity="0.7"/>` : ''}
+    ${todayX ? `<line x1="${todayX}" y1="${PAD.t}" x2="${todayX}" y2="${PAD.t + iH}" stroke="#1c1c1e" stroke-width="2"/>` : ''}
     ${yLabels}
     ${xLabels}
     <rect x="${PAD.l}" y="${PAD.t}" width="${iW}" height="${iH}" fill="none" stroke="rgba(0,0,0,.06)" stroke-width="1"/>
@@ -421,14 +510,14 @@ function makeLegendHtml() {
   const line  = (col, dash) => `<svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="${col}" stroke-width="2.5"${dash ? ` stroke-dasharray="5,3"` : ''}/></svg>`
   const band  = (col, op) => `<span style="display:inline-block;width:14px;height:10px;background:${col};opacity:${op};border-radius:2px;flex-shrink:0"></span>`
   const sq    = c => `<span style="display:inline-block;width:10px;height:10px;background:${c};border-radius:2px;flex-shrink:0"></span>`
-  const item  = (icon, lbl) => `<span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#636366;white-space:nowrap">${icon}<span>${lbl}</span></span>`
-  const row   = items => `<div style="display:flex;gap:10px;flex-wrap:wrap">${items.join('')}</div>`
-  return `<div style="display:flex;flex-direction:column;gap:4px">
+  const item  = (icon, lbl) => `<span style="display:flex;align-items:center;gap:6px;font-size:13px;color:#3a3a3c"><span style="flex-shrink:0">${icon}</span><span>${lbl}</span></span>`
+  const row   = items => `<div style="display:flex;flex-direction:column;gap:10px">${items.join('')}</div>`
+  return `<div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">
     ${row([
-      item(line('#0172A4', false), 'Réserve'),
-      item(line('#0172A4', true),  'Prévision J+7'),
-      item(band('#24B066', '1'),   'Eau disponible'),
-      item(band('#E05252', '1'),   'Zone de stress'),
+      item(line('#0172A4', false), 'Déficit (réserve)'),
+      item(line('#0172A4', true),  'Prévision J+14'),
+      item(band('#24B066', '1'),   'RFU — réserve facilement utilisable'),
+      item(band('#E05252', '1'),   'Réservoir de survie'),
     ])}
     ${row([
       item(sq('#2E75B6'), 'Pluie'),
@@ -439,32 +528,32 @@ function makeLegendHtml() {
   </div>`
 }
 
-function updateCumuls(el, data, period) {
+function cumulsBodyHtml(data, period) {
   const { nDays, nFcDays, pluie, etp, drainage, irrigation } = data
   const total = data.reservoir.length
   const { startIdx, displayLen } = getSlice(period, nDays, nFcDays, total)
   const end = Math.min(startIdx + displayLen, nDays)
   const sum = arr => arr.slice(startIdx, end).reduce((a, b) => a + b, 0)
   const cell = (c, label, v) =>
-    `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
-      <span style="font-size:12px;color:#636366">${label}</span>
-      <span style="font-size:13px;font-weight:700;color:${c}">${v} mm</span>
+    `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:11px 0;border-bottom:.5px solid rgba(0,0,0,.07)">
+      <span style="font-size:14px;color:#3a3a3c">${label}</span>
+      <span style="font-size:15px;font-weight:700;color:${c}">${v} mm</span>
     </div>`
-  el.innerHTML =
-    `<div style="font-size:10px;font-weight:600;color:#8e8e93;text-transform:uppercase;letter-spacing:.05em;padding:5px 14px 3px">Cumuls sur la période</div>` +
-    `<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;padding:0 14px 8px">
-      ${cell('#2E75B6', 'Pluie',      Math.round(sum(pluie))     )}
-      ${cell('#00887E', 'ETP',        +sum(etp).toFixed(1)       )}
-      ${cell('#FF8C00', 'Irrigation', Math.round(sum(irrigation)))}
-      ${cell('#8B1A1A', 'Drainage',   +sum(drainage).toFixed(1)  )}
-    </div>`
+  return `<div style="padding:0 0 4px">
+    ${cell('#2E75B6', 'Pluie',      Math.round(sum(pluie))     )}
+    ${cell('#00887E', 'ETP',        +sum(etp).toFixed(1)       )}
+    ${cell('#FF8C00', 'Irrigation', Math.round(sum(irrigation)))}
+    ${cell('#8B1A1A', 'Drainage',   +sum(drainage).toFixed(1)  )}
+  </div>`
 }
 
 function attachTooltip(container, data, startIdx, displayLen, resH) {
-  const { reservoir, ru, rfu, nDays, apr1, ruArr, rfuArr } = data
-  const PAD = RES_PAD
-  const W   = container.clientWidth
-  const iW  = W - PAD.l - PAD.r
+  const { reservoir, ru, rfu, nDays, nFcDays, apr1, ruArr, rfuArr, pluie, etp, drainage, irrigation } = data
+  const PAD     = RES_PAD
+  const histTop = resH + HIST_PAD.t
+  const W       = container.clientWidth
+  const H       = container.clientHeight
+  const iW      = W - PAD.l - PAD.r   // RES_PAD et HIST_PAD partagent les mêmes l/r : même mapping X
 
   container.style.position = 'relative'
 
@@ -473,32 +562,67 @@ function attachTooltip(container, data, startIdx, displayLen, resH) {
 
   const vLine = document.createElement('div')
   vLine.style.cssText = `position:absolute;width:1px;background:rgba(100,100,100,.35);pointer-events:none;display:none;top:${PAD.t}px`
-  vLine.style.height = (resH - PAD.t - PAD.b) + 'px'
+  vLine.style.height = (H - PAD.t - HIST_PAD.b) + 'px'
 
   container.appendChild(vLine)
   container.appendChild(tip)
 
-  const show = (clientX, clientY) => {
-    const rect = container.getBoundingClientRect()
-    const relY = clientY - rect.top
-    if (relY > resH) { hide(); return }
+  const idxAt = relX => {
+    const frac = Math.max(0, Math.min(1, (relX - PAD.l) / iW))
+    return Math.max(0, Math.min(reservoir.length - 1, Math.round(startIdx + frac * (displayLen - 1))))
+  }
 
-    const relX  = clientX - rect.left
-    const frac  = Math.max(0, Math.min(1, (relX - PAD.l) / iW))
-    const idx   = Math.max(0, Math.min(reservoir.length - 1, Math.round(startIdx + frac * (displayLen - 1))))
-    const val   = reservoir[idx]
+  const showReservoir = (idx, relX, relY) => {
+    const val    = reservoir[idx]
     const isFc   = idx >= nDays
     const dayRu  = ruArr  ? ruArr[Math.min(idx, ruArr.length - 1)]  : ru
     const dayRfu = rfuArr ? rfuArr[Math.min(idx, rfuArr.length - 1)] : rfu
+    const deficit = +(val - dayRu).toFixed(1)
     const col    = irrelisColor(val, dayRfu, dayRu)
-    const date  = new Date(apr1.getTime() + idx * 86400000)
-    const dateStr = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    const dateStr = fmtTipDate(idx)
 
-    tip.innerHTML = `<span style="color:${col}">${val} mm</span>&ensp;<span style="font-size:11px;opacity:.7">${dateStr}${isFc ? ' ·&thinsp;prév.' : ''}</span>`
-    const tipX = Math.max(60, Math.min(rect.width - 60, relX))
-    tip.style.left  = tipX + 'px'
+    tip.innerHTML = `<span style="color:${col}">${deficit} mm</span>&ensp;<span style="font-size:11px;opacity:.7">${dateStr}${isFc ? ' ·&thinsp;prév.' : ''}</span>`
+    tip.style.left  = Math.max(60, Math.min(container.clientWidth - 60, relX)) + 'px'
     tip.style.top   = Math.min(relY, resH - 20) + 'px'
     tip.style.display = 'block'
+  }
+
+  const showHistogram = (idx, relX, relY) => {
+    const dateStr = fmtTipDate(idx)
+    const beyondForecast = idx > nDays + nFcDays
+    const rows = [
+      ...(beyondForecast ? [] : [
+        ['#2E75B6', 'Pluie',    pluie[idx]],
+        ['#00887E', 'ETP',      etp[idx]],
+        ['#8B1A1A', 'Drainage', drainage[idx]],
+      ]),
+      ['#FF8C00', 'Irrigation', irrigation[idx]],
+    ].filter(([, , v]) => v > 0)
+
+    tip.innerHTML = rows.length
+      ? rows.map(([c, label, v]) => `<span style="color:${c}">${label} ${v} mm</span>`).join('&ensp;·&ensp;') +
+        `&ensp;<span style="font-size:11px;opacity:.7">${dateStr}</span>`
+      : `<span style="opacity:.7">Aucun mouvement</span>&ensp;<span style="font-size:11px;opacity:.7">${dateStr}</span>`
+    tip.style.left  = Math.max(60, Math.min(container.clientWidth - 60, relX)) + 'px'
+    tip.style.top   = Math.max(histTop + 14, Math.min(relY, container.clientHeight - 10)) + 'px'
+    tip.style.display = 'block'
+  }
+
+  const fmtTipDate = idx => {
+    const date = new Date(apr1.getTime() + idx * 86400000)
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  }
+
+  const show = (clientX, clientY) => {
+    const rect = container.getBoundingClientRect()
+    const relY = clientY - rect.top
+    if (relY > container.clientHeight) { hide(); return }
+
+    const relX = clientX - rect.left
+    const idx  = idxAt(relX)
+
+    if (relY <= resH) showReservoir(idx, relX, relY)
+    else showHistogram(idx, relX, relY)
 
     vLine.style.left    = relX + 'px'
     vLine.style.display = 'block'
@@ -531,6 +655,10 @@ function drawChart(container, data, period = 'saison') {
     makeHistogramSvg(W, histH, data, startIdx, displayLen)
 
   attachTooltip(container, data, startIdx, displayLen, resH)
+
+  container.querySelectorAll('.il-stade-dot').forEach(dot => {
+    dot.addEventListener('click', () => showToast(dot.dataset.label))
+  })
 }
 
 // ─── Config form ──────────────────────────────────────────────────────────────
@@ -571,7 +699,8 @@ function openConfigForm(plot, onSave) {
 
 function openGererPluvIrrig(plot, onSave) {
   let staged  = [...getIrrelisEvents(plot.id)]
-  let filter  = 'all'
+  let showPluie      = true
+  let showIrrigation = true
   let layer   = null
 
   const apr1 = new Date('2026-04-01T00:00:00')
@@ -581,7 +710,7 @@ function openGererPluvIrrig(plot, onSave) {
   }
 
   function renderLayer() {
-    const filtered = filter === 'all' ? staged : staged.filter(e => e.type === filter)
+    const filtered = staged.filter(e => (e.type === 'pluie' && showPluie) || (e.type === 'irrigation' && showIrrigation))
     const sortedFiltered = [...filtered].sort((a, b) => b.iso.localeCompare(a.iso))
 
     const rows = sortedFiltered.map(ev => {
@@ -606,19 +735,21 @@ function openGererPluvIrrig(plot, onSave) {
         </div>`
     }).join('')
 
-    const activeStyle = 'background:#0172A4;color:#fff;'
-    const inactStyle  = 'background:rgba(1,114,164,.08);color:#0172A4;'
-
     layer.innerHTML = `
       <div style="display:flex;align-items:center;padding:12px 16px;border-bottom:.5px solid rgba(0,0,0,.1);background:#fff;flex-shrink:0">
         <button id="gpi-back" style="color:#0172A4;background:none;border:none;font-size:15px;cursor:pointer;display:flex;align-items:center;gap:4px"><i class="bi bi-chevron-left"></i> Irré-LIS</button>
         <span style="font-size:16px;font-weight:700;color:#1c1c1e;flex:1;text-align:center">Pluies &amp; irrigations</span>
         <div style="width:80px"></div>
       </div>
-      <div style="display:flex;gap:6px;padding:10px 16px 8px;flex-shrink:0">
-        <button class="gpi-filter" data-f="all"       style="${filter==='all'       ? activeStyle : inactStyle}flex:1;border:none;border-radius:10px;padding:8px 4px;font-size:13px;font-weight:600;cursor:pointer">Tout</button>
-        <button class="gpi-filter" data-f="pluie"     style="${filter==='pluie'     ? activeStyle : inactStyle}flex:1;border:none;border-radius:10px;padding:8px 4px;font-size:13px;font-weight:600;cursor:pointer">Pluie</button>
-        <button class="gpi-filter" data-f="irrigation" style="${filter==='irrigation' ? activeStyle : inactStyle}flex:1;border:none;border-radius:10px;padding:8px 4px;font-size:13px;font-weight:600;cursor:pointer">Irrigation</button>
+      <div style="display:flex;gap:20px;padding:12px 16px 8px;flex-shrink:0">
+        <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:#2E75B6;cursor:pointer">
+          <input type="checkbox" class="gpi-check" data-t="pluie" ${showPluie ? 'checked' : ''} style="width:18px;height:18px;accent-color:#2E75B6;cursor:pointer">
+          Pluies
+        </label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;color:#FF8C00;cursor:pointer">
+          <input type="checkbox" class="gpi-check" data-t="irrigation" ${showIrrigation ? 'checked' : ''} style="width:18px;height:18px;accent-color:#FF8C00;cursor:pointer">
+          Irrigations
+        </label>
       </div>
       <div style="display:flex;gap:8px;padding:0 16px 12px;flex-shrink:0">
         <button id="gpi-add-pluie" style="flex:1;background:rgba(46,117,182,.1);color:#2E75B6;border:none;border-radius:12px;padding:11px 8px;font-size:14px;font-weight:600;cursor:pointer"><i class="bi bi-plus-circle"></i> Pluie</button>
@@ -640,8 +771,12 @@ function openGererPluvIrrig(plot, onSave) {
       onSave?.()
       showToast(`${staged.length} événement(s) enregistré(s)`)
     })
-    layer.querySelectorAll('.gpi-filter').forEach(btn => {
-      btn.addEventListener('click', () => { filter = btn.dataset.f; renderLayer() })
+    layer.querySelectorAll('.gpi-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (cb.dataset.t === 'pluie') showPluie = cb.checked
+        else showIrrigation = cb.checked
+        renderLayer()
+      })
     })
     layer.querySelectorAll('.gpi-edit').forEach(btn => {
       btn.addEventListener('click', () => { openAddSheet(staged[+btn.dataset.idx].type, +btn.dataset.idx) })
@@ -661,6 +796,7 @@ function openGererPluvIrrig(plot, onSave) {
         <div class="m-form-label">Quantité (mm)</div>
         <input id="gpi-mm" type="number" value="${existing?.mm ?? ''}" placeholder="ex : 25" min="0" max="300" style="width:100%;padding:10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:15px;background:#fff;box-sizing:border-box;margin-bottom:16px">
         <button id="gpi-sheet-save" style="width:100%;background:${type === 'pluie' ? '#2E75B6' : '#FF8C00'};color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:600;cursor:pointer">${editIdx >= 0 ? 'Modifier' : 'Ajouter'}</button>
+        ${editIdx >= 0 ? `<button id="gpi-sheet-transform" style="width:100%;background:none;border:none;color:#8e8e93;font-size:14px;font-weight:600;cursor:pointer;padding:12px 0 0;text-align:center">Transformer en ${type === 'pluie' ? 'irrigation' : 'pluie'}</button>` : ''}
       </div>`
     const title = type === 'pluie' ? (editIdx >= 0 ? 'Modifier la pluie' : 'Ajouter une pluie') : (editIdx >= 0 ? "Modifier l'irrigation" : 'Ajouter une irrigation')
     const sheet = showSheet({ title, body, doneLabel: 'Fermer', onDone: () => {} })
@@ -674,6 +810,13 @@ function openGererPluvIrrig(plot, onSave) {
       sheet.classList.remove('m-sheet-overlay--show')
       setTimeout(() => { sheet.remove(); renderLayer() }, 280)
     })
+    body.querySelector('#gpi-sheet-transform')?.addEventListener('click', () => {
+      const newType = type === 'pluie' ? 'irrigation' : 'pluie'
+      staged[editIdx] = { ...staged[editIdx], type: newType }
+      sheet.classList.remove('m-sheet-overlay--show')
+      setTimeout(() => { sheet.remove(); renderLayer() }, 280)
+      showToast(newType === 'irrigation' ? 'Transformé en irrigation' : 'Transformé en pluie')
+    })
   }
 
   layer = pushDetail('')
@@ -681,32 +824,10 @@ function openGererPluvIrrig(plot, onSave) {
   renderLayer()
 }
 
-// ─── Télécharger ──────────────────────────────────────────────────────────────
-
-function openTelecharger(plot) {
-  const body = document.createElement('div')
-  body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px">
-      <div style="width:56px;height:56px;border-radius:50%;background:rgba(48,209,88,.1);display:flex;align-items:center;justify-content:center;margin-bottom:16px">
-        <i class="bi bi-file-earmark-spreadsheet" style="font-size:26px;color:#30d158"></i>
-      </div>
-      <p style="font-size:14px;color:#636366;line-height:1.5;margin:0 0 16px">Le bilan hydrique Irré-LIS de <strong>${plot.name}</strong> sera envoyé par e-mail au format Excel.</p>
-      <div class="m-form-label" style="align-self:flex-start;width:100%;text-align:left">Adresse e-mail</div>
-      <input id="il-dl-email" type="email" value="contact@fermebocage.fr" style="width:100%;padding:10px;border:1.5px solid #e5e5ea;border-radius:10px;font-size:15px;background:#fff;box-sizing:border-box;margin-bottom:16px">
-      <button id="il-dl-send" style="width:100%;background:#30d158;color:#fff;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:600;cursor:pointer">Envoyer le fichier</button>
-    </div>`
-  const sheet = showSheet({ title: 'Télécharger le bilan', body, doneLabel: 'Fermer', onDone: () => {} })
-  body.querySelector('#il-dl-send').addEventListener('click', () => {
-    sheet.classList.remove('m-sheet-overlay--show')
-    setTimeout(() => sheet.remove(), 280)
-    showToast('Bilan envoyé par e-mail')
-  })
-}
-
 // ─── Widget parcelle ──────────────────────────────────────────────────────────
 
 export function irrelisMobileWidget(plot) {
-  const data = getIrrelisDailyData(plot, 5)
+  const data = getIrrelisDailyData(plot, 14)
   const { reservoir, pluie, etp, drainage, irrigation, nDays, ru, rfu, cfg, ruArr, rfuArr } = data
 
   const curVal  = reservoir[nDays] ?? reservoir[nDays - 1] ?? 0
@@ -753,7 +874,6 @@ export function irrelisMobileWidget(plot) {
         <span style="font-size:11px;color:#0172A4;font-weight:700;background:rgba(1,114,164,.09);border-radius:6px;padding:2px 7px">Irré-LIS</span>
         <span style="font-size:14px;font-weight:700;color:${col}">${curVal} <span style="font-size:11px;font-weight:400">mm</span></span>
         <span style="font-size:11px;color:#8e8e93">${pct}% RU</span>
-        <button class="m-il-detail-btn" data-il-plot="${plot.id}" style="margin-left:auto;font-size:12px;color:#0172A4;background:none;border:none;cursor:pointer;font-weight:600;white-space:nowrap">Voir le bilan →</button>
       </div>
       ${sparkSvg}
       <div style="display:flex;gap:0;margin-top:8px;padding-top:8px;border-top:.5px solid rgba(0,0,0,.07)">
@@ -762,6 +882,7 @@ export function irrelisMobileWidget(plot) {
         ${statCol('#00887E', 'ETP 7j', sumEtp + ' mm')}
         ${statCol('#8B1A1A', 'Drainage 7j', sumDrain + ' mm')}
       </div>
+      <button class="m-il-detail-btn m-widget-details-link" data-il-plot="${plot.id}">Voir détails →</button>
     </div>
   </div>`
 }
@@ -769,7 +890,10 @@ export function irrelisMobileWidget(plot) {
 // ─── Plot picker ──────────────────────────────────────────────────────────────
 
 function openPlotPicker(currentPlot, onSelect) {
-  const irrelisPlots = plots.filter(p => hasIrrelis(p))
+  const isAdherent  = new URLSearchParams(location.search).get('role') === 'adherent'
+  const irrelisPlots = plots
+    .filter(p => hasIrrelis(p) && (!isAdherent || p.orgId === ADHERENT_ORG_ID))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
   const body = document.createElement('div')
   body.style.cssText = 'padding:4px 0'
   body.innerHTML = irrelisPlots.map(p => `
@@ -794,8 +918,7 @@ function openPlotPicker(currentPlot, onSelect) {
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
 export function openIrrelisDetail(plot) {
-  const cfg      = getIrrelisConfig(plot.id)
-  const semisStr = new Date(cfg.semisDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  const cfg = getIrrelisConfig(plot.id)
   let currentPeriod = 'saison'
 
   const layer = pushDetail(`
@@ -812,7 +935,6 @@ export function openIrrelisDetail(plot) {
       <span style="font-size:12px;color:#0172A4;font-weight:700;background:rgba(1,114,164,.09);border-radius:6px;padding:3px 9px;white-space:nowrap;flex-shrink:0">Irré-LIS</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;color:#1c1c1e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cfg.culture}</div>
-        <div style="font-size:11px;color:#8e8e93;margin-top:1px">Semis : ${semisStr}</div>
       </div>
       <select id="il-period" style="flex-shrink:0;font-size:13px;color:#1c1c1e;border:1px solid #e5e5ea;border-radius:8px;padding:5px 8px;background:#fff;cursor:pointer;font-family:inherit">
         <option value="saison" selected>Saison entière</option>
@@ -823,37 +945,24 @@ export function openIrrelisDetail(plot) {
 
     <div id="il-chart-area" style="flex:1;overflow:hidden;background:#fff;min-height:0"></div>
 
-    <div id="il-cumuls" style="flex-shrink:0;background:#f9f9fb;border-top:.5px solid rgba(0,0,0,.08)"></div>
-
-    <div style="flex-shrink:0;background:#fff;border-top:.5px solid rgba(0,0,0,.07);padding:6px 14px 7px;display:flex;gap:12px;flex-wrap:wrap">
-      ${makeLegendHtml()}
+    <div class="w-irrig-act-row w-irrig-act-row--h" style="background:#fff;border-top:.5px solid rgba(0,0,0,.08);padding:8px 14px">
+      <button id="il-btn-cumuls" class="w-irrig-act-btn w-irrig-act-btn--sec">Voir cumuls</button>
+      <button id="il-btn-legend" class="w-irrig-act-btn w-irrig-act-btn--sec">Voir légende</button>
     </div>
-    <div style="display:flex;background:#fff;border-top:.5px solid rgba(0,0,0,.1);padding:8px 10px 14px;gap:8px">
-      <button id="il-btn-config" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(0,122,255,.07);border:none;border-radius:12px;padding:10px 4px;cursor:pointer">
-        <i class="bi bi-gear" style="font-size:20px;color:#007aff"></i>
-        <span style="font-size:11px;color:#007aff;font-weight:600">Configurer</span>
-      </button>
-      <button id="il-btn-pluv" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(1,114,164,.07);border:none;border-radius:12px;padding:10px 4px;cursor:pointer">
-        <i class="bi bi-cloud-rain" style="font-size:20px;color:#0172A4"></i>
-        <span style="font-size:11px;color:#0172A4;font-weight:600;text-align:center;line-height:1.2">Pluies &amp;<br>irrigations</span>
-      </button>
-      <button id="il-btn-dl" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(48,209,88,.07);border:none;border-radius:12px;padding:10px 4px;cursor:pointer">
-        <i class="bi bi-download" style="font-size:20px;color:#30d158"></i>
-        <span style="font-size:11px;color:#30d158;font-weight:600">Télécharger</span>
-      </button>
+    <div class="w-irrig-act-row" style="background:#fff;border-top:.5px solid rgba(0,0,0,.1);padding:8px 14px 14px">
+      <button id="il-btn-pluv" class="w-irrig-act-btn w-irrig-act-btn--pri"><i class="bi bi-cloud-rain"></i> Pluies &amp; irrigations</button>
+      <button id="il-btn-config" class="w-irrig-act-btn w-irrig-act-btn--sec"><i class="bi bi-gear"></i> Configurer</button>
     </div>
   `)
   layer.classList.add('m-fs-layer')
 
   const chartArea  = layer.querySelector('#il-chart-area')
-  const cumulEl    = layer.querySelector('#il-cumuls')
-  let data = getIrrelisDailyData(plot, 5)
+  let data = getIrrelisDailyData(plot, 14)
   let ro   = null
 
   function draw() {
     if (chartArea.clientWidth && chartArea.clientHeight) {
       drawChart(chartArea, data, currentPeriod)
-      updateCumuls(cumulEl, data, currentPeriod)
     }
   }
 
@@ -880,8 +989,19 @@ export function openIrrelisDetail(plot) {
     import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Irré-LIS'))
   })
 
-  const refresh = () => { data = getIrrelisDailyData(plot, 5); draw() }
+  layer.querySelector('#il-btn-cumuls').addEventListener('click', () => {
+    const body = document.createElement('div')
+    body.innerHTML = cumulsBodyHtml(data, currentPeriod)
+    showSheet({ title: 'Cumuls sur la période', body, doneLabel: 'Fermer', onDone: () => {} })
+  })
+
+  layer.querySelector('#il-btn-legend').addEventListener('click', () => {
+    const body = document.createElement('div')
+    body.innerHTML = makeLegendHtml()
+    showSheet({ title: 'Légende', body, doneLabel: 'Fermer', onDone: () => {} })
+  })
+
+  const refresh = () => { data = getIrrelisDailyData(plot, 14); draw() }
   layer.querySelector('#il-btn-config').addEventListener('click', () => openConfigForm(plot, refresh))
   layer.querySelector('#il-btn-pluv').addEventListener('click', () => openGererPluvIrrig(plot, refresh))
-  layer.querySelector('#il-btn-dl').addEventListener('click', () => openTelecharger(plot))
 }

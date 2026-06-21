@@ -9,7 +9,7 @@ const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
 const DASH_CUMUL_META = {
   dj:    { metricLabel: 'Degrés-jours',        unit: 'DJ', icon: 'bi-thermometer-sun', color: '#FBAF05' },
-  hf:    { metricLabel: 'Heures de froid',      unit: 'h',  icon: 'bi-thermometer-low', color: '#5AC8FA' },
+  hf:    { metricLabel: 'Heures de froid',      unit: 'h',  icon: 'bi-thermometer-low', color: '#0B3A64' },
   pluie: { metricLabel: 'Cumul de pluie',       unit: 'mm', icon: 'bi-droplet-fill',    color: '#2E75B6' },
   rayo:  { metricLabel: 'Rayonnement solaire',  unit: 'MJ', icon: 'bi-sun-fill',        color: '#CBCB0B' },
   etp:   { metricLabel: 'Évapotranspiration',   unit: 'mm', icon: 'bi-moisture',        color: '#7DBDD7' },
@@ -111,7 +111,7 @@ const ANOMALY_RESOLUTION = {
     diag: [
       { label: 'Coordonnées initiales', hint: 'Comparez avec les coordonnées enregistrées dans les paramètres' },
       { label: 'Dernier passage', hint: 'Qui a eu accès à la parcelle récemment ?' },
-      { label: 'Signal GPS', hint: 'Un signal faible peut fausser la localisation sans déplacement réel' },
+      { label: 'Signal GPS', hint: 'Un signal faible peut fausser la géolocalisation sans déplacement réel' },
     ],
   },
 }
@@ -976,12 +976,21 @@ const MAINT_TYPES_M = [
   { id: 'note',         label: 'Note technique',         icon: 'bi-chat-text',         color: '#8e8e93' },
 ]
 
+const SJ_NOTE_TEXTS = [
+  'Capteur légèrement déplacé — redressé', 'Antenne réorientée pour améliorer la réception',
+  'Végétation haute autour du capteur — dégagée', 'Capteur incliné après un coup de vent — stabilisé',
+]
+const SJ_MAINT_VARIANTS = ['antenne', 'bocal', 'lacet', 'cuillere']
+
 function getSJournal(sensorId) {
   try { const r = localStorage.getItem(SENSOR_JRN_KEY(sensorId)); if (r) return JSON.parse(r) } catch (_) {}
+  const second = SJ_MAINT_VARIANTS[sensorId % SJ_MAINT_VARIANTS.length]
+  const shift = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10) }
+  const offset = sensorId % 8
   return [
-    { id: 1, type: 'installation', date: '2023-01-15', user: 'Technicien Weenat', role: 'conseiller', texte: '' },
-    { id: 2, type: 'batterie',     date: '2023-06-10', user: 'Technicien Weenat', role: 'conseiller', texte: '' },
-    { id: 3, type: 'note',         date: '2023-11-02', user: 'Jean Dupont',       role: 'membre',     texte: 'Capteur légèrement déplacé — redressé' },
+    { id: 1, type: 'installation', date: shift('2023-01-15', offset), user: 'Technicien Weenat', role: 'conseiller', texte: '' },
+    { id: 2, type: second,         date: shift('2023-06-10', offset), user: 'Technicien Weenat', role: 'conseiller', texte: '' },
+    { id: 3, type: 'note',         date: shift('2023-11-02', offset), user: 'Jean Dupont',       role: 'membre',     texte: SJ_NOTE_TEXTS[sensorId % SJ_NOTE_TEXTS.length] },
   ]
 }
 
@@ -1147,8 +1156,8 @@ function openMobileSensorJournal(sensor, opts = {}) {
 
     let html = `
       <div style="padding:12px 16px 8px">
-        <button class="m-btn m-btn--primary" id="sjrn-add-btn">
-          <i class="bi bi-plus-circle-fill"></i> Ajouter une opération de maintenance
+        <button class="w-irrig-act-btn w-irrig-act-btn--pri" id="sjrn-add-btn">
+          <i class="bi bi-plus-lg"></i> Ajouter une entrée
         </button>
       </div>
     `
@@ -1172,7 +1181,7 @@ function openMobileSensorJournal(sensor, opts = {}) {
             <div class="m-jrn-body">
               <div class="m-jrn-hd">
                 <span class="m-jrn-date">${fmt(e.date)}</span>
-                <span style="font-size:12px;font-weight:600;color:${t.color}">${t.label}</span>
+                <span class="journal-type-badge journal-type-badge--maintenance">${t.label}</span>
                 ${fromDash
                   ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
                   : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}

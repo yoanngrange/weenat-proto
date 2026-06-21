@@ -27,7 +27,7 @@ export function patchParcel(id, patch) {
 }
 
 // Fields that can be user-edited and must stay in sync across all pages
-const PLOT_PATCH_FIELDS = ['name', 'crop', 'variety', 'phenoStage', 'irrigation', 'texture', 'soilAnalysis', 'substrate', 'env', 'volumeMaxM3', 'orgId', 'area', 'integrations', 'latlngs', 'lat', 'lng', 'ville']
+const PLOT_PATCH_FIELDS = ['name', 'crop', 'variety', 'phenoStage', 'irrigation', 'texture', 'soilAnalysis', 'substrate', 'env', 'volumeMaxM3', 'debitM3h', 'orgId', 'area', 'integrations', 'latlngs', 'lat', 'lng', 'ville']
 
 // Apply localStorage overrides to the in-memory plots array — call once at page init
 export function applyStoredPlotPatches(plotsArray) {

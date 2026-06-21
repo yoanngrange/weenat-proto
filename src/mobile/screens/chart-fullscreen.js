@@ -606,3 +606,130 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
   ro.observe(layer.querySelector('#m-chart-wrap'))
   drawChart()
 }
+
+// ─── Cumul fullscreen (histogramme croissant) ────────────────────────────────
+// Affiche un cumul (widget "Cumuls préférés" ou widget "Cumuls" d'une parcelle) sous forme
+// d'histogramme où chaque jour ajoute la valeur des jours précédents à celle du jour : les
+// barres ne font qu'augmenter, jusqu'au total affiché sur la carte (valeur exacte du dernier jour).
+export function initCumulFullscreen({ label, unit = '', color = '#0172A4', total = 0, fromDateIso, backLabel = 'Retour', seedKey = '', growthShape = 'linear' }) {
+  const fromDate = new Date(fromDateIso + 'T00:00:00')
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.max(1, Math.round((today - fromDate) / 86400000) + 1)
+  const dateAt = i => { const d = new Date(fromDate); d.setDate(d.getDate() + i); return d }
+  const fmtDate = d => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  const dayOfYear = d => Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000)
+
+  // Répartition journalière pseudo-aléatoire déterministe qui se cumule exactement à `total`.
+  // Très peu de métriques progressent vraiment de façon linéaire dans la réalité :
+  // - 'solar' (rayonnement)   : cycle saisonnier, pic au solstice (~21 juin, jour 172).
+  // - 'evapo' (ETP)           : cycle saisonnier, entraîné par chaleur + rayonnement, pic mi-juillet (jour 190).
+  // - 'temperature' (degrés-jours) : cycle saisonnier, pic fin juillet (jour 205, accumulation de chaleur).
+  // - 'cold' (heures de froid) : cycle saisonnier inverse, pic mi-janvier (jour 15, cœur de l'hiver) —
+  //   plat le reste de l'année, augmente fortement en hiver.
+  // - 'bursty' (pluie, humectation) : événementiel — la plupart des jours n'apportent presque rien,
+  //   quelques jours de pluie concentrent l'essentiel du cumul (palier puis saut, pas une diagonale).
+  // - 'linear' (par défaut) : à peu près constant jour après jour, juste du bruit.
+  const seed = [...String(seedKey)].reduce((a, c) => a + c.charCodeAt(0), seedKey.length * 31 + days)
+  const seasonalWeight = (doy, peakDay) => Math.max(0.05, (Math.cos((doy - peakDay) / 365 * 2 * Math.PI) + 1) / 2)
+  const SEASONAL_PEAK_DAY = { solar: 172, evapo: 190, temperature: 205, cold: 15 }
+  const weights = Array.from({ length: days }, (_, i) => {
+    const noise = Math.abs(Math.sin(seed * 0.13 + i * 1.71)) + 0.15
+    const peakDay = SEASONAL_PEAK_DAY[growthShape]
+    if (peakDay) {
+      const seasonal = seasonalWeight(dayOfYear(dateAt(i)), peakDay)
+      return seasonal * (0.6 + noise * 0.4)
+    }
+    if (growthShape === 'bursty') {
+      // Un seul "jour de pluie" (gros saut) par bloc d'environ 9 jours, le reste quasi plat —
+      // palier puis saut, pas une diagonale lisse.
+      const chunkSize  = 9
+      const chunkIdx   = Math.floor(i / chunkSize)
+      const posInChunk = i % chunkSize
+      const rainDay    = Math.floor(Math.abs(Math.sin(seed * 0.7 + chunkIdx * 3.1)) * chunkSize)
+      if (posInChunk !== rainDay) return 0.03
+      return 3 + Math.abs(Math.sin(seed * 1.3 + chunkIdx * 2.7)) * 12
+    }
+    return noise
+  })
+  const wSum = weights.reduce((a, b) => a + b, 0)
+  let running = 0
+  const cumulVals = weights.map(w => { running += (w / wSum) * total; return +running.toFixed(2) })
+  if (cumulVals.length) cumulVals[cumulVals.length - 1] = +total.toFixed(2)
+
+  const layer = pushDetail(`
+    <div class="m-fs-topbar">
+      <button class="m-fs-back"><i class="bi bi-chevron-left"></i>${backLabel}</button>
+      <span class="m-fs-info-text">${label} — depuis le ${fmtDate(fromDate)}</span>
+      <div style="width:32px"></div>
+    </div>
+    <div class="m-fs-chart-wrap" id="m-cumul-wrap" style="flex:1;position:relative;overflow:hidden;background:#fff">
+      <svg id="m-cumul-chart" width="100%" height="100%" style="display:block"></svg>
+      <div id="m-cumul-tip" style="display:none;position:absolute;pointer-events:none;background:rgba(28,28,30,.88);color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;z-index:10;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2)"></div>
+    </div>`)
+  layer.classList.add('m-fs-layer')
+
+  function draw() {
+    const svg  = layer.querySelector('#m-cumul-chart')
+    const wrap = layer.querySelector('#m-cumul-wrap')
+    if (!svg || !wrap) return
+    const W = wrap.clientWidth, H = wrap.clientHeight
+    if (!W || !H) return
+
+    const PAD = { t: 28, r: 18, b: 36, l: 46 }
+    const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b
+    const maxV = Math.max(...cumulVals, 1) * 1.08
+    const xOf = i => PAD.l + (days > 1 ? (i / (days - 1)) * innerW : innerW / 2)
+    const yOf = v => PAD.t + innerH - (v / maxV) * innerH
+    const bw  = Math.max(1.5, (innerW / days) * 0.7)
+
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`)
+
+    let grid = ''
+    for (let i = 0; i <= 4; i++) {
+      const y = PAD.t + (i / 4) * innerH, v = maxV - (i / 4) * maxV
+      grid += `<line x1="${PAD.l}" y1="${y.toFixed(1)}" x2="${W-PAD.r}" y2="${y.toFixed(1)}" stroke="rgba(0,0,0,.07)" stroke-width="1"/>`
+      grid += `<text x="${PAD.l-5}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" font-family="-apple-system,sans-serif" fill="#8e8e93">${fmtV(v)}</text>`
+    }
+
+    let bars = ''
+    cumulVals.forEach((v, i) => {
+      const bx = xOf(i), by = yOf(v), bh = (PAD.t + innerH) - by
+      bars += `<rect x="${(bx-bw/2).toFixed(1)}" y="${by.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${color}" opacity="0.85" rx="1"/>`
+    })
+
+    let xlabels = ''
+    const lStep = Math.max(1, Math.round(days / 6))
+    for (let i = 0; i < days; i += lStep) {
+      xlabels += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t+innerH+16).toFixed(1)}" text-anchor="middle" font-size="10" font-family="-apple-system,sans-serif" fill="#8e8e93">${fmtDate(dateAt(i))}</text>`
+    }
+
+    svg.innerHTML = `${grid}${bars}<line x1="${PAD.l}" y1="${(PAD.t+innerH).toFixed(1)}" x2="${W-PAD.r}" y2="${(PAD.t+innerH).toFixed(1)}" stroke="rgba(0,0,0,.1)" stroke-width="1"/>${xlabels}
+      <rect class="m-cf-hover" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="touch-action:none"/>`
+
+    const hRect = svg.querySelector('.m-cf-hover')
+    const tip   = layer.querySelector('#m-cumul-tip')
+
+    function onPos(clientX, clientY) {
+      const svgR = svg.getBoundingClientRect()
+      const frac = Math.max(0, Math.min(1, ((clientX - svgR.left) * (W / svgR.width) - PAD.l) / innerW))
+      const idx  = Math.round(frac * (days - 1))
+      if (idx < 0 || idx >= cumulVals.length) return
+      const wR = wrap.getBoundingClientRect()
+      const relX = clientX - wR.left, relY = clientY - wR.top
+      const tipLeft = relX + 14 + 110 > wR.width ? relX - 120 : relX + 14
+      tip.innerHTML = `<div style="font-size:16px;font-weight:700;color:${color}">${fmtV(cumulVals[idx])} <span style="font-size:11px;font-weight:400;opacity:.8">${unit}</span></div><div style="font-size:10px;opacity:.7;margin-top:2px">${fmtDate(dateAt(idx))}</div>`
+      tip.style.cssText = `display:block;position:absolute;pointer-events:none;background:rgba(28,28,30,.88);color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;z-index:10;white-space:nowrap;box-shadow:0 3px 10px rgba(0,0,0,.2);left:${tipLeft}px;top:${Math.max(relY-50,8)}px`
+    }
+    function onEnd() { tip.style.display = 'none' }
+
+    hRect.addEventListener('pointermove',  e => { e.preventDefault(); onPos(e.clientX, e.clientY) }, { passive: false })
+    hRect.addEventListener('pointerdown',  e => { e.currentTarget.setPointerCapture(e.pointerId); onPos(e.clientX, e.clientY) })
+    hRect.addEventListener('pointerup',    e => { if (e.pointerType === 'mouse') onEnd() })
+    hRect.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') onEnd() })
+  }
+
+  layer.querySelector('.m-fs-back').addEventListener('click', popDetail)
+  const ro = new ResizeObserver(draw)
+  ro.observe(layer.querySelector('#m-cumul-wrap'))
+  draw()
+}

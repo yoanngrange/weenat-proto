@@ -368,7 +368,7 @@ function msrCardHtml(m, idx) {
   const sensorIdForLink = m.subjectKey?.startsWith('s-') ? m.subjectKey.slice(2) : null
   const parcelIdForLink = m.subjectKey?.startsWith('p-') ? m.subjectKey.slice(2) : null
   const viewDataBtn = (sensorIdForLink || parcelIdForLink)
-    ? `<button class="m-wf-view-data" ${sensorIdForLink ? `data-sensor-id="${sensorIdForLink}"` : `data-parcel-id="${parcelIdForLink}"`} data-metric-id="${m.metricId}" data-period="${m.period}" data-step="${m.step}" style="display:flex;align-items:center;gap:4px;margin-top:8px;padding:6px 10px;border:none;background:rgba(0,122,255,.08);border-radius:8px;color:#007AFF;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center">Voir détails <i class="bi bi-fullscreen" style="font-size:11px"></i></button>`
+    ? `<button class="m-wf-view-data m-widget-details-link" ${sensorIdForLink ? `data-sensor-id="${sensorIdForLink}"` : `data-parcel-id="${parcelIdForLink}"`} data-metric-id="${m.metricId}" data-period="${m.period}" data-step="${m.step}">Voir détails →</button>`
     : ''
   return `
     <div class="m-wf-card">
@@ -666,6 +666,9 @@ const CUMULS_METRICS = [
   { id: 'hf',         label: 'Heures de froid',        unit: 'h',   base: 30,  amp: 120,  needsModels: ['P+','PT','SMV','TH'] },
   { id: 'humec',      label: 'Humectation foliaire',   unit: 'h',   base: 10,  amp: 40,   needsModels: ['LWS'] },
 ]
+// Forme de la courbe cumulative fullscreen par métrique (cf. initCumulFullscreen) — peu de
+// cumuls progressent vraiment de façon linéaire dans la réalité.
+const CUMUL_GROWTH_SHAPE = { etp: 'evapo', rayo: 'solar', pluie: 'bursty', dj: 'temperature', hf: 'cold', humec: 'bursty' }
 
 // Set of all sensor models that qualify for at least one cumul
 const CUMUL_QUALIFYING_MODELS = new Set(
@@ -688,7 +691,7 @@ const CUMUL_ICONS = {
   rayo:       { icon: 'bi-sun-fill',        color: '#CBCB0B' },
   pluie:      { icon: 'bi-droplet-fill',    color: '#2E75B6' },
   dj:         { icon: 'bi-thermometer-sun', color: '#FBAF05' },
-  hf:         { icon: 'bi-thermometer-low', color: '#FEE7B4' },
+  hf:         { icon: 'bi-thermometer-low', color: '#0B3A64' },
   humec:      { icon: 'bi-droplet-half',    color: '#00887E' },
 }
 
@@ -712,6 +715,7 @@ function renderCumulCards() {
         <span>depuis le ${c.fromDate}${thresholdText}</span>
         <button class="m-cumuls-edit" data-cidx="${idx}" type="button" title="Modifier"><i class="bi bi-pencil"></i> Modifier</button>
       </div>
+      <button class="m-cumuls-details m-widget-details-link" data-cidx="${idx}">Voir détails →</button>
     </div>`
   }).join('')
 }
@@ -1893,6 +1897,18 @@ export function initDashboardScreen(screenEl, role) {
       })
       content.querySelectorAll('.m-cumuls-edit').forEach(btn => {
         btn.addEventListener('click', () => openCumulEditSheet(+btn.dataset.cidx))
+      })
+      content.querySelectorAll('.m-cumuls-details').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const c = cumulsList[+btn.dataset.cidx]
+          if (!c) return
+          import('./chart-fullscreen.js').then(m => m.initCumulFullscreen({
+            label: c.metricLabel, unit: c.unit, color: c.color,
+            total: +c.value || 0, fromDateIso: c.fromDate,
+            backLabel: 'Tableau de bord', seedKey: `${c.subjectKey}-${c.metricId}`,
+            growthShape: CUMUL_GROWTH_SHAPE[c.metricId] || 'linear',
+          }))
+        })
       })
 
       function buildThresholdHtml(metricId, thresholds = {}) {

@@ -219,9 +219,9 @@ function renderForm() {
               <p style="margin:0;font-size:12px;color:var(--txt3);line-height:1.5;border-top:1px solid var(--bdr);padding-top:10px">Contrairement à d'autres plateformes, vous ne partagez des données qu'avec les autres exploitations adhérentes du réseau, pas n'importe qui.</p>
             </div>
             <div style="font-size:13px;color:var(--txt2);margin-bottom:14px">${NEARBY_NETWORKS_LIMIT} réseaux proches de votre exploitation</div>
-            <div style="display:flex;flex-wrap:wrap;gap:10px">
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px">
               ${NEARBY_NETWORKS.slice(0, NEARBY_NETWORKS_LIMIT).map((net, i) => `
-                <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;min-width:200px;flex:1">
+                <div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px">
                   <div style="display:flex;align-items:center;gap:10px">
                     <div style="width:36px;height:36px;border-radius:8px;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-shrink:0">
                       <span style="font-size:10px;font-weight:700;color:#0172A4">${netInitials(net.name)}</span>
@@ -242,8 +242,6 @@ function renderForm() {
                   </div>
                   <button class="btn-secondary p-join-btn" data-net-idx="${i}" style="font-size:12px">Demander à rejoindre</button>
                 </div>`).join('')}
-              <div style="min-width:200px;flex:1;height:0;padding:0;margin:0"></div>
-              <div style="min-width:200px;flex:1;height:0;padding:0;margin:0"></div>
             </div>
           </div>
         </div>
