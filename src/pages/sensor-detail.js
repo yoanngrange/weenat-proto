@@ -1011,9 +1011,9 @@ function renderPanel() {
   renderEvents()
   renderMetricsList()
   renderConfig()
+  renderAlertesSensor()
   renderPanelMembres(parcel)
   renderActions()
-  renderMaintenance()
   applyAccessControl()
 }
 
@@ -1028,7 +1028,7 @@ function renderIdentification(parcel, org, stored) {
     <div class="panel-row"><span class="panel-row-key">Modèle</span><span class="panel-row-val">${sensor.model}</span></div>
     <div class="panel-row"><span class="panel-row-key">Numéro série</span><span class="panel-row-val">${sensor.serial}</span></div>
     <div class="panel-row"><span class="panel-row-key">Réseau télécom</span><span class="panel-row-val">${sensor.telecom || 'Sigfox'}</span></div>
-    <div class="panel-row"><span class="panel-row-key">Exploitation</span><span class="panel-row-val">${org ? org.name : '—'}</span></div>
+    <div class="panel-row" id="panel-ident-org"><span class="panel-row-key">Exploitation</span><span class="panel-row-val">${org ? org.name : '—'}</span></div>
     <div class="panel-row"><span class="panel-row-key">Date d'ajout</span><span class="panel-row-val">15/01/2023</span></div>
   `
   const input = el.querySelector('[data-field="label"] input')
@@ -1036,9 +1036,11 @@ function renderIdentification(parcel, org, stored) {
     const save = () => {
       const v = input.value.trim()
       if (v && v !== currentLabel) {
+        const previousLabel = currentLabel
         currentLabel = v
         patchSensor(sensorId, { label: v })
         updateBreadcrumb(v, { label: 'Capteurs', href: 'capteurs.html' })
+        addSensorJournalEntry(`Nom du capteur modifié : « ${previousLabel} » → « ${v} »`)
       }
     }
     input.addEventListener('change', save)
@@ -1064,17 +1066,23 @@ function renderLocalisation(parcel, org) {
 function renderSignalQuality() {
   const q    = sensor.networkQuality || 80
   const msg7d = sensor.messages7d || 85
-  const qColor = q >= 80 ? 'var(--ok)' : q >= 60 ? 'var(--warn)' : 'var(--err)'
+  const colorFor = v => v >= 80 ? 'var(--ok)' : v >= 60 ? 'var(--warn)' : 'var(--err)'
+  const qColor   = colorFor(q)
+  const msgColor = colorFor(msg7d)
   document.getElementById('panel-signal').innerHTML = `
-    <div class="signal-bar-wrap">
-      <div class="signal-bar-track">
-        <div class="signal-bar-fill" style="width:${q}%;background:${qColor}"></div>
+    <div class="signal-metric">
+      <div class="signal-metric-row">
+        <span class="signal-bar-label">Qualité de la couverture réseau</span>
+        <span class="signal-bar-pct" style="color:${qColor}">${q}%</span>
       </div>
-      <span class="signal-bar-pct" style="color:${qColor}">${q}%</span>
+      <div class="signal-bar-track"><div class="signal-bar-fill" style="width:${q}%;background:${qColor}"></div></div>
     </div>
-    <div class="panel-row">
-      <span class="panel-row-key">Messages / 7 j</span>
-      <span class="panel-row-val">${msg7d}%</span>
+    <div class="signal-metric">
+      <div class="signal-metric-row">
+        <span class="signal-bar-label">Mesures reçues sur 7 jours</span>
+        <span class="signal-bar-pct" style="color:${msgColor}">${msg7d}%</span>
+      </div>
+      <div class="signal-bar-track"><div class="signal-bar-fill" style="width:${msg7d}%;background:${msgColor}"></div></div>
     </div>
     <div class="panel-row">
       <span class="panel-row-key">Opérateur</span>
@@ -1202,11 +1210,120 @@ function renderConfig() {
     `
   }
 
+  const section = el.closest('.panel-section')
   if (!html) {
-    el.innerHTML = '<div class="panel-empty">Pas de configuration spécifique pour ce modèle.</div>'
+    if (section) section.style.display = 'none'
   } else {
+    if (section) section.style.display = ''
     el.innerHTML = html
   }
+}
+
+// ─── Alertes ──────────────────────────────────────────────────────────────────
+
+function getAvailableAlertMetricsSensor() {
+  const ids = METRICS_BY_MODEL[sensor.model] || []
+  return ids.map(id => {
+    const def = METRIC_DEFS[id] || VIRTUAL_METRICS[id]
+    return def ? { id, name: def.name, unit: def.unit } : null
+  }).filter(Boolean)
+}
+
+function renderAlertesSensor() {
+  const el = document.getElementById('panel-alertes')
+  if (!el) return
+  const alertes = getStoredSensor(sensorId).alertes || []
+
+  const ALERT_ICONS = { seuil: 'bi-graph-up-arrow', absence: 'bi-wifi-off' }
+
+  let html = ''
+  if (alertes.length === 0) {
+    html += `<div class="panel-empty" style="margin-bottom:8px">Aucune alerte configurée</div>`
+  } else {
+    html += alertes.map((a, i) => `
+      <div class="alert-item">
+        <i class="bi ${ALERT_ICONS[a.type] || 'bi-bell'}" style="color:var(--warn)"></i>
+        <div class="alert-item-body">
+          <div class="alert-item-label">${a.label}</div>
+          <div class="alert-item-meta">${a.metric} ${a.condition || ''} ${a.threshold || ''} ${a.unit || ''}</div>
+        </div>
+        <button class="remove-alert-sensor-btn icon-btn" data-idx="${i}" title="Supprimer"><i class="bi bi-trash"></i></button>
+      </div>
+    `).join('')
+  }
+
+  html += `<button id="create-alert-sensor-btn" class="action-btn action-btn--primary" style="margin-top:6px"><i class="bi bi-plus"></i> Créer une alerte</button>`
+
+  el.innerHTML = html
+
+  el.querySelectorAll('.remove-alert-sensor-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx)
+      const updated = [...alertes]
+      updated.splice(idx, 1)
+      patchSensor(sensorId, { alertes: updated })
+      renderAlertesSensor()
+    })
+  })
+
+  el.querySelector('#create-alert-sensor-btn').addEventListener('click', () => showCreateAlertFormSensor(el))
+}
+
+function showCreateAlertFormSensor(container) {
+  if (container.querySelector('.alert-create-form')) return
+
+  const availableMetrics = getAvailableAlertMetricsSensor()
+
+  const form = document.createElement('div')
+  form.className = 'alert-create-form'
+  form.innerHTML = `
+    <div class="alert-form-row">
+      <select id="alert-metric-s" class="panel-add-select">
+        <option value="">Métrique…</option>
+        ${availableMetrics.map(m => `<option value="${m.id}" data-unit="${m.unit}">${m.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="alert-form-row" style="align-items:center;gap:6px">
+      <select id="alert-condition-s" class="panel-add-select" style="max-width:70px;flex:0 0 auto">
+        <option value=">">&gt;</option>
+        <option value="<">&lt;</option>
+        <option value="=">=</option>
+      </select>
+      <input type="number" id="alert-threshold-s" class="inline-edit" placeholder="Valeur" style="flex:1;min-width:0">
+      <span id="alert-unit-label-s" style="font-size:11px;color:var(--txt3);flex-shrink:0;min-width:30px">—</span>
+    </div>
+    <div class="alert-form-actions">
+      <button id="alert-save-btn-s" class="panel-add-btn">Enregistrer</button>
+      <button id="alert-cancel-btn-s" class="icon-btn"><i class="bi bi-x"></i></button>
+    </div>
+  `
+  container.appendChild(form)
+
+  form.querySelector('#alert-metric-s').addEventListener('change', e => {
+    const opt = e.target.selectedOptions[0]
+    form.querySelector('#alert-unit-label-s').textContent = opt?.dataset.unit || '—'
+  })
+
+  form.querySelector('#alert-save-btn-s').addEventListener('click', () => {
+    const metricId  = form.querySelector('#alert-metric-s').value
+    const metricDef = availableMetrics.find(m => m.id === metricId)
+    const condition = form.querySelector('#alert-condition-s').value
+    const threshold = form.querySelector('#alert-threshold-s').value
+    if (!metricId || !threshold) return
+
+    const newAlert = {
+      type:      'seuil',
+      label:     `Alerte ${metricDef?.name || metricId}`,
+      metric:    metricDef?.name || metricId,
+      condition, threshold,
+      unit:      metricDef?.unit || '',
+    }
+    const updated = [...(getStoredSensor(sensorId).alertes || []), newAlert]
+    patchSensor(sensorId, { alertes: updated })
+    renderAlertesSensor()
+  })
+
+  form.querySelector('#alert-cancel-btn-s').addEventListener('click', () => form.remove())
 }
 
 function showToastConfig() {
@@ -1256,8 +1373,11 @@ function renderLinkedPlots() {
 
   el.querySelectorAll('.remove-plot-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      linkedPlotIds = linkedPlotIds.filter(x => x !== parseInt(btn.dataset.id))
+      const id = parseInt(btn.dataset.id)
+      const p  = orgPlots.find(x => x.id === id)
+      linkedPlotIds = linkedPlotIds.filter(x => x !== id)
       patchSensor(sensorId, { linkedPlotIds })
+      if (p) addSensorJournalEntry(`Capteur délié de la parcelle « ${p.name} »`)
       renderLinkedPlots()
     })
   })
@@ -1280,8 +1400,10 @@ function renderLinkedPlots() {
     addBtn.onclick = () => {
       const id = parseInt(document.getElementById('add-plot-select').value)
       if (!id || linkedPlotIds.includes(id)) return
+      const p = orgPlots.find(x => x.id === id)
       linkedPlotIds.push(id)
       patchSensor(sensorId, { linkedPlotIds })
+      if (p) addSensorJournalEntry(`Capteur lié à la parcelle « ${p.name} »`)
       renderLinkedPlots()
     }
   }
@@ -1368,38 +1490,6 @@ function renderActions() {
   })
 }
 
-function renderMaintenance() {
-  const isAdherentSensor = sensor?.orgId === 1
-  const agentReseau = (() => {
-    const a = members.find(m => m.source === 'réseau' && m.role === 'agent' && m.orgIds.includes(sensor?.orgId))
-    if (a) return `${a.prenom} ${a.nom}`
-    const adm = members.find(m => m.source === 'réseau' && (m.role === 'admin' || m.role === 'propriétaire'))
-    return adm ? `${adm.prenom} ${adm.nom}` : 'Technicien réseau'
-  })()
-  const membreExploitation = isAdherentSensor
-    ? (() => { const m = members.find(mb => mb.source === 'adherent' && mb.orgIds.includes(1)); return m ? `${m.prenom} ${m.nom}` : agentReseau })()
-    : agentReseau
-  const items = [
-    { type: 'installation', label: 'Installation initiale',       date: '15/01/2023', user: agentReseau,          icon: 'bi-box-arrow-in-down' },
-    { type: 'nettoyage',    label: 'Nettoyage pluviomètre',       date: '20/03/2023', user: membreExploitation,   icon: 'bi-droplet' },
-    { type: 'batterie',     label: 'Changement de batterie',      date: '10/06/2023', user: agentReseau,          icon: 'bi-battery-charging' },
-    { type: 'note',         label: 'Redressage capteur déplacé',  date: '02/11/2023', user: membreExploitation,   icon: 'bi-chat-text' },
-  ]
-  document.getElementById('panel-maint').innerHTML = `
-    <div class="maint-timeline">
-      ${items.map(it => `
-        <div class="maint-item">
-          <div class="maint-icon"><i class="bi ${it.icon}"></i></div>
-          <div class="maint-body">
-            <div class="maint-label">${it.label}</div>
-            <div class="maint-meta">${it.date} · ${it.user}</div>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-    <button class="action-btn" style="margin-top:8px"><i class="bi bi-plus"></i> Ajouter une entrée</button>
-  `
-}
 
 // ─── Membres ──────────────────────────────────────────────────────────────────
 
@@ -1530,30 +1620,50 @@ function renderPanelMembres(parcel) {
 function initMiniMap() {
   const parcel = plots.find(p => sensor.parcelIds?.includes(p.id))
   const org    = parcel ? orgs.find(o => o.id === parcel.orgId) : (sensor.orgId ? orgs.find(o => o.id === sensor.orgId) : null)
-  if (!org?.lat) return
+  const lat = parcel?.lat ?? org?.lat
+  const lng = parcel?.lng ?? org?.lng
+  if (lat == null || lng == null) return
 
-  const map = L.map('sensor-mini-map', { zoomControl: false, attributionControl: false })
+  const map = L.map('sensor-mini-map', {
+    zoomControl: false, attributionControl: false,
+    dragging: false, touchZoom: false, scrollWheelZoom: false,
+    doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false,
+  })
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map)
 
-  const latlngs = parcel?.latlngs
-  if (Array.isArray(latlngs) && latlngs.length >= 3) {
-    // Show parcel polygon with very light fill
-    const poly = L.polygon(latlngs, {
-      color: '#0172A4', weight: 1.5, fillColor: '#0172A4', fillOpacity: 0.3
-    }).addTo(map)
-    // Place sensor dot at polygon centroid
-    const centerLat = latlngs.reduce((s, ll) => s + ll[0], 0) / latlngs.length
-    const centerLng = latlngs.reduce((s, ll) => s + ll[1], 0) / latlngs.length
-    L.circleMarker([centerLat, centerLng], {
-      radius: 6, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2
-    }).addTo(map)
-    map.fitBounds(poly.getBounds(), { padding: [10, 10] })
-  } else {
-    map.setView([org.lat, org.lng], 13)
-    L.circleMarker([org.lat, org.lng], {
-      radius: 6, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2
-    }).addTo(map)
-  }
+  // Le capteur est toujours représenté par un point (pas par la zone/contour de la parcelle liée),
+  // bounding box ±1 km de chaque côté, point centré.
+  const dLat = 1 / 111
+  const dLng = 1 / (111 * Math.cos(lat * Math.PI / 180))
+  map.fitBounds([[lat - dLat, lng - dLng], [lat + dLat, lng + dLng]])
+  L.circleMarker([lat, lng], {
+    radius: 6, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2
+  }).addTo(map)
+
+  document.getElementById('sensor-map-expand')?.addEventListener('click', () => openSensorMapModal(lat, lng))
+}
+
+function openSensorMapModal(lat, lng) {
+  const overlay = document.createElement('div')
+  overlay.className = 'modal add-modal'
+  overlay.innerHTML = `
+    <div class="add-modal-content" style="max-width:700px;padding:0;overflow:hidden">
+      <div class="add-modal-header" style="margin:0;padding:14px 18px;border-bottom:1px solid var(--bdr2)">
+        <span class="add-modal-title" style="font-size:16px">Localisation du capteur</span>
+        <button class="add-modal-close" aria-label="Fermer">×</button>
+      </div>
+      <div id="sensor-map-modal-map" style="height:420px"></div>
+    </div>`
+  document.body.appendChild(overlay)
+  const close = () => overlay.remove()
+  overlay.querySelector('.add-modal-close').addEventListener('click', close)
+  overlay.addEventListener('click', e => { if (e.target === overlay) close() })
+
+  const map = L.map('sensor-map-modal-map', { attributionControl: false })
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri' }).addTo(map)
+  map.setView([lat, lng], 15)
+  L.circleMarker([lat, lng], { radius: 8, color: 'white', fillColor: '#0172A4', fillOpacity: 1, weight: 2 }).addTo(map)
+  setTimeout(() => map.invalidateSize(), 0)
 }
 
 // ─── Access control (adherent viewing external sensor) ────────────────────────
@@ -1564,12 +1674,24 @@ function applyAccessControl() {
 
   ;[
     document.querySelector('#panel-plots')?.closest('.panel-section'),
-    document.querySelector('#panel-config')?.closest('.panel-section'),
     document.getElementById('panel-membres-section'),
     document.getElementById('panel-conseillers-section'),
     document.querySelector('#panel-actions')?.closest('.panel-section'),
-    document.querySelector('#panel-maint')?.closest('.panel-section'),
+    document.querySelector('#panel-alertes')?.closest('.panel-section'),
   ].forEach(el => { if (el) el.style.display = isAdherentExternal ? 'none' : '' })
+
+  // Champ "Exploitation" : un adhérent ne doit pas voir à quelle organisation appartient
+  // un capteur du réseau qui n'est pas le sien.
+  const orgRow = document.getElementById('panel-ident-org')
+  if (orgRow) orgRow.style.display = isAdherentExternal ? 'none' : ''
+
+  // Section Configuration : masquée pour l'externe, sinon laissée à l'état décidé par
+  // renderConfig() (masquée si aucune configuration n'est nécessaire pour ce modèle).
+  const configEl      = document.getElementById('panel-config')
+  const configSection = configEl?.closest('.panel-section')
+  if (configSection) {
+    configSection.style.display = isAdherentExternal ? 'none' : (configEl.innerHTML.trim() ? '' : 'none')
+  }
 
   const journalTab = document.querySelector('.detail-tab-btn[data-pane="tab-journal"]')
   if (journalTab) journalTab.style.display = isAdherentExternal ? 'none' : ''
@@ -1618,7 +1740,7 @@ function initTabs() {
 const SENSOR_JOURNAL_KEY = `sensor-journal-${sensorId}`
 
 const MAINT_TYPES = [
-  { id: 'installation',  label: 'Installation',            icon: 'bi-box-arrow-in-down', color: '#0172A4' },
+  { id: 'installation',  label: "Ajouté à l'organisation",  icon: 'bi-box-arrow-in-down', color: '#0172A4' },
   { id: 'batterie',      label: 'Remplacement batterie',   icon: 'bi-battery-charging',  color: '#e07820' },
   { id: 'antenne',       label: 'Remplacement antenne',    icon: 'bi-reception-4',       color: '#5b8dd9' },
   { id: 'bocal',         label: 'Remplacement bocal',      icon: 'bi-cup',               color: '#3a9e6a' },
@@ -1688,6 +1810,15 @@ function getSensorJournal() {
 
 function saveSensorJournal(entries) {
   localStorage.setItem(SENSOR_JOURNAL_KEY, JSON.stringify(entries))
+}
+
+// Ajoute une entrée système (note tracée automatiquement) en tête de journal et rafraîchit l'affichage
+function addSensorJournalEntry(texte) {
+  saveSensorJournal([
+    { id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), texte },
+    ...getSensorJournal(),
+  ])
+  renderSensorJournal()
 }
 
 function renderSensorJournal() {

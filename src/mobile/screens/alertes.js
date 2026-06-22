@@ -112,10 +112,10 @@ export function initAlertesScreen(screenEl, role) {
               <span class="m-alert-row-val">${fmtDate(a.lastTriggered)}</span>
             </div>
           </div>
-          <div class="w-irrig-act-row" style="padding:0 14px 14px">
-            <button class="w-irrig-act-btn w-irrig-act-btn--pri m-alert-detail-btn" type="button" data-id="${a.id}">Voir le détail</button>
-            <button class="w-irrig-act-btn w-irrig-act-btn--sec m-alert-edit-btn" type="button" data-id="${a.id}">Modifier l'alerte</button>
+          <div class="w-irrig-act-row" style="padding:0 14px">
+            <button class="w-irrig-act-btn w-irrig-act-btn--pri m-alert-edit-btn" type="button" data-id="${a.id}">Modifier l'alerte</button>
           </div>
+          <button class="m-widget-details-link m-alert-detail-btn" type="button" data-id="${a.id}" style="margin:8px 14px 14px;width:calc(100% - 28px)">Voir détails →</button>
         </div>`
     }).join('')
 

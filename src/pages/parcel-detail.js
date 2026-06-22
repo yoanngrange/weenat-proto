@@ -310,7 +310,7 @@ function getHatchCount() {
 // Catalog item name → widget ID
 const CATALOG_ITEM_ID = {
   'Cumuls': 'cumuls',
-  "Maï'zy": 'maizy', 'Suivi de culture': 'suivi-culture', 'Weephyt': 'weephyt',
+  "Maï'zy": 'maizy', 'Suivi de culture': 'suivi-culture', 'Traitements': 'weephyt',
   'Decitrait': 'decitrait', 'Tavelure Pomme': 'tavelure',
   'DPV': 'dpv', 'THI': 'thi', 'Température de rosée': 'temp-rosee',
   'Température du sol': 'temp-sol', 'Rayonnement solaire': 'w-pyrano', 'Gel': 'gel',
@@ -327,7 +327,7 @@ const CATALOG_ITEM_ID = {
 
 const WIDGET_CATALOG_WEB = [
   { title: 'Cumuls', items: ['Cumuls'] },
-  { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Weephyt','Decitrait','Tavelure Pomme'] },
+  { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Traitements','Decitrait','Tavelure Pomme'] },
   { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
   { title: 'Irrigation', items: ['Bilan hydrique','Irrigations','Sonde capacitive','Tensiomètre','Sonde de fertirrigation','Profil capteurs','Niveau de réservoir en eau utilisable','Profil de niveau de réservoir'] },
@@ -3190,6 +3190,14 @@ function showConfirmModal({ title, message, confirmLabel = 'Confirmer', onConfir
 
 // ─── Mini map (Géolocalisation) ───────────────────────────────────────────────
 
+// Mini-cartes des panneaux de configuration : statiques (pas de pan/zoom), une icône
+// dédiée juste sous la carte ouvre une vue interactive (modale ou page d'édition).
+const STATIC_MAP_OPTS = {
+  zoomControl: false, attributionControl: false,
+  dragging: false, touchZoom: false, scrollWheelZoom: false,
+  doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false,
+}
+
 function initMiniMap() {
   if (_miniMapInstance) { _miniMapInstance.invalidateSize(); return }
   const org = orgs.find(o => o.id === parcelBase.orgId)
@@ -3199,7 +3207,7 @@ function initMiniMap() {
 
   const latlngs = parcelState.latlngs
 
-  const map = L.map('parcel-mini-map', { zoomControl: false, attributionControl: false })
+  const map = L.map('parcel-mini-map', STATIC_MAP_OPTS)
   _miniMapInstance = map
 
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -3256,33 +3264,33 @@ function initTabs() {
 // ─── Dashboard (Widgets) ──────────────────────────────────────────────────────
 
 const WIDGET_DEFS = {
-  'previsions-5j':   { size:'1x1', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'weephyt':         { size:'1x1', title:'Weephyt',                    icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt,    footer: { label:'Voir Weephyt', href:'#' } },
+  'previsions-5j':   { size:'1x1', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir détails', href:'previsions.html' } },
+  'weephyt':         { size:'1x1', title:'Traitements',                 icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt },
   'cumuls':          { size:'1x1', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#2E75B6', render: renderWCumuls },
-  'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:"Voir les irrigations", href:`irrigation.html?plot=${parcelId}` } },
-  'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'dpv':             { size:'1x1', title:'DPV',                        icon:'bi-droplet-half',          color:'#5E88EC', render: renderWDpv,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'thi':             { size:'1x1', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'temp-rosee':      { size:'1x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#72B0D8', render: renderWTempRosee,  footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'temp-sol':        { size:'1x1', title:'Température du sol',         icon:'bi-layers',                color:'#795548', render: renderWTempSol,    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'maizy':           { size:'1x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:"Voir Maï'zy", href:'#' } },
-  'tavelure':        { size:'1x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure,           footer: { label:'Voir Tavelure', href:'#' } },
+  'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:'Voir détails', href:`irrigation.html?plot=${parcelId}` } },
+  'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir détails', href:'previsions.html' } },
+  'dpv':             { size:'1x1', title:'DPV',                        icon:'bi-droplet-half',          color:'#5E88EC', render: renderWDpv,        footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'thi':             { size:'1x1', title:'THI',                        icon:'bi-heart-pulse',           color:'#e0a030', render: renderWThi,        footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'temp-rosee':      { size:'1x1', title:'Température de rosée',       icon:'bi-thermometer',           color:'#72B0D8', render: renderWTempRosee,  footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'temp-sol':        { size:'1x1', title:'Température du sol',         icon:'bi-layers',                color:'#795548', render: renderWTempSol,    footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'maizy':           { size:'1x1', title:"Maï'zy",                     icon:'bi-calendar-check',        color:'#2d9e5f', render: renderWMaizy,      footer: { label:'Voir détails', href:'#' } },
+  'tavelure':        { size:'1x1', title:'Tavelure Pomme',             icon:'bi-exclamation-triangle',  color:'#e07050', render: renderWTavelure,           footer: { label:'Voir détails', href:'#' } },
   'suivi-culture':   { size:'1x1', title:'Suivi de culture',           icon:'bi-flower2',               color:'#78d8a0', render: renderWPlaceholder },
-  'decitrait':       { size:'1x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder,        footer: { label:'Voir Decitrait', href:'#' } },
-  'previsions-6h':   { size:'1x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'previsions-jour': { size:'1x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'previsions-tensio':{ size:'1x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#A6C157', render: renderWPlaceholder,        footer: { label:'Voir les prévisions', href:'previsions.html' } },
-  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#FBAF05', render: renderWSensor('w-station'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-thygro':        { size:'1x1', title:'Thermomètre-hygromètre',          icon:'bi-thermometer-half',      color:'#FBAF05', render: renderWSensor('w-thygro'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#795548', render: renderWSensor('w-tsol'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#616161', render: renderWSensor('w-anem'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#CBCB0B', render: renderWSensor('w-pyrano'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-lws':           { size:'1x1', title:"Capteur d'humectation foliaire",       icon:'bi-droplet',               color:'#00887E', render: renderWSensor('w-lws'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#4CBB17', render: renderWSensor('w-par'),    footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#ED9A2C', render: renderWSensor('w-capa'),   footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#A6C157', render: renderWSensor('w-tensio'), footer: { label:'Voir les données', href:'#', tab:'donnees' } },
-  'w-ec':            { size:'1x1', title:'Sonde de fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir les données', href:'#', tab:'donnees' } },
+  'decitrait':       { size:'1x1', title:'Decitrait',                  icon:'bi-shield',                color:'#6080b0', render: renderWPlaceholder,        footer: { label:'Voir détails', href:'#' } },
+  'previsions-6h':   { size:'1x1', title:'Prévisions à 6 heures',      icon:'bi-clock',                 color:'#5b8dd9', render: renderWPlaceholder,        footer: { label:'Voir détails', href:'previsions.html' } },
+  'previsions-jour': { size:'1x1', title:'Prévisions du jour',         icon:'bi-sun',                   color:'#f5c842', render: renderWPlaceholder,        footer: { label:'Voir détails', href:'previsions.html' } },
+  'previsions-tensio':{ size:'1x1',title:'Prévisions tensiométrie',    icon:'bi-graph-down',            color:'#A6C157', render: renderWPlaceholder,        footer: { label:'Voir détails', href:'previsions.html' } },
+  'w-station':       { size:'1x1', title:'Station météo',              icon:'bi-broadcast',             color:'#FBAF05', render: renderWSensor('w-station'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-thygro':        { size:'1x1', title:'Thermomètre-hygromètre',          icon:'bi-thermometer-half',      color:'#FBAF05', render: renderWSensor('w-thygro'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-tsol':          { size:'1x1', title:'Thermomètre de sol',         icon:'bi-layers',                color:'#795548', render: renderWSensor('w-tsol'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-anem':          { size:'1x1', title:'Anémomètre',                 icon:'bi-wind',                  color:'#616161', render: renderWSensor('w-anem'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-pyrano':        { size:'1x1', title:'Pyranomètre',                icon:'bi-sun',                   color:'#CBCB0B', render: renderWSensor('w-pyrano'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-lws':           { size:'1x1', title:"Capteur d'humectation foliaire",       icon:'bi-droplet',               color:'#00887E', render: renderWSensor('w-lws'),    footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-par':           { size:'1x1', title:'Capteur PAR',                icon:'bi-brightness-high',       color:'#4CBB17', render: renderWSensor('w-par'),    footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-capa':          { size:'1x1', title:'Sonde capacitive',           icon:'bi-moisture',              color:'#ED9A2C', render: renderWSensor('w-capa'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-tensio':        { size:'1x1', title:'Tensiomètre',                icon:'bi-graph-down',            color:'#A6C157', render: renderWSensor('w-tensio'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'w-ec':            { size:'1x1', title:'Sonde de fertirrigation',       icon:'bi-plug',                  color:'#2BCDDE', render: renderWSensor('w-ec'),     footer: { label:'Voir détails', href:'#', tab:'donnees' } },
   'profil-capteurs': { size:'1x1', title:'Profil capteurs',            icon:'bi-bar-chart',             color:'#5b8dd9', render: renderWPlaceholder },
   'niveau-reservoir':{ size:'1x1', title:'Niveau de réservoir (RFU)',  icon:'bi-droplet-fill',          color:'#0172A4', render: renderWNiveauReservoir },
   'profil-reservoir':{ size:'1x1', title:'Profil de réservoir',        icon:'bi-clipboard-data',        color:'#0172A4', render: renderWProfilReservoir },
@@ -3545,37 +3553,51 @@ function renderWPrev5j(el) {
 }
 
 function renderWWeephyt(el) {
-  const now=new Date()
-  const crop=parcelState.crop||parcelBase.crop||''
-  // Product families with mock 12h window data (true = window OK)
-  const families=[
-    {label:'Herbicides de contact',seed:7},
-    {label:'Fongicides',seed:3},
-    {label:'Herbicides racinaires',seed:11},
-    {label:'Herbicides systémiques',seed:5},
+  const now = new Date()
+  // Product families — on cherche la prochaine fenêtre favorable de chacune sur les 24h glissantes
+  const families = [
+    { label: 'Herbicides de contact', seed: 7 },
+    { label: 'Fongicides', seed: 3 },
+    { label: 'Herbicides racinaires', seed: 11 },
+    { label: 'Herbicides systémiques', seed: 5 },
   ]
-  const hours=Array.from({length:12},(_,i)=>{const d=new Date(now);d.setHours(d.getHours()+i);return d})
-  const fmtH=d=>`${String(d.getHours()).padStart(2,'0')}h`
+  const hours = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(now); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + i); return d
+  })
+  const fmtH = d => `${String(d.getHours()).padStart(2, '0')}h`
+  const dayLabel = d => d.toDateString() === now.toDateString() ? "Aujourd'hui" : 'Demain'
 
-  const timeline=family=>{
-    // deterministic pseudo-random from seed
-    const ok=hours.map((_,i)=>((family.seed*17+i*5)%11)<6)
-    return hours.map((h,i)=>`
-      <div class="w-weephyt-dot-wrap" title="${fmtH(h)} — ${ok[i]?'Fenêtre OK':'Fenêtre non OK'}">
-        <div class="w-weephyt-tl-dot" style="background:${ok[i]?'#2d9e5f':'#e07050'}"></div>
-        <div class="w-weephyt-tl-lbl">${i%3===0?fmtH(h):''}</div>
-      </div>`).join('')
+  const nextWindow = family => {
+    const ok = hours.map((_, i) => ((family.seed * 17 + parcelId * 13 + i * 5) % 11) < 6)
+    const start = ok.findIndex(v => v)
+    if (start === -1) return null
+    let end = start
+    while (end + 1 < ok.length && ok[end + 1]) end++
+    return { from: hours[start], to: new Date(hours[end].getTime() + 3600000) }
   }
 
-  el.innerHTML=`<div class="w-weephyt-wrap">
-    <div class="w-weephyt-tl-legend"><span style="color:#2d9e5f">● OK</span><span style="color:#e07050">● Non OK</span></div>
-    ${families.map(f=>`
-      <div class="w-weephyt-family">
-        <div class="w-weephyt-family-label">${f.label}</div>
-        <div class="w-weephyt-timeline">${timeline(f)}</div>
-      </div>`).join('')}
-    <div class="w-weephyt-src">Via <strong>Weephyt</strong> · ${crop||'—'}</div>
+  const rows = families.map(f => {
+    const w = nextWindow(f)
+    return `<div class="w-weephyt-family-row">
+      <span class="w-weephyt-family-label">${f.label}</span>
+      ${w
+        ? `<span class="w-weephyt-window"><i class="bi bi-check-circle-fill"></i> ${dayLabel(w.from)} ${fmtH(w.from)}–${fmtH(w.to)}</span>`
+        : `<span class="w-weephyt-window w-weephyt-window--none">Aucune fenêtre sous 24h</span>`}
+    </div>`
+  }).join('')
+
+  el.innerHTML = `<div class="w-weephyt-wrap">
+    ${rows}
+    <div class="w-weephyt-actions">
+      <button class="w-weephyt-btn w-weephyt-btn--pri" id="w-weephyt-saisir">Saisir un traitement</button>
+      <button class="w-weephyt-btn w-weephyt-btn--sec" id="w-weephyt-voir">Voir les traitements</button>
+    </div>
   </div>`
+
+  el.querySelector('#w-weephyt-saisir')?.addEventListener('click', () => window.openJournalModal?.('traitement'))
+  el.querySelector('#w-weephyt-voir')?.addEventListener('click', () => {
+    document.querySelector('.detail-tab-btn[data-pane="tab-journal"]')?.click()
+  })
 }
 
 const CUMULS_STATE_KEY = () => `w-cumuls-state-${parcelId}`
@@ -4402,7 +4424,7 @@ function renderWIrrigations(el) {
 
   const updateFooterLabel = () => {
     const ft = el.closest('.dash-block')?.querySelector('.dash-block-ft-link')
-    if (ft) ft.textContent = hasIrrigType ? 'Voir les irrigations →' : 'Gérer les irrigations →'
+    if (ft) ft.textContent = 'Voir détails →'
   }
 
   if (!hasIrrigType) {

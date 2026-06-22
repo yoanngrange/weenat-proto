@@ -303,7 +303,8 @@ export function initCapteursScreen(screenEl, role) {
         wrap.querySelector('#empty-add-sensor-btn').addEventListener('click', () => window.showMobileAddPage?.())
         return
       }
-      const bounds = []
+      const bounds = []      // tous les capteurs (filet de sécurité si aucun n'a la métrique)
+      const metBounds = []   // seulement les capteurs qui ont la métrique sélectionnée
       sensors.forEach(s => {
         const pos = sensorPos(s); if (!pos) return
         const measures = sensorMeasures(s.model, metricId)
@@ -337,10 +338,12 @@ export function initCapteursScreen(screenEl, role) {
           }).addTo(mapInstance)
         }
         bounds.push([pos.lat, pos.lng])
+        if (measures) metBounds.push([pos.lat, pos.lng])
       })
-      if (bounds.length) {
-        mapBounds = bounds
-        mapInstance.fitBounds(bounds, { padding: [32, 32] })
+      const fitTo = metBounds.length ? metBounds : bounds
+      if (fitTo.length) {
+        mapBounds = fitTo
+        mapInstance.fitBounds(fitTo, { padding: [32, 32] })
       }
       mapInstance.invalidateSize()
     }, 0)

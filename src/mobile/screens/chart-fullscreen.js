@@ -276,7 +276,12 @@ export function initChartFullscreen({ sensor = null, linkedSensorIds = [], metri
   }
 
   const metricIds = Object.keys(metricToSensor)
-  if (parcel && IRRIG_SEASON.some(i => i.plotId === parcel.id)) metricIds.push('irrigation')
+  // ETP, rayonnement et température de rosée sont toujours disponibles au niveau de la
+  // parcelle, même sans capteur qui les mesure spécifiquement.
+  if (parcel) {
+    ;['etp', 'rayonnement', 'temp_rosee'].forEach(mid => { if (!metricIds.includes(mid)) metricIds.push(mid) })
+    if (IRRIG_SEASON.some(i => i.plotId === parcel.id)) metricIds.push('irrigation')
+  }
   if (!metricIds.length) return
 
   // State

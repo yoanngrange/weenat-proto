@@ -238,7 +238,8 @@ export function initParcellesScreen(screenEl, role) {
         wrap.querySelector('#empty-create-parcel-btn').addEventListener('click', () => window.showMobileAddPage?.())
         return
       }
-      const bounds = []
+      const bounds = []      // toutes les parcelles (filet de sécurité si aucune n'a la métrique)
+      const metBounds = []   // seulement les parcelles qui ont la métrique sélectionnée
       plots.forEach(p => {
         const hasIrrig = metricId !== 'irrigation' || IRRIG_SEASON.some(i => i.plotId === p.id)
         const label = hasMetric(p, metricId) && hasIrrig ? `${getVal(p.id)} ${metric.unit}` : '—'
@@ -248,14 +249,14 @@ export function initParcellesScreen(screenEl, role) {
 
         const hasMet = hasMetric(p, metricId) && hasIrrig
         const dotColor = hasMet ? getMetricColor(metricId, getVal(p.id)) : '#0172A4'
+        const plotPts = (p.latlngs && p.latlngs.length >= 3) ? p.latlngs : [center]
 
         if (p.latlngs && p.latlngs.length >= 3) {
           const poly = L.polygon(p.latlngs, { color: '#fff', weight: 2, fillColor: dotColor, fillOpacity: 0.35 }).addTo(mapInstance)
           poly.on('click', openDetail)
-          bounds.push(...p.latlngs)
-        } else {
-          bounds.push(center)
         }
+        bounds.push(...plotPts)
+        if (hasMet) metBounds.push(...plotPts)
 
         // Centroïde cliquable — tooltip uniquement si la parcelle a la métrique
         const dot = L.circleMarker(center, {
@@ -287,9 +288,10 @@ export function initParcellesScreen(screenEl, role) {
         }
         dot.on('click', openDetail)
       })
-      if (bounds.length) {
-        mapBounds = bounds
-        mapInstance.fitBounds(bounds, { padding: [32, 32] })
+      const fitTo = metBounds.length ? metBounds : bounds
+      if (fitTo.length) {
+        mapBounds = fitTo
+        mapInstance.fitBounds(fitTo, { padding: [32, 32] })
       }
       mapInstance.invalidateSize()
     }, 0)

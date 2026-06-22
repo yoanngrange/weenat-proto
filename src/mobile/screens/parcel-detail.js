@@ -473,7 +473,8 @@ const MSR_STEP_LABELS = { '1h': 'Horaire', '1d': 'Journalier', '1w': 'Hebdo' }
 function chartCard(metricId, period, sensorId = null, plotId = null, step = '1h', subject = null) {
   const m = CHART_METRICS[metricId]; if (!m) return ''
   const cumulHtml = computeCumuls(metricId, period, m.cumulsType, plotId)
-  const detailLink = (sensorId || metricId === 'irrigation')
+  const ALWAYS_AVAILABLE = new Set(['irrigation', 'etp', 'rayonnement', 'temp_rosee'])
+  const detailLink = (sensorId || ALWAYS_AVAILABLE.has(metricId))
     ? `<div class="m-chart-details-link" data-sensor-id="${sensorId ?? ''}" data-metric-id="${metricId}">Voir détails →</div>`
     : ''
   const favBtn = subject
@@ -1777,18 +1778,8 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
     // Details link → open fullscreen chart
     layer.querySelectorAll('.m-chart-details-link').forEach(link => {
       link.addEventListener('click', () => {
-        if (link.dataset.metricId === 'irrigation') {
-          import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
-            linkedSensorIds,
-            metricId: 'irrigation',
-            backLabel: parcel.name,
-            parcel,
-          }))
-          return
-        }
-        const sid = +link.dataset.sensorId
-        const s = allSensors.find(x => x.id === sid)
-        if (!s) return
+        const sid = link.dataset.sensorId ? +link.dataset.sensorId : null
+        const s   = sid ? allSensors.find(x => x.id === sid) : null
         import('./chart-fullscreen.js').then(mod => mod.initChartFullscreen({
           sensor: s,
           linkedSensorIds,
