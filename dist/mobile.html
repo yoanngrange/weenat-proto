@@ -1497,6 +1497,7 @@
       border-radius: 14px; padding: 14px 14px 10px;
       border: 1px solid rgba(0,0,0,.07);
       box-shadow: 0 1px 4px rgba(0,0,0,.04);
+      overflow: hidden;
     }
     .m-widget-card-hd {
       display: flex; align-items: center; justify-content: space-between;
@@ -1572,6 +1573,18 @@
     .w-irrig-act-btn[disabled] { opacity: .38; cursor: not-allowed; pointer-events: none; }
     .m-widget-details-link { display: block; width: 100%; text-align: center; background: none; border: none; border-top: .5px solid rgba(0,0,0,.07); margin-top: 8px; padding: 9px 0 0; font-size: 13px; font-weight: 600; color: #0172A4; cursor: pointer; font-family: inherit; }
     .m-widget-details-link:active { opacity: .6; }
+    .w-weephyt-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .w-weephyt-family-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .w-weephyt-family-label { font-size: 12px; font-weight: 600; color: #3a3a3c; }
+    .w-weephyt-window { font-size: 12px; font-weight: 600; color: #1a9e40; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .w-weephyt-window--none { color: #8e8e93; font-weight: 500; }
+    .w-weephyt-actions { margin-top: 4px; }
+    .m-signal-metric { margin-bottom: 14px; }
+    .m-signal-metric-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .m-signal-bar-label { font-size: 13px; color: #3a3a3c; }
+    .m-signal-bar-pct { font-size: 13px; font-weight: 700; min-width: 36px; text-align: right; }
+    .m-signal-bar-track { height: 8px; background: #e5e5ea; border-radius: 4px; overflow: hidden; }
+    .m-signal-bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
     .w-irrig-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 8px 4px 16px; }
     .w-irrig-empty-msg { font-size: 12px; color: #8e8e93; line-height: 1.5; margin: 0; }
 
@@ -1806,6 +1819,7 @@
     .m-cumuls-saved-card {
       background: #fff; border-radius: 12px; border: 1px solid rgba(0,0,0,.08);
       padding: 12px 40px 12px 14px; display: flex; flex-direction: column; gap: 3px;
+      overflow: hidden;
     }
     .m-cumuls-saved-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .m-cumuls-saved-metric { font-size: 14px; font-weight: 600; color: #1c1c1e; }
@@ -1818,7 +1832,7 @@
     .m-pcumul-label { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
     .m-pcumul-value { font-size: 21px; font-weight: 700; line-height: 1.2; }
     .m-pcumul-unit { font-size: 13px; font-weight: 400; color: #8e8e93; margin-left: 4px; }
-    .m-pcumul-since { font-size: 11px; color: #8e8e93; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-top: 6px; }
+    .m-pcumul-since { font-size: 11px; color: #8e8e93; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
     .m-pcumul-date-inp { border: 1px solid #ccc; background: transparent; font-size: 11px; color: #8e8e93; cursor: pointer; font-family: inherit; padding: 3px 5px; border-radius: 5px; flex-shrink: 0; }
     .m-pcumul-cfg-btn { border: 1px solid #ccc; background: transparent; font-size: 11px; color: #8e8e93; cursor: pointer; font-family: inherit; padding: 3px 6px; border-radius: 5px; display: flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap; margin-left: auto; }
     .m-cumuls-del {
@@ -2664,7 +2678,7 @@
     }
     @keyframes ob-spin { to { transform: rotate(360deg); } }
   </style>
-  <script type="module" crossorigin src="/weenat-proto/assets/mobile-EKOnaoyl.js"></script>
+  <script type="module" crossorigin src="/weenat-proto/assets/mobile-BvvvEwhT.js"></script>
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/modulepreload-polyfill-B5Qt9EMX.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/plots-DhtWL7s_.js">
   <link rel="modulepreload" crossorigin href="/weenat-proto/assets/store-c0FlIf2T.js">

@@ -574,8 +574,11 @@ function paramsView(sensor) {
   const linkedPlots = (sensor.parcelIds || []).map(id => allPlots.find(p => p.id === id)).filter(Boolean)
   const primaryPlot = linkedPlots[0] || null
   const org = primaryPlot ? orgs.find(o => o.id === primaryPlot.orgId) : null
-  const signal = sensor.networkQuality || 0
-  const signalColor = signal > 70 ? '#30d158' : signal > 40 ? '#ff9f0a' : '#ff3b30'
+  const colorFor = v => v >= 80 ? '#30d158' : v >= 60 ? '#ff9f0a' : '#ff3b30'
+  const signal = sensor.networkQuality || 80
+  const signalColor = colorFor(signal)
+  const msg7d = sensor.messages7d || 85
+  const msgColor = colorFor(msg7d)
   const events = sensor.event ? (Array.isArray(sensor.event) ? sensor.event : [sensor.event]) : []
 
   const linkedPlotRows = linkedPlots.map((plot, i) => {
@@ -643,7 +646,11 @@ function paramsView(sensor) {
 
       <div class="m-list-section-header">Géolocalisation</div>
       <div class="m-list">
-        ${primaryPlot ? `<div id="sensor-minimap" class="m-minimap-container"></div>` : ''}
+        ${primaryPlot ? `<div id="sensor-minimap" class="m-minimap-container"></div>
+        <div class="m-list-row" data-action="expand-map">
+          <i class="bi bi-arrows-fullscreen" style="color:#0172A4"></i>
+          <span class="m-list-row-label" style="color:#0172A4">Agrandir la carte</span>
+        </div>` : ''}
         <div class="m-list-row">
           <span class="m-list-row-label">Commune</span>
           <span class="m-list-row-value">${org?.ville || '—'}</span>
@@ -672,13 +679,27 @@ function paramsView(sensor) {
               </div>`
             }).join('')
           : '<div class="m-list-row"><i class="bi bi-check-circle-fill" style="color:#30d158"></i><span class="m-list-row-label">Aucun événement en cours</span></div>'}
-        <div class="m-list-row">
-          <span class="m-list-row-label">Qualité du signal</span>
-          <span class="m-list-row-value" style="color:${signalColor};font-weight:600">${signal}%</span>
+      </div>
+
+      <div class="m-list-section-header">Réseau</div>
+      <div class="m-list" style="padding:12px 14px">
+        <div class="m-signal-metric">
+          <div class="m-signal-metric-row">
+            <span class="m-signal-bar-label">Qualité de la couverture réseau</span>
+            <span class="m-signal-bar-pct" style="color:${signalColor}">${signal}%</span>
+          </div>
+          <div class="m-signal-bar-track"><div class="m-signal-bar-fill" style="width:${signal}%;background:${signalColor}"></div></div>
         </div>
-        <div class="m-list-row m-list-row--last">
-          <span class="m-list-row-label">Émissions (moy. 7 j)</span>
-          <span class="m-list-row-value">${sensor.messages7d ?? '—'} msg</span>
+        <div class="m-signal-metric">
+          <div class="m-signal-metric-row">
+            <span class="m-signal-bar-label">Mesures reçues sur 7 jours</span>
+            <span class="m-signal-bar-pct" style="color:${msgColor}">${msg7d}%</span>
+          </div>
+          <div class="m-signal-bar-track"><div class="m-signal-bar-fill" style="width:${msg7d}%;background:${msgColor}"></div></div>
+        </div>
+        <div class="m-list-row m-list-row--last" style="padding:0;margin-top:4px">
+          <span class="m-list-row-label">Opérateur</span>
+          <span class="m-list-row-value">${sensor.telecom || 'Sigfox'}</span>
         </div>
       </div>
 
@@ -853,7 +874,10 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
     layer.querySelectorAll('.m-list-row[data-action]').forEach(row => {
       row.addEventListener('click', () => {
         const action = row.dataset.action
-        if (action === 'add-maintenance') {
+        if (action === 'expand-map') {
+          const primaryPlot = sensor.parcelIds.length ? allPlots.find(p => sensor.parcelIds.includes(p.id)) : null
+          if (primaryPlot) openSensorMapFullscreen(primaryPlot.lat, primaryPlot.lng)
+        } else if (action === 'add-maintenance') {
           openMobileSensorJournal(sensor, { openForm: true })
         } else if (action === 'add-plot') {
           openPlotPicker(sensor, role, renderView)
@@ -902,6 +926,7 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
           confirmLabel: 'Délier',
           onConfirm: () => {
             sensor.parcelIds = sensor.parcelIds.filter(id => id !== plotId)
+            addSJournalEntry(sensor.id, `Capteur délié de la parcelle « ${plot?.name || ''} »`)
             showToast(`Délié de ${plot?.name || 'la parcelle'}`)
             renderView()
           }
@@ -910,13 +935,16 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
     })
     layer.querySelector('#sensor-name-input')?.addEventListener('change', e => {
       const name = e.target.value.trim()
+      let previousName = ''
       try {
         const names = JSON.parse(localStorage.getItem('weenat-sensor-names')) || {}
+        previousName = names[sensor.id] || ''
         if (name) names[sensor.id] = name; else delete names[sensor.id]
         localStorage.setItem('weenat-sensor-names', JSON.stringify(names))
       } catch {}
       const titleEl = layer.querySelector('.m-detail-title')
       if (titleEl) titleEl.textContent = name || sensor.serial
+      addSJournalEntry(sensor.id, `Nom du capteur modifié : « ${previousName || sensor.serial} » → « ${name || sensor.serial} »`)
       window.dispatchEvent(new CustomEvent('weenat-sensor-renamed'))
     })
     layer.querySelector('#chp-depth-save')?.addEventListener('click', () => {
@@ -927,9 +955,11 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
       if (isNaN(val)) return
       val = Math.max(range[0], Math.min(range[1], val))
       input.value = val
+      const previousDepth = sensor.depth ?? range[0]
       sensor.depth = val
       const subtitleEl = layer.querySelector('.m-detail-subtitle')
       if (subtitleEl) subtitleEl.textContent = buildSensorSubtitle(sensor, sensorCity)
+      if (val !== previousDepth) addSJournalEntry(sensor.id, `Profondeur d'installation modifiée : ${previousDepth} cm → ${val} cm`)
       showToast(`Profondeur enregistrée : ${val} cm`)
     })
   }
@@ -965,7 +995,7 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
 const SENSOR_JRN_KEY = id => `sensor-journal-${id}`
 
 const MAINT_TYPES_M = [
-  { id: 'installation', label: 'Installation',           icon: 'bi-box-arrow-in-down', color: '#0172A4' },
+  { id: 'installation', label: "Ajouté à l'organisation", icon: 'bi-box-arrow-in-down', color: '#0172A4' },
   { id: 'batterie',     label: 'Remplacement batterie',  icon: 'bi-battery-charging',  color: '#e07820' },
   { id: 'antenne',      label: 'Remplacement antenne',   icon: 'bi-reception-4',       color: '#5b8dd9' },
   { id: 'bocal',        label: 'Remplacement bocal',     icon: 'bi-cup',               color: '#3a9e6a' },
@@ -996,6 +1026,33 @@ function getSJournal(sensorId) {
 
 function saveSJournal(sensorId, entries) {
   localStorage.setItem(SENSOR_JRN_KEY(sensorId), JSON.stringify(entries))
+}
+
+function addSJournalEntry(sensorId, texte) {
+  saveSJournal(sensorId, [{ id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), user: '', role: '', texte }, ...getSJournal(sensorId)])
+}
+
+function openSensorMapFullscreen(lat, lng) {
+  const layer = pushDetail(`
+    <div class="m-detail-header">
+      <div class="m-detail-topbar">
+        <button class="m-detail-back"><i class="bi bi-chevron-left"></i><span>Retour</span></button>
+        <span style="font-size:17px;font-weight:600">Localisation</span>
+        <div style="width:44px"></div>
+      </div>
+    </div>
+    <div class="m-detail-tabs" style="display:none"></div>
+    <div id="sensor-map-fullscreen" style="position:absolute;top:52px;left:0;right:0;bottom:0"></div>`)
+  layer.querySelector('.m-detail-back').addEventListener('click', popDetail)
+  setTimeout(() => {
+    const L = window.L
+    const el = layer.querySelector('#sensor-map-fullscreen')
+    if (!L || !el) return
+    const map = L.map(el, { zoomControl: true, attributionControl: false })
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(map)
+    map.setView([lat, lng], 16)
+    L.circleMarker([lat, lng], { radius: 9, color: '#fff', weight: 2, fillColor: '#5b8dd9', fillOpacity: 0.9 }).addTo(map)
+  }, 50)
 }
 
 function openPlotPicker(sensor, role, onChanged) {
@@ -1047,6 +1104,7 @@ function openPlotPicker(sensor, role, onChanged) {
             confirmLabel: 'Délier',
             onConfirm: () => {
               sensor.parcelIds = sensor.parcelIds.filter(id => id !== plot.id)
+              addSJournalEntry(sensor.id, `Capteur délié de la parcelle « ${plot.name} »`)
               showToast(`Délié de ${plot.name}`)
               renderList(query)
               onChanged()
@@ -1066,6 +1124,7 @@ function openPlotPicker(sensor, role, onChanged) {
             }, 280)
           } else {
             sensor.parcelIds = [...sensor.parcelIds, plot.id]
+            addSJournalEntry(sensor.id, `Capteur lié à la parcelle « ${plot.name} »`)
             showToast(`Lié à ${plot.name}`)
             renderList(query)
             onChanged()
@@ -1125,7 +1184,9 @@ function openConflictSheet(sensor, plot, conflicting, onLinked) {
   })
   body.querySelector('#keep-new').addEventListener('click', () => {
     conflicting.parcelIds = conflicting.parcelIds.filter(id => id !== plot.id)
+    addSJournalEntry(conflicting.id, `Capteur délié de la parcelle « ${plot.name} »`)
     sensor.parcelIds = [...sensor.parcelIds, plot.id]
+    addSJournalEntry(sensor.id, `Capteur lié à la parcelle « ${plot.name} »`)
     sheet.classList.remove('m-sheet-overlay--show')
     setTimeout(() => { sheet.remove(); showToast(`Lié à ${plot.name}`); onLinked() }, 280)
   })

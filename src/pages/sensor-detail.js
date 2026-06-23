@@ -1184,7 +1184,7 @@ function renderConfig() {
             <span style="font-size:12px;color:var(--txt2)">cm</span>
           </div>
         </div>
-        <button class="action-btn" style="margin-top:6px" onclick="showToastConfig()"><i class="bi bi-check-lg"></i> Enregistrer</button>
+        <button class="action-btn" id="chp-depth-save" style="margin-top:6px"><i class="bi bi-check-lg"></i> Enregistrer</button>
       </div>
     `
   }
@@ -1216,6 +1216,17 @@ function renderConfig() {
   } else {
     if (section) section.style.display = ''
     el.innerHTML = html
+    el.querySelector('#chp-depth-save')?.addEventListener('click', () => {
+      const r = model === 'CHP-15/30' ? [15, 30] : model === 'CHP-30/60' ? [30, 60] : [45, 90]
+      const input = el.querySelector('#chp-depth-input')
+      const v = +input.value
+      const previousDepth = sensor.depth ?? r[0]
+      if (v === previousDepth) { showToastConfig(); return }
+      sensor.depth = v
+      patchSensor(sensorId, { depth: v })
+      addSensorJournalEntry(`Profondeur d'installation modifiée : ${previousDepth} cm → ${v} cm`)
+      showToastConfig()
+    })
   }
 }
 
@@ -1794,7 +1805,8 @@ function getSensorJournal() {
   ]
   const seed = sensorId % 100
   const second = MAINT_VARIANTS[sensorId % MAINT_VARIANTS.length].id
-  const installDate = `${2022 + (sensorId % 3)}-${String(1 + (sensorId % 12)).padStart(2, '0')}-${String(1 + (sensorId * 3 % 27)).padStart(2, '0')}`
+  // Toujours antérieure aux autres entrées de démo (les plus anciennes datant de 2023-03-20) pour rester le 1er événement chronologique
+  const installDate = `${2021 + (sensorId % 2)}-${String(1 + (sensorId % 12)).padStart(2, '0')}-${String(1 + (sensorId * 3 % 27)).padStart(2, '0')}`
   const demo = [
     { id: 1, type: 'installation', date: installDate, user: technicien,   texte: '' },
     { id: 2, type: 'nettoyage',    date: '2023-03-20', user: utilisateur,  texte: NETTOYAGE_TEXTS[seed % NETTOYAGE_TEXTS.length] },

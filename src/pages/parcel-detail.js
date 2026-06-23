@@ -309,7 +309,7 @@ function getHatchCount() {
 
 // Catalog item name → widget ID
 const CATALOG_ITEM_ID = {
-  'Cumuls': 'cumuls',
+  'Cumuls': 'cumuls', 'Pluie': 'pluie-hist', 'Évapotranspiration': 'etp-hist',
   "Maï'zy": 'maizy', 'Suivi de culture': 'suivi-culture', 'Traitements': 'weephyt',
   'Decitrait': 'decitrait', 'Tavelure Pomme': 'tavelure',
   'DPV': 'dpv', 'THI': 'thi', 'Température de rosée': 'temp-rosee',
@@ -326,7 +326,7 @@ const CATALOG_ITEM_ID = {
 }
 
 const WIDGET_CATALOG_WEB = [
-  { title: 'Cumuls', items: ['Cumuls'] },
+  { title: 'Cumuls', items: ['Cumuls', 'Pluie', 'Évapotranspiration'] },
   { title: 'Outils aide à la décision', items: ["Maï'zy",'Suivi de culture','Traitements','Decitrait','Tavelure Pomme'] },
   { title: 'Indicateurs', items: ['DPV','THI','Température de rosée','Température du sol','Rayonnement solaire','Gel'] },
   { title: 'Prévisions', items: ['Prévisions à 5 jours','Prévisions à 6 heures','Prévisions du jour','Prévisions de tensiométrie'] },
@@ -484,7 +484,7 @@ function buildNewTypeDemo(author1, author2) {
   const variete = VARIETES[parcelBase.id % VARIETES.length]
   const dOffset = parcelBase.id % 6
   return [
-    { id: 1743465600000, type: 'cycle',     date: addDaysIso('2026-03-01', dOffset), auteur: author1, action: 'début', annee: '2026', texte: CYCLE_TEXTS[seed % CYCLE_TEXTS.length] },
+    { id: 1743465600000, type: 'cycle',     date: addDaysIso('2026-03-01', dOffset), auteur: author1, action: 'début', culture: crop, annee: '2026', texte: CYCLE_TEXTS[seed % CYCLE_TEXTS.length] },
     { id: 1743897600000, type: 'culture',   date: addDaysIso('2026-03-06', dOffset), auteur: author1, action: 'modification', culture: crop, variete, texte: 'Culture confirmée pour la saison 2026' },
     { id: 1744329600000, type: 'stade',     date: addDaysIso('2026-04-11', dOffset), auteur: author1, stade: stades[0], culture: crop, texte: '' },
     { id: 1745366400000, type: 'stade',     date: addDaysIso('2026-04-23', dOffset), auteur: author2, stade: stades[1], culture: crop, texte: '' },
@@ -643,6 +643,7 @@ function renderJournalTab() {
               </div>` : ''}
             ${e.type === 'cycle' ? `<div class="jrn-entry-meta">
                 <span class="jrn-entry-meta-chip"><i class="bi bi-arrow-right-circle"></i>${e.action === 'fin' ? 'Fin de cycle' : 'Début de cycle'}</span>
+                ${e.culture ? `<span class="jrn-entry-meta-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
                 ${e.annee ? `<span class="jrn-entry-meta-chip"><i class="bi bi-calendar3"></i>${e.annee}</span>` : ''}
               </div>` : ''}
             ${e.imageIds?.length ? `<div class="jrn-entry-photos-row" data-entry-id="${e.id}"></div>` : ''}
@@ -808,6 +809,10 @@ function openJournalForm(type) {
         </select>
       </div>
       <div class="journal-form-row">
+        <label class="journal-form-label">Culture</label>
+        <input type="text" id="jrn-f-culture" class="journal-form-input" value="${crop}" placeholder="Culture concernée">
+      </div>
+      <div class="journal-form-row">
         <label class="journal-form-label">Année</label>
         <input type="text" id="jrn-f-annee" class="journal-form-input" value="${new Date().getFullYear()}">
       </div>
@@ -889,8 +894,9 @@ function openJournalForm(type) {
       entry.unite   = modal.querySelector('#jrn-f-unite').value
       entry.methode = modal.querySelector('#jrn-f-methode').value
     } else if (type === 'cycle') {
-      entry.action = modal.querySelector('#jrn-f-action').value
-      entry.annee  = modal.querySelector('#jrn-f-annee').value.trim()
+      entry.action  = modal.querySelector('#jrn-f-action').value
+      entry.culture = modal.querySelector('#jrn-f-culture').value.trim()
+      entry.annee   = modal.querySelector('#jrn-f-annee').value.trim()
     }
 
     const hasData = texte || entry.produit || entry.culture || entry.stade || entry.volume || entry.annee || pendingImages.length
@@ -3265,8 +3271,10 @@ function initTabs() {
 
 const WIDGET_DEFS = {
   'previsions-5j':   { size:'1x1', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir détails', href:'previsions.html' } },
-  'weephyt':         { size:'1x1', title:'Traitements',                 icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt },
+  'weephyt':         { size:'1x1', title:'Traitements',                 icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt, footer: { label:'Voir détails', href:'#', tab:'journal' } },
   'cumuls':          { size:'1x1', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#2E75B6', render: renderWCumuls },
+  'pluie-hist':      { size:'2x1', title:'Pluie',                      icon:'bi-cloud-rain-heavy',      color:'#2E75B6', render: renderWHistBars('pluie'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'etp-hist':        { size:'2x1', title:'Évapotranspiration',         icon:'bi-moisture',              color:'#7DBDD7', render: renderWHistBars('etp'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
   'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir détails', href:'#', tab:'donnees' } },
   'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:'Voir détails', href:`irrigation.html?plot=${parcelId}` } },
   'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir détails', href:'previsions.html' } },
@@ -3318,7 +3326,7 @@ function pruneWidgetsAfterRemoval(remainingLinkedIds) {
   const hasCapa   = [...models].some(m => m.startsWith('CAPA-'))
   const hasTensio = [...models].some(m => TENSIO_MODELS.includes(m))
   // cumuls always valid: ETP + ensoleillement are sensor-independent; renderWCumuls filters pluie/DJ/HF internally
-  const valid = new Set(['previsions-5j', 'weephyt', 'cumuls'])
+  const valid = new Set(['previsions-5j', 'weephyt', 'cumuls', 'pluie-hist', 'etp-hist'])
   if (models.has('P+') || models.has('PT') || models.has('SMV') || models.has('P')) valid.add('w-station')
   if (models.has('TH'))     valid.add('w-thygro')
   if (models.has('T_MINI')) valid.add('w-tsol')
@@ -3362,8 +3370,12 @@ function computeDefaultWidgetIds() {
   const models  = new Set(linked.map(s => s.model))
   const hasCapa   = [...models].some(m => m.startsWith('CAPA-'))
   const hasTensio = [...models].some(m => TENSIO_MODELS.includes(m))
-  // cumuls always present: ETP + ensoleillement are always shown regardless of sensors
-  const ids = ['previsions-5j', 'weephyt', 'cumuls']
+  const hasIrrig = (!!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué')
+    || IRRIG_SEASON.some(i => i.plotId === parcelBase.id)
+  // Ordre par défaut : prévisions, irrigations, traitements, cumuls, données capteurs, puis pluie/ETP (J-7 -> J+7)
+  const ids = ['previsions-5j']
+  if (hasIrrig) ids.push('irrigations')
+  ids.push('weephyt', 'cumuls')
   if (models.has('P+') || models.has('PT') || models.has('SMV') || models.has('P')) ids.push('w-station')
   if (models.has('TH'))     ids.push('w-thygro')
   if (models.has('T_MINI')) ids.push('w-tsol')
@@ -3376,9 +3388,7 @@ function computeDefaultWidgetIds() {
   if (hasTensio) ids.push('w-tensio')
   if (models.has('EC'))     ids.push('w-ec')
   if (hasTensio || hasCapa) ids.push('bilan')
-  const hasIrrig = (!!parcelBase.irrigation && parcelBase.irrigation !== 'Non irrigué')
-    || IRRIG_SEASON.some(i => i.plotId === parcelBase.id)
-  if (hasIrrig) ids.push('irrigations')
+  ids.push('pluie-hist', 'etp-hist')
   return ids
 }
 
@@ -3590,14 +3600,10 @@ function renderWWeephyt(el) {
     ${rows}
     <div class="w-weephyt-actions">
       <button class="w-weephyt-btn w-weephyt-btn--pri" id="w-weephyt-saisir">Saisir un traitement</button>
-      <button class="w-weephyt-btn w-weephyt-btn--sec" id="w-weephyt-voir">Voir les traitements</button>
     </div>
   </div>`
 
   el.querySelector('#w-weephyt-saisir')?.addEventListener('click', () => window.openJournalModal?.('traitement'))
-  el.querySelector('#w-weephyt-voir')?.addEventListener('click', () => {
-    document.querySelector('.detail-tab-btn[data-pane="tab-journal"]')?.click()
-  })
 }
 
 const CUMULS_STATE_KEY = () => `w-cumuls-state-${parcelId}`
@@ -4047,6 +4053,9 @@ function renderWSensor(type) {
       'w-ec':    ()=>[{label:'Conductivité',val:rndf(0.1,3).toFixed(2)+' mS/cm',color:'#2BCDDE',icon:'bi-plug'}],
     }
     const rows=(rowsMap[type]||(() => []))()
+    const lastTs = new Date(Date.now() - Math.floor(5 + Math.random() * 55) * 60000)
+    const pad2 = n => String(n).padStart(2, '0')
+    const lastTsLabel = `${pad2(lastTs.getDate())}/${pad2(lastTs.getMonth()+1)}/${lastTs.getFullYear()} à ${pad2(lastTs.getHours())}:${pad2(lastTs.getMinutes())}`
     el.innerHTML=`
       <div class="w-sensor-rows">${rows.map(r=>`
         <div class="w-sensor-row">
@@ -4054,7 +4063,8 @@ function renderWSensor(type) {
           <span class="w-sensor-val" style="color:${r.color}">${r.val}</span>
           <span class="w-sensor-lbl">${r.label}</span>
         </div>`).join('')}</div>
-      <div class="w-sensor-src">${MODEL_NAMES[sensor.model]||sensor.model} · ${sensor.serial}</div>`
+      <div class="w-sensor-src">${MODEL_NAMES[sensor.model]||sensor.model} · ${sensor.serial}</div>
+      <div class="w-sensor-ts">Dernière mesure : ${lastTsLabel}</div>`
     // Update footer link to point to fullscreen chart page
     const ftLink = el.closest('.dash-block')?.querySelector('.dash-block-ft-link')
     if (ftLink) {
@@ -4062,6 +4072,57 @@ function renderWSensor(type) {
       ftLink.href = `capteur-graphique.html?sensorId=${sensor.id}&parcelId=${parcelId}&period=${currentPeriod}&step=${stepVal}`
       ftLink.removeAttribute('data-tab')
     }
+  }
+}
+
+// Histogramme J-7 -> J+7 (historique + prévision) pour la pluie ou l'évapotranspiration
+function renderWHistBars(kind) {
+  return (el) => {
+    const cfg = kind === 'pluie'
+      ? { color: '#2E75B6', unit: 'mm' }
+      : { color: '#7DBDD7', unit: 'mm' }
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const days = []
+    for (let off = -7; off <= 7; off++) {
+      const d = new Date(today); d.setDate(d.getDate() + off)
+      const seed = ((parcelId * 31 + (off + 7) * 17) % 101) / 101
+      const val = kind === 'pluie'
+        ? (seed > 0.72 ? +(2 + seed * 18).toFixed(1) : (seed > 0.5 ? +(seed * 4).toFixed(1) : 0))
+        : +(1.2 + seed * 4.2).toFixed(1)
+      days.push({ d, off, val, isFc: off > 0 })
+    }
+    const maxVal = Math.max(1, ...days.map(x => x.val))
+    const W = 600, H = 130, PT = 14, PB = 22, PL = 4, PR = 4
+    const innerH = H - PT - PB
+    const bw = (W - PL - PR) / days.length
+    const bars = days.map((x, idx) => {
+      const bx = PL + idx * bw
+      const bh = Math.max(0, (x.val / maxVal) * innerH)
+      const by = PT + innerH - bh
+      const fill = x.isFc ? `${cfg.color}55` : cfg.color
+      const stroke = x.isFc ? ` stroke="${cfg.color}" stroke-width="1" stroke-dasharray="2,2"` : ''
+      return `<rect x="${(bx + bw * 0.15).toFixed(1)}" y="${by.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${fill}"${stroke}/>`
+    }).join('')
+    const todayIdx = days.findIndex(x => x.off === 0)
+    const todayX = PL + todayIdx * bw + bw / 2
+    const labels = days.map((x, idx) => {
+      if (x.off % 3 !== 0) return ''
+      const lx = PL + idx * bw + bw / 2
+      const lbl = x.off === 0 ? 'Auj.' : `${x.d.getDate()}/${x.d.getMonth() + 1}`
+      return `<text x="${lx.toFixed(1)}" y="${H - 6}" font-size="8" text-anchor="middle" fill="var(--txt3)">${lbl}</text>`
+    }).join('')
+    const totalHist = days.filter(x => !x.isFc).reduce((s, x) => s + x.val, 0)
+    const totalFc   = days.filter(x => x.isFc).reduce((s, x) => s + x.val, 0)
+    el.innerHTML = `
+      <div class="w-hist-summary">
+        <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${cfg.color}"></span>7 derniers jours : <strong>${totalHist.toFixed(1)} ${cfg.unit}</strong></span>
+        <span class="w-hist-summary-item"><span class="w-hist-dot w-hist-dot--fc" style="border-color:${cfg.color}"></span>Prévision 7 jours : <strong>${totalFc.toFixed(1)} ${cfg.unit}</strong></span>
+      </div>
+      <svg class="w-hist-svg" width="100%" height="110" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <line x1="${todayX.toFixed(1)}" y1="${PT}" x2="${todayX.toFixed(1)}" y2="${PT + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="2,2"/>
+        ${bars}
+        ${labels}
+      </svg>`
   }
 }
 

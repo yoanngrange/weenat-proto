@@ -6534,13 +6534,13 @@ tr.row-selected td {
 .w-weephyt-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; }
 .w-weephyt-btn { flex: 1; border-radius: 8px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; border: 1px solid #1a9e40; }
 .w-weephyt-btn--pri { background: #1a9e40; color: #fff; }
-.w-weephyt-btn--sec { background: none; color: #1a9e40; }
 .w-weephyt-btn--pri:hover { background: #158536; }
-.w-weephyt-btn--sec:hover { background: rgba(26,158,64,.08); }
 
 /* Cumuls */
 .w-cumuls-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.w-cumul-item { display: flex; align-items: flex-start; gap: 8px; background: var(--bg); border: 1px solid var(--bdr2); border-radius: 7px; padding: 7px 8px; }
+.w-cumul-item { display: flex; align-items: flex-start; gap: 8px; background: var(--bg); border: 1px solid var(--bdr2); border-radius: 7px; padding: 7px 8px; min-width: 0; }
+.w-cumul-body { min-width: 0; }
+.w-cumul-date-input { max-width: 100%; box-sizing: border-box; }
 .w-cumul-icon { font-size: 14px; flex-shrink: 0; margin-top: 2px; }
 .w-cumul-body { flex: 1; min-width: 0; }
 .w-cumul-lbl { font-size: 11px; color: var(--txt3); display: flex; align-items: center; gap: 4px; }
@@ -6705,6 +6705,14 @@ tr.row-selected td {
 .w-sensor-val { font-weight: 700; min-width: 55px; }
 .w-sensor-lbl { font-size: 11px; color: var(--txt3); }
 .w-sensor-src { font-size: 10px; color: var(--txt3); margin-top: 6px; }
+.w-sensor-ts { font-size: 10px; color: var(--txt3); margin-top: 2px; }
+
+.w-hist-summary { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--txt2); margin-bottom: 4px; }
+.w-hist-summary-item { display: flex; align-items: center; gap: 5px; }
+.w-hist-summary-item strong { color: var(--txt); }
+.w-hist-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+.w-hist-dot--fc { background: transparent; border: 1px dashed; }
+.w-hist-svg { display: block; width: 100%; height: auto; }
 
 .notif-page-info { font-size: 13px; color: var(--txt2); }
 

@@ -41,7 +41,7 @@ const WIDGET_CATALOG = [
   { title: 'Prévisions',                items: [{ label: 'Prévisions à 5 jours',   id: 'previsions-5j' },
                                                   { label: 'Prévisions à 6 heures', id: 'previsions-6h' }] },
   { title: 'Outils aide à la décision', items: [{ label: "Maï'zy",                id: 'maizy'         },
-                                                  { label: 'Weephyt',              id: 'weephyt'       },
+                                                  { label: 'Traitements',          id: 'weephyt'       },
                                                   { label: 'Decitrait',            id: 'decitrait'     },
                                                   { label: 'Tavelure Pomme',       id: 'tavelure'      }] },
   { title: 'Indicateurs',               items: [{ label: 'DPV',                    id: 'dpv'           },
@@ -81,7 +81,7 @@ const _PARCEL_DASH_KEY = id => `dash-widgets-parcel-${id}`
 function _computeDefaultWidgetIds(parcel, linkedSensorIds) {
   const linked  = linkedSensorIds.map(id => allSensors.find(s => s.id === id)).filter(Boolean)
   const models  = new Set(linked.map(s => s.model))
-  const ids     = ['previsions-5j', 'cumuls', 'irrigations']
+  const ids     = ['previsions-5j', 'weephyt', 'cumuls', 'irrigations']
   Object.entries(WIDGET_SENSOR_MODELS).forEach(([wid, wModels]) => {
     if (wModels.some(m => models.has(m))) ids.push(wid)
   })
@@ -640,6 +640,7 @@ function widgetsView(parcel, linkedSensorIds = []) {
     if (wid === 'irrigations')        html += irrigationWidget(parcel)
     else if (wid === 'cumuls')        html += mWidgetCumuls(parcel, linkedSensorIds)
     else if (wid === 'previsions-5j') html += mWidgetPrev5j(parcel)
+    else if (wid === 'weephyt')       html += mWidgetTraitements(parcel)
     else if (wid === 'irrelis')       html += irrelisMobileWidget(parcel)
     else if (WIDGET_SENSOR_MODELS[wid]) {
       const wModels  = new Set(WIDGET_SENSOR_MODELS[wid])
@@ -752,8 +753,10 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
           <div class="m-pcumul-value" style="color:${it.color}">${it.val}<span class="m-pcumul-unit">${it.unit}</span></div>
           <div class="m-pcumul-since">
             <span>Depuis le</span>
-            <input type="date" class="m-pcumul-date m-pcumul-date-inp" data-cid="${it.id}" data-pid="${parcel.id}" value="${d}">
-            ${it.cfg ? `<button class="m-pcumul-cfg m-pcumul-cfg-btn" data-cid="${it.id}" data-pid="${parcel.id}"><i class="bi bi-gear"></i> ${it.cfgLabel}</button>` : ''}
+            <div class="m-pcumul-since-row">
+              <input type="date" class="m-pcumul-date m-pcumul-date-inp" data-cid="${it.id}" data-pid="${parcel.id}" value="${d}">
+              ${it.cfg ? `<button class="m-pcumul-cfg m-pcumul-cfg-btn" data-cid="${it.id}" data-pid="${parcel.id}"><i class="bi bi-gear"></i> ${it.cfgLabel}</button>` : ''}
+            </div>
           </div>
           <button class="m-pcumul-details m-widget-details-link" data-cid="${it.id}" data-pid="${parcel.id}" data-label="${it.label}" data-unit="${it.unit}" data-color="${it.color}" data-val="${it.val}" data-from="${d}">Voir détails →</button>
         </div>`
@@ -761,6 +764,50 @@ function mWidgetCumuls(parcel, linkedSensorIds = []) {
     : `<div style="font-size:13px;color:#8e8e93;padding:4px 0 4px">Tous les cumuls ont été supprimés.</div>${restoreHtml}`
 
   return mWidgetCard('Cumuls', 'bi-bar-chart-fill', '#0172A4', body, 'cumuls')
+}
+
+function mWidgetTraitements(parcel) {
+  const now = new Date()
+  const families = [
+    { label: 'Herbicides de contact', seed: 7 },
+    { label: 'Fongicides', seed: 3 },
+    { label: 'Herbicides racinaires', seed: 11 },
+    { label: 'Herbicides systémiques', seed: 5 },
+  ]
+  const hours = Array.from({ length: 24 }, (_, i) => {
+    const d = new Date(now); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + i); return d
+  })
+  const fmtH = d => `${String(d.getHours()).padStart(2, '0')}h`
+  const dayLabel = d => d.toDateString() === now.toDateString() ? "Aujourd'hui" : 'Demain'
+
+  const nextWindow = family => {
+    const ok = hours.map((_, i) => ((family.seed * 17 + parcel.id * 13 + i * 5) % 11) < 6)
+    const start = ok.findIndex(v => v)
+    if (start === -1) return null
+    let end = start
+    while (end + 1 < ok.length && ok[end + 1]) end++
+    return { from: hours[start], to: new Date(hours[end].getTime() + 3600000) }
+  }
+
+  const rows = families.map(f => {
+    const w = nextWindow(f)
+    return `<div class="w-weephyt-family-row">
+      <span class="w-weephyt-family-label">${f.label}</span>
+      ${w
+        ? `<span class="w-weephyt-window"><i class="bi bi-check-circle-fill"></i> ${dayLabel(w.from)} ${fmtH(w.from)}–${fmtH(w.to)}</span>`
+        : `<span class="w-weephyt-window w-weephyt-window--none">Aucune fenêtre sous 24h</span>`}
+    </div>`
+  }).join('')
+
+  const body = `<div class="w-weephyt-wrap">
+    ${rows}
+    <div class="w-weephyt-actions">
+      <button class="w-irrig-act-btn w-irrig-act-btn--pri m-weephyt-saisir" type="button" data-pid="${parcel.id}">Saisir un traitement</button>
+    </div>
+    <button class="m-widget-details-link m-weephyt-details" type="button" data-pid="${parcel.id}">Voir détails →</button>
+  </div>`
+
+  return mWidgetCard('Traitements', 'bi-shield-check', '#1a9e40', body, 'weephyt')
 }
 
 const _prev5jCache = {}
@@ -2043,6 +2090,13 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         }))
       })
     })
+    // Traitements widget
+    layer.querySelector('.m-weephyt-saisir')?.addEventListener('click', () => {
+      openMJournalForm('traitement', parcel.id, () => {})
+    })
+    layer.querySelector('.m-weephyt-details')?.addEventListener('click', () => {
+      openMobileParcelJournal(parcel)
+    })
     // Parcel cumuls — date
     layer.querySelectorAll('.m-pcumul-date').forEach(input => {
       input.addEventListener('click', () => input.showPicker?.())
@@ -2339,6 +2393,7 @@ function openMobileParcelJournal(parcel) {
               ${e.type === 'cycle' ? `
                 <div class="m-jrn-meta">
                   <span class="m-jrn-chip"><i class="bi bi-arrow-right-circle"></i>${e.action === 'fin' ? 'Fin de cycle' : 'Début de cycle'}</span>
+                  ${e.culture ? `<span class="m-jrn-chip"><i class="bi bi-flower1"></i>${e.culture}</span>` : ''}
                   ${e.annee ? `<span class="m-jrn-chip"><i class="bi bi-calendar3"></i>${e.annee}</span>` : ''}
                 </div>` : ''}
             </div>
@@ -2490,6 +2545,10 @@ function openMJournalForm(type, parcelId, onSaved) {
         </select>
       </div>
       <div>
+        <div class="m-form-label">Culture</div>
+        <input type="text" class="m-sheet-input" id="mjf-culture" value="${crop}" placeholder="Culture concernée">
+      </div>
+      <div>
         <div class="m-form-label">Année</div>
         <input type="text" class="m-sheet-input" id="mjf-annee" value="${new Date().getFullYear()}">
       </div>
@@ -2537,8 +2596,9 @@ function openMJournalForm(type, parcelId, onSaved) {
         entry.unite   = body.querySelector('#mjf-unite').value
         entry.methode = body.querySelector('#mjf-methode').value
       } else if (type === 'cycle') {
-        entry.action = body.querySelector('#mjf-action').value
-        entry.annee  = body.querySelector('#mjf-annee').value.trim()
+        entry.action  = body.querySelector('#mjf-action').value
+        entry.culture = body.querySelector('#mjf-culture').value.trim()
+        entry.annee   = body.querySelector('#mjf-annee').value.trim()
       }
 
       const hasData = texte || entry.produit || entry.culture || entry.stade || entry.volume || entry.annee
