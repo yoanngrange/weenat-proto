@@ -186,6 +186,9 @@ color: grey;
   margin-bottom: 5px;
 }
 
+.web-nav-icon { display: inline-flex; flex-shrink: 0; }
+.web-nav-icon svg { width: 15px; height: 15px; fill: currentColor; }
+
 #nav-links a:hover {
   background-color: var(--pri2);
 }
@@ -1744,6 +1747,11 @@ button {
 .filter-items {
   max-height: 200px;
   overflow-y: auto;
+}
+
+.filter-group-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--txt3); padding: 8px 10px 4px;
 }
 
 .filter-dropdown-panel label:hover {
@@ -8144,6 +8152,7 @@ details[open] > summary .irr-pr-caret { transform: rotate(90deg); }
   line-height: 1; padding: 0; opacity: .4; transition: opacity .15s;
 }
 .irr-gl-add:hover { opacity: 1; }
+.irr-gl-star { color: #FBAF05; font-size: 12px; margin-left: 4px; flex-shrink: 0; cursor: help; }
 .irr-gl-legend {
   display: flex; gap: 16px; padding: 8px 24px;
   font-size: 11px; color: var(--txt2); flex-wrap: wrap;

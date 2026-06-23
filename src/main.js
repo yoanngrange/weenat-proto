@@ -4,7 +4,7 @@ import { plots } from './data/plots.js'
 import { sensors } from './data/sensors.js'
 import { members } from './data/members.js'
 import { openExportModal } from './modules/export-modal.js'
-import { applyStoredPlotPatches, getParcel } from './data/store.js'
+import { applyStoredPlotPatches, getParcel, getStoredSensor } from './data/store.js'
 import { ADHERENT_ORG_ID, ADMIN_ORG_ID, IRRIG_TYPES, SOIL_TYPES } from './data/constants.js'
 import { IRRIG_SEASON } from './data/irrigations.js'
 applyStoredPlotPatches(plots)
@@ -605,16 +605,70 @@ function rebuildParcelFilter() {
     { set: v => { selectedParcelNames = v; updateContent() } }, 'badge-parcel-filter', true)
 }
 
-// Secteur (membre) panel for capteurs — limité à sa propre org pour l'adhérent
+// Secteur (membre) panel — 2 groupes : Mon exploitation (Ferme du Bocage) / Mon réseau
+// (membres réseau affectés à mon org, une de mes parcelles, ou un de mes capteurs)
 function rebuildMemberFilter() {
   const panelMember = document.getElementById('panel-member-filter')
   if (!panelMember) return
-  const sourceMembers = currentRole === 'adherent' ? members.filter(m => m.orgIds.includes(ADHERENT_ORG_ID)) : members
-  const allMemberNames = sourceMembers.filter(m => m.statut === 'actif').map(m => `${m.prenom} ${m.nom}`).sort()
+
+  const myOrgPlotIds = new Set(plots.filter(p => p.orgId === ADHERENT_ORG_ID).map(p => p.id))
+  const myOrgSensorIds = sensors.filter(s => s.orgId === ADHERENT_ORG_ID).map(s => s.id)
+  const sensorAssignedMemberIds = new Set()
+  myOrgSensorIds.forEach(sid => {
+    (getStoredSensor(sid).linkedOrgMemberIds || []).forEach(mid => sensorAssignedMemberIds.add(mid))
+  })
+
+  const exploitationNames = members
+    .filter(m => m.source === 'adherent' && m.statut === 'actif' && m.orgIds.includes(ADHERENT_ORG_ID))
+    .map(m => `${m.prenom} ${m.nom}`).sort()
+
+  const reseauNames = members
+    .filter(m => m.source === 'réseau' && m.statut === 'actif' && (
+      m.orgIds.includes(ADHERENT_ORG_ID) ||
+      (m.parcelIds || []).some(pid => myOrgPlotIds.has(pid)) ||
+      sensorAssignedMemberIds.has(m.id)
+    ))
+    .map(m => `${m.prenom} ${m.nom}`).sort()
+
   selectedMemberNames = []
   updateBadge('badge-member-filter', 0)
-  makeCheckboxPanel('panel-member-filter', allMemberNames,
-    { set: v => { selectedMemberNames = v; updateContent() } }, 'badge-member-filter', true)
+  makeGroupedCheckboxPanel('panel-member-filter', [
+    { label: 'Mon exploitation', names: exploitationNames },
+    { label: 'Mon réseau', names: reseauNames },
+  ], { set: v => { selectedMemberNames = v; updateContent() } }, 'badge-member-filter')
+}
+
+// Variante de makeCheckboxPanel avec des groupes affichés sous un en-tête (ex. Secteur)
+function makeGroupedCheckboxPanel(panelId, groups, stateRef, badgeId) {
+  const panel = document.getElementById(panelId)
+  if (!panel) return
+  const allNames = groups.flatMap(g => g.names)
+
+  function buildGroups() {
+    return groups.map(g => g.names.length ? `
+      <div class="filter-group-label">${g.label}</div>
+      <div class="filter-items">${g.names.map(v => `<label><input type="checkbox" value="${v}"> ${v}</label>`).join('')}</div>
+    ` : '').join('')
+  }
+
+  const allLabel = `<label class="filter-all-label"><input type="checkbox" class="cb-all-generic"> Tous</label>`
+  panel.innerHTML = allLabel + buildGroups()
+
+  const cbAll = panel.querySelector('.cb-all-generic')
+  cbAll?.addEventListener('change', () => {
+    panel.querySelectorAll('.filter-items input[type=checkbox]').forEach(cb => { cb.checked = cbAll.checked })
+    const checked = cbAll.checked ? allNames : []
+    stateRef.set(checked)
+    if (badgeId) updateBadge(badgeId, checked.length)
+  })
+  panel.querySelectorAll('.filter-items input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const checked = [...panel.querySelectorAll('.filter-items input[type=checkbox]:checked')].map(c => c.value)
+      cbAll.checked = checked.length === allNames.length
+      stateRef.set(checked)
+      if (badgeId) updateBadge(badgeId, checked.length)
+    })
+  })
 }
 
 function updateBadge(id, count) {

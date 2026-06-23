@@ -2,7 +2,7 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { IRRIG_SEASON } from '../data/irrigations.js'
-import { applyStoredPlotPatches } from '../data/store.js'
+import { applyStoredPlotPatches, getCumulsFavoris, saveCumulsFavoris } from '../data/store.js'
 import { orgs } from '../data/orgs.js'
 applyStoredPlotPatches(plots)
 
@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPhenologyWidget()
   renderTreatmentWidget()
   renderSensorWidget()
+  renderCumulsWidget()
   setupCollapsible()
   setupWidgetMenus()
   setupIrrigButtons()
@@ -626,6 +627,63 @@ function renderSensorWidget() {
     </div>`
 
   bindWidgetToggles(container)
+}
+
+// ─── Cumuls favoris widget ────────────────────────────────────────────────────
+
+function renderCumulsWidget() {
+  const container = document.getElementById('tdb-cumuls')
+  if (!container) return
+  const state = getCumulsFavoris()
+  const visible = state.list.filter(c => !state.hidden.includes(c.id))
+  const hidden  = state.list.filter(c => state.hidden.includes(c.id))
+
+  const itemHtml = c => `
+    <div class="w-cumul-item">
+      <i class="bi bi-bar-chart-fill w-cumul-icon" style="color:${c.color}"></i>
+      <div class="w-cumul-body">
+        <div class="w-cumul-lbl">${c.label}</div>
+        <div class="w-cumul-val" style="color:${c.color}">${c.val}</div>
+        <div class="w-cumul-date">${c.subjectLabel}</div>
+      </div>
+      <button class="tdb-cumul-del" data-id="${c.id}" title="Retirer">×</button>
+    </div>`
+
+  const restoreHtml = hidden.length
+    ? `<div style="border-top:1px solid var(--bdr2);padding-top:8px;margin-top:8px">
+        <div style="font-size:11px;color:var(--txt3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Disponibles</div>
+        ${hidden.map(c => `
+          <button class="tdb-cumul-restore" data-id="${c.id}" type="button"
+            style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px dashed var(--bdr);border-radius:8px;padding:7px 10px;background:none;cursor:pointer;font-family:inherit;margin-bottom:6px">
+            <i class="bi bi-bar-chart-fill" style="color:${c.color};font-size:14px;flex-shrink:0"></i>
+            <span style="font-size:12px;color:var(--txt);flex:1">${c.label} — ${c.subjectLabel}</span>
+            <i class="bi bi-plus-circle" style="color:var(--pri);font-size:14px;flex-shrink:0"></i>
+          </button>`).join('')}
+      </div>`
+    : ''
+
+  container.innerHTML = visible.length || hidden.length
+    ? `<div class="w-cumuls-list">${visible.map(itemHtml).join('')}</div>${restoreHtml}`
+    : `<p class="tdb-widget-empty">Aucun cumul enregistré. Ajoutez-en depuis l'onglet "Données" d'une parcelle.</p>`
+
+  container.querySelectorAll('.tdb-cumul-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = +btn.dataset.id
+      const s = getCumulsFavoris()
+      if (!s.hidden.includes(id)) s.hidden.push(id)
+      saveCumulsFavoris(s)
+      renderCumulsWidget()
+    })
+  })
+  container.querySelectorAll('.tdb-cumul-restore').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = +btn.dataset.id
+      const s = getCumulsFavoris()
+      s.hidden = s.hidden.filter(h => h !== id)
+      saveCumulsFavoris(s)
+      renderCumulsWidget()
+    })
+  })
 }
 
 // ─── Phenology widget ─────────────────────────────────────────────────────────

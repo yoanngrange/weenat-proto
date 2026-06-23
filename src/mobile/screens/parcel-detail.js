@@ -17,6 +17,13 @@ function irrigPlots(parcel) {
   return _role === 'adherent' ? allPlots.filter(p => p.orgId === parcel.orgId) : allPlots
 }
 
+// Header pages de détail : $ville . $culture . $typeIrrigation (même esprit que sensor-detail.js)
+const NO_IRRIG_TYPES_HD = new Set(['Non irrigué', 'Non renseigné', ''])
+function headerSubtitle(parcel, city) {
+  const irrig = parcel.irrigation && !NO_IRRIG_TYPES_HD.has(parcel.irrigation) ? parcel.irrigation : null
+  return [city, parcel.crop, irrig].filter(Boolean).join(' · ')
+}
+
 const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
 // Capteurs liés sur la mini-carte parcelle : un point chacun, ou une flèche directionnelle
@@ -1416,7 +1423,7 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
         <button class="m-detail-star" id="d-star"><i class="bi bi-star"></i></button>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${parcel.name}</div>
-          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[city, parcel.crop].filter(Boolean).join(' · ')}</div>` : ''}
+          ${headerSubtitle(parcel, city) ? `<div class="m-detail-subtitle">${headerSubtitle(parcel, city)}</div>` : ''}
         </div>
         <button class="m-detail-journal-btn" id="d-journal" title="Journal"><i class="bi bi-journal-text"></i></button>
       </div>
@@ -2344,7 +2351,7 @@ function openMobileParcelJournal(parcel) {
         <div style="width:38px"></div>
         <div class="m-detail-title-block">
           <div class="m-detail-title">${parcel.name}</div>
-          ${(parcel.crop || city) ? `<div class="m-detail-subtitle">${[city, parcel.crop].filter(Boolean).join(' · ')}</div>` : ''}
+          ${headerSubtitle(parcel, city) ? `<div class="m-detail-subtitle">${headerSubtitle(parcel, city)}</div>` : ''}
         </div>
         <div style="width:38px"></div>
       </div>

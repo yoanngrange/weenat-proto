@@ -3,6 +3,7 @@ import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { members } from '../data/members.js'
 import { orgs } from '../data/orgs.js'
 import { network } from '../data/network.js'
+import { BILLING_ENTITIES } from '../data/constants.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb()
@@ -22,14 +23,20 @@ const CONTRACT = {
   prixUnitaire:         29,   // € HT / mois
 }
 
-const BILLING_ADDR = {
-  societe:    network.nom,
-  siret:      network.siret,
-  adresse:    network.siege.adresse,
-  cp:         network.siege.codePostal,
-  ville:      network.siege.ville,
-  pays:       network.siege.pays,
+// Une adresse de facturation distincte par entité de facturation du réseau
+const BILLING_ADDR_BY_ENTITY = {
+  [BILLING_ENTITIES[0]]: {
+    societe: network.nom, siret: network.siret, adresse: network.siege.adresse,
+    cp: network.siege.codePostal, ville: network.siege.ville, pays: network.siege.pays,
+  },
+  [BILLING_ENTITIES[1]]: {
+    societe: "Agri'Up SAS", siret: '85234671900028', adresse: "12 rue de l'Innovation",
+    cp: '35000', ville: 'Rennes', pays: 'FR',
+  },
 }
+
+let currentEntity = BILLING_ENTITIES[0]
+function currentAddr() { return BILLING_ADDR_BY_ENTITY[currentEntity] }
 
 // ── Main render ───────────────────────────────────────────────────────────────
 

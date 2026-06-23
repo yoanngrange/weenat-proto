@@ -4,6 +4,13 @@ import { sensors } from '../data/sensors.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getStoredOrgs, saveOrgs } from '../data/store.js'
+import { BILLING_ENTITIES } from '../data/constants.js'
+
+// Entité de facturation : valeur stockée si renseignée à l'invitation, sinon répartition
+// déterministe (25% Agri'Up, le reste ABC) pour avoir un jeu de démo cohérent.
+function getFacturePar(org) {
+  return org.facturePar || (org.id % 4 === 0 ? BILLING_ENTITIES[1] : BILLING_ENTITIES[0])
+}
 
 // Map raw org statut → simplified filter key
 const STATUT_SIMPLIFIED = {
@@ -162,7 +169,7 @@ function render() {
   tbody.innerHTML = ''
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
     updateActionBar()
     return
   }
@@ -205,6 +212,7 @@ function render() {
       <td class="member-email">${org.codeAdherent}</td>
       <td>${proprietaireHtml}</td>
       <td><span class="plan-badge plan-badge--${(org.plan||'').toLowerCase()}">${org.plan}</span></td>
+      <td>${getFacturePar(org)}</td>
       <td>
         <span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${simplified}</span>
         ${simplified === "demande d'essai" ? `
@@ -355,6 +363,7 @@ function sortKey(o, col) {
   if (col === 'code')        return o.codeAdherent
   if (col === 'proprietaire') return `${o.nomProprietaire} ${o.prenomProprietaire}`.toLowerCase()
   if (col === 'plan')        return o.plan
+  if (col === 'facture-par') return getFacturePar(o)
   if (col === 'statut')      return o.statut
   if (col === 'date')        return o.dateAdhesion || ''
   if (col === 'ville')       return `${o.ville} ${o.departement}`.toLowerCase()

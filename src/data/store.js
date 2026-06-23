@@ -119,3 +119,26 @@ export function patchOrgData(id, patch) {
   store[`org_${id}`] = { ...(store[`org_${id}`] || {}), ...patch }
   save(store)
 }
+
+// ─── Cumuls favoris (widget tableau de bord) ───────────────────────────────────
+
+const CUMULS_FAV_MAX = 8
+
+export function getCumulsFavoris() {
+  return load()['cumulsFavoris'] || { list: [], hidden: [] }
+}
+
+export function saveCumulsFavoris(state) {
+  const store = load()
+  store['cumulsFavoris'] = state
+  save(store)
+}
+
+// Renvoie 'ok' ou 'max' (limite CUMULS_FAV_MAX atteinte)
+export function addCumulFavori(entry) {
+  const state = getCumulsFavoris()
+  if (state.list.length >= CUMULS_FAV_MAX) return 'max'
+  state.list.push({ id: Date.now(), ...entry })
+  saveCumulsFavoris(state)
+  return 'ok'
+}

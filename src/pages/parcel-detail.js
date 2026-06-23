@@ -4,7 +4,7 @@ import { sensors as allSensors } from '../data/sensors.js'
 import { orgs } from '../data/orgs.js'
 import { members } from '../data/members.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
-import { getParcel, patchParcel } from '../data/store.js'
+import { getParcel, patchParcel, addCumulFavori } from '../data/store.js'
 import { IRRIG_SEASON, saveIrrig, generateSeasonId } from '../data/irrigations.js'
 import { IRRIG_TYPES, SOIL_TYPES, SOIL_ANALYSIS_OPTION, ENV_TYPES } from '../data/constants.js'
 
@@ -987,9 +987,10 @@ document.addEventListener('DOMContentLoaded', () => {
     e.stopPropagation()
     const label = btn.dataset.cumulLabel, val = btn.dataset.cumulVal
     if (!confirm(`Ajouter "${label} : ${val}" au tableau de bord ?`)) return
-    // TODO: persist to dashboard layout
+    const color = btn.closest('.chart-card')?.dataset.color || 'var(--pri)'
+    const result = addCumulFavori({ label, val, color, subjectLabel: parcelBase.name })
     const toast = document.createElement('div')
-    toast.textContent = 'Cumul ajouté au tableau de bord'
+    toast.textContent = result === 'max' ? 'Limite de cumuls au tableau de bord atteinte' : 'Cumul ajouté au tableau de bord'
     Object.assign(toast.style, { position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', background:'rgba(28,28,30,.9)', color:'#fff', padding:'8px 16px', borderRadius:'8px', fontSize:'13px', zIndex:'9999', pointerEvents:'none' })
     document.body.appendChild(toast)
     setTimeout(() => toast.remove(), 2500)

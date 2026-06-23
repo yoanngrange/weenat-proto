@@ -1,9 +1,12 @@
 import { IRRIG_SEASON, RAIN_DATA, saveIrrig, generateSeasonId } from '../data/irrigations.js'
 import { IRRIG_TYPES } from '../data/constants.js'
 import { plots as ALL_PLOTS } from '../data/plots.js'
+import { sensors } from '../data/sensors.js'
 import { orgs } from '../data/orgs.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
 import { getParcel, patchParcel, getOrgData, patchOrgData } from '../data/store.js'
+
+const TENSIO_MODELS = ['CHP-15/30', 'CHP-30/60', 'CHP-60/90']
 
 const ADHERENT_ORG_ID = 1
 const IS_ADMIN = (localStorage.getItem('menuRole') || 'admin-reseau') === 'admin-reseau'
@@ -19,6 +22,7 @@ let advisorEnabled   = false
 let reservoirEnabled = false
 let detectorEnabled  = false
 let irrelisEnabled   = false
+let premierApportEnabled = false
 const rainEdits = {}
 const correctedRain = {} // clé `${plotId}_${iso}` → true si une irrigation détectée a été corrigée en pluie
 
@@ -164,6 +168,26 @@ function reservoirMmAt(p, iso) {
 function isDetectorPlot(p) {
   const irr = (p.irrigation || '').toLowerCase()
   return ['rampe', 'pivot', 'enrouleur'].some(t => irr.includes(t))
+}
+
+// Disponible sur les parcelles avec tensiomètre(s) et/ou sonde(s) capacitive(s)
+function hasCapaOrTensioPlot(p) {
+  return sensors.some(s => (s.parcelIds || []).includes(p.id) && (s.model.startsWith('CAPA-') || TENSIO_MODELS.includes(s.model)))
+}
+// Stade semis observé/renseigné = mock simplifié : une culture est définie sur la parcelle
+function hasSemisStage(p) { return !!p.crop }
+function hasSeasonEntered(p) { return IRRIG_SEASON.some(i => i.plotId === p.id && i.fromStrategy) }
+// Date suggérée de début de campagne — varie par parcelle entre le 21 mars et le 7 mai
+function premierApportDate(p) {
+  const year  = new Date(TODAY).getFullYear()
+  const start = new Date(year, 2, 21) // 21 mars
+  const span  = 47 // jours jusqu'au 7 mai (inclus)
+  const d = new Date(start)
+  d.setDate(d.getDate() + (p.id * 13) % span)
+  return d.toISOString().split('T')[0]
+}
+function isPremierApportEligible(p) {
+  return hasCapaOrTensioPlot(p) && hasSemisStage(p) && !hasSeasonEntered(p)
 }
 function getDetectorIrrig(p) {
   if (!isDetectorPlot(p)) return []
@@ -532,6 +556,8 @@ function showGlobaleView(resetScroll = false) {
     ...IRRIG_SEASON.map(i => i.iso),
     ...RAIN_DATA.filter(r => r.iso <= maxFuture).map(r => r.iso),
     ...(detectorEnabled ? [addDays(TODAY, -45)] : []),
+    // Étend la plage affichée jusqu'au 21 mars pour que les étoiles "Premier apport" (21/03 → 07/05) soient toutes visibles, pas seulement celles tombant après le début des données de pluie/irrigation.
+    ...(premierApportEnabled ? [`${new Date(TODAY).getFullYear()}-03-21`] : []),
     addDays(TODAY, -1),
     maxFuture,
   ]
@@ -605,7 +631,7 @@ function showGlobaleView(resetScroll = false) {
     const detIrrig   = detectorEnabled ? getDetectorIrrig(p) : []
     const showAdv    = advisorEnabled && isAdvisorPlot(p)
     const showRes    = reservoirEnabled && isReservoirPlot(p)
-    const isDetector = isDetectorPlot(p)
+    const showStarOn = premierApportEnabled && isPremierApportEligible(p) ? premierApportDate(p) : null
     let cells = ''
     for (const d of sortedDates) {
       const isT    = d === TODAY
@@ -626,10 +652,15 @@ function showGlobaleView(resetScroll = false) {
       let rainHtml = ''
       if (rainMm && filterRain) {
         const corrBadge = correctedRain[rainKey] ? `<span class="irr-gl-rain-corr-badge" title="Irrigation détectée corrigée en pluie">C</span>` : ''
-        rainHtml = detectorEnabled && isDetector
-          ? `<span class="irr-gl-rain irr-gl-rain--edit" data-rain-plotid="${p.id}" data-rain-iso="${d}" data-rain-mm="${rainMm}">${rainMm} mm${corrBadge}</span>`
+        // Modification possible sur le passé/aujourd'hui uniquement — jamais sur une pluie prévisionnelle.
+        rainHtml = d <= TODAY
+          ? `<span class="irr-gl-rain irr-gl-rain--edit" data-rain-plotid="${p.id}" data-rain-iso="${d}" data-rain-mm="${rainMm}" title="Modifier la pluie">${rainMm} mm${corrBadge}</span>`
           : `<span class="irr-gl-rain">${rainMm} mm${corrBadge}</span>`
       }
+
+      const starHtml = showStarOn === d
+        ? `<i class="bi bi-star-fill irr-gl-star" data-tip="Démarrage recommandé de votre saison d'irrigation"></i>`
+        : ''
 
       let irrigHtml = ''
       if (total) {
@@ -643,9 +674,9 @@ function showGlobaleView(resetScroll = false) {
         const durIcon = (debit && filterDuration) ? `<span class="irr-gl-dur-i" data-tip="Durée estimée : ${fmtDuree(mmToM3(total, p.area) / debit)}">i</span>` : ''
         irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer" data-mm="${total}"${idxs ? ` draggable="true" data-plot-id="${p.id}"` : ''}${
           idxs ? ` data-idxs="${idxs}" data-iso="${d}"` : ` data-det-plotid="${p.id}" data-det-plotname="${p.name}" data-det-iso="${d}" data-det-mm="${detMm}" data-det-rain="${rainMm}"`
-        }>${total} mm${dBadge}${durIcon}</span>`
+        }>${total} mm${dBadge}${durIcon}</span>${starHtml}`
       } else {
-        irrigHtml = `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>`
+        irrigHtml = `<button class="irr-gl-add" data-plot-id="${p.id}" data-plot-name="${p.name}" data-iso="${d}">+</button>${starHtml}`
       }
 
       let resHtml = ''
@@ -1666,6 +1697,10 @@ function renderLeft() {
         <input type="checkbox" id="irr-feat-irrelis" ${irrelisEnabled ? 'checked' : ''} />
         <span>Irré-LIS</span>
       </label>
+      <label class="irr-lc-cb-row">
+        <input type="checkbox" id="irr-feat-premier-apport" ${premierApportEnabled ? 'checked' : ''} />
+        <span>Premier apport</span>
+      </label>
     </div>
   `
 
@@ -1809,6 +1844,7 @@ function renderLeft() {
   left.querySelector('#irr-feat-reservoir')?.addEventListener('change', e => { reservoirEnabled = e.target.checked; refreshAll() })
   left.querySelector('#irr-feat-detector')?.addEventListener('change', e => { detectorEnabled = e.target.checked; refreshAll() })
   left.querySelector('#irr-feat-irrelis')?.addEventListener('change', e => { irrelisEnabled = e.target.checked; refreshAll() })
+  left.querySelector('#irr-feat-premier-apport')?.addEventListener('change', e => { premierApportEnabled = e.target.checked; refreshAll() })
 
   // Saison save
   left.querySelector('#irr-sa-save')?.addEventListener('click', () => {

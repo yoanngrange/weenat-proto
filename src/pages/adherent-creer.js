@@ -1,7 +1,13 @@
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+import { BILLING_ENTITIES } from '../data/constants.js'
 
 document.addEventListener('DOMContentLoaded', () => {
   updateBreadcrumb('Ajouter un adhérent', { label: 'Adhérents', href: 'adherents.html' })
+
+  const facturePar = document.getElementById('a-facture-par')
+  if (facturePar) {
+    facturePar.innerHTML = `<option value="">— choisir —</option>${BILLING_ENTITIES.map(e => `<option value="${e}">${e}</option>`).join('')}`
+  }
 
   // Highlight selected plan box
   document.querySelectorAll('input[name="a-plan"]').forEach(radio => {
@@ -24,11 +30,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const exploitation = document.getElementById('a-exploitation').value.trim()
     const telephone   = document.getElementById('a-telephone').value.trim()
     const plan        = document.querySelector('input[name="a-plan"]:checked')?.value
+    const facturePar  = document.getElementById('a-facture-par').value
 
     const errEl  = document.getElementById('form-error')
     const errMsg = document.getElementById('form-error-msg')
 
-    if (!prenom || !nom || !email || !exploitation || !telephone || !plan) {
+    if (!prenom || !nom || !email || !exploitation || !telephone || !plan || !facturePar) {
       errMsg.textContent = 'Tous les champs obligatoires doivent être remplis.'
       errEl.style.display = 'block'
       return
@@ -48,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ['a-prenom','a-nom','a-email','a-exploitation','a-telephone','a-code'].forEach(id => {
       document.getElementById(id).value = ''
     })
+    document.getElementById('a-facture-par').value = ''
     document.querySelector('input[name="a-plan"][value="Plus"]').checked = true
     document.getElementById('plan-plus-box').style.borderColor = 'var(--ok)'
     document.getElementById('plan-expert-box').style.borderColor = ''

@@ -112,9 +112,6 @@ export function initAlertesScreen(screenEl, role) {
               <span class="m-alert-row-val">${fmtDate(a.lastTriggered)}</span>
             </div>
           </div>
-          <div class="w-irrig-act-row" style="padding:0 14px">
-            <button class="w-irrig-act-btn w-irrig-act-btn--pri m-alert-edit-btn" type="button" data-id="${a.id}">Modifier l'alerte</button>
-          </div>
           <button class="m-widget-details-link m-alert-detail-btn" type="button" data-id="${a.id}" style="margin:8px 14px 14px;width:calc(100% - 28px)">Voir détails →</button>
         </div>`
     }).join('')
@@ -134,14 +131,6 @@ export function initAlertesScreen(screenEl, role) {
           render()
           showToast(`Alerte ${cb.checked ? 'activée' : 'désactivée'}`)
         }
-      })
-    })
-
-    // Modifier l'alerte → édition (à venir)
-    content.querySelectorAll('.m-alert-edit-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation()
-        showToast('Modification à venir')
       })
     })
 
@@ -181,17 +170,28 @@ export function initAlertesScreen(screenEl, role) {
           const rows = document.createElement('div')
           rows.className = 'm-sheet-info-rows'
           rows.innerHTML = `
-            <div class="m-sheet-info-row"><span>Métrique</span><span>${METRIC_LABELS[alert.metric] || alert.metric}</span></div>
-            <div class="m-sheet-info-row"><span>Paramètres</span><span>${alert.params || '—'}</span></div>
+            <div class="m-sheet-info-row"><span>Nom</span><input type="text" class="m-sheet-edit-field" id="alert-edit-name" value="${alert.name}"></div>
+            <div class="m-sheet-info-row"><span>Métrique</span><select class="m-sheet-edit-field" id="alert-edit-metric">
+              ${Object.entries(METRIC_LABELS).map(([id, label]) => `<option value="${id}"${id === alert.metric ? ' selected' : ''}>${label}</option>`).join('')}
+            </select></div>
+            <div class="m-sheet-info-row"><span>Paramètres</span><input type="text" class="m-sheet-edit-field" id="alert-edit-params" value="${alert.params || ''}"></div>
             <div class="m-sheet-info-row"><span>Dernier déclenchement</span><span>${fmtDate(alert.lastTriggered)}</span></div>
             <div class="m-sheet-info-row"><span>Créée le</span><span>${fmtDate(alert.created)}</span></div>
             ${alert.phones?.length ? `<div class="m-sheet-info-row"><span>Téléphone(s)</span><span>${alert.phones.join(', ')}</span></div>` : ''}
-            <div class="m-sheet-info-row"><span>Statut</span><span>${alert.statut}</span></div>`
+            <div class="m-sheet-info-row"><span>Statut</span><label class="m-toggle"><input type="checkbox" id="alert-edit-statut" ${alert.statut === 'actif' ? 'checked' : ''}><span class="m-toggle-track"></span></label></div>`
           const perimRow = document.createElement('div')
           perimRow.style.cssText = 'padding:8px 0;border-bottom:.5px solid rgba(0,0,0,.08)'
           perimRow.innerHTML = `<div style="font-size:13px;color:#8e8e93;margin-bottom:6px">Périmètre</div><div class="m-perimetre-list">${renderPerimetre()}</div>`
           rows.appendChild(perimRow)
           body.appendChild(rows)
+
+          rows.querySelector('#alert-edit-name').addEventListener('input', e => {
+            alert.name = e.target.value
+            sheet.querySelector('.m-sheet-title').textContent = alert.name
+          })
+          rows.querySelector('#alert-edit-metric').addEventListener('change', e => { alert.metric = e.target.value })
+          rows.querySelector('#alert-edit-params').addEventListener('input', e => { alert.params = e.target.value })
+          rows.querySelector('#alert-edit-statut').addEventListener('change', e => { alert.statut = e.target.checked ? 'actif' : 'inactif' })
 
           const fmt = d => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
           const histDiv = document.createElement('div')
@@ -230,7 +230,7 @@ export function initAlertesScreen(screenEl, role) {
         }
 
         rebuildBody()
-        const sheet = showSheet({ title: alert.name, body, doneLabel: 'Fermer', onDone: () => {} })
+        const sheet = showSheet({ title: alert.name, body, doneLabel: 'Fermer', onDone: () => render() })
       })
     })
   }
