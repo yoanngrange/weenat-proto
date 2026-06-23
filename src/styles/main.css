@@ -3641,6 +3641,22 @@ body.fs-page {
   overflow: hidden;
 }
 
+.mini-map-dir-arrow-inner {
+  position: relative;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(91,141,217,.9); color: #fff;
+  border: 2px solid #fff; border-radius: 50%;
+  font-size: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.mini-map-dir-count {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 14px; height: 14px; padding: 0 3px;
+  background: var(--err); color: #fff;
+  border-radius: 7px; font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+
 /* ── Signal bar ── */
 .signal-metric { margin-bottom: 12px; }
 .signal-metric-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
@@ -6675,6 +6691,13 @@ tr.row-selected td {
 .irr-det-vol-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .irr-det-vol-lbl { font-size: 11px; color: var(--txt3); flex-shrink: 0; }
 .irr-det-vol-input { width: 72px; padding: 3px 5px; border: 1px solid var(--bdr2); border-radius: 6px; font-size: 12px; text-align: right; }
+.irr-det-irrelis-sync-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 8px; padding: 7px 10px;
+  background: var(--pri2); color: var(--pri); border: 1px solid var(--pri);
+  border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.irr-det-irrelis-sync-btn:hover { background: var(--pri); color: #fff; }
 .irr-det-vol-bar { height: 5px; background: #e8e8ed; border-radius: 3px; overflow: hidden; margin: 3px 0; display: flex; }
 .irr-det-vol-bar-fill { height: 100%; }
 .irr-det-vol-note { font-size: 10px; color: var(--txt3); }
@@ -6711,7 +6734,6 @@ tr.row-selected td {
 .w-hist-summary-item { display: flex; align-items: center; gap: 5px; }
 .w-hist-summary-item strong { color: var(--txt); }
 .w-hist-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
-.w-hist-dot--fc { background: transparent; border: 1px dashed; }
 .w-hist-svg { display: block; width: 100%; height: auto; }
 
 .notif-page-info { font-size: 13px; color: var(--txt2); }
@@ -7644,11 +7666,11 @@ tr.row-selected td {
   flex-shrink: 0;
 }
 .irr-det-name {
-  font-size: 14px; font-weight: 700; color: var(--txt);
+  font-size: 20px; font-weight: 700; color: var(--txt);
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .irr-det-link {
-  font-size: 12px; color: var(--pri); text-decoration: none; white-space: nowrap;
+  font-size: 16px; color: var(--pri); text-decoration: none; white-space: nowrap;
   flex-shrink: 0;
 }
 .irr-det-link:hover { text-decoration: underline; }
@@ -7911,6 +7933,10 @@ tr.row-selected td {
 .irr-pr-cumul-val { font-size: 22px; font-weight: 700; margin: 4px 0; }
 .irr-pr-cumul-ct { font-size: 11px; color: var(--txt3); }
 .irr-pr-sep { width: 1px; background: var(--bdr); align-self: stretch; }
+.irr-pr-planned-totals { padding: 10px 24px; background: var(--bdr2); border-bottom: 1px solid var(--bdr); font-size: 12px; color: var(--txt2); }
+.irr-pr-planned-hd { font-weight: 700; color: var(--txt); margin-bottom: 4px; }
+.irr-pr-planned-row { margin-left: 4px; }
+.irr-pr-planned-row strong { color: var(--txt); font-weight: 700; }
 .irr-pg-timeline { padding: 12px 24px 8px; border-bottom: 1px solid var(--bdr2); }
 .irr-pg-tl-legend {
   display: flex; gap: 16px; margin-top: 4px;
@@ -8091,6 +8117,9 @@ details[open] > summary .irr-pr-caret { transform: rotate(90deg); }
   height: 16px; display: flex; align-items: center; justify-content: center;
 }
 .irr-gl-td--today { background: #FFFBF0; }
+.irr-gl-td--dragging { opacity: .4; }
+.irr-gl-td--dragover { background: var(--pri2); outline: 2px dashed var(--pri); outline-offset: -2px; }
+.irr-gl-irrig[draggable="true"] { cursor: grab; }
 .irr-gl-val { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 12px; }
 .irr-gl-rain { font-size: 11px; color: #3A7FC1; }
 .irr-gl-rain--edit { cursor: pointer; text-decoration: underline dotted; }

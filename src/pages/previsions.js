@@ -1,6 +1,27 @@
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
+import { orgs } from '../data/orgs.js'
+import { getStoredSensor } from '../data/store.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
+
+const MODEL_NAMES = {
+  'P+': 'Station météo', 'PT': 'Station météo', 'P': 'Pluviomètre',
+  'SMV': 'Station météo virtuelle', 'TH': 'Thermomètre-hygromètre', 'T_MINI': 'Thermomètre de sol',
+  'W': 'Anémomètre', 'PYRANO': 'Pyranomètre', 'PAR': 'Capteur PAR',
+  'LWS': "Capteur d'humectation foliaire", 'T_GEL': 'Capteur de gel',
+  'CHP-15/30': 'Tensiomètre', 'CHP-30/60': 'Tensiomètre', 'CHP-60/90': 'Tensiomètre',
+  'CAPA-30-3': 'Sonde capacitive', 'CAPA-60-6': 'Sonde capacitive', 'EC': 'Sonde de fertirrigation',
+}
+
+function sensorOptLabel(s) {
+  const nom = MODEL_NAMES[s.model] || s.model
+  const renamed = getStoredSensor(s.id).label || ''
+  const p = plots.find(x => (s.parcelIds || []).includes(x.id))
+  const org = orgs.find(o => o.id === s.orgId)
+  const ville = p?.ville || org?.ville || ''
+  // Pas de nom de parcelle : un capteur peut être lié à plusieurs parcelles.
+  return [nom, s.serial, renamed, ville].filter(Boolean).join(' · ')
+}
 
 const MY_ORG_ID = 1
 
@@ -70,10 +91,10 @@ function populateLocationSelect() {
   select.appendChild(addrOpt)
 
   const pg = document.createElement('optgroup'); pg.label = 'Parcelles'
-  visiblePlots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = p.crop ? `${p.name} (${p.crop})` : p.name; pg.appendChild(o) })
+  visiblePlots.forEach(p => { const o = document.createElement('option'); o.value = `parcel-${p.id}`; o.textContent = [p.name, p.crop].filter(Boolean).join(' — '); pg.appendChild(o) })
   select.appendChild(pg)
   const sg = document.createElement('optgroup'); sg.label = 'Capteurs'
-  visibleSensors.forEach(s => { const p = plots.find(x => (s.parcelIds || []).includes(x.id)); const o = document.createElement('option'); o.value = `sensor-${s.id}`; o.textContent = `${s.serial} — ${s.model}${p ? ` (${p.name})` : ''}`; sg.appendChild(o) })
+  visibleSensors.forEach(s => { const o = document.createElement('option'); o.value = `sensor-${s.id}`; o.textContent = sensorOptLabel(s); sg.appendChild(o) })
   select.appendChild(sg)
 
   select.value = 'addr'

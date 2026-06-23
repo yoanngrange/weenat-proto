@@ -259,8 +259,8 @@ function smooth(pts) {
 const MON_ABBR = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.']
 
 // Shared padding (used by SVG functions and tooltip)
-const RES_PAD  = { t: 24, r: 38, b: 28, l: 52 }
-const HIST_PAD = { t: 8,  r: 38, b: 28, l: 52 }
+const RES_PAD  = { t: 24, r: 20, b: 28, l: 40 }
+const HIST_PAD = { t: 8,  r: 20, b: 28, l: 40 }
 
 function makeReservoirSvg(W, H, data, startIdx, displayLen) {
   const { reservoir, nDays, nFcDays, cfg, apr1, ruArr, rfuArr } = data
@@ -424,9 +424,10 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
   const fcCutoff  = nDays + nFcDays
   const inForecast = j => (startIdx + j) <= fcCutoff
 
+  // Auto-scale indépendant pour chaque moitié — le négatif (ETP+drainage) ne doit pas être
+  // écrasé par l'échelle du positif (pluie+irrigation), souvent bien plus grande.
   const maxPos = Math.max(...sliceP.map((p, j) => (inForecast(j) ? p : 0) + (sliceI[j] || 0)), 1)
   const maxNeg = Math.max(...sliceE.map((e, j) => (inForecast(j) ? e + (sliceD[j] || 0) : 0)), 1)
-  const scale  = Math.max(maxPos, maxNeg, 1)
   const half   = iH / 2
 
   const barW = Math.max(1.5, (iW / displayLen) * 0.8)
@@ -438,10 +439,10 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
     const pVal = beyond ? 0 : sliceP[j]
     const eVal = beyond ? 0 : sliceE[j]
     const dVal = beyond ? 0 : sliceD[j]
-    const pH  = (pVal / scale) * half
-    const iH2 = (sliceI[j] / scale) * half
-    const eH  = (eVal / scale) * half
-    const dH  = (dVal / scale) * half
+    const pH  = (pVal / maxPos) * half
+    const iH2 = (sliceI[j] / maxPos) * half
+    const eH  = (eVal / maxNeg) * half
+    const dH  = (dVal / maxNeg) * half
     const x   = bx(j).toFixed(1)
     const bw  = barW.toFixed(1)
     if (pVal > 0)       bars += `<rect x="${x}" y="${(mid - pH).toFixed(1)}" width="${bw}" height="${pH.toFixed(1)}" fill="#2E75B6" opacity="0.85"/>`
@@ -450,12 +451,11 @@ function makeHistogramSvg(W, H, data, startIdx, displayLen) {
     if (dVal > 0)       bars += `<rect x="${x}" y="${(mid + eH).toFixed(1)}" width="${bw}" height="${dH.toFixed(1)}" fill="#8B1A1A" opacity="0.75"/>`
   }
 
-  // Y labels
-  const mmMax  = +scale.toFixed(1)
+  // Y labels (échelles haut/bas indépendantes)
   const yLabels = [
-    `<text x="${PAD.l - 6}" y="${(PAD.t + 13).toFixed(1)}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">+${mmMax}</text>`,
+    `<text x="${PAD.l - 6}" y="${(PAD.t + 13).toFixed(1)}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">+${maxPos.toFixed(1)}</text>`,
     `<text x="${PAD.l - 6}" y="${(mid + 4).toFixed(1)}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">0</text>`,
-    `<text x="${PAD.l - 6}" y="${(PAD.t + iH).toFixed(1)}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">-${mmMax}</text>`,
+    `<text x="${PAD.l - 6}" y="${(PAD.t + iH).toFixed(1)}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">-${maxNeg.toFixed(1)}</text>`,
     `<text x="${PAD.l - 6}" y="${PAD.t - 1}" text-anchor="end" font-size="11" font-family="-apple-system,sans-serif" fill="#8e8e93">mm</text>`,
   ].join('')
 
@@ -637,6 +637,25 @@ function attachTooltip(container, data, startIdx, displayLen, resH) {
     show(e.touches[0].clientX, e.touches[0].clientY)
   }, { passive: false })
   container.addEventListener('touchend', hide)
+
+  // Stades phéno : la tooltip du graphique (tip) doit afficher le nom du stade tapé,
+  // pas juste un showToast lointain en bas d'écran que l'utilisateur ne regarde pas.
+  let stadeHideTimer = null
+  container.querySelectorAll('.il-stade-dot').forEach(dot => {
+    dot.addEventListener('click', e => {
+      e.stopPropagation()
+      const rect  = container.getBoundingClientRect()
+      const relX  = e.clientX - rect.left
+      const relY  = e.clientY - rect.top
+      tip.innerHTML = `<span style="color:#34c759">${dot.dataset.label}</span>`
+      tip.style.left = Math.max(60, Math.min(container.clientWidth - 60, relX)) + 'px'
+      tip.style.top  = relY + 'px'
+      tip.style.display = 'block'
+      vLine.style.display = 'none'
+      clearTimeout(stadeHideTimer)
+      stadeHideTimer = setTimeout(hide, 2200)
+    })
+  })
 }
 
 function drawChart(container, data, period = 'saison') {
@@ -655,10 +674,6 @@ function drawChart(container, data, period = 'saison') {
     makeHistogramSvg(W, histH, data, startIdx, displayLen)
 
   attachTooltip(container, data, startIdx, displayLen, resH)
-
-  container.querySelectorAll('.il-stade-dot').forEach(dot => {
-    dot.addEventListener('click', () => showToast(dot.dataset.label))
-  })
 }
 
 // ─── Config form ──────────────────────────────────────────────────────────────
@@ -923,12 +938,12 @@ export function openIrrelisDetail(plot) {
 
   const layer = pushDetail(`
     <div class="m-fs-topbar">
-      <button class="m-fs-back" id="il-back"><i class="bi bi-chevron-left"></i>Parcelles</button>
+      <button class="m-fs-back" id="il-back"><i class="bi bi-chevron-left"></i>Parcelle</button>
       <button id="il-plot-picker" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:none;border:none;cursor:pointer;padding:0 4px;min-width:0">
         <span style="font-size:16px;font-weight:700;color:#1c1c1e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${plot.name}</span>
         <i class="bi bi-chevron-down" style="font-size:10px;color:#8e8e93;flex-shrink:0;margin-top:1px"></i>
       </button>
-      <button id="il-parcel-btn" style="background:none;border:none;color:#0172A4;font-size:13px;font-weight:600;cursor:pointer;padding:0 4px;white-space:nowrap">Parcelle →</button>
+      <div style="width:62px;flex-shrink:0"></div>
     </div>
 
     <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#fff;border-bottom:.5px solid rgba(0,0,0,.1);flex-shrink:0">
@@ -983,10 +998,6 @@ export function openIrrelisDetail(plot) {
   layer.querySelector('#il-period').addEventListener('change', e => {
     currentPeriod = e.target.value
     draw()
-  })
-
-  layer.querySelector('#il-parcel-btn').addEventListener('click', () => {
-    import('./parcel-detail.js').then(m => m.initParcelDetail(plot, [], 'widgets', 'Irré-LIS'))
   })
 
   layer.querySelector('#il-btn-cumuls').addEventListener('click', () => {

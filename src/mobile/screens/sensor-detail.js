@@ -583,9 +583,10 @@ function paramsView(sensor) {
 
   const linkedPlotRows = linkedPlots.map((plot, i) => {
     const isLast = i === linkedPlots.length - 1
-    return `<div class="m-list-row${isLast && linkedPlots.length > 0 ? '' : ''}" data-unlink-plot="${plot.id}">
-      <span class="m-list-row-label">${plot.name}</span>
+    return `<div class="m-list-row${isLast && linkedPlots.length > 0 ? '' : ''}" data-open-plot="${plot.id}" style="cursor:pointer">
+      <span class="m-list-row-label" style="color:#0172A4;font-weight:600">${plot.name}</span>
       ${plot.crop ? `<span class="m-list-row-value">${plot.crop}</span>` : ''}
+      <i class="bi bi-chevron-right" style="color:#0172A4;font-size:14px;flex-shrink:0;margin-right:2px"></i>
       <button data-unlink-plot-btn="${plot.id}" style="background:none;border:none;padding:4px 6px;cursor:pointer;color:#ff3b30;font-size:13px;line-height:1;flex-shrink:0" title="Délier">
         <i class="bi bi-x-circle"></i>
       </button>
@@ -915,6 +916,14 @@ export function initSensorDetail(sensor, initialView = 'donnees', role = 'admin'
         if (events[idx]) openAnomalyResolution(events[idx], sensor)
       })
     })
+    layer.querySelectorAll('[data-open-plot]').forEach(row => {
+      row.addEventListener('click', () => {
+        const plot = allPlots.find(p => p.id === +row.dataset.openPlot)
+        if (!plot) return
+        const linked = allSensors.filter(s => s.parcelIds.includes(plot.id)).map(s => s.id)
+        import('./parcel-detail.js').then(m => m.initParcelDetail(plot, linked, 'widgets', 'Capteur'))
+      })
+    })
     layer.querySelectorAll('[data-unlink-plot-btn]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
@@ -1029,7 +1038,7 @@ function saveSJournal(sensorId, entries) {
 }
 
 function addSJournalEntry(sensorId, texte) {
-  saveSJournal(sensorId, [{ id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), user: '', role: '', texte }, ...getSJournal(sensorId)])
+  saveSJournal(sensorId, [{ id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), user: '', role: '', texte, _system: true }, ...getSJournal(sensorId)])
 }
 
 function openSensorMapFullscreen(lat, lng) {
@@ -1231,6 +1240,7 @@ function openMobileSensorJournal(sensor, opts = {}) {
         const t = typeMap[e.type] || { label: e.type, icon: 'bi-circle', color: '#8e8e93' }
         const isLast = idx === entries.length - 1
         const fromDash = !!e._fromDashboard
+        const canDelete = e.type === 'note' && !e._system
         html += `
           <div class="m-jrn-entry" data-id="${e.id}">
             <div class="m-jrn-aside">
@@ -1245,7 +1255,9 @@ function openMobileSensorJournal(sensor, opts = {}) {
                 <span class="journal-type-badge journal-type-badge--maintenance">${t.label}</span>
                 ${fromDash
                   ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
-                  : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
+                  : canDelete
+                    ? `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`
+                    : ''}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
               ${e.user ? `<div style="font-size:11px;color:#8e8e93;margin-top:3px;display:flex;gap:5px;align-items:center">${e.user}${roleBadgeSensor(e.role)}</div>` : ''}

@@ -605,7 +605,7 @@ function renderJournalTab() {
   } else {
     all.forEach(e => {
       const c = CONFIG[e.type] || CONFIG.note
-      const isAuto = e.type === 'modification' || e._auto === true
+      const canDelete = e.type === 'note'
       const isTraitement = e.type === 'traitement'
       html += `
         <div class="jrn-entry" data-id="${e.id}">
@@ -619,7 +619,7 @@ function renderJournalTab() {
                 ${c.label}
               </span>
               ${e.auteur ? `<span class="jrn-entry-auteur">${e.auteur}</span>` : ''}
-              ${!isAuto ? `<button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>` : ''}
+              ${canDelete ? `<button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>` : ''}
             </div>
             ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
             ${isTraitement && (e.produit || e.dose || e.cible) ? `
@@ -1846,15 +1846,42 @@ function irrigationSeriesWeb(plotId, count, stepMins, hatchCount = 0) {
   return vals
 }
 
+// Disponibilité mock d'Irrigation Advizor (même règle que irrigation-page.js isAdvisorPlot)
+function isAdvisorPlotWeb(p) { return p.id % 3 === 2 }
+function advisorDayMmWeb(p, dayOffset) {
+  const seed = ((p.id * 13 + dayOffset * 23) % 17) / 17
+  return seed > 0.4 ? +(3 + seed * 12).toFixed(1) : 0
+}
+
 function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
   const W = 600, H = 180, PAD = { t: 12, r: 8, b: 28, l: 44 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
+
+  // Sur les parcelles avec Irrigation Advizor (pas de temps journalier) : la recommandation
+  // J+n n'est affichée que si la période choisie va effectivement jusqu'à J+n (hatchCount
+  // = nombre de jours de prévision réellement couverts par la période/pas de temps courants).
+  const advisorActive = stepMins === 1440 && isAdvisorPlotWeb(parcelBase)
   const totalCount = count + hatchCount
 
   const bins = irrigationSeriesWeb(parcelId, count, stepMins, hatchCount)
 
-  const maxV = Math.max(...bins, 1)
+  // Histogramme des irrigations recommandées (Irrigation Advizor) sur J+1 → J+7
+  const bucketMs = stepMins * 60000
+  const startMs  = Date.now() - count * bucketMs
+  const advisorBars = []
+  if (advisorActive) {
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
+    for (let dOff = 1; dOff <= 7; dOff++) {
+      const v = advisorDayMmWeb(parcelBase, dOff)
+      if (v <= 0) continue
+      const dayMidMs = dayStart.getTime() + dOff * 86400000 + 12 * 3600000
+      const idx = Math.floor((dayMidMs - startMs) / bucketMs)
+      if (idx >= count && idx < totalCount) advisorBars.push({ idx, v })
+    }
+  }
+
+  const maxV = Math.max(...bins, ...advisorBars.map(b => b.v), 1)
   const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - (v / maxV) * innerH
 
@@ -1864,6 +1891,18 @@ function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
     const v = (maxV - (i / 4) * maxV).toFixed(1)
     lines += `<line x1="${PAD.l}" y1="${y}" x2="${W - PAD.r}" y2="${y}" stroke="var(--bdr2)" stroke-width="1"/>`
     lines += `<text x="${PAD.l - 4}" y="${y + 4}" text-anchor="end" font-size="10" fill="var(--txt3)">${v}</text>`
+  }
+
+  // ── Axe X : baseline + dates (le futur s'affiche toujours en date, jamais en heure) ──
+  lines += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
+  const labelStep = Math.max(1, Math.floor(totalCount / 6))
+  for (let i = 0; i < totalCount; i += labelStep) {
+    const x = xOf(i).toFixed(1)
+    const agoMins = (count - i) * stepMins
+    const lbl = (stepMins >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
+    lines += `<text x="${x}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${lbl}</text>`
   }
 
   // Zone striée représentant la portion "prévisions" du graphique
@@ -1888,6 +1927,16 @@ function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
     const h = (PAD.t + innerH) - y
     lines += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${isFc ? '#C7C7CC' : color}" opacity="${isFc ? '0.5' : '0.85'}" rx="1"/>`
   })
+
+  advisorBars.forEach(({ idx, v }) => {
+    const x = xOf(idx)
+    const y = yOf(v)
+    const h = (PAD.t + innerH) - y
+    lines += `<rect x="${(x - barW / 2).toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="3,2" rx="1"/>`
+  })
+  if (advisorBars.length) {
+    lines += `<text x="${(PAD.l + 2).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" font-size="10" font-family="var(--font)" fill="${color}" font-style="italic">┄ Recommandé (Irrigation Advizor)</text>`
+  }
 
   svg.innerHTML = lines
 }
@@ -3204,6 +3253,57 @@ const STATIC_MAP_OPTS = {
   doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false,
 }
 
+// Capteurs liés représentés sur la mini-carte : un point chacun, ou une flèche directionnelle
+// groupée (avec compteur) quand ils sont hors de la bounding box affichée.
+const MAP_DIRS = [
+  { key: 'N',  icon: 'bi-arrow-up' },   { key: 'NE', icon: 'bi-arrow-up-right' },
+  { key: 'E',  icon: 'bi-arrow-right' }, { key: 'SE', icon: 'bi-arrow-down-right' },
+  { key: 'S',  icon: 'bi-arrow-down' },  { key: 'SW', icon: 'bi-arrow-down-left' },
+  { key: 'W',  icon: 'bi-arrow-left' },  { key: 'NW', icon: 'bi-arrow-up-left' },
+]
+function bearingDirKey(dLat, dLng) {
+  const angle = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360
+  return MAP_DIRS[Math.round(angle / 45) % 8].key
+}
+function arrowLatLngOnBounds(bounds, key) {
+  // Légèrement à l'intérieur du cadre (10%) pour que l'icône ne soit jamais coupée par le conteneur.
+  const n0 = bounds.getNorth(), s0 = bounds.getSouth(), e0 = bounds.getEast(), w0 = bounds.getWest()
+  const padLat = (n0 - s0) * 0.1, padLng = (e0 - w0) * 0.1
+  const n = n0 - padLat, s = s0 + padLat, e = e0 - padLng, w = w0 + padLng
+  const midLat = (n + s) / 2, midLng = (e + w) / 2
+  return { N: [n, midLng], NE: [n, e], E: [midLat, e], SE: [s, e], S: [s, midLng], SW: [s, w], W: [midLat, w], NW: [n, w] }[key]
+}
+function renderLinkedSensorMarkers(map, centerLat, centerLng) {
+  const linkedIds = parcelState.linkedSensorIds || []
+  if (!linkedIds.length) return
+  const bounds = map.getBounds()
+  const offDirs = {}
+  linkedIds.forEach(sid => {
+    const s = allSensors.find(x => x.id === sid)
+    if (!s) return
+    const otherPid = s.parcelIds.find(id => id !== parcelBase.id)
+    const posParcel = otherPid ? plots.find(p => p.id === otherPid) : null
+    const sLat = posParcel?.lat ?? centerLat, sLng = posParcel?.lng ?? centerLng
+    if (sLat == null || sLng == null) return
+    if (bounds.contains([sLat, sLng])) {
+      L.circleMarker([sLat, sLng], { radius: 6, color: '#fff', weight: 2, fillColor: '#5b8dd9', fillOpacity: 0.95 }).addTo(map)
+    } else {
+      const key = bearingDirKey(sLat - centerLat, sLng - centerLng)
+      offDirs[key] = (offDirs[key] || 0) + 1
+    }
+  })
+  Object.entries(offDirs).forEach(([key, count]) => {
+    const dir = MAP_DIRS.find(d => d.key === key)
+    const icon = L.divIcon({
+      className: 'mini-map-dir-arrow',
+      html: `<div class="mini-map-dir-arrow-inner"><i class="bi ${dir.icon}"></i>${count > 1 ? `<span class="mini-map-dir-count">${count}</span>` : ''}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    })
+    L.marker(arrowLatLngOnBounds(bounds, key), { icon, interactive: false }).addTo(map)
+  })
+}
+
 function initMiniMap() {
   if (_miniMapInstance) { _miniMapInstance.invalidateSize(); return }
   const org = orgs.find(o => o.id === parcelBase.orgId)
@@ -3225,6 +3325,8 @@ function initMiniMap() {
       color: 'white', weight: 2, fillColor: '#0172A4', fillOpacity: 0.3
     }).addTo(map)
     map.fitBounds(poly.getBounds(), { padding: [10, 10] })
+    const center = poly.getBounds().getCenter()
+    renderLinkedSensorMarkers(map, center.lat, center.lng)
   } else {
     // Parcelle représentée par un point : bounding box ±1 km de chaque côté, point centré.
     const dLat = 1 / 111
@@ -3233,6 +3335,7 @@ function initMiniMap() {
     L.circleMarker([lat, lng], {
       radius: 7, color: 'white', fillColor: 'var(--ok)', fillOpacity: 1, weight: 2
     }).addTo(map)
+    renderLinkedSensorMarkers(map, lat, lng)
   }
 }
 
@@ -3273,8 +3376,8 @@ const WIDGET_DEFS = {
   'previsions-5j':   { size:'1x1', title:'Prévisions 5 jours',        icon:'bi-calendar3-week',        color:'#5b8dd9', render: renderWPrev5j,     footer: { label:'Voir détails', href:'previsions.html' } },
   'weephyt':         { size:'1x1', title:'Traitements',                 icon:'bi-shield-check',          color:'#2d9e5f', render: renderWWeephyt, footer: { label:'Voir détails', href:'#', tab:'journal' } },
   'cumuls':          { size:'1x1', title:'Cumuls',                     icon:'bi-bar-chart-fill',        color:'#2E75B6', render: renderWCumuls },
-  'pluie-hist':      { size:'2x1', title:'Pluie',                      icon:'bi-cloud-rain-heavy',      color:'#2E75B6', render: renderWHistBars('pluie'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
-  'etp-hist':        { size:'2x1', title:'Évapotranspiration',         icon:'bi-moisture',              color:'#7DBDD7', render: renderWHistBars('etp'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'pluie-hist':      { size:'1x1', title:'Pluie',                      icon:'bi-cloud-rain-heavy',      color:'#2E75B6', render: renderWHistBars('pluie'), footer: { label:'Voir détails', href:'#', tab:'donnees' } },
+  'etp-hist':        { size:'1x1', title:'Évapotranspiration',         icon:'bi-moisture',              color:'#7DBDD7', render: renderWHistBars('etp'),   footer: { label:'Voir détails', href:'#', tab:'donnees' } },
   'bilan':           { size:'1x1', title:'Bilan hydrique',             icon:'bi-droplet',               color:'#0172A4', render: renderWBilan,      footer: { label:'Voir détails', href:'#', tab:'donnees' } },
   'irrigations':     { size:'1x1', title:'Irrigations',               icon:'bi-moisture',              color:'#FF8C00', render: renderWIrrigations, footer: { label:'Voir détails', href:`irrigation.html?plot=${parcelId}` } },
   'gel':             { size:'1x1', title:'Suivi du risque de gel',     icon:'bi-thermometer-snow',      color:'#FEE7B4', render: renderWGel,        footer: { label:'Voir détails', href:'previsions.html' } },
@@ -4076,6 +4179,8 @@ function renderWSensor(type) {
 }
 
 // Histogramme J-7 -> J+7 (historique + prévision) pour la pluie ou l'évapotranspiration
+const W_HIST_TODAY_COLOR = '#bf5af2'
+
 function renderWHistBars(kind) {
   return (el) => {
     const cfg = kind === 'pluie'
@@ -4095,18 +4200,19 @@ function renderWHistBars(kind) {
     const W = 600, H = 130, PT = 14, PB = 22, PL = 4, PR = 4
     const innerH = H - PT - PB
     const bw = (W - PL - PR) / days.length
+    const stripeId = `w-hist-stripe-${kind}`
+    const todayIdx = days.findIndex(x => x.off === 0)
+    const todayX = PL + todayIdx * bw
+    const fcZoneX = todayX + bw
     const bars = days.map((x, idx) => {
       const bx = PL + idx * bw
       const bh = Math.max(0, (x.val / maxVal) * innerH)
       const by = PT + innerH - bh
-      const fill = x.isFc ? `${cfg.color}55` : cfg.color
-      const stroke = x.isFc ? ` stroke="${cfg.color}" stroke-width="1" stroke-dasharray="2,2"` : ''
-      return `<rect x="${(bx + bw * 0.15).toFixed(1)}" y="${by.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${fill}"${stroke}/>`
+      const fill = x.off === 0 ? W_HIST_TODAY_COLOR : (x.isFc ? `${cfg.color}66` : cfg.color)
+      return `<rect x="${(bx + bw * 0.15).toFixed(1)}" y="${by.toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${fill}"/>`
     }).join('')
-    const todayIdx = days.findIndex(x => x.off === 0)
-    const todayX = PL + todayIdx * bw + bw / 2
     const labels = days.map((x, idx) => {
-      if (x.off % 3 !== 0) return ''
+      if (x.off % 4 !== 0) return ''
       const lx = PL + idx * bw + bw / 2
       const lbl = x.off === 0 ? 'Auj.' : `${x.d.getDate()}/${x.d.getMonth() + 1}`
       return `<text x="${lx.toFixed(1)}" y="${H - 6}" font-size="8" text-anchor="middle" fill="var(--txt3)">${lbl}</text>`
@@ -4115,11 +4221,16 @@ function renderWHistBars(kind) {
     const totalFc   = days.filter(x => x.isFc).reduce((s, x) => s + x.val, 0)
     el.innerHTML = `
       <div class="w-hist-summary">
-        <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${cfg.color}"></span>7 derniers jours : <strong>${totalHist.toFixed(1)} ${cfg.unit}</strong></span>
-        <span class="w-hist-summary-item"><span class="w-hist-dot w-hist-dot--fc" style="border-color:${cfg.color}"></span>Prévision 7 jours : <strong>${totalFc.toFixed(1)} ${cfg.unit}</strong></span>
+        <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${cfg.color}"></span>7j : <strong>${totalHist.toFixed(1)} ${cfg.unit}</strong></span>
+        <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${W_HIST_TODAY_COLOR}"></span>Prévision 7j : <strong>${totalFc.toFixed(1)} ${cfg.unit}</strong></span>
       </div>
       <svg class="w-hist-svg" width="100%" height="110" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <line x1="${todayX.toFixed(1)}" y1="${PT}" x2="${todayX.toFixed(1)}" y2="${PT + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="2,2"/>
+        <defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+          <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+        </pattern></defs>
+        <rect x="${fcZoneX.toFixed(1)}" y="${PT}" width="${(W - PR - fcZoneX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+        <line x1="${fcZoneX.toFixed(1)}" y1="${PT}" x2="${fcZoneX.toFixed(1)}" y2="${PT + innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
         ${bars}
         ${labels}
       </svg>`

@@ -18,6 +18,7 @@ let globaleExtraMonths = 0
 let advisorEnabled   = false
 let reservoirEnabled = false
 let detectorEnabled  = false
+let irrelisEnabled   = false
 const rainEdits = {}
 const correctedRain = {} // clé `${plotId}_${iso}` → true si une irrigation détectée a été corrigée en pluie
 
@@ -27,6 +28,8 @@ let filterRain      = true
 let filterDetected  = true
 let filterConfirmed = true
 let filterReservoir = true
+let filterDuration  = true
+let dragIrrigState  = null // { idxs:number[], iso:string, plotId:number } pendant un drag & drop
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,6 +90,13 @@ function getOrgVolMax(orgId) {
   return orgs.find(o => o.id === orgId)?.volumeMax ?? null
 }
 
+function getOrgPrixM3(orgId) {
+  const stored = getOrgData(orgId).prixM3
+  return stored !== undefined ? stored : 0.37
+}
+
+function fmtEuro(n) { return n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €' }
+
 function getPlotVolMax(plotId) { return getParcel(plotId).volumeMaxM3 ?? null }
 function getPlotDebit(plotId) { return getParcel(plotId).debitM3h ?? null }
 
@@ -98,13 +108,34 @@ function refreshDurationIcons(plotId) {
   document.querySelectorAll(`tr[data-row-plot="${plotId}"] .irr-gl-irrig`).forEach(span => {
     span.querySelector('.irr-gl-dur-i')?.remove()
     const mm = +span.dataset.mm
-    if (!debit || !mm) return
+    if (!debit || !mm || !filterDuration) return
     const icon = document.createElement('span')
     icon.className   = 'irr-gl-dur-i'
     icon.dataset.tip  = `Durée estimée : ${fmtDuree(mmToM3(mm, p?.area) / debit)}`
     icon.textContent  = 'i'
     span.appendChild(icon)
   })
+}
+
+// Insère/retire la checkbox "Durées" de la légende sans reconstruire toute la grille
+// (même contrainte que refreshDurationIcons — préserver le scroll horizontal du tableau)
+function refreshDurationCheckbox() {
+  const legend = document.querySelector('.irr-gl-legend')
+  if (!legend) return
+  const anyDebit = plots.some(p => getPlotDebit(p.id))
+  const existing = legend.querySelector('.irr-gl-filter[data-filter="duration"]')
+  if (anyDebit && !existing) {
+    const label = document.createElement('label')
+    label.className = 'irr-gl-filter-item'
+    label.innerHTML = `<input type="checkbox" class="irr-gl-filter" data-filter="duration" checked><span class="irr-gl-dur-i">i</span>&nbsp;Durées`
+    legend.appendChild(label)
+    label.querySelector('.irr-gl-filter').addEventListener('change', e => {
+      filterDuration = e.target.checked
+      showGlobaleView()
+    })
+  } else if (!anyDebit && existing) {
+    existing.closest('.irr-gl-filter-item').remove()
+  }
 }
 
 function orgPlotM3(orgId) {
@@ -430,6 +461,10 @@ function renderVolBanner() {
   const pctPlan = volMax ? Math.min(100 - pctReal, Math.round(planM3 / volMax * 100)) : 0
   const pctUsed = pctReal + pctPlan
 
+  const prixM3 = getOrgPrixM3(targetOrgId)
+  const realBudget = prixM3 ? realM3 * prixM3 : 0
+  const planBudget = prixM3 ? planM3 * prixM3 : 0
+
   const fmtNum = n => n !== null && n !== undefined ? n.toLocaleString('fr-FR') : ''
 
   wrap.innerHTML = `
@@ -438,6 +473,11 @@ function renderVolBanner() {
         <div class="irr-vol-title">Volume irrigation</div>
         <div class="irr-vol-total">${fmtM3(totalM3)}${volMax ? ` <span style="font-size:11px;font-weight:400;color:var(--txt3)">/ ${fmtM3(volMax)}</span>` : ''}</div>
         <div class="irr-vol-sub"><span style="color:#FF8500">▪ ${fmtM3(realM3)}</span> effectués · <span style="color:#FFB705">▪ ${fmtM3(planM3)}</span> planifiés</div>
+        <div class="irr-vol-ctrl-row" style="margin-top:6px">
+          <span class="irr-vol-ctrl-lbl">Volume limité :</span>
+          <input class="irr-vol-input" id="irr-vol-max-inp" type="text" inputmode="numeric" placeholder="—" value="${fmtNum(volMax)}" />
+          <span class="irr-vol-ctrl-lbl">m³</span>
+        </div>
       </div>
       <div class="irr-vol-bar-wrap">
         <div class="irr-vol-bar-label">Consommation d'eau sur mon exploitation</div>
@@ -454,10 +494,15 @@ function renderVolBanner() {
         })() : ''}
       </div>
       <div class="irr-vol-controls">
-        <div class="irr-vol-ctrl-row">
-          <span class="irr-vol-ctrl-lbl">Volume limité :</span>
-          <input class="irr-vol-input" id="irr-vol-max-inp" type="text" inputmode="numeric" placeholder="—" value="${fmtNum(volMax)}" />
-          <span class="irr-vol-ctrl-lbl">m³</span>
+        <div class="irr-vol-title">Budget saison</div>
+        ${prixM3
+          ? `<div class="irr-vol-total">${fmtEuro(realBudget + planBudget)}</div>
+             <div class="irr-vol-sub"><span style="color:#FF8500">▪ ${fmtEuro(realBudget)}</span> effectués · <span style="color:#FFB705">▪ ${fmtEuro(planBudget)}</span> planifiés</div>`
+          : `<div class="irr-vol-bar-nomax">Définissez un prix du m³ →</div>`}
+        <div class="irr-vol-ctrl-row" style="margin-top:6px">
+          <span class="irr-vol-ctrl-lbl">Prix du m³ :</span>
+          <input class="irr-vol-input" id="irr-prix-m3-inp" type="text" inputmode="numeric" placeholder="—" value="${fmtNum(prixM3)}" />
+          <span class="irr-vol-ctrl-lbl">€</span>
         </div>
       </div>
     </div>`
@@ -467,6 +512,13 @@ function renderVolBanner() {
     const v   = raw !== '' ? parseInt(raw) : null
     if (v !== null) e.target.value = v.toLocaleString('fr-FR')
     patchOrgData(targetOrgId, { volumeMax: v })
+    renderVolBanner()
+  })
+  wrap.querySelector('#irr-prix-m3-inp')?.addEventListener('change', e => {
+    const raw = e.target.value.replace(/\s/g, '').replace(',', '.')
+    const v   = raw !== '' ? parseFloat(raw) : null
+    if (v !== null) e.target.value = v.toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+    patchOrgData(targetOrgId, { prixM3: v })
     renderVolBanner()
   })
 }
@@ -588,8 +640,8 @@ function showGlobaleView(resetScroll = false) {
           : ''
         const detMm  = visDetDay.reduce((s,i) => s+i.mm, 0)
         const debit  = getPlotDebit(p.id)
-        const durIcon = debit ? `<span class="irr-gl-dur-i" data-tip="Durée estimée : ${fmtDuree(mmToM3(total, p.area) / debit)}">i</span>` : ''
-        irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer" data-mm="${total}"${
+        const durIcon = (debit && filterDuration) ? `<span class="irr-gl-dur-i" data-tip="Durée estimée : ${fmtDuree(mmToM3(total, p.area) / debit)}">i</span>` : ''
+        irrigHtml = `<span class="irr-gl-val irr-gl-irrig" style="color:${col};cursor:pointer" data-mm="${total}"${idxs ? ` draggable="true" data-plot-id="${p.id}"` : ''}${
           idxs ? ` data-idxs="${idxs}" data-iso="${d}"` : ` data-det-plotid="${p.id}" data-det-plotname="${p.name}" data-det-iso="${d}" data-det-mm="${detMm}" data-det-rain="${rainMm}"`
         }>${total} mm${dBadge}${durIcon}</span>`
       } else {
@@ -605,7 +657,7 @@ function showGlobaleView(resetScroll = false) {
       if (showRes && filterReservoir) content += `<div class="irr-gl-slot">${resHtml}</div>`
       const isSunTd    = dayOfWeek(d) === 0
       const isAdvRange = showAdv && d > TODAY && d <= J7
-      cells += `<td class="irr-gl-td${isT ? ' irr-gl-td--today' : ''}${isSunTd ? ' irr-gl-td--week-end' : ''}${isAdvRange ? ' irr-gl-td--advisor-range' : ''}">${content}</td>`
+      cells += `<td class="irr-gl-td${isT ? ' irr-gl-td--today' : ''}${isSunTd ? ' irr-gl-td--week-end' : ''}${isAdvRange ? ' irr-gl-td--advisor-range' : ''}" data-iso="${d}" data-plot-id="${p.id}">${content}</td>`
       if (advisorEnabled && d === J7) {
         let advCell = ''
         if (showAdv) {
@@ -644,6 +696,8 @@ function showGlobaleView(resetScroll = false) {
 
   const rows = sortedPlotList().map(plotRow).join('')
 
+  const anyDebit = plots.some(p => getPlotDebit(p.id))
+
   right.innerHTML = `
     <div class="irr-gl-outer">
       <div class="irr-gl-sticky-hd" id="irr-gl-sticky-hd">
@@ -654,6 +708,7 @@ function showGlobaleView(resetScroll = false) {
           <label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="rain" ${filterRain ? 'checked' : ''}><span class="irr-gl-dot" style="background:#3A7FC1"></span>Pluie</label>
           ${detectorEnabled ? `<span class="irr-gl-filter-item"><span class="irr-gl-rain-corr-badge" style="margin-left:0">C</span>&nbsp;Pluie corrigée (ex-irrig. détectée)</span>` : ''}
           ${reservoirEnabled ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="reservoir" ${filterReservoir ? 'checked' : ''}><span class="irr-gl-dot" style="background:#9E9E9E"></span>Réservoir</label>` : ''}
+          ${anyDebit ? `<label class="irr-gl-filter-item"><input type="checkbox" class="irr-gl-filter" data-filter="duration" ${filterDuration ? 'checked' : ''}><span class="irr-gl-dur-i">i</span>&nbsp;Durées</label>` : ''}
         </div>
         <div class="irr-gl-scroll-top" id="irr-gl-scroll-top">
           <div class="irr-gl-scroll-inner" id="irr-gl-scroll-inner"></div>
@@ -718,6 +773,7 @@ function showGlobaleView(resetScroll = false) {
       else if (f === 'detected') filterDetected = cb.checked
       else if (f === 'confirmed') filterConfirmed = cb.checked
       else if (f === 'reservoir') filterReservoir = cb.checked
+      else if (f === 'duration') filterDuration = cb.checked
       showGlobaleView()
     })
   })
@@ -741,6 +797,46 @@ function showGlobaleView(resetScroll = false) {
   right.querySelectorAll('.irr-gl-add').forEach(el => {
     el.addEventListener('click', () => {
       showQuickAddModal(el.dataset.plotId, el.dataset.plotName, el.dataset.iso)
+    })
+  })
+
+  // Drag & drop d'une irrigation d'un jour à l'autre (même parcelle)
+  right.querySelectorAll('.irr-gl-irrig[draggable="true"]').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      dragIrrigState = {
+        idxs: el.dataset.idxs.split(',').map(Number),
+        iso: el.dataset.iso,
+        plotId: +el.dataset.plotId,
+      }
+      el.closest('.irr-gl-td')?.classList.add('irr-gl-td--dragging')
+      e.dataTransfer.effectAllowed = 'move'
+    })
+    el.addEventListener('dragend', () => {
+      el.closest('.irr-gl-td')?.classList.remove('irr-gl-td--dragging')
+      right.querySelectorAll('.irr-gl-td--dragover').forEach(td => td.classList.remove('irr-gl-td--dragover'))
+      dragIrrigState = null
+    })
+  })
+
+  right.querySelectorAll('.irr-gl-td[data-iso]').forEach(td => {
+    td.addEventListener('dragover', e => {
+      if (!dragIrrigState) return
+      if (+td.dataset.plotId !== dragIrrigState.plotId || td.dataset.iso === dragIrrigState.iso) return
+      e.preventDefault()
+      td.classList.add('irr-gl-td--dragover')
+    })
+    td.addEventListener('dragleave', () => td.classList.remove('irr-gl-td--dragover'))
+    td.addEventListener('drop', e => {
+      if (!dragIrrigState) return
+      if (+td.dataset.plotId !== dragIrrigState.plotId || td.dataset.iso === dragIrrigState.iso) return
+      e.preventDefault()
+      const { idxs, iso: fromIso } = dragIrrigState
+      idxs.forEach(idx => { if (IRRIG_SEASON[idx]) IRRIG_SEASON[idx].iso = td.dataset.iso })
+      saveIrrig()
+      showSaveConfirmModal('Irrigation déplacée', [
+        `${fmtDateShort(fromIso)} → ${fmtDateShort(td.dataset.iso)}`,
+      ])
+      showGlobaleView()
     })
   })
 
@@ -1105,6 +1201,21 @@ function openDetailPanel(p) {
 }
 
 const MONTHS_SHORT = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc']
+const MONTHS_FULL = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
+
+function renderPlannedTotals(plan) {
+  const curWeek  = isoWeek(TODAY)
+  const curYear  = TODAY.slice(0, 4)
+  const curMonth = TODAY.slice(0, 7)
+  const weekMm  = plan.filter(i => i.iso.slice(0, 4) === curYear && isoWeek(i.iso) === curWeek).reduce((s, i) => s + i.mm, 0)
+  const monthMm = plan.filter(i => i.iso.slice(0, 7) === curMonth).reduce((s, i) => s + i.mm, 0)
+  const monthName = MONTHS_FULL[parseInt(TODAY.slice(5, 7), 10) - 1]
+  return `<div class="irr-pr-planned-totals">
+    <div class="irr-pr-planned-hd">Total planifiées :</div>
+    <div class="irr-pr-planned-row">· Semaine S${curWeek} : <strong>${weekMm} mm</strong></div>
+    <div class="irr-pr-planned-row">· Mois ${monthName} : <strong>${monthMm} mm</strong></div>
+  </div>`
+}
 
 function renderDetailPanel(p) {
   const panel = document.getElementById('irr-detail')
@@ -1201,6 +1312,7 @@ function renderDetailPanel(p) {
         <input class="irr-det-vol-input" id="irr-det-debit-input" type="number" min="0" step="0.1" placeholder="—" value="${getPlotDebit(p.id) ?? ''}" />
         <span class="irr-det-vol-lbl">m³/h</span>
       </div>
+      ${irrelisEnabled ? `<button class="irr-det-irrelis-sync-btn" id="irr-det-irrelis-sync"><i class="bi bi-arrow-repeat"></i> Synchroniser pluies et irrigations sur Irré-LIS</button>` : ''}
     </div>`
 
   const item = ir => {
@@ -1255,6 +1367,7 @@ function renderDetailPanel(p) {
         <div class="irr-det-meta">${seasonLine}</div>
         ${stratBar}
         ${renderCumuls(irrig)}
+        ${renderPlannedTotals(plan)}
         ${renderTimeline(irrig)}
         ${volSectionHtml}
       </div>
@@ -1336,6 +1449,12 @@ function renderDetailPanel(p) {
     patchParcel(p.id, { debitM3h: val })
     renderDetailPanel(p)
     refreshDurationIcons(p.id)
+    refreshDurationCheckbox()
+  })
+  panel.querySelector('#irr-det-irrelis-sync')?.addEventListener('click', () => {
+    showSaveConfirmModal('Synchronisation Irré-LIS', [
+      `Pluies et irrigations synchronisées pour « ${p.name} »`,
+    ])
   })
 
   panel.querySelector('#irr-det-close').addEventListener('click', () => {
@@ -1543,6 +1662,10 @@ function renderLeft() {
         <input type="checkbox" id="irr-feat-detector" ${detectorEnabled ? 'checked' : ''} />
         <span>Irrigation Detector</span>
       </label>
+      <label class="irr-lc-cb-row">
+        <input type="checkbox" id="irr-feat-irrelis" ${irrelisEnabled ? 'checked' : ''} />
+        <span>Irré-LIS</span>
+      </label>
     </div>
   `
 
@@ -1685,6 +1808,7 @@ function renderLeft() {
   left.querySelector('#irr-feat-advisor')?.addEventListener('change', e => { advisorEnabled = e.target.checked; refreshAll() })
   left.querySelector('#irr-feat-reservoir')?.addEventListener('change', e => { reservoirEnabled = e.target.checked; refreshAll() })
   left.querySelector('#irr-feat-detector')?.addEventListener('change', e => { detectorEnabled = e.target.checked; refreshAll() })
+  left.querySelector('#irr-feat-irrelis')?.addEventListener('change', e => { irrelisEnabled = e.target.checked; refreshAll() })
 
   // Saison save
   left.querySelector('#irr-sa-save')?.addEventListener('click', () => {

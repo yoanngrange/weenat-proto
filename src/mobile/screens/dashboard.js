@@ -1076,7 +1076,10 @@ function sensorOptLabel(s, plots) {
   const nom = DASHBOARD_MODEL_NAMES[s.model] || s.model
   const ville = (s.parcelIds || []).map(id => plots.find(p => p.id === id)).filter(Boolean).find(p => p.ville)?.ville
     || orgById[s.orgId]?.ville || ''
-  return [nom, s.serial, ville].filter(Boolean).join(' — ')
+  let renamed = ''
+  try { renamed = (JSON.parse(localStorage.getItem('weenat-sensor-names')) || {})[s.id] || '' } catch {}
+  // Pas de nom de parcelle : un capteur peut être lié à plusieurs parcelles.
+  return [nom, s.serial, renamed, ville].filter(Boolean).join(' · ')
 }
 
 const DASHBOARD_MODEL_NAMES = {

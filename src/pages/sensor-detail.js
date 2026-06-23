@@ -1827,7 +1827,7 @@ function saveSensorJournal(entries) {
 // Ajoute une entrée système (note tracée automatiquement) en tête de journal et rafraîchit l'affichage
 function addSensorJournalEntry(texte) {
   saveSensorJournal([
-    { id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), texte },
+    { id: Date.now(), type: 'note', date: new Date().toISOString().slice(0, 10), texte, _system: true },
     ...getSensorJournal(),
   ])
   renderSensorJournal()
@@ -1855,6 +1855,7 @@ function renderSensorJournal() {
     entries.forEach((e, idx) => {
       const t = typeMap[e.type] || { label: e.type, icon: 'bi-circle', color: '#8e8e93' }
       const isLast = idx === entries.length - 1
+      const canDelete = e.type === 'note' && !e._system
       html += `
         <div class="jrn-entry" data-id="${e.id}">
           <div class="jrn-entry-aside">
@@ -1866,7 +1867,7 @@ function renderSensorJournal() {
             <div class="jrn-entry-hd">
               <span class="jrn-entry-date">${fmt(e.date)}</span>
               <span class="journal-type-badge journal-type-badge--maintenance">${t.label}</span>
-              <button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>
+              ${canDelete ? `<button class="jrn-entry-delete" data-id="${e.id}" title="Supprimer"><i class="bi bi-trash3"></i></button>` : ''}
             </div>
             ${e.texte ? `<div class="jrn-entry-texte">${e.texte}</div>` : ''}
             ${e.user ? `<div style="font-size:11px;color:var(--txt3);margin-top:2px">${e.user}</div>` : ''}

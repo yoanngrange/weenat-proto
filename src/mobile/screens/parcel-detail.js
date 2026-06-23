@@ -19,6 +19,55 @@ function irrigPlots(parcel) {
 
 const cumulThresholds = { djMin: 0, djMax: 18, hfSeuil: 7.2 }
 
+// Capteurs liés sur la mini-carte parcelle : un point chacun, ou une flèche directionnelle
+// groupée (avec compteur) quand ils sont hors de la bounding box affichée.
+const MAP_DIRS = [
+  { key: 'N',  icon: 'bi-arrow-up' },   { key: 'NE', icon: 'bi-arrow-up-right' },
+  { key: 'E',  icon: 'bi-arrow-right' }, { key: 'SE', icon: 'bi-arrow-down-right' },
+  { key: 'S',  icon: 'bi-arrow-down' },  { key: 'SW', icon: 'bi-arrow-down-left' },
+  { key: 'W',  icon: 'bi-arrow-left' },  { key: 'NW', icon: 'bi-arrow-up-left' },
+]
+function bearingDirKey(dLat, dLng) {
+  const angle = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360
+  return MAP_DIRS[Math.round(angle / 45) % 8].key
+}
+function arrowLatLngOnBounds(bounds, key) {
+  const n0 = bounds.getNorth(), s0 = bounds.getSouth(), e0 = bounds.getEast(), w0 = bounds.getWest()
+  const padLat = (n0 - s0) * 0.1, padLng = (e0 - w0) * 0.1
+  const n = n0 - padLat, s = s0 + padLat, e = e0 - padLng, w = w0 + padLng
+  const midLat = (n + s) / 2, midLng = (e + w) / 2
+  return { N: [n, midLng], NE: [n, e], E: [midLat, e], SE: [s, e], S: [s, midLng], SW: [s, w], W: [midLat, w], NW: [n, w] }[key]
+}
+function renderLinkedSensorMarkers(L, map, centerLat, centerLng, parcelId, linkedSensorIds) {
+  if (!linkedSensorIds.length) return
+  const bounds = map.getBounds()
+  const offDirs = {}
+  linkedSensorIds.forEach(sid => {
+    const s = allSensors.find(x => x.id === sid)
+    if (!s) return
+    const otherPid = s.parcelIds.find(id => id !== parcelId)
+    const posParcel = otherPid ? allPlots.find(p => p.id === otherPid) : null
+    const sLat = posParcel?.lat ?? centerLat, sLng = posParcel?.lng ?? centerLng
+    if (sLat == null || sLng == null) return
+    if (bounds.contains([sLat, sLng])) {
+      L.circleMarker([sLat, sLng], { radius: 6, color: '#fff', weight: 2, fillColor: '#5b8dd9', fillOpacity: 0.95 }).addTo(map)
+    } else {
+      const key = bearingDirKey(sLat - centerLat, sLng - centerLng)
+      offDirs[key] = (offDirs[key] || 0) + 1
+    }
+  })
+  Object.entries(offDirs).forEach(([key, count]) => {
+    const dir = MAP_DIRS.find(d => d.key === key)
+    const icon = L.divIcon({
+      className: 'mini-map-dir-arrow',
+      html: `<div class="mini-map-dir-arrow-inner"><i class="bi ${dir.icon}"></i>${count > 1 ? `<span class="mini-map-dir-count">${count}</span>` : ''}</div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    })
+    L.marker(arrowLatLngOnBounds(bounds, key), { icon, interactive: false }).addTo(map)
+  })
+}
+
 // Correspondance entre les IDs du widget "Cumuls" (mWidgetCumuls) et ceux du tableau de bord
 const WCUMUL_TO_DASH = { etp: 'etp', enso: 'rayo', pluie: 'pluie', djc: 'dj', hfroid: 'hf', humec: 'humec' }
 // Forme de la courbe cumulative fullscreen par cumul (cf. initCumulFullscreen)
@@ -1777,9 +1826,12 @@ export function initParcelDetail(parcel, linkedSensorIds = [], initialView = 'wi
       if (parcel.latlngs?.length >= 3) {
         const poly = L.polygon(parcel.latlngs, { color: '#fff', weight: 2, fillColor: '#0172A4', fillOpacity: 0.4 }).addTo(map)
         map.fitBounds(poly.getBounds(), { padding: [8, 8] })
+        const center = poly.getBounds().getCenter()
+        renderLinkedSensorMarkers(L, map, center.lat, center.lng, parcel.id, linkedSensorIds)
       } else {
         map.setView([parcel.lat, parcel.lng], 14)
         L.circleMarker([parcel.lat, parcel.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#0172A4', fillOpacity: 0.9 }).addTo(map)
+        renderLinkedSensorMarkers(L, map, parcel.lat, parcel.lng, parcel.id, linkedSensorIds)
       }
     }, 50)
   }
@@ -2362,9 +2414,9 @@ function openMobileParcelJournal(parcel) {
                 <span class="journal-type-badge journal-type-badge--${c.badgeCls}">${c.label}</span>
                 ${fromDash
                   ? `<span style="font-size:10px;background:#f2f2f7;color:#8e8e93;border-radius:4px;padding:1px 5px">Dashboard</span>`
-                  : isSystem
-                    ? ''
-                    : `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`}
+                  : (!isSystem && e.type === 'note')
+                    ? `<button class="m-jrn-del" data-id="${e.id}"><i class="bi bi-trash3"></i></button>`
+                    : ''}
               </div>
               ${e.texte ? `<div class="m-jrn-texte">${e.texte}</div>` : ''}
               ${e.auteur ? `<div style="font-size:11px;color:#8e8e93;margin-top:3px;display:flex;gap:5px;align-items:center">${e.auteur}${roleBadgeMobile(e.role)}</div>` : ''}
