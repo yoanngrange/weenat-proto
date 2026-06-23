@@ -93,6 +93,9 @@ function renderBillingPage() {
 
       <div class="billing-top-right">
         <div class="billing-section">
+          <div class="billing-entity-tabs" id="billing-entity-tabs">
+            ${BILLING_ENTITIES.map(e => `<button class="billing-entity-tab${e === currentEntity ? ' active' : ''}" data-entity="${esc(e)}">${esc(e)}</button>`).join('')}
+          </div>
           <div class="billing-section-title" style="display:flex;align-items:center;justify-content:space-between">
             <span><i class="bi bi-building"></i> Adresses</span>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:400;cursor:pointer">
@@ -113,29 +116,29 @@ function renderBillingPage() {
               <div class="billing-form-grid">
                 <div class="form-row billing-form-full">
                   <label for="bf-societe">Raison sociale</label>
-                  <input id="bf-societe" type="text" value="${esc(BILLING_ADDR.societe)}" placeholder="Nom de la société">
+                  <input id="bf-societe" type="text" value="${esc(currentAddr().societe)}" placeholder="Nom de la société">
                 </div>
                 <div class="form-row billing-form-full">
                   <label for="bf-adresse">Adresse postale</label>
-                  <input id="bf-adresse" type="text" value="${esc(BILLING_ADDR.adresse)}" placeholder="Numéro et rue">
+                  <input id="bf-adresse" type="text" value="${esc(currentAddr().adresse)}" placeholder="Numéro et rue">
                 </div>
                 <div class="form-row">
                   <label for="bf-cp">Code postal</label>
-                  <input id="bf-cp" type="text" value="${esc(BILLING_ADDR.cp)}" placeholder="00000">
+                  <input id="bf-cp" type="text" value="${esc(currentAddr().cp)}" placeholder="00000">
                 </div>
                 <div class="form-row">
                   <label for="bf-ville">Ville</label>
-                  <input id="bf-ville" type="text" value="${esc(BILLING_ADDR.ville)}" placeholder="Ville">
+                  <input id="bf-ville" type="text" value="${esc(currentAddr().ville)}" placeholder="Ville">
                 </div>
                 <div class="form-row billing-form-full">
                   <label for="bf-pays">Pays</label>
                   <select id="bf-pays">
-                    ${COUNTRIES.map(c => `<option value="${c.code}"${c.code === BILLING_ADDR.pays ? ' selected' : ''}>${c.label}</option>`).join('')}
+                    ${COUNTRIES.map(c => `<option value="${c.code}"${c.code === currentAddr().pays ? ' selected' : ''}>${c.label}</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-row billing-form-full" id="bf-siret-row">
                   <label for="bf-siret" id="bf-siret-label">SIRET</label>
-                  <input id="bf-siret" type="text" value="${esc(BILLING_ADDR.siret)}" placeholder="14 chiffres">
+                  <input id="bf-siret" type="text" value="${esc(currentAddr().siret)}" placeholder="14 chiffres">
                 </div>
               </div>
             </form>
@@ -192,6 +195,7 @@ function renderBillingPage() {
               <th>Date d'émission</th>
               <th style="text-align:right">Montant HT</th>
               <th>Détail</th>
+              <th>Facturé à</th>
               <th>Date de règlement</th>
               <th>Statut</th>
               <th>Actions</th>
@@ -204,6 +208,7 @@ function renderBillingPage() {
                 <td>${formatDate(inv.dateEmission)}</td>
                 <td class="billing-amount">${inv.montant.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € HT</td>
                 <td><button class="billing-detail-csv-btn" data-id="${inv.numero}" style="border:none;background:none;color:var(--pri);cursor:pointer;font-size:13px;padding:2px 4px;font-family:inherit;white-space:nowrap">Fichier &darr;</button></td>
+                <td>${esc(inv.facturePar)}</td>
                 <td>${inv.dateReglement ? formatDate(inv.dateReglement) : '<span style="color:var(--txt3)">—</span>'}</td>
                 <td>${invoiceStatusBadge(inv.statut)}</td>
                 <td class="billing-actions-cell">
@@ -233,6 +238,14 @@ function renderBillingPage() {
 // ── Event binding ─────────────────────────────────────────────────────────────
 
 function bindEvents() {
+  // Onglets entité de facturation
+  document.querySelectorAll('.billing-entity-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentEntity = btn.dataset.entity
+      renderBillingPage()
+    })
+  })
+
   // Country select → update tax field label
   const paysSelect = document.getElementById('bf-pays')
   if (paysSelect) {
@@ -271,14 +284,14 @@ function bindEvents() {
     showToast('Adresse enregistrée.')
   })
   document.getElementById('billing-addr-cancel')?.addEventListener('click', () => {
-    document.getElementById('bf-societe').value = BILLING_ADDR.societe
-    document.getElementById('bf-adresse').value = BILLING_ADDR.adresse
-    document.getElementById('bf-cp').value       = BILLING_ADDR.cp
-    document.getElementById('bf-ville').value    = BILLING_ADDR.ville
-    document.getElementById('bf-pays').value     = BILLING_ADDR.pays
-    document.getElementById('bf-siret').value    = BILLING_ADDR.siret
+    document.getElementById('bf-societe').value = currentAddr().societe
+    document.getElementById('bf-adresse').value = currentAddr().adresse
+    document.getElementById('bf-cp').value       = currentAddr().cp
+    document.getElementById('bf-ville').value    = currentAddr().ville
+    document.getElementById('bf-pays').value     = currentAddr().pays
+    document.getElementById('bf-siret').value    = currentAddr().siret
     document.getElementById('bf-copie-factures').value = ''
-    updateTaxField(BILLING_ADDR.pays)
+    updateTaxField(currentAddr().pays)
   })
 
   document.querySelectorAll('.billing-pdf-btn').forEach(btn => {
@@ -351,6 +364,7 @@ function generateInvoices() {
       montant,
       dateReglement,
       statut,
+      facturePar: i % 4 === 0 ? BILLING_ENTITIES[1] : BILLING_ENTITIES[0],
     })
   }
   return invoices.reverse()

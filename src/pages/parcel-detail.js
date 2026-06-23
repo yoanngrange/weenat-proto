@@ -3701,7 +3701,7 @@ function renderWWeephyt(el) {
   }).join('')
 
   el.innerHTML = `<div class="w-weephyt-wrap">
-    ${rows}
+    <div class="w-weephyt-rows">${rows}</div>
     <div class="w-weephyt-actions">
       <button class="w-weephyt-btn w-weephyt-btn--pri" id="w-weephyt-saisir">Saisir un traitement</button>
     </div>
@@ -4225,16 +4225,18 @@ function renderWHistBars(kind) {
         <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${cfg.color}"></span>7j : <strong>${totalHist.toFixed(1)} ${cfg.unit}</strong></span>
         <span class="w-hist-summary-item"><span class="w-hist-dot" style="background:${W_HIST_TODAY_COLOR}"></span>Prévision 7j : <strong>${totalFc.toFixed(1)} ${cfg.unit}</strong></span>
       </div>
-      <svg class="w-hist-svg" width="100%" height="110" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
-          <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
-        </pattern></defs>
-        <rect x="${fcZoneX.toFixed(1)}" y="${PT}" width="${(W - PR - fcZoneX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
-        <line x1="${fcZoneX.toFixed(1)}" y1="${PT}" x2="${fcZoneX.toFixed(1)}" y2="${PT + innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
-        ${bars}
-        ${labels}
-      </svg>`
+      <div class="w-hist-chart-wrap">
+        <svg class="w-hist-svg" width="100%" height="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+            <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+          </pattern></defs>
+          <rect x="${fcZoneX.toFixed(1)}" y="${PT}" width="${(W - PR - fcZoneX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+          <line x1="${fcZoneX.toFixed(1)}" y1="${PT}" x2="${fcZoneX.toFixed(1)}" y2="${PT + innerH}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+          ${bars}
+          ${labels}
+        </svg>
+      </div>`
   }
 }
 

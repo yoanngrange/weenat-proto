@@ -5546,6 +5546,16 @@ select.panel-field-input { max-width: 220px; cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Billing entity tabs (1 par entité de facturation du réseau) ─────────── */
+.billing-entity-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.billing-entity-tab {
+  background: var(--bg); border: 1px solid var(--bdr2); border-radius: 16px;
+  padding: 5px 14px; font-size: 12px; font-weight: 600; color: var(--txt2);
+  cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.billing-entity-tab:hover { border-color: var(--pri); }
+.billing-entity-tab.active { background: var(--pri); color: #fff; border-color: var(--pri); }
+
 /* ── Billing address tabs ─────────────────────────────────────────────────── */
 .billing-addr-tabs {
   display: flex;
@@ -6433,7 +6443,11 @@ tr.row-selected td {
   padding: 2px 10px 8px;
   overflow: hidden;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
+.w-hist-chart-wrap { flex: 1; min-height: 0; position: relative; }
+.w-hist-chart-wrap .w-hist-svg { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
 .dash-block-ft {
   padding: 8px 10px 8px;
   flex-shrink: 0;
@@ -6550,12 +6564,13 @@ tr.row-selected td {
 .w-prev5-tmin { color: #5b8dd9; }
 
 /* Traitements (ex-Weephyt) */
-.w-weephyt-wrap { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.w-weephyt-wrap { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.w-weephyt-rows { display: flex; flex-direction: column; gap: 12px; flex: 1; justify-content: center; }
 .w-weephyt-family-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .w-weephyt-family-label { font-size: 11px; font-weight: 600; color: var(--txt2); }
 .w-weephyt-window { font-size: 11px; font-weight: 600; color: #1a9e40; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .w-weephyt-window--none { color: var(--txt3); font-weight: 500; }
-.w-weephyt-actions { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; }
+.w-weephyt-actions { display: flex; gap: 8px; padding-top: 6px; flex-shrink: 0; }
 .w-weephyt-btn { flex: 1; border-radius: 8px; padding: 9px 10px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; border: 1px solid #1a9e40; }
 .w-weephyt-btn--pri { background: #1a9e40; color: #fff; }
 .w-weephyt-btn--pri:hover { background: #158536; }
@@ -6731,7 +6746,7 @@ tr.row-selected td {
 /* ── Niveau de réservoir / Profil de réservoir widgets ── */
 .w-reservoir-agg-sel { font-size: 11px; color: var(--txt2); border: 1px solid var(--bdr2); border-radius: 6px; background: transparent; padding: 3px 6px; font-family: inherit; cursor: pointer; align-self: flex-start; }
 
-.w-sensor-rows { display: flex; flex-direction: column; gap: 4px; }
+.w-sensor-rows { display: flex; flex-direction: column; gap: 10px; flex: 1; justify-content: center; }
 .w-sensor-row { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .w-sensor-val { font-weight: 700; min-width: 55px; }
 .w-sensor-lbl { font-size: 11px; color: var(--txt3); }

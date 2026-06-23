@@ -53,6 +53,7 @@ const PLANS = ['Essential', 'Plus', 'Expert']
 
 let selectedPlans   = []
 let selectedStatuts = ['actif', 'en essai', 'invité', "demande d'essai"]
+let selectedSecteurs = []
 let currentSort     = { column: null, direction: 'asc' }
 let selectedIds     = new Set()
 
@@ -69,6 +70,8 @@ function initFilters() {
 
   makeCheckboxPanel('panel-plan',   plans,   v => { selectedPlans   = v }, 'badge-plan')
   makeCheckboxPanel('panel-statut', STATUT_FILTER_OPTIONS, v => { selectedStatuts = v }, 'badge-statut', ['actif', 'en essai', 'invité', "demande d'essai"])
+  const secteurNames = members.filter(m => m.source === 'réseau' && m.statut === 'actif').map(m => `${m.prenom} ${m.nom}`).sort()
+  makeCheckboxPanel('panel-secteur', secteurNames, v => { selectedSecteurs = v }, 'badge-secteur')
 
   document.querySelectorAll('.filter-dropdown-btn').forEach(btn => {
     btn.addEventListener('click', e => {
@@ -136,6 +139,12 @@ function getFiltered() {
   let list = localOrgs
   if (selectedPlans.length)   list = list.filter(o => selectedPlans.includes(o.plan))
   if (selectedStatuts.length) list = list.filter(o => selectedStatuts.includes(orgStatutSimplified(o)))
+  if (selectedSecteurs.length) {
+    const secteurOrgIds = new Set(
+      members.filter(m => selectedSecteurs.includes(`${m.prenom} ${m.nom}`)).flatMap(m => m.orgIds)
+    )
+    list = list.filter(o => secteurOrgIds.has(o.id))
+  }
   return list
 }
 
@@ -169,7 +178,7 @@ function render() {
   tbody.innerHTML = ''
 
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="11" style="padding:32px;text-align:center;color:var(--txt3)">Aucun adhérent ne correspond aux filtres.</td></tr>'
     updateActionBar()
     return
   }
@@ -212,7 +221,11 @@ function render() {
       <td class="member-email">${org.codeAdherent}</td>
       <td>${proprietaireHtml}</td>
       <td><span class="plan-badge plan-badge--${(org.plan||'').toLowerCase()}">${org.plan}</span></td>
-      <td>${getFacturePar(org)}</td>
+      <td>
+        <select class="inline-edit adh-facture-par-select" data-id="${org.id}">
+          ${BILLING_ENTITIES.map(e => `<option value="${e}"${e === getFacturePar(org) ? ' selected' : ''}>${e}</option>`).join('')}
+        </select>
+      </td>
       <td>
         <span class="statut-badge ${statutStyle.cls}"><i class="bi ${statutStyle.icon}"></i> ${simplified}</span>
         ${simplified === "demande d'essai" ? `
@@ -220,7 +233,6 @@ function render() {
           <button class="icon-btn reject-trial-btn" data-id="${org.id}" title="Rejeter" style="color:var(--err)"><i class="bi bi-x-circle-fill"></i></button>
         ` : ''}
       </td>
-      <td class="member-email">${formatDate(org.dateAdhesion)}</td>
       <td class="member-email">${[org.ville, org.departement].filter(Boolean).join(' · ')}</td>
       <td class="admin-links-cell">${membresHtml}</td>
       <td class="num">${orgSensors.length}</td>
@@ -248,6 +260,14 @@ function render() {
         org.nomProprietaire    = member.nom
         persist()
       }
+    })
+  })
+
+  // Facturé par select handler
+  tbody.querySelectorAll('.adh-facture-par-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const org = localOrgs.find(o => o.id === parseInt(sel.dataset.id))
+      if (org) { org.facturePar = sel.value; persist() }
     })
   })
 
@@ -365,7 +385,6 @@ function sortKey(o, col) {
   if (col === 'plan')        return o.plan
   if (col === 'facture-par') return getFacturePar(o)
   if (col === 'statut')      return o.statut
-  if (col === 'date')        return o.dateAdhesion || ''
   if (col === 'ville')       return `${o.ville} ${o.departement}`.toLowerCase()
   if (col === 'capteurs')    return String(sensors.filter(s => s.orgId === o.id).length).padStart(6, '0')
   if (col === 'parcelles')   return String(plots.filter(p => p.orgId === o.id).length).padStart(6, '0')
