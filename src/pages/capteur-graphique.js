@@ -108,8 +108,29 @@ const MOCK_TRAITEMENTS = [
   { label: 'Fertilisation',  daysAgo: 30, color: '#66BB6A' },
 ]
 
+// parcel-detail.js (page d'origine du lien "plein écran") utilise des IDs de métriques
+// différents de ceux de cette page : on les traduit pour éviter de retomber sur la 1ère
+// métrique du capteur (ex: Pluie) quel que soit le graphique réellement cliqué.
+const METRIC_ID_ALIASES = {
+  temp: 'temperature',
+  humidite: 'humidite_air',
+  tsol: 'temp_sol',
+  humec: 'humectation',
+  tseche: 'temp_seche',
+  thumide: 'temp_humide',
+  ec: 'conductivite',
+  pothydr: 'potentiel_hydrique',
+  vwc10: 'humidite_sol_10',
+  vwc20: 'humidite_sol_20',
+  vwc30: 'humidite_sol_30',
+  vwc40: 'humidite_sol_40',
+  vwc50: 'humidite_sol_50',
+  vwc60: 'humidite_sol_60',
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentMetricId = urlParams.get('metricId') || null
+currentMetricId = METRIC_ID_ALIASES[currentMetricId] || currentMetricId
 let currentPeriod   = urlParams.get('period') || '7d'
 let currentStep     = urlParams.get('step') || '1h'
 let yScaleMode  = 'auto'   // 'auto' | 'seuils' | 'personnalisee'

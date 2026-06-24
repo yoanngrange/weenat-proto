@@ -3,7 +3,7 @@ import { orgs } from '../data/orgs.js'
 import { plots } from '../data/plots.js'
 import { sensors } from '../data/sensors.js'
 import { updateBreadcrumb } from '../js/breadcrumb.js'
-import { getStoredMembers, saveMembers, getStoredAdherentMembers, saveAdherentMembers } from '../data/store.js'
+import { getStoredMembers, saveMembers, getStoredAdherentMembers, saveAdherentMembers, getParcel, getStoredSensor } from '../data/store.js'
 
 const ROLE_COLORS = {
   'propriétaire': 'var(--txt)',
@@ -153,6 +153,39 @@ function getFiltered() {
 
 function persist() { saveMembers({ _version: DATA_VERSION, data: localMembers }) }
 
+// Reflète les ajouts/retraits de membre faits depuis le panneau "Membres" d'une parcelle ou d'un
+// capteur (qui patchent linkedOrgMemberIds/linkedConseillerIds sur la parcelle/le capteur) : la
+// liste affichée ici est l'union de l'assignation statique (m.parcelIds) et de ces patches, avec
+// priorité au patch quand il existe explicitement (y compris pour un retrait).
+function getMemberLinkedParcelIds(m) {
+  const ids = new Set((m.parcelIds || []).filter(pid => plots.some(p => p.id === pid)))
+  const isAdherent = m.source === 'adherent'
+  plots.forEach(p => {
+    const stored = getParcel(p.id)
+    const overrideList = isAdherent ? stored?.linkedOrgMemberIds : stored?.linkedConseillerIds
+    if (overrideList === undefined) return
+    if (overrideList.includes(m.id)) ids.add(p.id)
+    else ids.delete(p.id)
+  })
+  return [...ids]
+}
+
+function getMemberLinkedSensorIds(m, linkedParcelIds) {
+  const excluded = m.excludedSensorIds || []
+  const ids = new Set(
+    sensors.filter(s => s.parcelIds?.some(pid => linkedParcelIds.includes(pid)) && !excluded.includes(s.id)).map(s => s.id)
+  )
+  const isAdherent = m.source === 'adherent'
+  sensors.forEach(s => {
+    const stored = getStoredSensor(s.id)
+    const overrideList = isAdherent ? stored?.linkedOrgMemberIds : stored?.linkedConseillerIds
+    if (overrideList === undefined) return
+    if (overrideList.includes(m.id)) ids.add(s.id)
+    else ids.delete(s.id)
+  })
+  return [...ids]
+}
+
 function render() {
   const list = getFiltered()
   updateStats(list)
@@ -185,10 +218,11 @@ function render() {
 
   list.forEach(m => {
     const isAgent = m.role === 'agent'
-    const memberOrgs    = isAgent ? orgs.filter(o => m.orgIds.includes(o.id)) : []
-    const memberParcels = plots.filter(p => m.parcelIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'fr'))
-    const excluded = m.excludedSensorIds || []
-    const memberSensors = sensors.filter(s => m.parcelIds.includes(s.parcelId) && !excluded.includes(s.id))
+    const memberOrgs      = isAgent ? orgs.filter(o => m.orgIds.includes(o.id)) : []
+    const linkedParcelIds = getMemberLinkedParcelIds(m)
+    const linkedSensorIds = getMemberLinkedSensorIds(m, linkedParcelIds)
+    const memberParcels = plots.filter(p => linkedParcelIds.includes(p.id)).sort((a,b) => a.name.localeCompare(b.name,'fr'))
+    const memberSensors = sensors.filter(s => linkedSensorIds.includes(s.id))
 
     const orgsHtml = !isAgent
       ? '<span class="tag-none" style="color:var(--txt3);font-size:11px">—</span>'
@@ -361,10 +395,9 @@ function sortKey(m, col) {
   if (col === 'role')     return m.role
   if (col === 'statut')   return m.statut
   if (col === 'orgs')     return String(m.orgIds.length).padStart(6, '0')
-  if (col === 'parcelles') return String(m.parcelIds.length).padStart(6, '0')
+  if (col === 'parcelles') return String(getMemberLinkedParcelIds(m).length).padStart(6, '0')
   if (col === 'capteurs') {
-    const excluded = m.excludedSensorIds || []
-    const count = sensors.filter(s => m.parcelIds.includes(s.parcelId) && !excluded.includes(s.id)).length
+    const count = getMemberLinkedSensorIds(m, getMemberLinkedParcelIds(m)).length
     return String(count).padStart(6, '0')
   }
   return ''

@@ -484,16 +484,24 @@ function buildNewTypeDemo(author1, author2) {
   const variete = VARIETES[parcelBase.id % VARIETES.length]
   const dOffset = parcelBase.id % 6
   return [
-    { id: 1743465600000, type: 'cycle',     date: addDaysIso('2026-03-01', dOffset), auteur: author1, action: 'début', culture: crop, annee: '2026', texte: CYCLE_TEXTS[seed % CYCLE_TEXTS.length] },
-    { id: 1743897600000, type: 'culture',   date: addDaysIso('2026-03-06', dOffset), auteur: author1, action: 'modification', culture: crop, variete, texte: 'Culture confirmée pour la saison 2026' },
-    { id: 1744329600000, type: 'stade',     date: addDaysIso('2026-04-11', dOffset), auteur: author1, stade: stades[0], culture: crop, texte: '' },
-    { id: 1745366400000, type: 'stade',     date: addDaysIso('2026-04-23', dOffset), auteur: author2, stade: stades[1], culture: crop, texte: '' },
-    { id: 1746057600000, type: 'stade',     date: addDaysIso('2026-05-01', dOffset), auteur: author2, stade: stades[2], culture: crop, texte: DEV_TEXTS[seed % DEV_TEXTS.length] },
+    { id: 1743465600000, type: 'cycle',     date: addDaysIso(daysAgoIso(61), dOffset), auteur: author1, action: 'début', culture: crop, annee: '2026', texte: CYCLE_TEXTS[seed % CYCLE_TEXTS.length] },
+    { id: 1743897600000, type: 'culture',   date: addDaysIso(daysAgoIso(56), dOffset), auteur: author1, action: 'modification', culture: crop, variete, texte: 'Culture confirmée pour la saison 2026' },
+    { id: 1744329600000, type: 'stade',     date: addDaysIso(daysAgoIso(50), dOffset), auteur: author1, stade: stades[0], culture: crop, texte: '' },
+    { id: 1745366400000, type: 'stade',     date: addDaysIso(daysAgoIso(38), dOffset), auteur: author2, stade: stades[1], culture: crop, texte: '' },
+    { id: 1746057600000, type: 'stade',     date: addDaysIso(daysAgoIso(28), dOffset), auteur: author2, stade: stades[2], culture: crop, texte: DEV_TEXTS[seed % DEV_TEXTS.length] },
   ]
 }
 
 function addDaysIso(iso, n) {
   const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+// Ancré sur "aujourd'hui" (plutôt qu'une date calendaire fixe) pour que les notes/traitements
+// de démo restent visibles dans les périodes courtes par défaut (7j, J-7→J+2), quelle que soit
+// la date à laquelle le prototype est ouvert.
+function daysAgoIso(n) {
+  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n)
   return d.toISOString().slice(0, 10)
 }
 
@@ -512,6 +520,48 @@ function autoIrrigationEvents(plotId) {
   }))
 }
 
+const TRAITEMENT_SCENARIOS = [
+  { cible: 'Pucerons',  produit: 'Karate Zeon 10 CS',   dose: '0,1 L/ha',  obs1: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',          obs2: 'peu de pucerons visibles, situation sous contrôle.' },
+  { cible: 'Mildiou',   produit: 'Bordeaux mixture',     dose: '2 kg/ha',   obs1: 'Taches suspectes observées sur les feuilles basses, conditions humides.',         obs2: 'progression stoppée, feuillage sain.' },
+  { cible: 'Limaces',   produit: 'Métaldéhyde',          dose: '5 kg/ha',   obs1: 'Dégâts de limaces constatés en bordure de parcelle après les pluies.',           obs2: 'dégâts limités, population réduite.' },
+  { cible: 'Altises',   produit: 'Karaté K',             dose: '75 mL/ha',  obs1: 'Présence d\'altises sur jeunes plants, seuil de nuisibilité approché.',          obs2: 'population sous contrôle, reprise normale.' },
+]
+
+// IDs fixes (servent de clé stable pour rafraîchir les dates de ces entrées de démo
+// sans toucher aux éventuelles notes/traitements ajoutés réellement par l'utilisateur)
+const NOTE2_DEMO_ID = 1748100000000
+
+function buildNoteTraitementDemo(author1, author2) {
+  const tIdx = parcelBase.id % TRAITEMENT_SCENARIOS.length
+  const scn  = TRAITEMENT_SCENARIOS[tIdx]
+  const scn2 = TRAITEMENT_SCENARIOS[(tIdx + 1) % TRAITEMENT_SCENARIOS.length]
+  const tOffset = parcelBase.id % 6
+  // Dates ancrées sur "aujourd'hui" (et non une date calendaire fixe) pour que ces notes/traitements
+  // restent visibles dans les périodes courtes par défaut (7 jours, J-7→J+2), quelle que soit la date
+  // d'ouverture du prototype.
+  const dTraitement1 = addDaysIso(daysAgoIso(14), tOffset)
+  const dTraitement2 = addDaysIso(daysAgoIso(5), tOffset)
+  return [
+    { id: 1746921600000, type: 'note',      category: 'Observation générale', date: addDaysIso(daysAgoIso(19), tOffset), auteur: author1, texte: scn.obs1 },
+    { id: 1747353600000, type: 'traitement',date: dTraitement1, auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: scn.produit, dose: scn.dose, cible: scn.cible },
+    { id: 1747785600000, type: 'note',      category: 'Observation générale', date: addDaysIso(daysAgoIso(9), tOffset), auteur: author1, texte: `Suite traitement du ${dTraitement1.split('-').reverse().slice(0, 2).join('/')} : ${scn.obs2}` },
+    { id: 1748000000000, type: 'traitement',date: dTraitement2, auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: scn2.produit, dose: scn2.dose, cible: scn2.cible },
+    { id: NOTE2_DEMO_ID, type: 'note',      category: 'Observation générale', date: addDaysIso(daysAgoIso(2), tOffset), auteur: author1, texte: `Suite traitement du ${dTraitement2.split('-').reverse().slice(0, 2).join('/')} : ${scn2.obs2}` },
+  ]
+}
+
+// Si les entrées de démo existantes datent de plus de 20 jours (prototype ouvert longtemps après
+// leur génération), elles ne seraient plus visibles dans les périodes courtes par défaut : on les
+// rebase sur "aujourd'hui" en ne touchant que les entrées de démo connues (par id fixe).
+function rebaseDemoDatesIfStale(parsed, author1, author2) {
+  const note2 = parsed.find(e => e.id === NOTE2_DEMO_ID)
+  if (!note2) return parsed
+  const ageDays = Math.round((Date.now() - new Date(note2.date + 'T00:00:00').getTime()) / 86400000)
+  if (ageDays <= 20) return parsed
+  const freshById = new Map([...buildNoteTraitementDemo(author1, author2), ...buildNewTypeDemo(author1, author2)].map(e => [e.id, e]))
+  return parsed.map(e => freshById.get(e.id) || e)
+}
+
 function getJournal() {
   const isAdherentParcel = parcelBase.orgId === 1
   const author1 = isAdherentParcel ? 'Jean-Michel Dutilleul' : 'Thomas Bertrand'
@@ -519,33 +569,17 @@ function getJournal() {
   try {
     const raw = localStorage.getItem(JOURNAL_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw)
+      let parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         const hasNew = parsed.some(e => NEW_JOURNAL_TYPES.has(e.type))
-        if (!hasNew) {
-          const merged = [...buildNewTypeDemo(author1, author2), ...parsed]
-          localStorage.setItem(JOURNAL_KEY, JSON.stringify(merged))
-          return merged
-        }
-        return parsed
+        if (!hasNew) parsed = [...buildNewTypeDemo(author1, author2), ...parsed]
+        const rebased = rebaseDemoDatesIfStale(parsed, author1, author2)
+        if (!hasNew || rebased !== parsed) localStorage.setItem(JOURNAL_KEY, JSON.stringify(rebased))
+        return rebased
       }
     }
   } catch (_) {}
-  const TRAITEMENT_SCENARIOS = [
-    { cible: 'Pucerons',  produit: 'Karate Zeon 10 CS',   dose: '0,1 L/ha',  obs1: 'Observation de quelques pucerons sur les feuilles basses. À surveiller.',          obs2: 'peu de pucerons visibles, situation sous contrôle.' },
-    { cible: 'Mildiou',   produit: 'Bordeaux mixture',     dose: '2 kg/ha',   obs1: 'Taches suspectes observées sur les feuilles basses, conditions humides.',         obs2: 'progression stoppée, feuillage sain.' },
-    { cible: 'Limaces',   produit: 'Métaldéhyde',          dose: '5 kg/ha',   obs1: 'Dégâts de limaces constatés en bordure de parcelle après les pluies.',           obs2: 'dégâts limités, population réduite.' },
-    { cible: 'Altises',   produit: 'Karaté K',             dose: '75 mL/ha',  obs1: 'Présence d\'altises sur jeunes plants, seuil de nuisibilité approché.',          obs2: 'population sous contrôle, reprise normale.' },
-  ]
-  const tIdx = parcelBase.id % TRAITEMENT_SCENARIOS.length
-  const scn  = TRAITEMENT_SCENARIOS[tIdx]
-  const tOffset = parcelBase.id % 6
-  const demo = [
-    { id: 1746921600000, type: 'note',      category: 'Observation générale', date: addDaysIso('2026-05-11', tOffset), auteur: author1, texte: scn.obs1 },
-    { id: 1747353600000, type: 'traitement',date: addDaysIso('2026-05-16', tOffset), auteur: author2, texte: 'Application conforme aux conditions météo. Vent < 2 m/s.', produit: scn.produit, dose: scn.dose, cible: scn.cible },
-    { id: 1747785600000, type: 'note',      category: 'Observation générale', date: addDaysIso('2026-05-21', tOffset), auteur: author1, texte: `Suite traitement du ${addDaysIso('2026-05-16', tOffset).split('-').reverse().slice(0, 2).join('/')} : ${scn.obs2}` },
-    ...buildNewTypeDemo(author1, author2),
-  ]
+  const demo = [...buildNoteTraitementDemo(author1, author2), ...buildNewTypeDemo(author1, author2)]
   localStorage.setItem(JOURNAL_KEY, JSON.stringify(demo))
   return demo
 }
@@ -1006,6 +1040,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let tensioViewMode = 'capteur' // 'capteur' | 'horizon'
 let compareParcelId = null
+let compareYearAgo  = false
+const YEAR_OFFSET_MIN = 365 * 1440 // décalage d'un an en minutes, pour rejouer les générateurs de données un an plus tôt
 
 const CHARTS_ORDER_KEY = `charts-order-parcel-${parcelId}`
 function loadChartOrder() { try { return JSON.parse(localStorage.getItem(CHARTS_ORDER_KEY) || 'null') } catch { return null } }
@@ -1149,7 +1185,38 @@ function renderCharts() {
   const mainContainer = document.getElementById('charts-container')
   mainContainer.innerHTML = ''
 
-  if (compareParcelId) {
+  if (compareYearAgo) {
+    mainContainer.className = 'compare-rows'
+
+    const thisYear = new Date().getFullYear()
+    const headerRow = document.createElement('div')
+    headerRow.className = 'compare-header-row'
+    headerRow.innerHTML = `
+      <div class="compare-col-header"><span>${parcelState.name || parcelBase.name} — ${thisYear - 1}</span></div>
+      <div class="compare-col-header">
+        <span>${parcelState.name || parcelBase.name} — ${thisYear}</span>
+        <button class="icon-btn compare-close-btn" title="Fermer la comparaison"><i class="bi bi-x-lg"></i></button>
+      </div>`
+    mainContainer.appendChild(headerRow)
+    headerRow.querySelector('.compare-close-btn')?.addEventListener('click', () => {
+      compareYearAgo = false
+      updateCompareBtn()
+      renderCharts()
+    })
+
+    const metrics = getParcelFlatMetrics(parcelState.linkedSensorIds)
+    metrics.forEach(m => {
+      const row = document.createElement('div')
+      row.className = 'compare-row'
+      const leftSlot = document.createElement('div')
+      appendChartCard(leftSlot, m, null, null, null, false, null, true)
+      const rightSlot = document.createElement('div')
+      appendChartCard(rightSlot, m, null, null, null, false, null, false)
+      row.appendChild(leftSlot)
+      row.appendChild(rightSlot)
+      mainContainer.appendChild(row)
+    })
+  } else if (compareParcelId) {
     mainContainer.className = 'compare-rows'
 
     const compareBase = plots.find(p => p.id === compareParcelId)
@@ -1235,7 +1302,7 @@ function appendTensioCard(container, metricId, tensioSensors, source = null, emi
   const card = document.createElement('div')
   card.className = 'chart-card tensio-multi-card'
   card.dataset.tensioMetric = metricId
-  card.dataset.tensioCurves = JSON.stringify(curves.map(c => ({ depth: c.depth, color: c.color })))
+  card.dataset.tensioCurves = JSON.stringify(curves.map(c => ({ depth: c.depth, color: c.color, label: c.label })))
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const legend = curves.map(c =>
@@ -1274,7 +1341,7 @@ function appendTensioCard(container, metricId, tensioSensors, source = null, emi
 function _buildCapaMultiCard(container, horizons, colorKey, title, unit, svgClass, dataKey, cardKey) {
   const card = document.createElement('div')
   card.className = `chart-card ${dataKey}-multi-card`
-  card.dataset[dataKey + 'Curves'] = JSON.stringify(horizons.map(h => ({ depth: h.depth, color: h[colorKey] })))
+  card.dataset[dataKey + 'Curves'] = JSON.stringify(horizons.map(h => ({ depth: h.depth, color: h[colorKey], label: h.label })))
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const legend = horizons.map(h =>
@@ -1304,7 +1371,7 @@ function appendCapaTsolCard(container, horizons, source = null, emissionMins = n
   _buildCapaMultiCard(container, horizons, 'tsolColor', 'Température du sol par horizon', '°C', 'capa-tsol-svg', 'capaT', cardKey)
 }
 
-function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false, sensorId = null) {
+function appendChartCard(container, m, source = null, emissionMins = null, cardKey = null, unavailable = false, sensorId = null, yearShift = false) {
   const base = m.base()
   const card = document.createElement('div')
   card.className = 'chart-card'
@@ -1314,14 +1381,15 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   card.dataset.chartType  = m.chartType || 'line'
   card.dataset.metricId   = m.id
   card.dataset.metricName = m.name
+  if (yearShift) card.dataset.yearShift = '1'
   card.dataset.metricUnit = m.unit
   if (m.isIrrigation) card.dataset.isIrrigation = '1'
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
     ? (() => {
-        const cumulText = `${genCumulValue(m)} ${m.cumul.unit}`
-        return `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${cumulText}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${cumulText}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button></div>`
+        const cumulText = `${genCumulValue(m, yearShift)} ${m.cumul.unit}`
+        return `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${cumulText}</strong><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${cumulText}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button></span></div>`
       })()
     : ''
   const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
@@ -1523,19 +1591,21 @@ function drawAllCharts() {
     if (card.classList.contains('tensio-multi-card')) {
       const svg = card.querySelector('.tensio-svg')
       const curves = JSON.parse(card.dataset.tensioCurves || '[]')
-      if (svg && curves.length > 0) drawTensioMultiChart(svg, curves, count, step)
+      // Pas de prévisions pour les sondes sol : la zone hachurée est affichée (si l'agrégat
+      // l'impose) mais sans courbe à l'intérieur, comme pour les autres métriques non prévisibles.
+      if (svg && curves.length > 0) drawTensioMultiChart(svg, curves, count, step, card.dataset.tensioMetric || 'pothydr', hatchCount)
       return
     }
     if (card.classList.contains('capa-multi-card')) {
       const svg = card.querySelector('.capa-svg')
       const curves = JSON.parse(card.dataset.capaCurves || '[]')
-      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'vwc')
+      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'vwc', hatchCount)
       return
     }
     if (card.classList.contains('capaT-multi-card')) {
       const svg = card.querySelector('.capa-tsol-svg')
       const curves = JSON.parse(card.dataset.capaTCurves || '[]')
-      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'tsol')
+      if (svg && curves.length > 0) drawCapaMultiChart(svg, curves, count, step, 'tsol', hatchCount)
       return
     }
     const svg = card.querySelector('.chart-svg')
@@ -1547,11 +1617,14 @@ function drawAllCharts() {
     const metricId  = card.dataset.metricId || ''
     const metricName = card.dataset.metricName || ''
     const metricUnit = card.dataset.metricUnit || ''
+    const yearOffsetMin = card.dataset.yearShift === '1' ? YEAR_OFFSET_MIN : 0
     if (card.dataset.isIrrigation) {
       drawIrrigationChart(svg, color, count, step, hatchCount)
     } else {
-      const showFcData = hatchCount > 0 && FORECAST_METRICS.has(metricId)
-      drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit, hatchCount, showFcData)
+      // Pas de prévisions sur la colonne "année dernière" (zone hachurée non pertinente pour du passé)
+      const showFcData = yearOffsetMin === 0 && hatchCount > 0 && FORECAST_METRICS.has(metricId)
+      const effHatch = yearOffsetMin === 0 ? hatchCount : 0
+      drawChart(svg, base, color, count, step, isCumul, chartType, metricId, metricName, metricUnit, effHatch, showFcData, yearOffsetMin)
     }
   })
   renderPhenoOverlay()
@@ -1559,17 +1632,21 @@ function drawAllCharts() {
 }
 
 // curves: [{ depth, color }] — déjà calculé par appendTensioCharts selon le mode
-function drawTensioMultiChart(svg, curves, count, step) {
+// hatchCount : nombre de pas de la zone "prévisions" — pas de courbe dedans (sondes sol non prévisibles),
+// mais la zone hachurée est affichée si l'agrégat sélectionné l'impose, comme pour les autres métriques.
+function drawTensioMultiChart(svg, curves, count, step, metricId = 'pothydr', hatchCount = 0) {
   const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
+  const unit = metricId === 'tsol' ? '°C' : 'kPa'
+  const totalCount = count + hatchCount
 
-  // Générer une série de valeurs par courbe, basée sur la profondeur
+  // Générer une série de valeurs par courbe, basée sur la profondeur (historique uniquement)
   const allSeries = curves.map(c => {
-    const base = 20 + c.depth * 0.8 + Math.random() * 20
+    const base = metricId === 'tsol' ? (16 - c.depth * 0.04 + Math.random() * 3) : (20 + c.depth * 0.8 + Math.random() * 20)
     return Array.from({ length: count }, (_, idx) => {
       const minsAgo = (count - 1 - idx) * step
-      return Math.max(0, genRealisticVal('pothydr', base, minsAgo))
+      return metricId === 'tsol' ? genRealisticVal('tsol', base, minsAgo) : Math.max(0, genRealisticVal('pothydr', base, minsAgo))
     })
   })
 
@@ -1578,7 +1655,7 @@ function drawTensioMultiChart(svg, curves, count, step) {
   const maxV = Math.max(...allVals)
   const range = maxV - minV || 1
 
-  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
 
   const clipId = `tc-${Math.random().toString(36).slice(2)}`
@@ -1592,6 +1669,19 @@ function drawTensioMultiChart(svg, curves, count, step) {
     out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${v.toFixed(0)}</text>`
   }
 
+  // Zone striée "prévisions" — affichée si l'agrégat l'impose, sans données à l'intérieur
+  if (hatchCount > 0) {
+    const boundaryX = xOf(count - 0.5)
+    const stripeId = `tc_stripe_${Math.random().toString(36).slice(2, 8)}`
+    out += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+      </pattern></defs>
+      <rect x="${boundaryX.toFixed(1)}" y="${PAD.t}" width="${(W - PAD.r - boundaryX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+      <line x1="${boundaryX.toFixed(1)}" y1="${PAD.t}" x2="${boundaryX.toFixed(1)}" y2="${(PAD.t + innerH)}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${(W - PAD.r - 4).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)" font-style="italic">Prévisions</text>`
+  }
+
   // Draw one curve per entry in curves[]
   allSeries.forEach((vals, ci) => {
     const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
@@ -1599,22 +1689,31 @@ function drawTensioMultiChart(svg, curves, count, step) {
     out += `<path d="${path}" fill="none" stroke="${curves[ci].color}" stroke-width="2" stroke-linecap="round" clip-path="url(#${clipId})"/>`
   })
 
-  // X-axis baseline + labels
+  // X-axis baseline + labels (le futur s'affiche toujours en date, jamais en heure)
   out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
-  const labelStep = Math.max(1, Math.floor(count / 6))
-  for (let i = 0; i < count; i += labelStep) {
-    const minsAgo = (count - 1 - i) * step
-    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+  const labelStep = Math.max(1, Math.floor(totalCount / 6))
+  for (let i = 0; i < totalCount; i += labelStep) {
+    const agoMins = (count - i) * step
+    const lbl = (step >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
+    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${lbl}</text>`
   }
 
+  out += `<rect class="chart-hover-rect" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="cursor:crosshair"/>`
+
   svg.innerHTML = out
+
+  attachMultiChartTooltip(svg, allSeries, curves, xOf, yOf, count, step, unit, PAD, W, totalCount)
 }
 
 // CAPA multi-horizon chart — VWC (%vol) or Tsol (°C) depending on mode
-function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
+// hatchCount : zone "prévisions" affichée sans données (sondes sol non prévisibles)
+function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc', hatchCount = 0) {
   const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
+  const totalCount = count + hatchCount
 
   const allSeries = curves.map((c, ci) => {
     if (mode === 'tsol') {
@@ -1636,7 +1735,7 @@ function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
   const maxV = Math.ceil(Math.max(...allVals) + 2)
   const range = maxV - minV || 1
 
-  const xOf = i => PAD.l + (i / Math.max(count - 1, 1)) * innerW
+  const xOf = i => PAD.l + (i / Math.max(totalCount - 1, 1)) * innerW
   const yOf = v => PAD.t + innerH - ((v - minV) / range) * innerH
 
   const clipId = `cc-${Math.random().toString(36).slice(2)}`
@@ -1649,6 +1748,19 @@ function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
     out += `<text x="${PAD.l - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)">${v.toFixed(0)}</text>`
   }
 
+  // Zone striée "prévisions" — affichée si l'agrégat l'impose, sans données à l'intérieur
+  if (hatchCount > 0) {
+    const boundaryX = xOf(count - 0.5)
+    const stripeId = `cc_stripe_${Math.random().toString(36).slice(2, 8)}`
+    out += `<defs><pattern id="${stripeId}" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="8" height="8" fill="rgba(142,142,147,.05)"/>
+        <line x1="0" y1="0" x2="0" y2="8" stroke="rgba(142,142,147,.16)" stroke-width="4"/>
+      </pattern></defs>
+      <rect x="${boundaryX.toFixed(1)}" y="${PAD.t}" width="${(W - PAD.r - boundaryX).toFixed(1)}" height="${innerH}" fill="url(#${stripeId})"/>
+      <line x1="${boundaryX.toFixed(1)}" y1="${PAD.t}" x2="${boundaryX.toFixed(1)}" y2="${(PAD.t + innerH)}" stroke="rgba(142,142,147,.4)" stroke-width="1" stroke-dasharray="2,2"/>
+      <text x="${(W - PAD.r - 4).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" text-anchor="end" font-size="10" font-family="var(--font)" fill="var(--txt3)" font-style="italic">Prévisions</text>`
+  }
+
   allSeries.forEach((vals, ci) => {
     const pts = vals.map((v, i) => ({ x: xOf(i), y: yOf(v) }))
     const path = smoothPath(pts)
@@ -1656,16 +1768,90 @@ function drawCapaMultiChart(svg, curves, count, step, mode = 'vwc') {
   })
 
   out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
-  const labelStep = Math.max(1, Math.floor(count / 6))
-  for (let i = 0; i < count; i += labelStep) {
-    const minsAgo = (count - 1 - i) * step
-    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(minsAgo)}</text>`
+  const labelStep = Math.max(1, Math.floor(totalCount / 6))
+  for (let i = 0; i < totalCount; i += labelStep) {
+    const agoMins = (count - i) * step
+    const lbl = (step >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
+    out += `<text x="${xOf(i).toFixed(1)}" y="${(PAD.t + innerH + 14).toFixed(1)}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${lbl}</text>`
   }
 
+  out += `<rect class="chart-hover-rect" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="cursor:crosshair"/>`
+
   svg.innerHTML = out
+
+  attachMultiChartTooltip(svg, allSeries, curves, xOf, yOf, count, step, mode === 'tsol' ? '°C' : '%vol', PAD, W, totalCount)
 }
 
-function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '', hatchCount = 0, showFcData = false) {
+// Tooltip pour les graphiques multi-courbes (tensio par horizon/capteur, capa par horizon) :
+// affiche la valeur de chaque courbe à la position survolée, avec sa couleur/son libellé.
+function attachMultiChartTooltip(svg, allSeries, curveLabels, xOf, yOf, count, stepMins, unit, PAD, W, totalCount = count) {
+  const tip  = getTooltip()
+  const rect = svg.querySelector('.chart-hover-rect')
+  if (!rect) return
+
+  const ns = 'http://www.w3.org/2000/svg'
+  const dots = allSeries.map((_, ci) => {
+    const dot = document.createElementNS(ns, 'circle')
+    dot.setAttribute('r', '4')
+    dot.setAttribute('fill', curveLabels[ci]?.color || '#888')
+    dot.setAttribute('stroke', '#fff')
+    dot.setAttribute('stroke-width', '1.5')
+    dot.style.display = 'none'
+    dot.style.pointerEvents = 'none'
+    svg.appendChild(dot)
+    return dot
+  })
+
+  rect.addEventListener('mousemove', e => {
+    const svgRect = svg.getBoundingClientRect()
+    const scaleX  = W / svgRect.width
+    const svgX    = (e.clientX - svgRect.left) * scaleX
+    const innerW  = W - PAD.l - PAD.r
+    const frac    = Math.max(0, Math.min(1, (svgX - PAD.l) / innerW))
+    const idx     = Math.round(frac * (totalCount - 1))
+    if (idx < 0) return
+
+    const rows = allSeries.map((vals, ci) => {
+      const v = vals[idx]
+      if (v === undefined) return ''
+      dots[ci].setAttribute('cx', xOf(idx))
+      dots[ci].setAttribute('cy', yOf(v))
+      dots[ci].style.display = ''
+      const label = curveLabels[ci]?.label || ''
+      const color = curveLabels[ci]?.color || '#888'
+      const valLabel = Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)
+      return `<div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0"></span>
+        <span style="color:var(--txt2)">${label}</span>
+        <strong style="margin-left:auto;color:${color}">${valLabel} ${unit}</strong>
+      </div>`
+    }).join('')
+
+    if (!rows) {
+      dots.forEach(d => d.style.display = 'none')
+      tip.style.display = 'none'
+      return
+    }
+
+    const agoMins = (count - 1 - idx) * stepMins
+    const tsLabel = (stepMins >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
+    tip.innerHTML = `<div style="font-size:11px;color:var(--txt3);margin-bottom:2px">${tsLabel}</div>${rows}`
+    tip.style.display = 'block'
+    tip.style.left = `${Math.min(e.clientX + 12, window.innerWidth - 200)}px`
+    tip.style.top  = `${e.clientY - 10}px`
+  })
+
+  rect.addEventListener('mouseleave', () => {
+    tip.style.display = 'none'
+    dots.forEach(d => d.style.display = 'none')
+  })
+}
+
+function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line', metricId = '', metricName = '', metricUnit = '', hatchCount = 0, showFcData = false, yearOffsetMin = 0) {
   const W = 600, H = 180, PAD = { t: 14, r: 10, b: 28, l: 46 }
   const innerW = W - PAD.l - PAD.r
   const innerH = H - PAD.t - PAD.b
@@ -1676,7 +1862,7 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   // Generate values with realistic day/night cycle
   const rawPerStep = Math.max(1, Math.round(stepMins / 15))
   const vals = Array.from({ length: genCount }, (_, idx) => {
-    const minsAgo = (count - 1 - idx) * stepMins
+    const minsAgo = (count - 1 - idx) * stepMins + yearOffsetMin
     if (isCumul) {
       let sum = 0
       for (let j = 0; j < rawPerStep; j++) {
@@ -1741,13 +1927,16 @@ function drawChart(svg, base, color, count, stepMins, isCumul, chartType = 'line
   // ── X-axis baseline ──
   out += `<line x1="${PAD.l}" y1="${PAD.t + innerH}" x2="${W - PAD.r}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1"/>`
 
-  // ── Vertical grid lines + X labels ──
+  // ── Vertical grid lines + X labels ── (le futur s'affiche toujours en date, jamais en heure)
   const labelStep = Math.max(1, Math.floor(totalCount / 6))
   for (let i = 0; i < totalCount; i += labelStep) {
     const x = xOf(i).toFixed(1)
     const agoMins = (count - i) * stepMins
+    const lbl = (stepMins >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
     out += `<line x1="${x}" y1="${PAD.t}" x2="${x}" y2="${PAD.t + innerH}" stroke="var(--bdr2)" stroke-width="1" stroke-dasharray="3,3"/>`
-    out += `<text x="${x}" y="${PAD.t + innerH + 14}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${xLabel(agoMins)}</text>`
+    out += `<text x="${x}" y="${PAD.t + innerH + 14}" text-anchor="middle" font-size="10" font-family="var(--font)" fill="var(--txt3)">${lbl}</text>`
   }
 
   if (chartType === 'bar') {
@@ -1823,7 +2012,9 @@ function attachChartTooltip(svg, vals, xOf, yOf, _minV, _maxV, totalCount, nowCo
     dot.style.display = ''
 
     const agoMins = (nowCount - idx) * stepMins
-    const tsLabel = xLabel(agoMins)
+    const tsLabel = (stepMins >= 1440 || agoMins < 0)
+      ? (() => { const d = new Date(Date.now() - agoMins * 60000); return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}` })()
+      : xLabel(agoMins)
     const valLabel = Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2)
 
     tip.innerHTML = `
@@ -1951,16 +2142,21 @@ function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
     lines += `<text x="${(PAD.l + 2).toFixed(1)}" y="${(PAD.t + 12).toFixed(1)}" font-size="10" font-family="var(--font)" fill="${color}" font-style="italic">┄ Recommandé (Irrigation Advizor)</text>`
   }
 
+  lines += `<rect class="chart-hover-rect" x="${PAD.l}" y="${PAD.t}" width="${innerW}" height="${innerH}" fill="transparent" style="cursor:crosshair"/>`
+
   svg.innerHTML = lines
+
+  attachChartTooltip(svg, bins, xOf, yOf, 0, maxV, totalCount, count, stepMins, 'Irrigation', 'mm', color, PAD, W, H)
 }
 
-function genCumulValue(m) {
+function genCumulValue(m, yearShift = false) {
   if (m.id === 'pluie') {
     // Dérivé de la même série journalière déterministe que le graphique : le cumul affiché
     // correspond toujours à la somme réelle de la pluie sur la période sélectionnée.
     const days = Math.max(1, Math.ceil(getPeriodMinutes() / 1440))
+    const yearOff = yearShift ? 365 : 0
     let total = 0
-    for (let off = -(days - 1); off <= 0; off++) total += dailyRainMm(off)
+    for (let off = -(days - 1); off <= 0; off++) total += dailyRainMm(off - yearOff)
     return +total.toFixed(1)
   }
   const table = { etp: () => rndf(15, 80), rayonnement: () => rnd(500, 3000) }
@@ -2411,7 +2607,16 @@ function initCompareControl() {
 function updateCompareBtn() {
   const wrap = document.getElementById('compare-control')
   if (!wrap) return
-  if (compareParcelId) {
+  if (compareYearAgo) {
+    wrap.innerHTML = `<button class="compare-btn compare-btn--active" id="compare-open-btn"><i class="bi bi-layout-split"></i> Même période l'année dernière <i class="bi bi-x-lg compare-clear-icon" style="opacity:.7"></i></button>`
+    wrap.querySelector('.compare-clear-icon')?.addEventListener('click', e => {
+      e.stopPropagation()
+      compareYearAgo = false
+      updateCompareBtn()
+      renderCharts()
+    })
+    wrap.querySelector('#compare-open-btn')?.addEventListener('click', openCompareDropdown)
+  } else if (compareParcelId) {
     const name = plots.find(p => p.id === compareParcelId)?.name || 'Parcelle'
     wrap.innerHTML = `<button class="compare-btn compare-btn--active" id="compare-open-btn"><i class="bi bi-layout-split"></i> ${name} <i class="bi bi-x-lg compare-clear-icon" style="opacity:.7"></i></button>`
     wrap.querySelector('.compare-clear-icon')?.addEventListener('click', e => {
@@ -2437,6 +2642,8 @@ function openCompareDropdown() {
   dropdown.className = 'compare-dropdown'
   dropdown.innerHTML = `
     <input class="compare-search-input" type="text" placeholder="Rechercher une parcelle…">
+    <div class="compare-dropdown-item compare-dropdown-item--year-ago${compareYearAgo ? ' active' : ''}" data-year-ago="1"><i class="bi bi-calendar2-week"></i> Même période l'année dernière</div>
+    <div class="compare-dropdown-sep"></div>
     <div class="compare-dropdown-list">
       ${otherParcels.map(p => `<div class="compare-dropdown-item${p.id === compareParcelId ? ' active' : ''}" data-id="${p.id}"><i class="bi bi-map"></i> ${p.name}</div>`).join('')}
     </div>
@@ -2446,12 +2653,20 @@ function openCompareDropdown() {
   searchInput.focus()
   searchInput.addEventListener('input', e => {
     const q = e.target.value.toLowerCase()
-    dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+    dropdown.querySelectorAll('.compare-dropdown-list .compare-dropdown-item').forEach(item => {
       item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none'
     })
   })
-  dropdown.querySelectorAll('.compare-dropdown-item').forEach(item => {
+  dropdown.querySelector('.compare-dropdown-item--year-ago')?.addEventListener('click', () => {
+    compareParcelId = null
+    compareYearAgo = true
+    dropdown.remove()
+    updateCompareBtn()
+    renderCharts()
+  })
+  dropdown.querySelectorAll('.compare-dropdown-list .compare-dropdown-item').forEach(item => {
     item.addEventListener('click', () => {
+      compareYearAgo = false
       compareParcelId = parseInt(item.dataset.id)
       dropdown.remove()
       updateCompareBtn()

@@ -1974,6 +1974,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const _p = plots.find(pl => pl.id === +_plotId)
     if (_p) {
       openDetailPanel(_p)
+      // La parcelle peut être loin dans la liste : scroller jusqu'à sa ligne pour qu'on
+      // sache à quelle parcelle correspond le panneau déplié.
+      setTimeout(() => {
+        document.querySelector(`[data-row-plot="${_plotId}"]`)?.scrollIntoView({ behavior: 'auto', block: 'center' })
+      }, 50)
       if (_action === 'saisie' || _action === 'saison') {
         setTimeout(() => {
           const msId = _action === 'saisie' ? 'irr-s-scope' : 'irr-sa-scope'
