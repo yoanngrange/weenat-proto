@@ -14,7 +14,7 @@ const sensor    = sensors.find(s => s.id === sensorId)
 
 const METRIC_DEFS = {
   pluie:            { name: 'Pluie',               unit: 'mm',        color: '#2E75B6', baseVal: () => rnd(0, 8),     cumul: { label: 'Cumul de pluie',       unit: 'mm'   }, isCumul: true },
-  temperature:      { name: 'Température',          unit: '°C',        color: '#FBAF05', baseVal: () => rnd(10, 28),   cumul: { label: 'Cumul de degrés jour', unit: '°j'  } },
+  temperature:      { name: 'Température',          unit: '°C',        color: '#FBAF05', baseVal: () => rnd(10, 28),   cumul: { label: 'Cumul de degrés jour', unit: 'DJ'  } },
   humidite_air:     { name: 'Humidité',         unit: '%',         color: '#5B12A4', baseVal: () => rnd(40, 90)   },
   dpv:              { name: 'DPV',                  unit: 'kPa',       color: '#5E88EC', baseVal: () => rndf(0.1, 2.5) },
   vent_vitesse:            { name: 'Vent – vitesse',            unit: 'km/h', color: '#616161', baseVal: () => rnd(0, 40)   },
@@ -373,7 +373,7 @@ function renderTempThresholdHtml(metricId) {
       </div>
       <div class="temp-threshold-stat">
         <i class="bi bi-sun"></i>
-        <span class="temp-threshold-val">${djc} °j</span>
+        <span class="temp-threshold-val">${djc} DJ</span>
         <span class="temp-threshold-label">Degrés-jours cumulés</span>
         <span class="temp-threshold-ctrl">
           Base <input type="number" class="temp-thresh-input" data-type="base" value="6" step="0.5" min="-5" max="20"> °C
@@ -396,7 +396,7 @@ function bindTempThresholds() {
       if (type === 'cold') {
         stat.textContent = `${Math.round(Math.random() * 150 + 30)} h`
       } else {
-        stat.textContent = `${Math.round(Math.random() * 350 + 80)} °j`
+        stat.textContent = `${Math.round(Math.random() * 350 + 80)} DJ`
       }
     })
   })

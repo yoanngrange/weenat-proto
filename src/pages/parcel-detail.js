@@ -31,12 +31,12 @@ const IRRIGATION_METRIC = { id: 'irrigation', name: 'Irrigation', unit: 'mm', co
 const METRICS_BY_MODEL = {
   'P+':       [
     { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: 'DJ' } },
     { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'PT': [
     { id: 'pluie', name: 'Pluie',       unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8), cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true,  chartType: 'bar' },
-    { id: 'temp',  name: 'Température', unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
+    { id: 'temp',  name: 'Température', unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: 'DJ' } },
     { id: 'etp',   name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'P': [
@@ -44,12 +44,12 @@ const METRICS_BY_MODEL = {
   ],
   'SMV': [
     { id: 'pluie',    name: 'Pluie',        unit: 'mm',  color: '#2E75B6', base: () => rnd(0, 8),   cumul: { label: 'Cumul de pluie', unit: 'mm' }, isCumul: true, chartType: 'bar' },
-    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
+    { id: 'temp',     name: 'Température',  unit: '°C',  color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: 'DJ' } },
     { id: 'humidite', name: 'Humidité',     unit: '%',   color: '#5B12A4', base: () => rnd(40, 90) },
     { id: 'etp',      name: 'Évapotranspiration (ETP)', unit: 'mm/j', color: '#7DBDD7', base: () => rndf(0.5, 5), cumul: { label: 'Cumul ETP', unit: 'mm' }, isCumul: false, chartType: 'bar' },
   ],
   'TH': [
-    { id: 'temp',     name: 'Température',  unit: '°C', color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: '°j' } },
+    { id: 'temp',     name: 'Température',  unit: '°C', color: '#FBAF05', base: () => rnd(10, 28), cumul: { label: 'Cumul de degrés jour', unit: 'DJ' } },
     { id: 'humidite', name: 'Humidité', unit: '%',  color: '#5B12A4', base: () => rnd(40, 90) },
   ],
   'CHP-15/30': [
@@ -1319,7 +1319,10 @@ function appendChartCard(container, m, source = null, emissionMins = null, cardK
   if (cardKey) { card.dataset.cardKey = cardKey; card.draggable = true }
 
   const cumulHtml = m.cumul
-    ? `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${genCumulValue(m)} ${m.cumul.unit}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${genCumulValue(m)} ${m.cumul.unit}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button></div>`
+    ? (() => {
+        const cumulText = `${genCumulValue(m)} ${m.cumul.unit}`
+        return `<div class="chart-cumul"><span class="chart-cumul-label">${m.cumul.label} : <strong>${cumulText}</strong></span><button class="chart-cumul-add-btn" data-cumul-label="${m.cumul.label}" data-cumul-val="${cumulText}" title="Ajouter au tableau de bord"><i class="bi bi-house-add"></i></button></div>`
+      })()
     : ''
   const sourceHtml = source ? `<span class="chart-card-source">${source}</span>` : ''
   const emHtml = emissionMins != null ? `<span class="chart-card-emission">il y a ${emissionMins} min</span>` : ''
@@ -1485,8 +1488,17 @@ function genRealisticVal(metricId, base, minutesAgo, noise = 0.15) {
       return Math.max(0, base * Math.max(0, 0.8 - sf * 1.2) * wet * n())
     }
     case 'pluie': {
-      const rainChance = 0.06 + (1 - df) * 0.22
-      return Math.random() < rainChance ? base * Math.random() * 2.5 * (1.3 - df) : 0
+      // Pluie déterministe (seedée sur parcelId + jour calendaire) pour que le graphique,
+      // le cumul affiché à côté et les widgets "Pluie"/"Cumuls" du tableau de bord soient cohérents entre eux.
+      const ts = Date.now() - minutesAgo * 60000
+      const off = Math.floor(ts / 86400000) - Math.floor(Date.now() / 86400000)
+      const total = dailyRainMm(off)
+      if (total <= 0) return 0
+      const startH = Math.floor(rainSeed(off) * 21) // fenêtre de pluie de 3h dans la journée
+      const hourOfTs = new Date(ts).getHours() + new Date(ts).getMinutes() / 60
+      // La fenêtre de 3h est échantillonnée par tranches de 15 min (12 tranches) : diviser par 12
+      // pour que la somme des tranches reconstitue exactement le total journalier `dailyRainMm`.
+      return (hourOfTs >= startH && hourOfTs < startH + 3) ? total / 12 : 0
     }
     case 'vent':
     case 'rafales': {
@@ -1943,7 +1955,15 @@ function drawIrrigationChart(svg, color, count, stepMins, hatchCount = 0) {
 }
 
 function genCumulValue(m) {
-  const table = { pluie: () => rnd(20, 120), etp: () => rndf(15, 80), rayonnement: () => rnd(500, 3000) }
+  if (m.id === 'pluie') {
+    // Dérivé de la même série journalière déterministe que le graphique : le cumul affiché
+    // correspond toujours à la somme réelle de la pluie sur la période sélectionnée.
+    const days = Math.max(1, Math.ceil(getPeriodMinutes() / 1440))
+    let total = 0
+    for (let off = -(days - 1); off <= 0; off++) total += dailyRainMm(off)
+    return +total.toFixed(1)
+  }
+  const table = { etp: () => rndf(15, 80), rayonnement: () => rnd(500, 3000) }
   const fn = table[m.id]
   return fn ? fn() : rnd(10, 100)
 }
@@ -3730,7 +3750,7 @@ function renderWCumuls(el) {
 
   const allAvailable=[
     {id:'etp',  label:'Évapotranspiration',value:rndf(20,80).toFixed(1),unit:'mm',color:'#c090e0',icon:'bi-sun',show:true},
-    {id:'pluie',label:'Pluie',             value:rnd(10,50),             unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
+    {id:'pluie',label:'Pluie',             value:pluieCumulSince(dates.pluie||jan1),unit:'mm',color:'#45b7d1',icon:'bi-cloud-rain-heavy',show:met.has('pluie')},
     {id:'djc',  label:'Degrés jours',      value:rnd(40,180),            unit:'DJ',color:'#e07050',icon:'bi-thermometer-half',show:met.has('temp'),cfg:true,
       cfgLabel:`${cfg.djMin??0}–${cfg.djMax??18}°C`,cfgFields:[{key:'djMin',label:'T min',def:0},{key:'djMax',label:'T max',def:18}]},
     {id:'hfroid',label:'Heures de froid',  value:rnd(5,40),              unit:'h', color:'#0B3A64',icon:'bi-snow',show:met.has('temp'),cfg:true,
@@ -4179,6 +4199,29 @@ function renderWSensor(type) {
   }
 }
 
+// Génération déterministe (seedée sur parcelId + date) de la pluie journalière,
+// partagée entre l'histogramme J-7→J+7 et le cumul "Pluie" pour qu'ils restent cohérents entre eux.
+function rainSeed(off) {
+  const raw = (parcelId * 31 + (off + 7) * 17) % 101
+  return ((raw + 101) % 101) / 101
+}
+function dailyRainMm(off) {
+  const seed = rainSeed(off)
+  return seed > 0.72 ? +(2 + seed * 18).toFixed(1) : (seed > 0.5 ? +(seed * 4).toFixed(1) : 0)
+}
+function dayOffset(date, today) {
+  return Math.round((date.getTime() - today.getTime()) / 86400000)
+}
+function pluieCumulSince(sinceIso) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const start = new Date(sinceIso + 'T00:00:00')
+  let total = 0
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    total += dailyRainMm(dayOffset(d, today))
+  }
+  return +total.toFixed(1)
+}
+
 // Histogramme J-7 -> J+7 (historique + prévision) pour la pluie ou l'évapotranspiration
 const W_HIST_TODAY_COLOR = '#bf5af2'
 
@@ -4191,9 +4234,9 @@ function renderWHistBars(kind) {
     const days = []
     for (let off = -7; off <= 7; off++) {
       const d = new Date(today); d.setDate(d.getDate() + off)
-      const seed = ((parcelId * 31 + (off + 7) * 17) % 101) / 101
+      const seed = rainSeed(off)
       const val = kind === 'pluie'
-        ? (seed > 0.72 ? +(2 + seed * 18).toFixed(1) : (seed > 0.5 ? +(seed * 4).toFixed(1) : 0))
+        ? dailyRainMm(off)
         : +(1.2 + seed * 4.2).toFixed(1)
       days.push({ d, off, val, isFc: off > 0 })
     }

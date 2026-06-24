@@ -98,7 +98,9 @@ const org = isAdmin
       }
       return raw
     })()
-const owners = members.filter(m => m.role === 'propriétaire' || m.role === 'admin')
+const owners = isAdmin
+  ? members.filter(m => m.role === 'propriétaire' || m.role === 'admin')
+  : members.filter(m => m.source === 'adherent' && m.orgIds.includes(1))
 
 const USER_ORGS = isAdmin
   ? [{ id: '100', name: "Breiz'Agri Conseil" }, { id: '42', name: 'Exploitation Dupont' }]

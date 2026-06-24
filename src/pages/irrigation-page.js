@@ -15,8 +15,15 @@ let plots = IS_ADMIN ? ALL_PLOTS : ALL_PLOTS.filter(p => p.orgId === ADHERENT_OR
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-let activeAction = null // 'saisie' | 'saison' | 'export'
+let activeAction = null // 'saisie' | 'saison' | 'export' | 'sync'
 let leftCollapsed = false
+const SYNC_TOOLS = [
+  { id: 'mesparcelles', label: 'MesParcelles', authType: 'apikey' },
+  { id: 'smag',         label: 'Smag',         authType: 'apikey' },
+  { id: 'geofolia',     label: 'Geofolia',     authType: 'credentials' },
+  { id: 'mympls',       label: 'My MPS',       authType: 'credentials' },
+]
+const syncEnabled = {}
 let globaleExtraMonths = 0
 let advisorEnabled   = false
 let reservoirEnabled = false
@@ -1676,6 +1683,30 @@ function renderLeft() {
       </div>
       <button class="irr-pm-btn irr-pm-btn--pri" id="irr-ex-dl"><i class="bi bi-download"></i> Télécharger CSV</button>
     </div>
+
+    <button class="irr-lc-btn${activeAction==='sync'?' irr-lc-btn--active':''}" data-action="sync">
+      <i class="bi bi-arrow-left-right"></i><span>Synchroniser les irrigations</span>
+      <i class="bi bi-chevron-down irr-lc-chev"></i>
+    </button>
+    <div class="irr-lc-form${activeAction==='sync'?'':' irr-lc-form--hidden'}" id="irr-form-sync">
+      <div class="irr-lc-field">
+        <label class="irr-lc-lbl">Outils tiers</label>
+        <div class="irr-sync-list">
+          ${SYNC_TOOLS.map(t => `
+            <label class="irr-lc-cb-row">
+              <input type="checkbox" class="irr-sync-cb" data-tool="${t.id}"${syncEnabled[t.id] ? ' checked' : ''} />
+              <span>${t.label}</span>
+            </label>
+            <div class="irr-sync-creds" id="irr-sync-creds-${t.id}" style="${syncEnabled[t.id] ? '' : 'display:none'}">
+              ${t.authType === 'apikey'
+                ? `<input type="text" class="irr-lc-input" placeholder="Clé d'API">`
+                : `<input type="text" class="irr-lc-input" placeholder="Identifiant" style="margin-bottom:6px">
+                   <input type="password" class="irr-lc-input" placeholder="Mot de passe">`}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
     </div>
     </div>
 
@@ -1729,6 +1760,16 @@ function renderLeft() {
       const action = btn.dataset.action
       activeAction = activeAction === action ? null : action
       renderLeft()
+    })
+  })
+
+  // Synchronisation outils tiers
+  left.querySelectorAll('.irr-sync-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const tool = cb.dataset.tool
+      syncEnabled[tool] = cb.checked
+      const creds = left.querySelector(`#irr-sync-creds-${tool}`)
+      if (creds) creds.style.display = cb.checked ? '' : 'none'
     })
   })
 
